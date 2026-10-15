@@ -1,0 +1,2058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mr. Cross — Practice</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a64; --line: #dedbd2;
+    --accent: #1f5fa8; --accent-soft: #e6eef8; --good: #2f7a32; --good-soft: #e7f3e4;
+    --bad: #b03a2e; --bad-soft: #fbe9e6; --warn: #8a5a00;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 16px; line-height: 1.5; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 80px; }
+  header h1 { font-size: 24px; margin: 0 0 4px; font-weight: 650; }
+  header p { margin: 0; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-top: 18px; }
+  label { display: block; font-weight: 600; margin: 14px 0 6px; }
+  select, input[type=text], input[type=password] { width: 100%; padding: 10px 12px; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+  button { font: inherit; cursor: pointer; }
+  .btn { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 11px 20px; font-weight: 600; margin-top: 18px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+  .err { color: var(--bad); font-size: 14px; margin-top: 8px; min-height: 1em; }
+  .q { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 18px 12px; margin-top: 16px; }
+  .qhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .qnum { font-weight: 700; }
+  .qtopic { font-size: 13px; color: var(--muted); }
+  canvas { display: block; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .diagram { margin: 10px 0 4px; }
+  .drawwrap { position: relative; margin: 10px 0 4px; }
+  .drawwrap > canvas.base { width: 100%; height: auto; }
+  .drawwrap > canvas.layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+  .drawwrap.on > canvas.layer { pointer-events: auto; touch-action: none; cursor: crosshair; }
+  .drawwrap.on { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 4px; }
+  .drawbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 2px; }
+  .drawbar button { font-size: 14px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+  .drawbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .drawbar .dot { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
+  .drawbar .dot.picked { box-shadow: 0 0 0 2px var(--ink); }
+  .drawbar .tools { display: none; gap: 8px; align-items: center; }
+  .checkbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+  .checkbtn { margin: 0; padding: 8px 18px; }
+  .flash { flex-basis: 100%; color: var(--warn); background: #fdf3dc; border-radius: 8px; padding: 8px 12px; font-size: 15px; }
+  .work { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .worktitle { font-weight: 700; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .work textarea { width: 100%; margin-top: 8px; padding: 10px 12px; font: 16px system-ui, sans-serif; border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+  .mkeys { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .mkeys button { min-width: 36px; padding: 5px 8px; font: 16px Georgia, serif; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
+  .mkeys button:hover { border-color: var(--accent); }
+  .mkeys .mtext { font: 13px system-ui, sans-serif; }
+  .anskeys { margin-top: 8px; }
+  .anskeys button { min-width: 34px; padding: 3px 7px; font-size: 15px; }
+  math-field.mans { display: inline-block; min-width: 96px; min-height: 40px; padding: 2px 8px; font-size: 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; vertical-align: middle; }
+  math-field.mans:focus-within { border-color: var(--accent); }
+  math-field.mans[read-only] { background: #f3f1ec; }
+  .mrow { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  math-field.mline { flex: 1; min-height: 42px; padding: 4px 8px; font-size: 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  math-field.mline:focus-within { border-color: var(--accent); outline: none; }
+  math-field.ro { display: block; border: none; background: #faf9f6; margin-bottom: 4px; }
+  math-field::part(menu-toggle) { display: none; }
+  .mdel { border: none; background: none; color: var(--muted); font-size: 20px; padding: 2px 6px; }
+  .madd { font-size: 14px; padding: 6px 12px; border: 1px dashed var(--line); border-radius: 8px; background: #fff; color: var(--accent); }
+  .typedwork { white-space: pre-wrap; margin-top: 8px; padding: 10px 12px; background: #faf9f6; border-radius: 8px; font-size: 15px; }
+  .drawbar.on .tools { display: flex; }
+  .choices { display: grid; gap: 8px; margin-top: 12px; }
+  .choice { display: flex; align-items: center; gap: 12px; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; color: var(--ink); }
+  .choice:hover { border-color: var(--accent); }
+  .choice.sel { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .choice.right { border-color: var(--good); background: var(--good-soft); }
+  .choice.wrong { border-color: var(--bad); background: var(--bad-soft); }
+  .letter { flex: 0 0 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font-weight: 700; font-size: 14px; background: #fff; }
+  .choice.sel .letter { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .bar { position: sticky; bottom: 0; background: rgba(246,244,239,.96); border-top: 1px solid var(--line); padding: 12px 16px; margin: 24px -16px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .bar .btn { margin: 0; }
+  .score { font-size: 40px; font-weight: 750; margin: 4px 0; }
+  .status { font-size: 14px; padding: 10px 12px; border-radius: 8px; margin-top: 12px; }
+  .status.ok { background: var(--good-soft); color: var(--good); }
+  .status.fail { background: var(--bad-soft); color: var(--bad); }
+  .status.wait { background: var(--accent-soft); color: var(--accent); }
+  .sol { margin-top: 10px; font-size: 15px; background: #faf9f6; border-left: 3px solid var(--accent); padding: 8px 12px; }
+  .tag { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .tag.bad { background: var(--bad-soft); color: var(--bad); }
+  .tag.part { background: #fdf3dc; color: var(--warn); }
+  .small { font-size: 13px; color: var(--muted); }
+  .hidden { display: none; }
+  .fr { margin-top: 12px; }
+  .frpart { font-weight: 700; font-size: 14px; color: var(--muted); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .frrow { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; }
+  .frfield { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; font-family: Georgia, "Times New Roman", serif; font-size: 18px; }
+  .frlabel { font-size: 17px; }
+  .frprefix { font-size: 18px; }
+  .fr input.num { width: 92px; } .fr input.let { width: 110px; text-transform: uppercase; letter-spacing: 1px; }
+  .fr input, .fr select { padding: 8px 10px; font-size: 17px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); width: auto; }
+  .fr input:disabled, .fr select:disabled { background: #f3f1ec; }
+  code { background: #eee; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="title">Practice</h1>
+    <p id="subtitle">Mr. Cross</p>
+  </header>
+  <div id="app"></div>
+</div>
+
+<script>
+/* =====================================================================
+   TEACHER SETTINGS — edit this block
+   ===================================================================== */
+const CONFIG = {
+  TEACHER_NAME: 'Mr. Cross',
+
+  // Paste your Apps Script web app URL here (ends in /exec). Leave '' to skip saving.
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbycKSv_XXuM9HI9evVQ6dapHk0hGWBgqPVEh8CneUqkoOKx8CzKUUGa14x3lHrQl-Ih/exec',
+
+  PERIODS: ['1st', '2nd', '4th', '5th', '6th', '7th', '8th'],
+
+  // Change this word every semester so last semester's versions don't repeat.
+  SALT: 'fall-2026',
+
+  // Show worked solutions after a student submits?
+  SHOW_SOLUTIONS: true,
+
+  // Send each student's work (answers, typed work, drawings) to a Google Doc in your Drive.
+  // Needs the updated PracticeResults.gs. Set to false to send scores only.
+  SEND_WORK: true,
+
+  // Defaults for the menu assignments (the assignment builder can set these per link):
+  // RETRIES  = extra tries on a missed question (0 = no Check button; graded only at Submit).
+  //            Each retry is a NEW version of that question, so answers can't be copied.
+  // ATTEMPTS = how many times a student may take the whole assignment (each attempt has new numbers).
+  RETRIES: 0,
+  ATTEMPTS: 1,
+
+  // Teacher answer-key PIN, stored as a hash. Default PIN is 1234.
+  // To change it: open practice.html?makehash=YOURPIN and paste the number shown here.
+  TEACHER_PIN_HASH: '6236275116407138',
+};
+
+// Assignments, grouped by subject.
+//   One assignment:          practice.html?set=KEY
+//   A subject's list only:   practice.html?subject=geometry   (or precalc, act)
+// Each item is [question type, how many] or [question type, how many, 'fr'] for free response.
+// Optional per assignment: retries: 2 (Check button + new versions), attempts: 3 (whole-assignment tries).
+// Types:
+//   5.1: angleSum, extAngleAlgebra, extAngleRatio, classifyTriangle
+//   5.2: congStatement (#1-2), correspondingParts (#3-6), findXY (#7-8), congReason (#9-10), thirdAngle (#13-14)
+//   5.3–5.6: triCongruence (marked figures), triCongruenceGiven ("Given:" text, unmarked figure)
+//   other: dilation, composite, trigGraph
+const SUBJECTS = {
+  geometry: 'Geometry',
+  precalc:  'Pre-Calculus',
+  act:      'ACT Prep',
+};
+const SETS = {
+  // ----- Geometry -----
+  'geo-transform': { subject: 'geometry', title: 'Ch. 4 Transformations',     items: [['dilation', 5], ['composite', 5]] },
+  'geo-5-1':       { subject: 'geometry', title: '5.1 Angles of Triangles',   items: [['classifyTriangle', 3], ['angleSum', 3], ['extAngleAlgebra', 2], ['extAngleRatio', 2]] },
+  'geo-5-2':       { subject: 'geometry', title: '5.2 Congruent Polygons',    items: [['congStatement', 3], ['correspondingParts', 3], ['findXY', 2], ['congReason', 2], ['thirdAngle', 2]] },
+  'geo-5-3-6':     { subject: 'geometry', title: '5.3–5.6 Triangle Congruence (SSS, SAS, ASA, AAS, HL)', items: [['triCongruence', 9], ['triCongruenceGiven', 3]] },
+  // ----- Pre-Calculus -----
+  'precalc-trig':  { subject: 'precalc',  title: 'Graphs of Sine and Cosine', items: [['trigGraph', 6]] },
+  // ----- ACT Prep -----
+  'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
+};
+/* ===================================================================== */
+
+
+/* ---------- seeded randomness ---------- */
+function cyrb53(str, seed = 0) {
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const ri = (r, a, b) => a + Math.floor(r() * (b - a + 1));
+const pick = (r, arr) => arr[Math.floor(r() * arr.length)];
+function shuffle(r, arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
+
+/* ---------- formatting ---------- */
+const MINUS = '−';
+function fmt(n) {
+  if (Math.abs(n - Math.round(n)) < 1e-9) n = Math.round(n);
+  else n = Math.round(n * 100) / 100;
+  if (Object.is(n, -0)) n = 0;
+  return n < 0 ? MINUS + String(-n) : String(n);
+}
+const pt = (p) => `(${fmt(p[0])}, ${fmt(p[1])})`;
+const deg = (n) => fmt(n) + '°';
+function term(m, c) {
+  let s = (m === 1 ? '' : m) + 'x';
+  if (c > 0) s += ' + ' + c;
+  if (c < 0) s += ' ' + MINUS + ' ' + (-c);
+  return s;
+}
+const halfInt = (n) => Math.abs(n * 2 - Math.round(n * 2)) < 1e-9;
+
+// Build 4 distinct choices: correct + priority distractors + shuffled candidates + fallbacks
+function buildChoices(r, correct, cands, fallback, priority = []) {
+  const out = [correct];
+  const add = (c) => { if (c != null && !out.includes(c) && out.length < 4) out.push(c); };
+  priority.forEach(add);
+  shuffle(r, cands).forEach(add);
+  for (let i = 0; out.length < 4 && i < 200; i++) add(fallback(i));
+  const choices = shuffle(r, out);
+  return { choices, answer: choices.indexOf(correct) };
+}
+
+/* ---------- free-response helpers ---------- */
+// Value of a student's answer: plain text ("1/2", "-3", "95°", "x = 5") or LaTeX from the math editor (\frac{1}{2}, 2\pi, \sqrt{3})
+function parseNum(v) {
+  if (v == null) return NaN;
+  let t = String(v);
+  if (/[\\{}]/.test(t) && window.MathLive && MathLive.convertLatexToAsciiMath) { try { t = MathLive.convertLatexToAsciiMath(t); } catch { return NaN; } }
+  t = t.trim().replace(/^.*=/, '').replace(/\^\(?@\)?/g, '').replace(/degrees?$/i, '').replace(/[°\s,]/g, '')
+    .replace(/−/g, '-').replace(/π/g, 'pi').replace(/√/g, 'sqrt').replace(/xx|×|·|\\cdot/g, '*').replace(/-:|÷/g, '/');
+  if (!t) return NaN;
+  return evalExpr(t);
+}
+// tiny safe evaluator: numbers, + - * / ^, parentheses, pi, sqrt(), implied multiplication (2pi, 3sqrt(2))
+function evalExpr(src) {
+  let i = 0;
+  const peek = () => src[i];
+  const startsAtom = () => i < src.length && (/[\d.(]/.test(src[i]) || src.startsWith('pi', i) || src.startsWith('sqrt', i));
+  function expr() { let v = term(); while (peek() === '+' || peek() === '-') { const op = src[i++]; const w = term(); v = op === '+' ? v + w : v - w; } return v; }
+  function term() {
+    let v = unary();
+    for (;;) {
+      if (peek() === '*' || peek() === '/') { const op = src[i++]; const w = unary(); v = op === '*' ? v * w : v / w; }
+      else if (startsAtom()) v *= power();
+      else return v;
+    }
+  }
+  function unary() { if (peek() === '-') { i++; return -unary(); } if (peek() === '+') { i++; return unary(); } return power(); }
+  function power() { const b = atom(); if (peek() === '^') { i++; return Math.pow(b, unary()); } return b; }
+  function atom() {
+    if (peek() === '(') { i++; const v = expr(); if (src[i++] !== ')') throw 0; return v; }
+    if (src.startsWith('pi', i)) { i += 2; return Math.PI; }
+    if (src.startsWith('sqrt', i)) { i += 4; return Math.sqrt(atom()); }
+    const m = /^\d*\.?\d+/.exec(src.slice(i));
+    if (!m) throw 0;
+    i += m[0].length; return +m[0];
+  }
+  try { const v = expr(); return i === src.length && isFinite(v) ? v : NaN; } catch { return NaN; }
+}
+const numEq = (v, a) => { const n = parseNum(v); return !isNaN(n) && Math.abs(n - a) < 0.011; };
+const normLetters = (v) => String(v || '').toUpperCase().replace(/[^A-Z]/g, '');
+const FR = {
+  num: (label, ans, { suffix = '' } = {}) => ({ fields: [{ kind: 'number', label, suffix }], check: (v) => numEq(v[0], ans), display: `${fmt(ans)}${suffix}`, key: [fmt(ans).replace(MINUS, '-')] }),
+  nums: (labels, ans, display) => ({ fields: labels.map((label) => ({ kind: 'number', label })), check: (v) => ans.every((a, i) => numEq(v[i], a)), display,
+    key: ans.map((a) => (halfInt(a) ? fmt(a).replace(MINUS, '-') : String(Math.round(a * 1000) / 1000))) }),
+  letters: (prefix, ans, display, { anyOrder = false } = {}) => ({ fields: [{ kind: 'text', label: '', prefix }], key: [ans],
+    check: (v) => (anyOrder ? normLetters(v[0]).split('').sort().join('') === ans.toUpperCase().split('').sort().join('') : normLetters(v[0]) === ans.toUpperCase()), display }),
+  select: (label, options, ans) => ({ fields: [{ kind: 'select', label, options }], check: (v) => v[0] === ans, display: ans, key: [ans] }),
+};
+
+/* ---------- question templates ---------- */
+const TEMPLATES = {};
+
+TEMPLATES.extAngleAlgebra = (r) => {
+  for (let t = 0; t < 2000; t++) {
+    const x = ri(r, 6, 20), m1 = ri(r, 1, 3), m2 = ri(r, 1, 3), c1 = ri(r, -10, 30), c2 = ri(r, -10, 30);
+    const A = m1 * x + c1, B = m2 * x + c2, ext = A + B, C = 180 - ext;
+    if (c1 === 0 || c2 === 0 || (m1 === m2 && c1 === c2) || A < 35 || B < 30 || C < 30 || A > 110 || B > 100) continue;
+    const m3 = m1 + m2 + ri(r, 1, 3), c3 = ext - m3 * x;
+    if (c3 === 0 || Math.abs(c3) > 90) continue;
+    const t1 = term(m1, c1), t2 = term(m2, c2), t3 = term(m3, c3);
+    return {
+      topic: 'Exterior angles',
+      stem: `In △ABC, side BC is extended through C to point D, as shown. The measure of ∠A is (${t1})°, the measure of ∠B is (${t2})°, and the measure of ∠ACD is (${t3})°. What is the measure of ∠ACB?`,
+      draw: (cv) => drawExtTriangle(cv, { left: B, top: A, names: ['A', 'B', 'C', 'D'], labels: { top: `(${t1})°`, left: `(${t2})°`, ext: `(${t3})°` } }),
+      ...buildChoices(r, deg(C), [deg(ext), deg(A), deg(B)], (i) => deg(C + (i % 2 ? 1 : -1) * 5 * (1 + (i >> 1))), [deg(x)]),
+      fr: FR.num('m∠ACB =', C, { suffix: '°' }),
+      solution: `An exterior angle equals the sum of the two remote interior angles: ${t3} = (${t1}) + (${t2}), so x = ${x}. Then m∠ACD = ${ext}°. ∠ACB forms a linear pair with ∠ACD, so m∠ACB = 180° ${MINUS} ${ext}° = ${C}°.`,
+    };
+  }
+};
+
+TEMPLATES.extAngleRatio = (r) => {
+  for (let t = 0; t < 2000; t++) {
+    const p = ri(r, 1, 5), q = ri(r, p + 1, 8);
+    if (gcd(p, q) !== 1) continue;
+    const k = ri(r, 4, 30), P = p * k, Q = q * k, E = P + Q, R = 180 - E;
+    if (E < 90 || E > 155 || P < 30 || R < 25 || Q > 100) continue;
+    const ask = r() < 0.5 ? 'largest' : 'smallest';
+    const angles = [P, Q, R];
+    const ans = ask === 'largest' ? Math.max(...angles) : Math.min(...angles);
+    const wrong180 = (ask === 'largest' ? q : p) * 180 / (p + q);
+    const lp = (p === 1 ? '' : p) + 'x', lq = q + 'x';
+    const lab = (s) => (s === 'x' ? 'x°' : `(${s})°`);
+    return {
+      topic: 'Exterior angles',
+      stem: `In the figure shown, points Q, R, and S are collinear. What is the measure of the ${ask} interior angle of △PQR?`,
+      draw: (cv) => drawExtTriangle(cv, { left: Q, top: P, names: ['P', 'Q', 'R', 'S'], labels: { top: lab(lp), left: lab(lq), ext: `${E}°` } }),
+      ...buildChoices(r, deg(ans), [...angles.map(deg), deg(E), halfInt(wrong180) ? deg(wrong180) : null], (i) => deg(ans + (i % 2 ? 1 : -1) * 5 * (1 + (i >> 1))), halfInt(wrong180) ? [deg(wrong180)] : []),
+      fr: FR.num(`${ask[0].toUpperCase() + ask.slice(1)} interior angle =`, ans, { suffix: '°' }),
+      solution: `By the exterior angle theorem, ${lp} + ${lq} = ${E}, so ${p + q}x = ${E} and x = ${k}. The remote interior angles are ${P}° and ${Q}°. The interior angle at R is 180° ${MINUS} ${E}° = ${R}°. The ${ask} interior angle is ${ans}°.`,
+    };
+  }
+};
+
+TEMPLATES.classifyTriangle = (r) => {
+  const triples = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [20, 21, 29], [9, 12, 15], [6, 8, 10], [12, 16, 20], [9, 40, 41]];
+  for (let t = 0; t < 2000; t++) {
+    const kind = pick(r, ['right', 'acuteTrap', 'obtuseTrap', 'iso', 'scalene']);
+    let s;
+    if (kind === 'right') s = pick(r, triples).slice();
+    else if (kind === 'acuteTrap') { const tr = pick(r, triples); s = [tr[0], tr[1], tr[2] - 1]; }
+    else if (kind === 'obtuseTrap') { const tr = pick(r, triples); s = [tr[0], tr[1], tr[2] + 1]; }
+    else if (kind === 'iso') { const a = ri(r, 4, 15); s = [a, a, ri(r, 2, 2 * a - 1)]; }
+    else s = [ri(r, 4, 20), ri(r, 4, 20), ri(r, 4, 20)];
+    const so = s.slice().sort((a, b) => a - b);
+    if (so[0] + so[1] <= so[2]) continue;
+    const [a, b, c] = so;
+    const sumSq = a * a + b * b, cSq = c * c;
+    const ang = sumSq === cSq ? 'right' : sumSq > cSq ? 'acute' : 'obtuse';
+    const eq = new Set(so).size;
+    const side = eq === 1 ? 'equilateral' : eq === 2 ? 'isosceles' : 'scalene';
+    const lab = (an, sd) => `${an[0].toUpperCase() + an.slice(1)} and ${sd}`;
+    const cands = [];
+    ['acute', 'right', 'obtuse'].filter((x) => x !== ang).forEach((o) => cands.push(lab(o, side)));
+    ['scalene', 'isosceles', 'equilateral'].filter((x) => x !== side && (x !== 'equilateral' || ang === 'acute')).forEach((o) => cands.push(lab(ang, o)));
+    const priority = ang !== 'right' && kind.endsWith('Trap') ? [lab('right', side)] : [];
+    const shown = shuffle(r, s);
+    const rel = sumSq === cSq ? '=' : sumSq > cSq ? '>' : '<';
+    return {
+      topic: 'Classifying triangles',
+      stem: `A triangle has side lengths of ${shown[0]} inches, ${shown[1]} inches, and ${shown[2]} inches. Which of the following best describes the triangle?`,
+      ...buildChoices(r, lab(ang, side), cands, (i) => lab(['acute', 'right', 'obtuse'][i % 3], ['scalene', 'isosceles'][(i >> 1) % 2]), priority),
+      frStem: `A triangle has side lengths of ${shown[0]} inches, ${shown[1]} inches, and ${shown[2]} inches. Classify the triangle by its angles and by its sides.`,
+      fr: { fields: [{ kind: 'select', label: 'By angles', options: ['acute', 'right', 'obtuse'] }, { kind: 'select', label: 'By sides', options: ['scalene', 'isosceles', 'equilateral'] }],
+        check: (v) => v[0] === ang && v[1] === side, display: lab(ang, side), key: [ang, side] },
+      solution: `The longest side is ${c}. Compare: ${a}² + ${b}² = ${sumSq} and ${c}² = ${cSq}. Since ${sumSq} ${rel} ${cSq}, the triangle is ${ang}. ${side === 'scalene' ? 'All three sides are different, so it is scalene.' : side === 'isosceles' ? 'Two sides are equal, so it is isosceles.' : 'All three sides are equal, so it is equilateral.'}`,
+    };
+  }
+};
+
+TEMPLATES.dilation = (r) => {
+  for (let t = 0; t < 2000; t++) {
+    const [n, d] = pick(r, [[1, 2], [1, 3], [2, 1], [3, 1], [3, 2], [1, 4]]);
+    const k = n / d;
+    const origin = r() < 0.5;
+    const C = origin ? [0, 0] : [ri(r, -4, 4), ri(r, -4, 4)];
+    if (!origin && C[0] === 0 && C[1] === 0) continue;
+    const v = [d * ri(r, -3, 3), d * ri(r, -3, 3)];
+    if (v[0] === 0 || v[1] === 0) continue;
+    const P = [C[0] + v[0], C[1] + v[1]];
+    const img = [C[0] + k * v[0], C[1] + k * v[1]];
+    if (Math.abs(img[0]) > 15 || Math.abs(img[1]) > 15) continue;
+    const kStr = d === 1 ? `${n}` : `${n}/${d}`;
+    const ok = (p) => (halfInt(p[0]) && halfInt(p[1]) ? pt(p) : null);
+    const cands = origin
+      ? [ok([P[0] / k, P[1] / k]), ok([P[0] * k, P[1]]), ok([P[0] + k, P[1] + k]), ok([P[0] * k, -P[1] * k])]
+      : [ok([P[0] * k, P[1] * k]), ok([v[0] * k, v[1] * k]), ok([P[0] * k + C[0], P[1] * k + C[1]]), ok([C[0] + v[0] / k, C[1] + v[1] / k])];
+    const sol = origin
+      ? `With the center at the origin, multiply each coordinate by ${kStr}: (${kStr} · ${fmt(P[0])}, ${kStr} · ${fmt(P[1])}) = ${pt(img)}.`
+      : `Find the vector from the center to P: (${fmt(P[0])} ${MINUS} ${fmt(C[0])}, ${fmt(P[1])} ${MINUS} ${fmt(C[1])}) = ${pt(v)}. Multiply it by ${kStr}: ${pt([k * v[0], k * v[1]])}. Add it to the center: ${pt(img)}.`;
+    return {
+      topic: 'Dilations',
+      stem: `In the standard (x, y) coordinate plane, point P${pt(P)} is dilated by a scale factor of ${kStr} with the center of dilation at ${origin ? 'the origin' : pt(C)}. What are the coordinates of the image of point P?`,
+      ...buildChoices(r, pt(img), cands, (i) => pt([img[0] + [1, -1, 0, 0, 2, -2][i % 6], img[1] + [0, 0, 1, -1, -2, 2][i % 6]])),
+      fr: FR.nums(['x-coordinate', 'y-coordinate'], img, pt(img)),
+      solution: sol,
+    };
+  }
+};
+
+TEMPLATES.composite = (r) => {
+  const TR = {
+    rx:   { name: 'reflected over the x-axis', rule: '(x, y) → (x, −y)', f: ([x, y]) => [x, -y], opp: 'ry' },
+    ry:   { name: 'reflected over the y-axis', rule: '(x, y) → (−x, y)', f: ([x, y]) => [-x, y], opp: 'rx' },
+    ryx:  { name: 'reflected over the line y = x', rule: '(x, y) → (y, x)', f: ([x, y]) => [y, x], opp: null },
+    r90:  { name: 'rotated 90° counterclockwise about the origin', rule: '(x, y) → (−y, x)', f: ([x, y]) => [-y, x], opp: 'r270' },
+    r270: { name: 'rotated 90° clockwise about the origin', rule: '(x, y) → (y, −x)', f: ([x, y]) => [y, -x], opp: 'r90' },
+    r180: { name: 'rotated 180° about the origin', rule: '(x, y) → (−x, −y)', f: ([x, y]) => [-x, -y], opp: null },
+  };
+  const makeTr = () => {
+    let h = 0, k = 0; while (h === 0) h = ri(r, -5, 5); while (k === 0) k = ri(r, -5, 5);
+    const u = (n) => (Math.abs(n) === 1 ? 'unit' : 'units');
+    return { name: `translated ${Math.abs(h)} ${u(h)} ${h > 0 ? 'right' : 'left'} and ${Math.abs(k)} ${u(k)} ${k > 0 ? 'up' : 'down'}`,
+      rule: `(x, y) → (x ${h > 0 ? '+' : MINUS} ${Math.abs(h)}, y ${k > 0 ? '+' : MINUS} ${Math.abs(k)})`,
+      f: ([x, y]) => [x + h, y + k], wrong: ([x, y]) => [x - h, y + k] };
+  };
+  for (let t = 0; t < 2000; t++) {
+    const keys = Object.keys(TR);
+    const useTr = r() < 0.3;
+    const k1 = pick(r, keys); let k2 = pick(r, keys);
+    if (k1 === k2) continue;
+    let T1 = TR[k1], T2 = TR[k2];
+    if (useTr) { if (r() < 0.5) T1 = makeTr(); else T2 = makeTr(); }
+    const A = [ri(r, -6, 6), ri(r, -6, 6)];
+    if (A[0] === 0 || A[1] === 0 || Math.abs(A[0]) === Math.abs(A[1])) continue;
+    const ans = T2.f(T1.f(A));
+    const rev = T1.f(T2.f(A));
+    if (pt(rev) === pt(ans)) continue; // order should matter
+    const wrongDir = (T) => (T.wrong ? T.wrong : T.opp ? TR[T.opp].f : null);
+    const cands = [pt(T1.f(A)), pt(T2.f(A))];
+    if (wrongDir(T1)) cands.push(pt(T2.f(wrongDir(T1)(A))));
+    if (wrongDir(T2)) cands.push(pt(wrongDir(T2)(T1.f(A))));
+    const mid = T1.f(A);
+    return {
+      topic: 'Transformations',
+      stem: `In the standard (x, y) coordinate plane, point A${pt(A)} is ${T1.name}. The image is then ${T2.name}. What are the coordinates of the final image of point A?`,
+      ...buildChoices(r, pt(ans), cands, (i) => pt([[-ans[0], ans[1]], [ans[1], ans[0]], [ans[0], -ans[1]], [-ans[1], -ans[0]], [ans[0] + 1, ans[1]]][i % 5]), [pt(rev)]),
+      fr: FR.nums(['x-coordinate', 'y-coordinate'], ans, pt(ans)),
+      solution: `Step 1: ${T1.rule.replace(/−/g, MINUS)}, so ${pt(A)} → ${pt(mid)}. Step 2: ${T2.rule.replace(/−/g, MINUS)}, so ${pt(mid)} → ${pt(ans)}. Doing the steps in the other order gives ${pt(rev)}, so the order matters.`,
+    };
+  }
+};
+
+TEMPLATES.trigGraph = (r) => {
+  const bs = [{ n: 1, d: 1 }, { n: 2, d: 1 }, { n: 3, d: 1 }, { n: 1, d: 2 }];
+  const frac = { '1/2': '½', '1/3': '⅓' };
+  const arg = (bn, bd) => (bn === bd ? 'x' : bd === 1 ? `${bn}x` : `${frac[bn + '/' + bd] || bn + '/' + bd}x`);
+  const eqn = (fn, a, bn, bd, c) => {
+    const g = gcd(bn, bd); bn /= g; bd /= g;
+    const inside = arg(bn, bd);
+    let s = `y = ${a === 1 ? '' : a}${fn}${inside === 'x' ? ' x' : '(' + inside + ')'}`;
+    if (c > 0) s += ` + ${c}`; if (c < 0) s += ` ${MINUS} ${-c}`;
+    return s;
+  };
+  for (let t = 0; t < 500; t++) {
+    const a = ri(r, 1, 4), c = ri(r, -3, 3), b = pick(r, bs);
+    if (a === 1 && c === 0) continue;
+    const correct = eqn('cos', a, b.n, b.d, c);
+    const inv = b.n === b.d ? { n: 2, d: 1 } : { n: b.d, d: b.n };
+    const cands = [eqn('cos', a, inv.n, inv.d, c), eqn('cos', 2 * a, b.n, b.d, c - a), eqn('sin', a, b.n, b.d, c)];
+    const minX = piFrac(b.d, b.n);
+    return {
+      topic: 'Graphs of trig functions',
+      stem: 'The graph of a function of the form y = a cos(bx) + c, where a > 0 and b > 0, is shown in the standard (x, y) coordinate plane. Which of the following could be the equation of the function?',
+      draw: (cv) => drawTrig(cv, { a, c, bn: b.n, bd: b.d }),
+      ...buildChoices(r, correct, cands, (i) => eqn('cos', a + 1 + i, b.n, b.d, c)),
+      frStem: 'The graph of a function of the form y = a cos(bx) + c, where a > 0 and b > 0, is shown in the standard (x, y) coordinate plane. What are the values of a, b, and c? (Fractions like 1/2 are OK.)',
+      fr: FR.nums(['a', 'b', 'c'], [a, b.n / b.d, c], `a = ${a}, b = ${b.d === 1 ? b.n : b.n + '/' + b.d}, c = ${fmt(c)}`),
+      solution: `The maximum is ${fmt(a + c)} and the minimum is ${fmt(c - a)}. Midline: c = (${fmt(a + c)} + ${c - a < 0 ? '(' + fmt(c - a) + ')' : fmt(c - a)}) / 2 = ${fmt(c)}. Amplitude: a = ${fmt(a + c)} ${MINUS} ${fmt(c)} = ${a}. A maximum to the next minimum is half a period, so the period is 2 · ${minX} and b = ${b.d === 1 ? b.n : b.n + '/' + b.d}. The graph starts at a maximum when x = 0, so it is a cosine graph: ${correct}.`,
+    };
+  }
+};
+
+function piFrac(num, den) {
+  if (num === 0) return '0';
+  const g = gcd(num, den); num /= g; den /= g;
+  const top = num === 1 ? 'π' : num + 'π';
+  return den === 1 ? top : `${top}/${den}`;
+}
+
+/* ---------- drawing ---------- */
+function makeCanvas(w, h) {
+  const cv = document.createElement('canvas');
+  const dpr = Math.max(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  cv.style.width = '100%'; cv.style.maxWidth = w + 'px'; cv.style.height = 'auto';
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+  cv._w = w; cv._h = h; cv._ctx = ctx;
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  return cv;
+}
+
+const TEXT_FONT = '17px Georgia, "Times New Roman", serif';
+function wrapLines(ctx, text, maxW) {
+  text = text.replace(/\([^()]*\)/g, (m) => m.replace(/ /g, ' ')); // keep (x + 30) on one line
+  const words = text.split(' '); const lines = []; let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function textCanvas(text, width, font = TEXT_FONT, lh = 26) {
+  const probe = document.createElement('canvas').getContext('2d');
+  probe.font = font;
+  const lines = wrapLines(probe, text, width - 4);
+  const cv = makeCanvas(width, lines.length * lh + 6);
+  cv.style.maxWidth = '100%'; cv.style.width = width + 'px';
+  const ctx = cv._ctx;
+  ctx.font = font; ctx.fillStyle = '#1d1d1b'; ctx.strokeStyle = '#1d1d1b'; ctx.lineWidth = 1.2; ctx.textBaseline = 'top';
+  lines.forEach((l, i) => {
+    // draw letters followed by U+0305 with a real bar over the whole run
+    const parts = l.split(/((?:.\u0305)+)/);
+    let x = 2; const y = 4 + i * lh;
+    for (const part of parts) {
+      if (!part) continue;
+      const over = /\u0305/.test(part), txt = part.replace(/\u0305/g, '');
+      ctx.fillText(txt, x, y);
+      const w = ctx.measureText(txt).width;
+      if (over) { ctx.beginPath(); ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + w - 1, y + 1); ctx.stroke(); }
+      x += w;
+    }
+  });
+  return cv;
+}
+
+function drawExtTriangle(cv, o) {
+  const ctx = cv._ctx, W = cv._w, H = cv._h;
+  const rad = (d) => (d * Math.PI) / 180;
+  const alpha = o.left, top = o.top, gamma = 180 - alpha - top;
+  const LT = Math.sin(rad(gamma)) / Math.sin(rad(top));
+  const L = [0, 0], R = [1, 0], T = [LT * Math.cos(rad(alpha)), LT * Math.sin(rad(alpha))];
+  const D = [Math.max(1.55, T[0] + 0.4), 0];
+  const minx = Math.min(0, T[0]), maxx = D[0], maxy = T[1];
+  const m = 55, s = Math.min((W - 2 * m) / (maxx - minx), (H - 2 * m - 20) / maxy);
+  const X = (p) => [m + (p[0] - minx) * s + ((W - 2 * m) - (maxx - minx) * s) / 2, H - m - 10 - p[1] * s];
+  const [l, rr, tt, dd] = [X(L), X(R), X(T), X(D)];
+  ctx.clearRect(0, 0, W, H);
+  ctx.lineWidth = 2; ctx.strokeStyle = '#1d1d1b'; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(...l); ctx.lineTo(...dd); ctx.moveTo(...l); ctx.lineTo(...tt); ctx.lineTo(...rr); ctx.stroke();
+  ctx.fillStyle = '#1d1d1b';
+  [l, rr, tt, dd].forEach((p) => { ctx.beginPath(); ctx.arc(p[0], p[1], 3.5, 0, 2 * Math.PI); ctx.fill(); });
+  ctx.font = 'italic 19px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(o.names[0], tt[0], tt[1] - 18);
+  ctx.fillText(o.names[1], l[0] - 12, l[1] + 18);
+  ctx.fillText(o.names[2], rr[0], rr[1] + 22);
+  ctx.fillText(o.names[3], dd[0], dd[1] + 22);
+  const angOf = (a, b) => (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI; // math coords
+  const arc = (V, a1, a2, r, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(V[0], V[1], r, rad(-a1), rad(-a2), true); ctx.stroke();
+  };
+  // Slide each label out along its angle bisector until its box clears every side of the figure
+  const segs = [[l, dd], [l, tt], [tt, rr]];
+  const placed = [];
+  const clear = (cx, cy, w, h) => placed.every((b) => Math.abs(cx - b.x) > (w + b.w) / 2 + 6 || Math.abs(cy - b.y) > (h + b.h) / 2 + 4) && segs.every(([p, q]) => {
+    for (let k = 0; k <= 60; k++) {
+      const x = p[0] + ((q[0] - p[0]) * k) / 60, y = p[1] + ((q[1] - p[1]) * k) / 60;
+      if (x > cx - w / 2 - 7 && x < cx + w / 2 + 7 && y > cy - h / 2 - 6 && y < cy + h / 2 + 6) return false;
+    }
+    return true;
+  });
+  const sign = (p, a, b) => (p[0] - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (p[1] - b[1]);
+  const inside = (p) => { const d1 = sign(p, l, rr), d2 = sign(p, rr, tt), d3 = sign(p, tt, l);
+    return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)); };
+  const label = (V, a1, a2, start, text, color, interior) => {
+    const mid = rad((a1 + a2) / 2);
+    ctx.font = '16px Georgia, serif';
+    const w = ctx.measureText(text).width, h = 16;
+    let best = null;
+    for (let d = start; d < 260; d += 2) {
+      const x = V[0] + d * Math.cos(mid), y = V[1] - d * Math.sin(mid);
+      if (interior && !inside([x, y])) break; // never let an interior label leave the triangle
+      if (!best) best = [x, y];
+      if (clear(x, y, w, h)) { best = [x, y]; break; }
+    }
+    const [x, y] = best || [V[0] + start * Math.cos(mid), V[1] - start * Math.sin(mid)];
+    placed.push({ x, y, w, h });
+    ctx.fillStyle = color; ctx.fillText(text, x, y);
+  };
+  const blue = '#1f5fa8', red = '#b03a2e';
+  arc(l, 0, alpha, 30, blue);
+  label(l, 0, alpha, 46, o.labels.left, blue, true);
+  let a1 = angOf(T, L), a2 = angOf(T, R);
+  if (a1 > a2) [a1, a2] = [a2, a1];
+  arc(tt, a1, a2, 30, blue);
+  label(tt, a1, a2, 40, o.labels.top, blue, true);
+  const extAng = 180 - gamma;
+  arc(rr, 0, extAng, 26, red);
+  label(rr, 0, extAng, 36, o.labels.ext, red);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#6b6a64'; ctx.font = 'italic 13px Georgia, serif';
+  ctx.fillText('Note: Figure not necessarily drawn to scale.', 10, H - 12);
+}
+
+function drawTrig(cv, o) {
+  const ctx = cv._ctx, W = cv._w, H = cv._h;
+  const { a, c, bn, bd } = o;
+  const b = bn / bd, period = (2 * Math.PI) / b, step = period / 4;
+  const xmin = -step * 0.35, xmax = 2 * period + step * 0.35;
+  const ymax = Math.max(a + c + 1.8, 1.2), ymin = Math.min(c - a - 1.6, -0.8);
+  const ml = 34, mr = 22, mt = 18, mb = 14;
+  const X = (x) => ml + ((x - xmin) / (xmax - xmin)) * (W - ml - mr);
+  const Y = (y) => mt + ((ymax - y) / (ymax - ymin)) * (H - mt - mb);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#e1ded6'; ctx.lineWidth = 1;
+  for (let i = 1; i <= 8; i++) { ctx.beginPath(); ctx.moveTo(X(i * step), Y(ymax)); ctx.lineTo(X(i * step), Y(ymin)); ctx.stroke(); }
+  const ystep = ymax - ymin > 13 ? 2 : 1;
+  for (let y = Math.ceil(ymin); y <= ymax; y++) {
+    if (y === 0 || y % ystep) continue;
+    ctx.beginPath(); ctx.moveTo(X(xmin), Y(y)); ctx.lineTo(X(xmax), Y(y)); ctx.stroke();
+  }
+  ctx.strokeStyle = '#1d1d1b'; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.moveTo(X(xmin), Y(0)); ctx.lineTo(X(xmax), Y(0)); ctx.moveTo(X(0), Y(ymax)); ctx.lineTo(X(0), Y(ymin)); ctx.stroke();
+  ctx.fillStyle = '#1d1d1b'; ctx.font = '14px Georgia, serif';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let y = Math.ceil(ymin); y <= ymax; y++) { if (y === 0 || y % ystep) continue; ctx.fillText(fmt(y), X(0) - 10, Y(y)); }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let i = 2; i <= 8; i += 2) ctx.fillText(piFrac(i * bd, 2 * bn), X(i * step) + 2, Y(0) + 5);
+  ctx.font = 'italic 15px Georgia, serif';
+  ctx.textAlign = 'left'; ctx.fillText('x', X(xmax) - 8, Y(0) - 22);
+  ctx.textBaseline = 'top'; ctx.fillText('y', X(0) + 7, Y(ymax) - 2);
+  ctx.strokeStyle = '#1f5fa8'; ctx.lineWidth = 2.4; ctx.beginPath();
+  for (let i = 0; i <= 500; i++) {
+    const x = (2 * period * i) / 500, y = a * Math.cos(b * x) + c;
+    i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y));
+  }
+  ctx.stroke();
+  ctx.fillStyle = '#103d6e';
+  [[0, a + c], [period / 2, c - a]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(X(x), Y(y), 4.5, 0, 2 * Math.PI); ctx.fill(); });
+  ctx.fillStyle = '#1d1d1b'; ctx.font = '15px Georgia, serif'; ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left'; ctx.fillText(`(0, ${fmt(a + c)})`, X(0) + 10, Y(a + c) - 14);
+  ctx.textAlign = 'center'; ctx.fillText(`(${piFrac(bd, bn)}, ${fmt(c - a)})`, X(period / 2), Y(c - a) + 20);
+}
+
+/* ---------- shapes & marked figures (chapter 5) ---------- */
+const VEC = {
+  add: (a, b) => [a[0] + b[0], a[1] + b[1]], sub: (a, b) => [a[0] - b[0], a[1] - b[1]], mul: (a, k) => [a[0] * k, a[1] * k],
+  len: (a) => Math.hypot(a[0], a[1]), norm: (a) => { const l = Math.hypot(a[0], a[1]) || 1; return [a[0] / l, a[1] / l]; },
+  rot: (a, t) => [a[0] * Math.cos(t) - a[1] * Math.sin(t), a[0] * Math.sin(t) + a[1] * Math.cos(t)],
+};
+const SEG = (s) => s.split('').map((c) => c + '̅').join(''); // overline: A̅B̅
+const LETTERS_POOL = 'ABCDEFGHJKLMNPQRSTUVWXYZ'.split('');
+function pickLetters(r, n, exclude = []) {
+  const pool = LETTERS_POOL.filter((c) => !exclude.includes(c));
+  if (r() < 0.5) { // consecutive run, textbook style (ABC, DEF)
+    for (let t = 0; t < 30; t++) {
+      const i = ri(r, 0, LETTERS_POOL.length - n);
+      const run = LETTERS_POOL.slice(i, i + n);
+      if (run.every((c) => !exclude.includes(c))) return run;
+    }
+  }
+  return shuffle(r, pool).slice(0, n).sort();
+}
+function triAngles(r, lo = 35, hi = 100) {
+  for (let t = 0; t < 5000; t++) {
+    const a = ri(r, lo, hi), b = ri(r, lo, hi), c = 180 - a - b;
+    if (c < lo || c > hi) continue;
+    if (Math.abs(a - b) < 8 || Math.abs(b - c) < 8 || Math.abs(a - c) < 8) continue;
+    return [a, b, c];
+  }
+  return [50, 60, 70];
+}
+function triShape(ang) { // angle ang[i] at vertex i, side v0v1 = 1
+  const [A, B, C] = ang.map((d) => (d * Math.PI) / 180);
+  const b = Math.sin(B) / Math.sin(C);
+  return [[0, 0], [1, 0], [b * Math.cos(A), b * Math.sin(A)]];
+}
+function interiorAngles(pts) {
+  const n = pts.length;
+  return pts.map((p, i) => {
+    const u = VEC.norm(VEC.sub(pts[(i + n - 1) % n], p)), v = VEC.norm(VEC.sub(pts[(i + 1) % n], p));
+    return (Math.acos(Math.max(-1, Math.min(1, u[0] * v[0] + u[1] * v[1]))) * 180) / Math.PI;
+  });
+}
+function quadShape(r) {
+  for (let t = 0; t < 5000; t++) {
+    const base = r() * Math.PI * 2;
+    const pts = [0, 1, 2, 3].map((i) => {
+      const th = base + (i * Math.PI) / 2 + (r() - 0.5) * 0.9, rad = 0.7 + r() * 0.5;
+      return [rad * Math.cos(th), rad * Math.sin(th)];
+    });
+    const crosses = pts.map((p, i) => { const a = VEC.sub(pts[(i + 1) % 4], p), b = VEC.sub(pts[(i + 2) % 4], pts[(i + 1) % 4]); return a[0] * b[1] - a[1] * b[0]; });
+    if (!crosses.every((c) => c > 0)) continue;
+    const angs = interiorAngles(pts);
+    if (angs.some((a) => a < 60 || a > 130)) continue;
+    const sides = pts.map((p, i) => VEC.len(VEC.sub(pts[(i + 1) % 4], p))).sort();
+    if (sides.some((s, i) => i && s - sides[i - 1] < 0.08)) continue;
+    return pts;
+  }
+}
+function transformPts(pts, r, { reflect = false, scale = 1, angle = null } = {}) {
+  const th = angle == null ? r() * Math.PI * 2 : angle;
+  return pts.map((p) => VEC.mul(VEC.rot([reflect ? -p[0] : p[0], p[1]], th), scale));
+}
+function bbox(pts) {
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+}
+function layoutPair(A, B) { // put B to the right of A, vertically centered
+  const a = bbox(A), b = bbox(B);
+  const gap = 0.7 * Math.max(a.x1 - a.x0, a.y1 - a.y0, b.x1 - b.x0, b.y1 - b.y0);
+  const dx = a.x1 + gap - b.x0, dy = (a.y0 + a.y1) / 2 - (b.y0 + b.y1) / 2;
+  return [A, B.map((p) => [p[0] + dx, p[1] + dy])];
+}
+function boundaryNames(r, letters, n) { // names for an image polygon, consecutive around its boundary
+  const off = ri(r, 0, n - 1), dir = r() < 0.5 ? 1 : -1;
+  return Array.from({ length: n }, (_, i) => letters[((off + dir * i) % n + n) % n]);
+}
+
+function drawFigure(cv, fig) {
+  const ctx = cv._ctx, W = cv._w, H = cv._h;
+  if (cv._stack && fig.polys.length === 2) { // phone: put the second figure under the first
+    const a = bbox(fig.polys[0].pts), b = bbox(fig.polys[1].pts);
+    const gap = 0.35 * Math.max(a.y1 - a.y0, b.y1 - b.y0, a.x1 - a.x0);
+    const dx = (a.x0 + a.x1) / 2 - (b.x0 + b.x1) / 2, dy = a.y0 - gap - b.y1;
+    fig = { ...fig, polys: [fig.polys[0], { ...fig.polys[1], pts: fig.polys[1].pts.map((p) => [p[0] + dx, p[1] + dy]) }] };
+  }
+  const all = fig.polys.flatMap((p) => p.pts);
+  const bb = bbox(all), m = fig.polys.some((P) => (P.slab || []).some(Boolean)) ? 66 : 46, noteH = fig.note ? 16 : 0;
+  const s = Math.min((W - 2 * m) / (bb.x1 - bb.x0), (H - 2 * m - noteH) / (bb.y1 - bb.y0));
+  const ox = (W - (bb.x1 - bb.x0) * s) / 2, oy = (H - noteH - (bb.y1 - bb.y0) * s) / 2;
+  const X = (p) => [ox + (p[0] - bb.x0) * s, oy + (bb.y1 - p[1]) * s];
+  const polys = fig.polys.map((p) => ({ ...p, c: p.pts.map(X) }));
+  const red = '#b03a2e', blue = '#1f5fa8', ink = '#1d1d1b';
+  ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const segs = [];
+  polys.forEach((P) => {
+    ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.beginPath();
+    P.c.forEach((q, i) => (i ? ctx.lineTo(...q) : ctx.moveTo(...q))); ctx.closePath(); ctx.stroke();
+    P.c.forEach((q, i) => segs.push([q, P.c[(i + 1) % P.c.length]]));
+  });
+  const placed = [];
+  const clear = (cx, cy, w, h) => placed.every((b) => Math.abs(cx - b.x) > (w + b.w) / 2 + 5 || Math.abs(cy - b.y) > (h + b.h) / 2 + 3) &&
+    segs.every(([p, q]) => { for (let k = 0; k <= 50; k++) { const x = p[0] + ((q[0] - p[0]) * k) / 50, y = p[1] + ((q[1] - p[1]) * k) / 50;
+      if (x > cx - w / 2 - 6 && x < cx + w / 2 + 6 && y > cy - h / 2 - 5 && y < cy + h / 2 + 5) return false; } return true; });
+  const insidePoly = (pt, c) => { let sgn = 0; for (let i = 0; i < c.length; i++) { const a = c[i], b = c[(i + 1) % c.length];
+    const cr = (b[0] - a[0]) * (pt[1] - a[1]) - (b[1] - a[1]) * (pt[0] - a[0]); if (Math.abs(cr) < 1e-9) continue;
+    if (!sgn) sgn = Math.sign(cr); else if (Math.sign(cr) !== sgn) return false; } return true; };
+  // marks
+  polys.forEach((P) => {
+    const n = P.c.length;
+    P.c.forEach((v, i) => {
+      const u1 = VEC.norm(VEC.sub(P.c[(i + n - 1) % n], v)), u2 = VEC.norm(VEC.sub(P.c[(i + 1) % n], v));
+      ctx.strokeStyle = red; ctx.lineWidth = 1.6;
+      if (P.right && P.right[i]) {
+        const z = 12; ctx.beginPath(); ctx.moveTo(...VEC.add(v, VEC.mul(u1, z))); ctx.lineTo(...VEC.add(v, VEC.add(VEC.mul(u1, z), VEC.mul(u2, z)))); ctx.lineTo(...VEC.add(v, VEC.mul(u2, z))); ctx.stroke();
+      } else if (P.arcs && P.arcs[i]) {
+        const a1 = Math.atan2(u1[1], u1[0]), a2 = Math.atan2(u2[1], u2[0]);
+        let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+        for (let k = 0; k < P.arcs[i]; k++) { ctx.beginPath(); ctx.arc(v[0], v[1], 17 + 5 * k, a1, a1 + d, d < 0); ctx.stroke(); }
+      }
+      if (P.ticks && P.ticks[i]) {
+        const w = P.c[(i + 1) % n], mid = VEC.mul(VEC.add(v, w), 0.5), dirv = VEC.norm(VEC.sub(w, v)), nrm = [-dirv[1], dirv[0]];
+        for (let k = 0; k < P.ticks[i]; k++) {
+          const c = VEC.add(mid, VEC.mul(dirv, (k - (P.ticks[i] - 1) / 2) * 5));
+          ctx.beginPath(); ctx.moveTo(...VEC.add(c, VEC.mul(nrm, 6))); ctx.lineTo(...VEC.add(c, VEC.mul(nrm, -6))); ctx.stroke();
+        }
+      }
+    });
+  });
+  ctx.fillStyle = ink;
+  polys.forEach((P) => P.c.forEach((v) => { ctx.beginPath(); ctx.arc(v[0], v[1], 3, 0, 2 * Math.PI); ctx.fill(); }));
+  // vertex names (outward from the group's center)
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'italic 19px Georgia, serif';
+  const groups = {};
+  polys.forEach((P, k) => { const g = P.group ?? 'p' + k; (groups[g] = groups[g] || []).push(...P.c); });
+  const center = (pts) => VEC.mul(pts.reduce((a, b) => VEC.add(a, b), [0, 0]), 1 / pts.length);
+  const done = new Set();
+  polys.forEach((P, k) => {
+    const cen = center(groups[P.group ?? 'p' + k]);
+    P.c.forEach((v, i) => {
+      const nm = P.names && P.names[i]; if (!nm || done.has(nm)) return; done.add(nm);
+      let dirN = VEC.norm(VEC.sub(v, cen));
+      // a vertex shared by two polygons that share nothing else (vertical angles): use an empty gap of the "X"
+      const sharedHere = polys.filter((Q) => Q !== P && Q.c.some((q) => VEC.len(VEC.sub(q, v)) < 1));
+      if (sharedHere.length && sharedHere.every((Q) => Q.c.filter((q) => P.c.some((pp) => VEC.len(VEC.sub(q, pp)) < 1)).length === 1)) {
+        const n = P.c.length, d1 = VEC.norm(VEC.sub(P.c[(i + n - 1) % n], v)), d2 = VEC.norm(VEC.sub(P.c[(i + 1) % n], v));
+        dirN = VEC.norm(VEC.sub(d1, d2));
+      }
+      const o = VEC.add(v, VEC.mul(dirN, 17));
+      ctx.fillStyle = ink; ctx.fillText(nm, o[0], o[1]); placed.push({ x: o[0], y: o[1], w: 14, h: 18 });
+    });
+  });
+  // side labels (outside each polygon)
+  ctx.font = '16px Georgia, serif';
+  polys.forEach((P) => {
+    const n = P.c.length, cen = center(P.c);
+    (P.slab || []).forEach((t, i) => {
+      if (!t) return;
+      const v = P.c[i], w = P.c[(i + 1) % n], mid = VEC.mul(VEC.add(v, w), 0.5);
+      let nrm = VEC.norm([-(w[1] - v[1]), w[0] - v[0]]);
+      if ((mid[0] - cen[0]) * nrm[0] + (mid[1] - cen[1]) * nrm[1] < 0) nrm = VEC.mul(nrm, -1);
+      const tw = ctx.measureText(t).width;
+      let best = null;
+      for (let d = 10; d < 80; d += 2) {
+        const off = d + Math.abs(nrm[0]) * tw / 2 + Math.abs(nrm[1]) * 8, p = VEC.add(mid, VEC.mul(nrm, off));
+        if (p[0] - tw / 2 < 4 || p[0] + tw / 2 > W - 4 || p[1] < 10 || p[1] > H - 24) continue;
+        if (!best) best = p;
+        if (clear(p[0], p[1], tw, 16)) { best = p; break; }
+      }
+      if (!best) { const p = VEC.add(mid, VEC.mul(nrm, 12 + tw / 2)); best = [Math.min(Math.max(p[0], tw / 2 + 4), W - tw / 2 - 4), Math.min(Math.max(p[1], 10), H - 24)]; }
+      placed.push({ x: best[0], y: best[1], w: tw, h: 16 });
+      ctx.fillStyle = blue; ctx.fillText(t, best[0], best[1]);
+    });
+  });
+  // angle labels (inside, along the bisector)
+  polys.forEach((P) => {
+    const n = P.c.length;
+    (P.alab || []).forEach((t, i) => {
+      if (!t) return;
+      const v = P.c[i], u1 = VEC.norm(VEC.sub(P.c[(i + n - 1) % n], v)), u2 = VEC.norm(VEC.sub(P.c[(i + 1) % n], v));
+      const bis = VEC.norm(VEC.add(u1, u2));
+      const big = t === '1';
+      ctx.font = big ? 'bold 17px Georgia, serif' : '16px Georgia, serif';
+      const tw = ctx.measureText(t).width;
+      const start = (P.arcs && P.arcs[i] ? 17 + 5 * P.arcs[i] : P.right && P.right[i] ? 18 : 12) + 10;
+      let best = null;
+      const others = P.c.filter((_, k) => k !== i);
+      for (let d = start; d <= start + 70; d += 2) { // stay clearly closer to this vertex than any other
+        const p = VEC.add(v, VEC.mul(bis, d));
+        if (!insidePoly(p, P.c)) break;
+        if (others.some((o) => VEC.len(VEC.sub(p, o)) * 0.55 < d)) break;
+        if (clear(p[0], p[1], tw, 16)) { best = p; break; }
+      }
+      let leader = null;
+      if (!best && !big) { // no room inside: put it outside with an arrow to the angle (textbook style)
+        const a0 = Math.atan2(bis[1], bis[0]);
+        search: for (let rad = 44; rad <= 110; rad += 6) {
+          for (const da of [100, -100, 125, -125, 75, -75, 150, -150, 180]) {
+            const a = a0 + (da * Math.PI) / 180, p = [v[0] + rad * Math.cos(a), v[1] + rad * Math.sin(a)];
+            if (p[0] - tw / 2 < 4 || p[0] + tw / 2 > W - 4 || p[1] < 12 || p[1] > H - 26) continue;
+            if (polys.some((Q) => insidePoly(p, Q.c))) continue;
+            if (clear(p[0], p[1], tw, 16)) { best = p; leader = VEC.add(v, VEC.mul(bis, 22)); break search; }
+          }
+        }
+      }
+      best = best || VEC.add(v, VEC.mul(bis, start));
+      placed.push({ x: best[0], y: best[1], w: tw, h: 16 });
+      if (leader) {
+        const dir = VEC.norm(VEC.sub(leader, best));
+        const from = VEC.add(best, [dir[0] * (tw / 2 + 3), dir[1] * 11]);
+        const tip = leader, back = VEC.norm(VEC.sub(from, tip)), sideV = [-back[1], back[0]];
+        ctx.strokeStyle = blue; ctx.lineWidth = 1.3;
+        ctx.beginPath(); ctx.moveTo(...from); ctx.lineTo(...tip); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(...VEC.add(tip, VEC.add(VEC.mul(back, 7), VEC.mul(sideV, 3.5)))); ctx.lineTo(...tip); ctx.lineTo(...VEC.add(tip, VEC.add(VEC.mul(back, 7), VEC.mul(sideV, -3.5)))); ctx.stroke();
+        if (!(P.arcs && P.arcs[i]) && !(P.right && P.right[i])) {
+          const a1 = Math.atan2(u1[1], u1[0]), a2 = Math.atan2(u2[1], u2[0]);
+          let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+          ctx.beginPath(); ctx.arc(v[0], v[1], 22, a1, a1 + d, d < 0); ctx.stroke();
+        }
+      }
+      ctx.fillStyle = big ? ink : blue; ctx.fillText(t, best[0], best[1]);
+    });
+  });
+  if (fig.note) { ctx.textAlign = 'left'; ctx.fillStyle = '#6b6a64'; ctx.font = 'italic 13px Georgia, serif'; ctx.fillText('Note: Figure not necessarily drawn to scale.', 10, H - 10); }
+}
+
+// two congruent polygons: A as given, B = rotated/reflected copy named consecutively around its boundary
+function congruentPair(r, A, { scale = 1 } = {}) {
+  const n = A.length;
+  const reflect = r() < 0.5;
+  const B0 = transformPts(A, r, { reflect, scale });
+  const [A2, B2] = layoutPair(A, B0);
+  const L1 = pickLetters(r, n), L2 = pickLetters(r, n, L1);
+  return { A: A2, B: B2, L1, L2, nb: boundaryNames(r, L2, n) };
+}
+const nextI = (i, n) => (i + 1) % n;
+const sideName = (names, i) => names[i] + names[nextI(i, names.length)];
+
+TEMPLATES.congStatement = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const n = r() < 0.6 ? 3 : 4;
+    const shape = n === 3 ? triShape(triAngles(r)) : quadShape(r);
+    const { A, B, L1, L2, nb } = congruentPair(r, shape);
+    const ticks = shuffle(r, Array.from({ length: n }, (_, i) => i + 1));
+    const arcs = shuffle(r, Array.from({ length: n }, (_, i) => i + 1));
+    const sym = n === 3 ? '△' : '';
+    const draw = (cv) => drawFigure(cv, { polys: [{ pts: A, names: L1, ticks, arcs }, { pts: B, names: nb, ticks, arcs }] });
+    const word = n === 3 ? 'triangles' : 'quadrilaterals';
+    const sol = `Match the parts with the same marks: ${L1.map((c, i) => `∠${c} ↔ ∠${nb[i]}`).join(', ')}. So ${sym}${L1.join('')} ≅ ${sym}${nb.join('')}, and corresponding sides match too, for example ${SEG(sideName(L1, 0))} ≅ ${SEG(sideName(nb, 0))}.`;
+    if (r() < 0.5) {
+      const correct = `${sym}${L1.join('')} ≅ ${sym}${nb.join('')}`;
+      const readings = [];
+      for (let j = 0; j < n; j++) for (const d of [1, -1]) readings.push(`${sym}${L1.join('')} ≅ ${sym}${Array.from({ length: n }, (_, i) => nb[((j + d * i) % n + n) % n]).join('')}`);
+      const alpha = `${sym}${L1.join('')} ≅ ${sym}${L2.join('')}`;
+      return { topic: 'Congruent polygons', size: [600, 270], pair: true, stem: `The two ${word} shown are congruent. Which of the following is a correct congruence statement?`, draw,
+        frStem: `The two ${word} shown are congruent. Complete the congruence statement ${sym}${L1.join('')} ≅ ${sym}____.`,
+        fr: FR.letters(`${sym}${L1.join('')} ≅ ${sym}`, nb.join(''), correct),
+        ...buildChoices(r, correct, readings.filter((x) => x !== correct), () => null, alpha !== correct ? [alpha] : []), solution: sol };
+    }
+    const i = ri(r, 0, n - 1);
+    const useSide = r() < 0.5;
+    const correct = useSide ? `${SEG(sideName(L1, i))} ≅ ${SEG(sideName(nb, i))}` : `∠${L1[i]} ≅ ∠${nb[i]}`;
+    const wrong = [];
+    for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) if (a !== b) {
+      wrong.push(`${SEG(sideName(L1, a))} ≅ ${SEG(sideName(nb, b))}`);
+      wrong.push(`∠${L1[a]} ≅ ∠${nb[b]}`);
+    }
+    const other = n === 3 ? 'triangle' : 'quadrilateral';
+    return { topic: 'Congruent polygons', size: [600, 270], pair: true, stem: `The two ${word} shown are congruent. Which of the following is a pair of congruent corresponding parts?`, draw,
+      frStem: useSide ? `The two ${word} shown are congruent. Which side of the other ${other} corresponds to ${SEG(sideName(L1, i))}?` : `The two ${word} shown are congruent. Which angle of the other ${other} corresponds to ∠${L1[i]}?`,
+      fr: useSide ? FR.letters('', sideName(nb, i), SEG(sideName(nb, i)), { anyOrder: true }) : FR.letters('∠', nb[i], `∠${nb[i]}`),
+      ...buildChoices(r, correct, wrong, () => null), solution: sol };
+  }
+};
+
+TEMPLATES.correspondingParts = (r) => {
+  for (let t = 0; t < 500; t++) {
+    const ang = triAngles(r, 25, 115);
+    const { A, B, L1, nb } = congruentPair(r, triShape(ang));
+    const sl = shuffle(r, Array.from({ length: 17 }, (_, i) => i + 4)).slice(0, 3);
+    const [p, q, k3] = shuffle(r, [0, 1, 2]);
+    const s1 = ri(r, 0, 2), s2 = (s1 + ri(r, 1, 2)) % 3;
+    const alA = [null, null, null], alB = [null, null, null], slA = [null, null, null], slB = [null, null, null];
+    alA[p] = ang[p] + '°'; alB[q] = ang[q] + '°'; slA[s1] = String(sl[s1]); slB[s2] = String(sl[s2]);
+    const statement = `△${L1.join('')} ≅ △${nb.join('')}`;
+    const kind = pick(r, ['direct1', 'direct2', 'third', 'third', 'side1', 'side2']);
+    let ask, ans, why;
+    if (kind === 'direct1') { ask = `m∠${nb[p]}`; ans = ang[p]; why = `∠${nb[p]} corresponds to ∠${L1[p]}, so they have the same measure: ${ang[p]}°.`; }
+    else if (kind === 'direct2') { ask = `m∠${L1[q]}`; ans = ang[q]; why = `∠${L1[q]} corresponds to ∠${nb[q]}, so they have the same measure: ${ang[q]}°.`; }
+    else if (kind === 'third') {
+      const inB = r() < 0.5; ask = `m∠${inB ? nb[k3] : L1[k3]}`; ans = ang[k3];
+      why = `m∠${L1[p]} = ${ang[p]}°, and m∠${L1[q]} = m∠${nb[q]} = ${ang[q]}°. By the Triangle Sum Theorem, the third angle is 180° ${MINUS} ${ang[p]}° ${MINUS} ${ang[q]}° = ${ang[k3]}°.`;
+    }
+    else if (kind === 'side1') { ask = sideName(L1, s2); ans = sl[s2]; why = `${SEG(sideName(L1, s2))} corresponds to ${SEG(sideName(nb, s2))}, so ${sideName(L1, s2)} = ${sl[s2]}.`; }
+    else { ask = sideName(nb, s1); ans = sl[s1]; why = `${SEG(sideName(nb, s1))} corresponds to ${SEG(sideName(L1, s1))}, so ${sideName(nb, s1)} = ${sl[s1]}.`; }
+    const isAng = kind.startsWith('d') || kind === 'third';
+    const f = isAng ? deg : (v) => fmt(v);
+    const cands = isAng ? [ang[p], ang[q], ang[k3], 180 - ang[p], 180 - ang[q], 90].map(deg) : [sl[s1], sl[s2], sl[s1] + sl[s2], Math.abs(sl[s1] - sl[s2]), 2 * ans].map((v) => fmt(v));
+    if (!isAng && cands.filter((c) => c !== fmt(ans)).length < 3) continue;
+    return { topic: 'Corresponding parts', size: [600, 270], pair: true,
+      stem: `In the figure, ${statement}. What is ${ask}?`,
+      draw: (cv) => drawFigure(cv, { note: true, polys: [{ pts: A, names: L1, alab: alA, slab: slA }, { pts: B, names: nb, alab: alB, slab: slB }] }),
+      fr: FR.num(`${ask} =`, ans, { suffix: isAng ? '°' : '' }),
+      ...buildChoices(r, f(ans), cands, (i) => f(ans + (i % 2 ? 1 : -1) * (2 + i))), solution: `Use the congruence statement ${statement} to match parts in order. ${why}` };
+  }
+};
+
+TEMPLATES.findXY = (r) => {
+  const termY = (k, c) => { let s = (k === 1 ? '' : k) + 'y'; if (c > 0) s += ' + ' + c; if (c < 0) s += ' ' + MINUS + ' ' + (-c); return s; };
+  for (let t = 0; t < 3000; t++) {
+    const ang = triAngles(r, 30, 110);
+    const [p, q, k3] = shuffle(r, [0, 1, 2]);
+    const tv = r() < 0.5 ? p : k3, tgt = ang[tv];
+    const m1 = ri(r, 2, 5), x = ri(r, 4, 30), c1 = tgt - m1 * x;
+    if (c1 === 0 || Math.abs(c1) > 60) continue;
+    const s = ri(r, 0, 2);
+    const formB = r() < 0.5;
+    let y, L, sideExpr, ySolve, ySignSlip;
+    if (formB) {
+      const m2 = ri(r, 1, 3), k = ri(r, 1, 3); y = ri(r, 2, 12); L = m2 * x - k * y;
+      if (L < 4 || L > 40) continue;
+      sideExpr = `${m2 === 1 ? '' : m2}x ${MINUS} ${k === 1 ? '' : k}y`;
+      ySolve = (xv) => (m2 * xv - L) / k;
+      ySignSlip = (m2 * x + L) / k;
+    } else {
+      const k = ri(r, 2, 4); y = ri(r, 2, 12); L = ri(r, 6, 30); const c = L - k * y;
+      if (c === 0 || Math.abs(c) > 30) continue;
+      sideExpr = termY(k, c);
+      ySolve = () => y;
+      ySignSlip = (L + c) / k;
+    }
+    const pair = (xv, yv) => (halfInt(xv) && halfInt(yv) && xv > 0 && yv > 0 ? `x = ${fmt(xv)}, y = ${fmt(yv)}` : null);
+    const wrongT = [ang[p], ang[q], ang[k3], 180 - tgt].filter((v) => v !== tgt);
+    const cands = wrongT.map((tt) => { const xv = (tt - c1) / m1; return pair(xv, ySolve(xv)); });
+    cands.push(pair(y, x), pair(x, ySignSlip));
+    const { A, B, L1, nb } = congruentPair(r, triShape(ang));
+    const alA = [null, null, null], alB = [null, null, null], slA = [null, null, null], slB = [null, null, null];
+    alA[p] = ang[p] + '°'; alA[q] = ang[q] + '°'; slA[s] = String(L);
+    alB[tv] = `(${term(m1, c1)})°`; slB[s] = `(${sideExpr})`;
+    const st = `△${L1.join('')} ≅ △${nb.join('')}`;
+    const angStep = tv === p
+      ? `∠${nb[tv]} corresponds to ∠${L1[tv]}, so ${term(m1, c1)} = ${tgt} and x = ${x}.`
+      : `The third angle of △${L1.join('')} is 180° ${MINUS} ${ang[p]}° ${MINUS} ${ang[q]}° = ${tgt}°. ∠${nb[tv]} corresponds to ∠${L1[tv]}, so ${term(m1, c1)} = ${tgt} and x = ${x}.`;
+    return { topic: 'Congruent polygons: find x and y', size: [620, 290], pair: true,
+      stem: `In the figure, ${st}. What are the values of x and y?`,
+      draw: (cv) => drawFigure(cv, { note: true, polys: [{ pts: A, names: L1, alab: alA, slab: slA }, { pts: B, names: nb, alab: alB, slab: slB }] }),
+      ...buildChoices(r, `x = ${x}, y = ${y}`, cands, (i) => pair(x + [0, 1, -1, 2, 0, -2][i % 6], y + [1, 0, 1, -1, -1, 0][i % 6] + Math.floor(i / 6))),
+      fr: FR.nums(['x', 'y'], [x, y], `x = ${x}, y = ${y}`),
+      solution: `${angStep} ${SEG(sideName(nb, s))} corresponds to ${SEG(sideName(L1, s))}, so ${sideExpr} = ${L}. Substitute x = ${x}: y = ${y}.` };
+  }
+};
+
+TEMPLATES.thirdAngle = (r) => {
+  for (let t = 0; t < 500; t++) {
+    let ang;
+    const right = r() < 0.35;
+    if (right) { const a = ri(r, 25, 65); if (a === 45) continue; ang = shuffle(r, [90, a, 90 - a]); }
+    else ang = triAngles(r, 25, 110);
+    let [p, q, k3] = shuffle(r, [0, 1, 2]);
+    if (right) { const ri90 = ang.indexOf(90); if (ri90 === k3) [p, k3] = [k3, p]; }
+    const A = triShape(ang);
+    const reflect = r() < 0.5;
+    const [A2, B2] = layoutPair(A, transformPts(A, r, { reflect, scale: 0.7 + r() * 0.25 }));
+    const L1 = pickLetters(r, 3), nb = boundaryNames(r, pickLetters(r, 3, L1), 3);
+    const arcs = [0, 0, 0], rt = [false, false, false];
+    let nArc = 1;
+    for (const v of [p, q]) { if (ang[v] === 90) rt[v] = true; else arcs[v] = nArc++; }
+    const alA = [null, null, null], alB = [null, null, null];
+    for (const v of [p, q]) if (ang[v] !== 90) alA[v] = ang[v] + '°';
+    alB[k3] = '1';
+    const ans = ang[k3];
+    const known = [p, q].map((v) => ang[v]);
+    return { topic: 'Third Angles Theorem', size: [600, 270], pair: true,
+      stem: 'In the figure, angles with the same marks are congruent. What is m∠1?',
+      draw: (cv) => drawFigure(cv, { polys: [{ pts: A2, names: L1, alab: alA, arcs, right: rt }, { pts: B2, names: nb, alab: alB, arcs, right: rt }] }),
+      ...buildChoices(r, deg(ans), [...known, 180 - known[0], 180 - known[1], 90, known[0] + known[1]].map(deg), (i) => deg(ans + (i % 2 ? 1 : -1) * 5 * (1 + (i >> 1)))),
+      fr: FR.num('m∠1 =', ans, { suffix: '°' }),
+      solution: `Two pairs of angles are congruent, so by the Third Angles Theorem the third pair is congruent too. ∠1 matches ∠${L1[k3]}, so m∠1 = 180° ${MINUS} ${known[0]}° ${MINUS} ${known[1]}° = ${ans}°.` };
+  }
+};
+
+TEMPLATES.congReason = (r) => {
+  const REASONS = ['Reflexive Property of Congruence', 'Symmetric Property of Congruence', 'Transitive Property of Congruence', 'Third Angles Theorem', 'Vertical Angles Congruence Theorem', 'Triangle Sum Theorem', 'Exterior Angle Theorem'];
+  const lenV = 0.55 + r() * 0.3, th = ((55 + r() * 25) * Math.PI) / 180;
+  const u = [1, 0], v = [lenV * Math.cos(th), lenV * Math.sin(th)];
+  const P = transformPts([[0, 0], u, VEC.add(u, v), v], r, { reflect: r() < 0.5 });
+  const [X, Y, Z, Wn] = pickLetters(r, 4);
+  const draw = (cv) => drawFigure(cv, { polys: [
+    { pts: [P[0], P[1], P[3]], names: [X, Y, Wn], ticks: [1, 0, 2], arcs: [0, 1, 2], group: 'g' },
+    { pts: [P[2], P[3], P[1]], names: [Z, Wn, Y], ticks: [1, 0, 2], arcs: [0, 1, 2], group: 'g' }] });
+  const kind = pick(r, ['reflexive', 'third', 'statement']);
+  const base = 'Use the markings in the figure. ';
+  if (kind === 'reflexive') {
+    const c = REASONS[0];
+    return { topic: 'Showing polygons are congruent', size: [520, 300], draw,
+      stem: `${base}Which reason explains why ${SEG(Wn + Y)} ≅ ${SEG(Y + Wn)}?`,
+      fr: FR.select('Reason', REASONS, c),
+      ...buildChoices(r, c, REASONS.slice(1), () => null, [REASONS[1]]),
+      solution: `${SEG(Wn + Y)} is a side of both triangles. Any segment is congruent to itself, by the Reflexive Property of Congruence.` };
+  }
+  if (kind === 'third') {
+    const c = REASONS[3];
+    return { topic: 'Showing polygons are congruent', size: [520, 300], draw,
+      stem: `${base}Which reason explains why ∠${X} ≅ ∠${Z}?`,
+      fr: FR.select('Reason', REASONS, c),
+      ...buildChoices(r, c, REASONS.filter((x) => x !== c), () => null, [REASONS[5]]),
+      solution: `The marks show ∠${X}${Y}${Wn} ≅ ∠${Z}${Wn}${Y} and ∠${X}${Wn}${Y} ≅ ∠${Z}${Y}${Wn}. When two angles of one triangle are congruent to two angles of another, the third angles are congruent too (Third Angles Theorem).` };
+  }
+  const order = shuffle(r, [0, 1, 2]);
+  const T1 = [X, Y, Wn], T2 = [Z, Wn, Y];
+  const correct = `△${order.map((i) => T1[i]).join('')} ≅ △${order.map((i) => T2[i]).join('')}`;
+  const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]].map((pm) => `△${order.map((i) => T1[i]).join('')} ≅ △${pm.map((j) => T2[order[j]]).join('')}`);
+  return { topic: 'Showing polygons are congruent', size: [520, 300], draw,
+    stem: `${base}The two triangles are congruent. Which of the following is a correct congruence statement?`,
+    frStem: `${base}The two triangles are congruent. Complete the congruence statement △${order.map((i) => T1[i]).join('')} ≅ △____.`,
+    fr: FR.letters(`△${order.map((i) => T1[i]).join('')} ≅ △`, order.map((i) => T2[i]).join(''), correct),
+    ...buildChoices(r, correct, perms.filter((x) => x !== correct), () => null),
+    solution: `Match the marks: ${X} ↔ ${Z} (third angles), ${Y} ↔ ${Wn} (one arc), and ${Wn} ↔ ${Y} (two arcs). So ${correct}.` };
+};
+
+TEMPLATES.angleSum = (r) => {
+  for (let t = 0; t < 3000; t++) {
+    const ang = triAngles(r, 25, 115), x = ri(r, 5, 25);
+    const ms = [], cs = [];
+    let ok = true;
+    for (let i = 0; i < 3; i++) {
+      const m = ri(r, 1, 5), c = ang[i] - m * x;
+      if (c === 0 || Math.abs(c) > 50) { ok = false; break; }
+      ms.push(m); cs.push(c);
+    }
+    if (!ok) continue;
+    const L = pickLetters(r, 3);
+    const pts = transformPts(triShape(ang), r, { reflect: r() < 0.5 });
+    const labels = ms.map((m, i) => `(${term(m, cs[i])})°`);
+    const sm = ms.reduce((a, b) => a + b), sc = cs.reduce((a, b) => a + b);
+    const draw = (cv) => drawFigure(cv, { note: true, polys: [{ pts, names: L, alab: labels }] });
+    const eqn = `${labels.map((l) => l.slice(0, -1)).join(' + ')} = 180`;
+    const xSol = `By the Triangle Sum Theorem, ${eqn}. Combine like terms: ${sm}x ${sc < 0 ? MINUS + ' ' + -sc : '+ ' + sc} = 180, so x = ${x}.`;
+    if (r() < 0.5) {
+      const alt = [(360 - sc) / sm, (90 - sc) / sm, (180 + sc) / sm].filter(halfInt).map((v) => `x = ${fmt(v)}`);
+      return { topic: 'Triangle Sum Theorem', size: [520, 300], draw, stem: `In △${L.join('')}, what is the value of x?`,
+        fr: FR.num('x =', x),
+        ...buildChoices(r, `x = ${x}`, [...alt, `x = ${ang[0]}`], (i) => `x = ${x + (i % 2 ? 1 : -1) * (1 + (i >> 1))}`), solution: xSol };
+    }
+    const i = ri(r, 0, 2);
+    return { topic: 'Triangle Sum Theorem', size: [520, 300], draw, stem: `In △${L.join('')}, what is m∠${L[i]}?`,
+      fr: FR.num(`m∠${L[i]} =`, ang[i], { suffix: '°' }),
+      ...buildChoices(r, deg(ang[i]), [...ang.map(deg), deg(x), deg(180 - ang[i])], (k) => deg(ang[i] + (k % 2 ? 1 : -1) * 5 * (1 + (k >> 1))), [deg(x)]),
+      solution: `${xSol} Then m∠${L[i]} = ${term(ms[i], cs[i]).replace('x', '(' + x + ')')} = ${ang[i]}°.` };
+  }
+};
+
+/* ---------- triangle congruence (5.3 SAS, 5.5 SSS/HL, 5.6 ASA/AAS) ---------- */
+// Parts of a triangle: side k joins vertices k and k+1; angle v is at vertex v.
+// known = { S: Set of side indices, A: Set of vertex indices, right: vertex index or null }
+function congCriteria(known) {
+  const S = known.S, A = known.A, out = new Set();
+  const sideBetween = (u, v) => [0, 1, 2].find((s) => new Set([s, (s + 1) % 3]).has(u) && new Set([s, (s + 1) % 3]).has(v));
+  if (S.size === 3) out.add('SSS');
+  for (const v of A) if (S.has((v + 2) % 3) && S.has(v)) out.add('SAS');
+  const angs = [...A];
+  for (let i = 0; i < angs.length; i++) for (let j = i + 1; j < angs.length; j++) {
+    const between = sideBetween(angs[i], angs[j]);
+    for (const s of S) out.add(s === between ? 'ASA' : 'AAS');
+  }
+  if (known.right != null && A.has(known.right)) {
+    const r = known.right, hyp = (r + 1) % 3;
+    if (S.has(hyp) && (S.has(r) || S.has((r + 2) % 3))) out.add('HL');
+  }
+  return out;
+}
+
+function triCong(r, givenText) {
+  const CRIT = ['SSS', 'SAS', 'ASA', 'AAS', 'HL'];
+  const target = pick(r, ['SSS', 'SSS', 'SAS', 'SAS', 'ASA', 'ASA', 'AAS', 'AAS', 'HL', 'none']);
+  for (let t = 0; t < 20000; t++) {
+    const config = pick(r, ['separate', 'separate', 'line', 'point', 'vertical']);
+    // shape
+    let ang, right = null;
+    if (target === 'HL' || r() < 0.2) {
+      const a = ri(r, 28, 62); if (a === 45) continue;
+      right = ri(r, 0, 2); ang = [0, 0, 0]; ang[right] = 90; ang[(right + 1) % 3] = a; ang[(right + 2) % 3] = 90 - a;
+    } else ang = triAngles(r, 35, 100);
+    // implicit part from the figure
+    const implicit = { S: new Set(), A: new Set() };
+    let k = null, v0 = null;
+    if (config === 'line' || config === 'point') { k = ri(r, 0, 2); implicit.S.add(k); }
+    if (config === 'vertical') { v0 = ri(r, 0, 2); if (v0 === right) continue; implicit.A.add(v0); }
+    // marked parts
+    const avail = [];
+    [0, 1, 2].forEach((s) => { if (!implicit.S.has(s)) avail.push(['S', s]); });
+    [0, 1, 2].forEach((v) => { if (!implicit.A.has(v) && v !== right) avail.push(['A', v]); });
+    const nMark = ri(r, 1, 3);
+    const marked = shuffle(r, avail).slice(0, nMark);
+    const known = { S: new Set(implicit.S), A: new Set(implicit.A), right };
+    marked.forEach(([ty, i]) => known[ty].add(i));
+    if (right != null) known.A.add(right);
+    const crit = congCriteria(known);
+    const nKnown = known.S.size + known.A.size;
+    if (target === 'none') { if (crit.size || nKnown < 3) continue; }
+    else if (crit.size !== 1 || !crit.has(target)) continue;
+    // in "Given" mode the implicit part must not be the only thing (keep it a real question)
+    // ----- build figure
+    const P = triShape(ang);
+    const L1 = pickLetters(r, 3);
+    let T2pts, N2, group = null, polysOf;
+    if (config === 'separate') {
+      const pr = congruentPair(r, P); polysOf = { A: pr.A, B: pr.B }; T2pts = pr.B; N2 = pr.nb; L1.splice(0, 3, ...pr.L1);
+    } else {
+      const extra = pickLetters(r, 2, L1);
+      if (config === 'line') {
+        const a = P[k], b = P[(k + 1) % 3], c = P[(k + 2) % 3], d = VEC.norm(VEC.sub(b, a));
+        const proj = VEC.add(a, VEC.mul(d, (c[0] - a[0]) * d[0] + (c[1] - a[1]) * d[1]));
+        const Q = VEC.sub(VEC.mul(proj, 2), c);
+        T2pts = [0, 1, 2].map((i) => (i === (k + 2) % 3 ? Q : P[i]));
+        N2 = [0, 1, 2].map((i) => (i === (k + 2) % 3 ? extra[0] : L1[i]));
+      } else if (config === 'point') {
+        const M = VEC.mul(VEC.add(P[k], P[(k + 1) % 3]), 0.5);
+        T2pts = P.map((p) => VEC.sub(VEC.mul(M, 2), p));
+        N2 = [0, 1, 2].map((i) => (i === k ? L1[(k + 1) % 3] : i === (k + 1) % 3 ? L1[k] : extra[0]));
+      } else {
+        const C = P[v0];
+        T2pts = P.map((p) => VEC.sub(VEC.mul(C, 2), p));
+        let e = 0; N2 = [0, 1, 2].map((i) => (i === v0 ? L1[v0] : extra[e++]));
+      }
+      const all = transformPts([...P, ...T2pts], r, { reflect: r() < 0.5 });
+      polysOf = { A: all.slice(0, 3), B: all.slice(3) };
+      group = 'g';
+    }
+    // marks
+    const ticks = [0, 0, 0], arcs = [0, 0, 0], rt = [false, false, false];
+    let tc = 1, ac = 1;
+    shuffle(r, marked).forEach(([ty, i]) => { if (ty === 'S') ticks[i] = tc++; else arcs[i] = ac++; });
+    if (right != null) rt[right] = true;
+    const showMarks = !givenText;
+    const poly = (pts, names) => ({ pts, names, group, ticks: showMarks ? ticks : null, arcs: showMarks ? arcs : null, right: showMarks ? rt : null });
+    const draw = (cv) => drawFigure(cv, { polys: [poly(polysOf.A, L1), poly(polysOf.B, N2)] });
+    // names & statements
+    const angName = (N, v) => `∠${N[(v + 2) % 3]}${N[v]}${N[(v + 1) % 3]}`;
+    const sideStr = (N, s) => SEG(N[s] + N[(s + 1) % 3]);
+    const order = shuffle(r, [0, 1, 2]);
+    const lhs = `△${order.map((i) => L1[i]).join('')}`;
+    const rhsOf = (perm) => `△${perm.map((i) => N2[order[i]]).join('')}`;
+    const rhs = rhsOf([0, 1, 2]);
+    const wrongPerms = [[0, 2, 1], [1, 0, 2], [2, 1, 0], [1, 2, 0], [2, 0, 1]].map(rhsOf).filter((x) => x !== rhs);
+    // explanation pieces
+    const facts = [];
+    marked.forEach(([ty, i]) => facts.push(ty === 'S' ? `${sideStr(L1, i)} ≅ ${sideStr(N2, i)}` : `${angName(L1, i)} ≅ ${angName(N2, i)}`));
+    if (right != null) facts.push(`${angName(L1, right)} and ${angName(N2, right)} are right angles`);
+    const implicitFacts = [];
+    if (k != null) implicitFacts.push(`${sideStr(L1, k)} ≅ ${sideStr(N2, k)} (shared side, Reflexive Property)`);
+    if (v0 != null) implicitFacts.push(`${angName(L1, v0)} ≅ ${angName(N2, v0)} (vertical angles)`);
+    const givenLine = givenText ? `Given: ${facts.join('; ')}.` : '';
+    const name = target === 'none' ? null : target;
+    let whyNot = '';
+    if (target === 'none') {
+      const ns = known.S.size, na = known.A.size;
+      whyNot = na === 3 && ns === 0 ? 'Three pairs of congruent angles (AAA) only show the triangles have the same shape, not the same size.'
+        : ns === 2 && na === 1 ? 'The congruent angle is not between the two congruent sides (SSA), and SSA does not prove triangles congruent.'
+        : 'There is not enough information to use SSS, SAS, ASA, AAS, or HL.';
+    }
+    const sol = `${facts.length ? (givenText ? 'Given' : 'Marked') + ': ' + facts.join('; ') + '. ' : ''}${implicitFacts.length ? 'From the figure: ' + implicitFacts.join('; ') + '. ' : ''}` +
+      (name ? `That is ${{ SSS: 'three pairs of sides', SAS: 'two sides and the included angle', ASA: 'two angles and the included side', AAS: 'two angles and a non-included side', HL: 'a hypotenuse and a leg of right triangles' }[name]}, so ${lhs} ≅ ${rhs} by ${name}.` : whyNot + ' Not possible.');
+    const base = givenText ? `${givenLine} Use the figure. ` : 'Use the markings in the figure. ';
+    // Wrong reasons that are clearly wrong (never ASA vs AAS, which a student could justify with the Third Angles Theorem,
+    // and never SAS/SSS for HL, which the Pythagorean Theorem could justify)
+    const tempting = { SSS: 'SAS', SAS: pick(r, ['SSS', 'ASA']), ASA: 'SAS', AAS: 'SAS', HL: pick(r, ['ASA', 'AAS']) };
+    const debatable = { ASA: ['AAS'], AAS: ['ASA'], HL: ['SAS', 'SSS'] };
+    const correct = name || 'Not possible';
+    const pool = [...CRIT, 'Not possible'].filter((x) => x !== correct && !(debatable[correct] || []).includes(x));
+    const mc = buildChoices(r, correct, pool, () => null, name ? [tempting[name], 'Not possible'] : [pick(r, ['SAS', 'AAS'])]);
+    // Part B: any correct correspondence is accepted, written either way around
+    const fwd = {}, back = {};
+    L1.forEach((c, i) => { fwd[c] = N2[i]; back[N2[i]] = c; });
+    const sameSet = (str, arr) => str.split('').sort().join('') === arr.slice().sort().join('');
+    const statementOk = (s1, s2) => {
+      const a = normLetters(s1), b = normLetters(s2);
+      if (a.length !== 3 || b.length !== 3 || new Set(a).size !== 3) return false;
+      if (sameSet(a, L1)) return b === a.split('').map((c) => fwd[c]).join('');
+      if (sameSet(a, N2)) return b === a.split('').map((c) => back[c]).join('');
+      return false;
+    };
+    const lhsLetters = order.map((i) => L1[i]).join(''), rhsLetters = order.map((i) => N2[i]).join('');
+    const lockB = (v) => v[0] === 'Not possible';
+    const partSpec = (choiceKind) => ({
+      fields: [
+        { kind: choiceKind, part: 'Part A', label: choiceKind === 'select' ? 'Reason' : '', options: choiceKind === 'select' ? [...CRIT, 'Not possible'] : mc.choices },
+        { kind: 'text', part: 'Part B', label: '', prefix: '△', lockWhen: lockB },
+        { kind: 'text', label: '', prefix: '≅ △', lockWhen: lockB },
+      ],
+      score: (v) => {
+        if (!v || !v[0]) return 0;
+        if (!name) return v[0] === 'Not possible' ? 1 : 0;
+        return (v[0] === name ? 0.5 : 0) + (v[0] !== 'Not possible' && statementOk(v[1], v[2]) ? 0.5 : 0);
+      },
+      check(v) { return this.score(v) === 1; },
+      answered: (v) => !!v[0] && (v[0] === 'Not possible' || (normLetters(v[1]).length > 0 && normLetters(v[2]).length > 0)),
+      display: name ? `${lhs} ≅ ${rhs} by ${name}` : 'Not possible',
+      key: name ? [name, lhsLetters, rhsLetters] : ['Not possible', '', ''],
+    });
+    const stem = `${base}Part A: Which postulate or theorem proves the triangles congruent? If they cannot be proven congruent, choose “Not possible.” Part B: If they are congruent, write a congruence statement.`;
+    return { topic: 'Triangle congruence', size: config === 'separate' ? [600, 280] : [520, 300], pair: config === 'separate', draw,
+      stem, twoPart: { mc: partSpec('choice'), fr: partSpec('select') }, ...mc, solution: sol,
+      _check: { known, target, statementOk, L1, N2 } };
+  }
+}
+TEMPLATES.triCongruence = (r) => triCong(r, false);
+TEMPLATES.triCongruenceGiven = (r) => triCong(r, true);
+
+/* ---------- question type catalog (used by the assignment builder) ---------- */
+const QUESTION_TYPES = [
+  { id: 'dilation',           subject: 'geometry', section: 'Chapter 4 Transformations', label: 'Dilations', desc: 'Center at the origin or another point' },
+  { id: 'composite',          subject: 'geometry', section: 'Chapter 4 Transformations', label: 'Composite transformations', desc: 'Reflect, rotate, translate — order matters' },
+  { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
+  { id: 'angleSum',           subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Triangle Sum Theorem', desc: 'Angles written in x — find x or an angle' },
+  { id: 'extAngleAlgebra',    subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Exterior angle (algebra)', desc: 'Exterior angle and remote interior angles in x' },
+  { id: 'extAngleRatio',      subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Exterior angle (ratio)', desc: 'Remote angles labeled 3x and 5x, find an interior angle' },
+  { id: 'congStatement',      subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Congruence statements', desc: 'Marked figures: correct statement or corresponding parts (#1–2)' },
+  { id: 'correspondingParts', subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Complete the statement', desc: 'Given △XYZ ≅ △MNL, find an angle or side (#3–6)' },
+  { id: 'findXY',             subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Find x and y', desc: 'Congruent triangles with expressions (#7–8)' },
+  { id: 'congReason',         subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Show polygons are congruent', desc: 'Reflexive Property, Third Angles Theorem (#9–10)' },
+  { id: 'thirdAngle',         subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Third Angles Theorem', desc: 'Find m∠1 (#13–14)' },
+  { id: 'triCongruence',      subject: 'geometry', section: '5.3–5.6 Triangle Congruence', label: 'Prove congruent (marked figure)', desc: 'Part A: SSS, SAS, ASA, AAS, HL, or not possible. Part B: write the congruence statement' },
+  { id: 'triCongruenceGiven', subject: 'geometry', section: '5.3–5.6 Triangle Congruence', label: 'Prove congruent (“Given:” text)', desc: 'Same two parts, with the facts given in words instead of marks' },
+  { id: 'trigGraph',          subject: 'precalc',  section: 'Trigonometry', label: 'Graphs of sine and cosine', desc: 'Find a, b, c from a graph' },
+];
+
+/* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
+let CUSTOM_KEY = null;
+(function loadCustom() {
+  const mix = new URLSearchParams(location.search).get('mix');
+  if (!mix) return;
+  const items = mix.split('_').map((p) => p.split('.')).filter(([id, n]) => TEMPLATES[id] && +n > 0).map(([id, n, f]) => [id, Math.min(20, Math.floor(+n)), f === 'fr' ? 'fr' : 'mc']);
+  if (!items.length) return;
+  const q = new URLSearchParams(location.search);
+  const title = (q.get('title') || 'Custom Practice').slice(0, 80);
+  const subject = SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry';
+  const shuffleQs = q.get('order') === 'mixed';
+  const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
+  const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
+  CUSTOM_KEY = 'custom-' + cyrb53(`${mix}|${title}|${shuffleQs}`).toString(36).slice(-8);
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts };
+})();
+
+/* ---------- question generation ---------- */
+function applyMode(q, mode) {
+  if (q.twoPart) { q.mode = 'fr'; q.fr = mode === 'fr' ? q.twoPart.fr : q.twoPart.mc; return q; } // Part A + Part B
+  if (mode === 'fr' && q.fr) { q.mode = 'fr'; if (q.frStem) q.stem = q.frStem; }
+  else q.mode = 'mc';
+  return q;
+}
+const isAnswered = (q, a) => (q.mode === 'fr'
+  ? Array.isArray(a) && (q.fr.answered ? q.fr.answered(a) : q.fr.fields.every((_, k) => String(a[k] || '').trim() !== ''))
+  : a !== null && a !== undefined && !Array.isArray(a));
+const scoreOf = (q, a) => (q.mode === 'fr'
+  ? (q.fr.score ? q.fr.score(Array.isArray(a) ? a : []) : Array.isArray(a) && q.fr.check(a) ? 1 : 0)
+  : a === q.answer ? 1 : 0);
+const isCorrect = (q, a) => scoreOf(q, a) === 1;
+const norm = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
+function generate(setKey, period, name, attempt = 1) {
+  const seedStr = `${CONFIG.SALT}|${setKey}|${period}|${norm(name)}` + (attempt > 1 ? `|a${attempt}` : '');
+  const r = mulberry32(cyrb53(seedStr));
+  let qs = [];
+  for (const [tpl, count, mode] of SETS[setKey].items) for (let i = 0; i < count; i++) {
+    const q = applyMode(TEMPLATES[tpl](r), mode); q.tpl = tpl; q.fmt = mode; qs.push(q);
+  }
+  if (SETS[setKey].shuffle) qs = shuffle(r, qs);
+  return { qs, seedStr, version: cyrb53(seedStr).toString(36).slice(-6).toUpperCase() };
+}
+// a fresh version of question i for retry number t (same type and format, new numbers)
+function regenQuestion(seedStr, old, i, t) {
+  const q = applyMode(TEMPLATES[old.tpl](mulberry32(cyrb53(`${seedStr}|q${i}|r${t}`))), old.fmt);
+  q.tpl = old.tpl; q.fmt = old.fmt;
+  return q;
+}
+const setting = (setKey, name) => {
+  const v = SETS[setKey][name];
+  if (v !== undefined) return v;
+  if (name === 'attempts') return CONFIG.ALLOW_RETAKE ? 99 : CONFIG.ATTEMPTS || 1;
+  return CONFIG.RETRIES || 0;
+};
+
+/* ---------- storage (best effort) ---------- */
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+/* ---------- UI ---------- */
+const app = document.getElementById('app');
+const params = new URLSearchParams(location.search);
+const LETTERS = ['A', 'B', 'C', 'D'];
+let state = null;
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') e.className = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
+  }
+  kids.flat().forEach((k) => e.append(k instanceof Node ? k : document.createTextNode(k)));
+  return e;
+}
+const contentWidth = () => Math.min(700, app.clientWidth) - 38;
+
+function startScreen(teacher = false) {
+  const setKey = CUSTOM_KEY || params.get('set');
+  app.innerHTML = '';
+  const card = el('div', { class: 'card' });
+  let setSel = null;
+  if (!SETS[setKey]) {
+    const subj = (params.get('subject') || '').toLowerCase();
+    const subjects = Object.keys(SUBJECTS).filter((k) => !SUBJECTS[subj] || k === subj);
+    if (SUBJECTS[subj]) document.getElementById('title').textContent = SUBJECTS[subj];
+    setSel = el('select', { id: 'set' }, el('option', { value: '' }, 'Choose an assignment…'),
+      ...subjects.map((sk) => {
+        const g = el('optgroup', { label: SUBJECTS[sk] });
+        Object.entries(SETS).filter(([, v]) => v.subject === sk).forEach(([k, v]) => g.append(el('option', { value: k }, v.title)));
+        return g;
+      }).filter((g) => g.children.length));
+    card.append(el('label', { for: 'set' }, 'Assignment'), setSel);
+  } else {
+    document.getElementById('title').textContent = SETS[setKey].title;
+    document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${CONFIG.TEACHER_NAME}`;
+  }
+  const per = el('select', { id: 'period' }, el('option', { value: '' }, 'Choose your class period…'), ...CONFIG.PERIODS.map((p) => el('option', { value: p }, p + ' period')));
+  const nm = el('input', { type: 'text', id: 'name', placeholder: 'First and last name', autocomplete: 'off' });
+  const err = el('div', { class: 'err' });
+  const clear = () => (err.textContent = '');
+  [per, nm, setSel].forEach((x) => x && x.addEventListener('input', clear));
+  card.append(el('label', { for: 'period' }, teacher ? "Student's class period" : 'Class period'), per,
+    el('label', { for: 'name' }, teacher ? "Student's name (as they typed it)" : 'Your name'), nm);
+  const attSel = el('select', { id: 'attempt' }, ...Array.from({ length: 10 }, (_, n) => el('option', { value: String(n + 1) }, `Attempt ${n + 1}`)));
+  if (teacher) card.append(el('label', { for: 'attempt' }, 'Which attempt'), attSel,
+    el('p', { class: 'small' }, 'Shows the first version of each question. If retries are on, later versions are listed in the student’s work Doc.'));
+  if (!teacher) card.append(el('p', { class: 'small' }, 'Type your full name exactly the same way every time. Your questions are made just for you, so your answers won’t match anyone else’s.'));
+  card.append(el('button', { class: 'btn', onclick: () => {
+    const sk = setSel ? setSel.value : setKey;
+    const name = nm.value.trim().replace(/\s+/g, ' ');
+    if (!sk) return (err.textContent = 'Choose an assignment first.');
+    if (!per.value) return (err.textContent = 'Choose your class period.');
+    if (norm(name).length < 4 || !name.includes(' ')) return (err.textContent = 'Enter your first and last name.');
+    begin(sk, per.value, name, teacher, teacher ? +attSel.value : 1);
+  } }, teacher ? 'Show answer key' : 'Start'), err);
+  app.append(card);
+}
+
+async function begin(setKey, period, name, teacher, teacherAttempt = 1) {
+  if (!mathReady) { app.innerHTML = '<div class="card">Loading…</div>'; await mathLoading; }
+  document.getElementById('title').textContent = SETS[setKey].title;
+  document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period`;
+  const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${norm(name)}`;
+  const attempts = setting(setKey, 'attempts'), retries = setting(setKey, 'retries');
+  const meta = teacher ? { attempt: teacherAttempt, scores: [] } : store.get(base + ':meta') || { attempt: 1, scores: [] };
+  const attempt = Math.min(meta.attempt, attempts);
+  const key = attempt > 1 ? `${base}:a${attempt}` : base;
+  const { qs, version, seedStr } = generate(setKey, period, name, attempt);
+  const saved = teacher ? {} : store.get(key) || {};
+  const tries = saved.tries || {};
+  Object.keys(tries).forEach((i) => { if (tries[i] > 0 && qs[i]) qs[i] = regenQuestion(seedStr, qs[i], +i, tries[i]); });
+  state = { setKey, period, name, qs, version, seedStr, key, base, meta, attempt, attempts, retries, teacher,
+    answers: saved.answers || Array(qs.length).fill(null),
+    submitted: !teacher && saved.submitted ? saved.submitted : null,
+    started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
+    tries, status: saved.status || {}, history: saved.history || {}, flash: {},
+    drawings: (!teacher && store.get(key + ':draw')) || {}, drawOn: {}, work: (!teacher && store.get(key + ':work')) || {} };
+  if (!teacher) { saveState(); store.set(base + ':meta', meta); }
+  render();
+}
+function saveState() {
+  if (state.teacher) return;
+  const saved = store.get(state.key) || {};
+  store.set(state.key, { ...saved, answers: state.answers, started: state.started, tabAways: state.tabAways,
+    tries: state.tries, status: state.status, history: state.history, submitted: state.submitted });
+}
+
+function render() {
+  app.innerHTML = '';
+  const { qs, answers, submitted, teacher } = state;
+  const W = contentWidth();
+  if (submitted) app.append(resultsCard());
+  if (teacher) app.append(el('div', { class: 'card' }, el('strong', {}, 'Answer key'), el('p', { class: 'small' }, `Version ${state.version}. This is exactly what this student sees.`)));
+  qs.forEach((q, i) => {
+    const locked = !!state.status[i];
+    const box = el('div', { class: 'q', id: 'q' + i });
+    box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic)));
+    box.append(textCanvas(q.stem, W));
+    if (q.draw) {
+      const graph = q.topic.startsWith('Graphs');
+      const dw = graph ? Math.max(Math.min(620, W), 420) : 560;
+      const narrow = W < 480;
+      const cv = q.size ? (narrow && q.pair ? makeCanvas(360, 440) : makeCanvas(q.size[0], q.size[1])) : makeCanvas(dw, graph ? Math.max(250, Math.round(330 * dw / 620)) : 300);
+      cv._stack = narrow && q.pair;
+      q.draw(cv); box.append(drawable(cv, String(i), { readOnly: !!submitted || !!teacher || locked }));
+    }
+    const showSol = ((submitted || locked) && CONFIG.SHOW_SOLUTIONS) || teacher;
+    if (q.mode === 'fr') { box.append(frArea(q, i)); box.append(checkBar(q, i)); if (!teacher) box.append(workArea(q, i)); if (showSol) box.append(el('div', { class: 'sol' }, q.solution)); app.append(box); return; }
+    const ch = el('div', { class: 'choices' });
+    q.choices.forEach((c, j) => {
+      let cls = 'choice';
+      const reveal = submitted || teacher || locked;
+      if (answers[i] === j) cls += ' sel';
+      if (reveal && j === q.answer) cls += ' right';
+      if (reveal && answers[i] === j && j !== q.answer) cls += ' wrong';
+      const b = el('button', { class: cls, type: 'button', 'aria-label': `Choice ${LETTERS[j]}` }, el('span', { class: 'letter' }, LETTERS[j]), textCanvas(c, Math.min(W - 70, 520), '17px Georgia, "Times New Roman", serif', 24));
+      if (!reveal) b.addEventListener('click', () => choose(i, j));
+      else b.disabled = true;
+      ch.append(b);
+    });
+    box.append(ch);
+    box.append(checkBar(q, i));
+    if (!teacher) box.append(workArea(q, i));
+    if (showSol) box.append(el('div', { class: 'sol' }, q.solution));
+    app.append(box);
+  });
+  if (!submitted && !teacher) {
+    const done = qs.filter((q, i) => isAnswered(q, answers[i])).length;
+    const err = el('span', { class: 'err', id: 'submitErr' });
+    app.append(el('div', { class: 'bar' }, el('span', {}, el('strong', { id: 'doneCount' }, `${done} of ${qs.length}`), ' answered ', err),
+      el('button', { class: 'btn', onclick: submit }, 'Submit')));
+  }
+}
+
+/* ---------- scratch drawing on diagrams (kept on this device only) ---------- */
+const PENS = [['#c0392b', 'Red pen'], ['#1f5fa8', 'Blue pen'], ['#1d1d1b', 'Black pen']];
+let penColor = PENS[0][0];
+function saveDrawings() {
+  if (state.teacher) return;
+  const json = JSON.stringify(state.drawings);
+  if (json.length < 400000) store.set(state.key + ':draw', state.drawings); // stay well under browser storage limits
+}
+function paintStrokes(ctx, strokes, W, H) {
+  strokes.forEach((st) => {
+    ctx.strokeStyle = st.c; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    st.p.forEach(([x, y], n) => (n ? ctx.lineTo(x * W, y * H) : ctx.moveTo(x * W, y * H)));
+    if (st.p.length === 1) ctx.lineTo(st.p[0][0] * W + 0.1, st.p[0][1] * H);
+    ctx.stroke();
+  });
+}
+// key: which drawing this is ('0', '1', … for diagrams; 'w0', 'w1', … for work pads)
+function drawable(cv, key, { label = 'Draw', startOn = false, readOnly = false } = {}) {
+  const wrap = el('div', { class: 'drawwrap', style: `max-width:${cv.style.maxWidth}` });
+  cv.classList.add('base'); cv.style.maxWidth = '100%';
+  const layer = makeCanvas(cv._w, cv._h);
+  layer.className = 'layer'; layer.style.maxWidth = 'none'; layer.style.height = '100%';
+  wrap.append(cv, layer);
+  const ctx = layer._ctx, W = cv._w, H = cv._h;
+  const strokes = (state.drawings[key] = state.drawings[key] || []);
+  if (!readOnly) state.drawings['L' + key] = [W, H, !!cv._stack]; // layout the strokes belong to (for the teacher's copy)
+  const redraw = () => { ctx.clearRect(0, 0, W, H); paintStrokes(ctx, strokes, W, H); };
+  redraw();
+  if (readOnly) return el('div', {}, wrap);
+  let cur = null;
+  const pos = (e) => { const b = layer.getBoundingClientRect(); return [Math.round(((e.clientX - b.left) / b.width) * 1000) / 1000, Math.round(((e.clientY - b.top) / b.height) * 1000) / 1000]; };
+  layer.addEventListener('pointerdown', (e) => {
+    if (!state.drawOn[key]) return;
+    e.preventDefault(); layer.setPointerCapture(e.pointerId);
+    cur = { c: penColor, p: [pos(e)] }; strokes.push(cur); redraw();
+  });
+  layer.addEventListener('pointermove', (e) => {
+    if (!cur) return;
+    e.preventDefault();
+    const p = pos(e), last = cur.p[cur.p.length - 1];
+    if (Math.abs(p[0] - last[0]) + Math.abs(p[1] - last[1]) > 0.003) { cur.p.push(p); redraw(); }
+  });
+  const end = () => { if (cur) { cur = null; saveDrawings(); } };
+  layer.addEventListener('pointerup', end); layer.addEventListener('pointercancel', end);
+
+  const bar = el('div', { class: 'drawbar' });
+  const toggle = el('button', { type: 'button' });
+  const dots = PENS.map(([c, name]) => {
+    const d = el('button', { type: 'button', class: 'dot', title: name, 'aria-label': name, style: `background:${c}` });
+    d.addEventListener('click', () => { penColor = c; app.querySelectorAll('.drawbar .dot').forEach((x) => x.classList.toggle('picked', x.style.background === d.style.background)); });
+    if (c === penColor) d.classList.add('picked');
+    return d;
+  });
+  const undo = el('button', { type: 'button' }, 'Undo');
+  undo.addEventListener('click', () => { strokes.pop(); redraw(); saveDrawings(); });
+  const clear = el('button', { type: 'button' }, 'Clear');
+  clear.addEventListener('click', () => { strokes.length = 0; redraw(); saveDrawings(); });
+  const setOn = (on) => {
+    state.drawOn[key] = on;
+    wrap.classList.toggle('on', on); bar.classList.toggle('on', on); toggle.classList.toggle('active', on);
+    toggle.textContent = on ? '✓ Done' : `✎ ${label}`;
+  };
+  toggle.addEventListener('click', () => setOn(!state.drawOn[key]));
+  bar.append(toggle, el('span', { class: 'tools' }, ...dots, undo, clear));
+  if (state.drawOn[key] === undefined) state.drawOn[key] = startOn;
+  setOn(!!state.drawOn[key]);
+  return el('div', {}, wrap, bar);
+}
+
+// light grid "scratch paper"
+function paintGrid(cv) {
+  const ctx = cv._ctx, W = cv._w, H = cv._h;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#e6eef8'; ctx.lineWidth = 1;
+  for (let x = 20; x < W; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 20; y < H; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+}
+const PAD = [640, 260];
+const coarse = (() => { try { return matchMedia('(pointer: coarse)').matches; } catch { return false; } })();
+function workArea(q, i) {
+  const done = !!state.submitted;
+  const wrap = el('div', { class: 'work' }, el('div', { class: 'worktitle' }, 'Show your work'));
+  const strokes = state.drawings['w' + i] || [];
+  const typed = workLines(i).filter((l) => l.trim()).length > 0;
+  if (done && !strokes.length && !typed) { wrap.append(el('div', { class: 'small' }, 'No work shown.')); return wrap; }
+  if (!done || strokes.length) {
+    const L = done && state.drawings['Lw' + i] ? state.drawings['Lw' + i] : contentWidth() < 480 ? [360, 300] : PAD; // taller pad on phones
+    const pad = makeCanvas(L[0], L[1]); paintGrid(pad);
+    wrap.append(drawable(pad, 'w' + i, { label: 'Write', startOn: !coarse, readOnly: done }));
+  }
+  if (done && !typed) return wrap;
+  wrap.append(mathReady ? mathWork(i, done) : plainWork(i, done));
+  return wrap;
+}
+
+/* ---------- typed work: math editor (MathLive) with a plain-text fallback ---------- */
+const MATH_CDN = 'https://cdn.jsdelivr.net/npm/mathlive@0.98.6/dist/mathlive.min.js';
+let mathReady = false;
+const mathLoading = new Promise((resolve) => {
+  const s = document.createElement('script');
+  s.src = MATH_CDN;
+  s.onload = () => {
+    try { MathfieldElement.soundsDirectory = null; MathfieldElement.keypressSound = null; MathfieldElement.plonkSound = null; } catch {}
+    mathReady = !!(window.customElements && customElements.get('math-field'));
+    resolve();
+  };
+  s.onerror = () => resolve(); // blocked or offline: plain text box instead
+  setTimeout(resolve, 6000);
+  document.head.append(s);
+});
+const workLines = (i) => { const w = state.work[i]; return Array.isArray(w) ? w : w ? [String(w)] : []; };
+const saveWork = () => store.set(state.key + ':work', state.work);
+
+function plainWork(i, done) {
+  const text = workLines(i).join('\n');
+  if (done) return el('div', { class: 'typedwork' }, workLines(i).map(latexToText).join('\n'));
+  const ta = el('textarea', { rows: '2', placeholder: 'Type your work or explain your reasoning (optional)' });
+  ta.value = text;
+  ta.addEventListener('input', () => { state.work[i] = ta.value.split('\n'); saveWork(); });
+  return ta;
+}
+
+const MATH_KEYS = [
+  ['x²', '^2'], ['xⁿ', '^{#?}'], ['x₁', '_{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'],
+  ['π', '\\pi'], ['°', '^{\\circ}'], ['≅', '\\cong'], ['∠', '\\angle'], ['△', '\\triangle'], ['⊥', '\\perp'], ['∥', '\\parallel'],
+  ['≠', '\\ne'], ['≤', '\\le'], ['≥', '\\ge'], ['±', '\\pm'], ['×', '\\times'], ['÷', '\\div'], ['θ', '\\theta'],
+];
+function configureField(mf) {
+  mf.smartMode = true;               // typed words become text
+  mf.mathModeSpace = '\\:';          // the space bar makes a space
+  mf.mathVirtualKeyboardPolicy = 'manual';
+  mf.menuItems = [];
+}
+function mathWork(i, done) {
+  const box = el('div', { class: 'mathwork' });
+  if (done) {
+    workLines(i).filter((l) => l.trim()).forEach((l) => { const mf = new MathfieldElement(); mf.value = l; mf.readOnly = true; mf.className = 'mline ro'; box.append(mf); });
+    return box;
+  }
+  let focused = null;
+  const list = el('div', { class: 'mlines' });
+  const save = () => { state.work[i] = [...list.querySelectorAll('math-field')].map((m) => m.value); saveWork(); };
+  const addLine = (val = '', afterRow = null, focus = false) => {
+    const mf = new MathfieldElement();
+    configureField(mf);
+    mf.value = val;
+    mf.className = 'mline';
+    mf.setAttribute('aria-label', 'Work line');
+    const del = el('button', { type: 'button', class: 'mdel', title: 'Delete this line', 'aria-label': 'Delete this line' }, '×');
+    const row = el('div', { class: 'mrow' }, mf, del);
+    del.addEventListener('click', () => { if (list.children.length > 1) row.remove(); else mf.value = ''; save(); });
+    mf.addEventListener('input', save);
+    mf.addEventListener('focus', () => { focused = mf; });
+    mf.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); addLine('', row, true); save(); }
+      if (e.key === 'Backspace' && !mf.value && list.children.length > 1) {
+        e.preventDefault(); const prev = row.previousElementSibling || row.nextElementSibling; row.remove(); save();
+        const pm = prev && prev.querySelector('math-field'); if (pm) pm.focus();
+      }
+    }, { capture: true });
+    if (afterRow) afterRow.after(row); else list.append(row);
+    if (focus) { mf.focus(); requestAnimationFrame(() => { if (document.activeElement !== mf) mf.focus(); }); }
+    return mf;
+  };
+  const lines = workLines(i);
+  (lines.length ? lines : ['']).forEach((l) => addLine(l));
+  const target = () => (focused && focused.isConnected ? focused : list.lastElementChild.querySelector('math-field'));
+  const keys = el('div', { class: 'mkeys' }, ...MATH_KEYS.map(([label, latex]) => {
+    const b = el('button', { type: 'button', title: 'Insert ' + label }, label);
+    b.addEventListener('mousedown', (e) => e.preventDefault()); // keep the cursor in the line
+    b.addEventListener('click', () => { const mf = target(); mf.focus(); mf.insert(latex, { format: 'latex', selectionMode: 'placeholder' }); save(); });
+    return b;
+  }));
+  const textBtn = el('button', { type: 'button', class: 'mtext', title: 'Switch between words and math' }, 'Aa Text');
+  textBtn.addEventListener('mousedown', (e) => e.preventDefault());
+  textBtn.addEventListener('click', () => { const mf = target(); mf.focus(); mf.executeCommand(['switchMode', mf.mode === 'text' ? 'math' : 'text']); });
+  keys.prepend(textBtn);
+  const add = el('button', { type: 'button', class: 'madd' }, '+ New line');
+  add.addEventListener('click', () => { addLine('', null, true); save(); });
+  box.append(el('div', { class: 'small', style: 'margin:8px 0 4px' }, 'Type your work: ^ for exponents, _ for subscripts, / for fractions. Press Enter for a new line.'), keys, list, add);
+  return box;
+}
+
+// readable plain text for the teacher's Google Doc: x^2 → x², 90^@ → 90°, sqrt(25) → √(25)
+const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '+': '⁺', '-': '⁻', n: 'ⁿ', x: 'ˣ', y: 'ʸ', i: 'ⁱ' };
+const SUB = { 0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉', '+': '₊', '-': '₋', a: 'ₐ', e: 'ₑ', x: 'ₓ', n: 'ₙ' };
+function latexToText(latex) {
+  if (!latex) return '';
+  let a = latex;
+  if (mathReady && window.MathLive && MathLive.convertLatexToAsciiMath) { try { a = MathLive.convertLatexToAsciiMath(latex); } catch {} }
+  else return latex; // plain-text fallback lines are already plain
+  return a.split('"').map((part, k) => {
+    if (k % 2) return part; // inside "text" stays as typed
+    const map = (str, table) => str.split('').every((c) => table[c]) ? str.split('').map((c) => table[c]).join('') : null;
+    return part
+      .replace(/\^@/g, '°')
+      .replace(/\(([\w.]+)\)\/\(([\w.]+)\)/g, '$1/$2')
+      .replace(/\^\(([^()]+)\)/g, (m, g) => map(g, SUP) || '^(' + g + ')')
+      .replace(/\^([0-9a-z+-])/gi, (m, g) => map(g, SUP) || m)
+      .replace(/_\(([^()]+)\)/g, (m, g) => map(g, SUB) || '_(' + g + ')')
+      .replace(/_([0-9a-z])/gi, (m, g) => map(g, SUB) || m)
+      .replace(/sqrt\(/g, '√(').replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/\+-/g, '±')
+      .replace(/(\d)xx(\d)/g, '$1×$2').replace(/ xx /g, ' × ').replace(/-:/g, '÷')
+      .replace(/\btheta\b/g, 'θ').replace(/pi(?![a-z])/g, 'π');
+  }).join('').replace(/\s+/g, ' ').trim();
+}
+
+function frArea(q, i) {
+  const reveal = state.submitted || state.teacher || !!state.status[i];
+  const vals = state.teacher ? q.fr.key.slice() : Array.isArray(state.answers[i]) ? state.answers[i].slice() : q.fr.fields.map(() => '');
+  const wrap = el('div', { class: 'fr' });
+  const controls = [];
+  let row = null, lastAns = null, hasMath = false;
+  const applyLocks = () => q.fr.fields.forEach((f, k) => {
+    if (!f.lockWhen || reveal) return;
+    const locked = f.lockWhen(vals);
+    controls[k].disabled = locked;
+    controls[k].placeholder = locked ? '' : 'letters';
+  });
+  const save = () => {
+    state.answers[i] = vals.slice();
+    const saved = store.get(state.key) || {};
+    store.set(state.key, { ...saved, answers: state.answers });
+    const dc = document.getElementById('doneCount');
+    if (dc) dc.textContent = `${state.qs.filter((qq, n) => isAnswered(qq, state.answers[n])).length} of ${state.qs.length}`;
+    applyLocks();
+  };
+  q.fr.fields.forEach((f, k) => {
+    if (!row || f.part) {
+      if (f.part) wrap.append(el('div', { class: 'frpart' }, f.part));
+      row = el('div', { class: 'frrow' }); wrap.append(row);
+    }
+    if (f.kind === 'choice') { // multiple-choice part inside a multi-part question
+      const box = el('div', { class: 'choices', style: 'margin-top:0;width:100%' });
+      const btns = f.options.map((o, j) => {
+        const b = el('button', { class: 'choice', type: 'button' }, el('span', { class: 'letter' }, LETTERS[j]), el('span', { style: 'font:17px Georgia,serif' }, o));
+        if (reveal) b.disabled = true;
+        else b.addEventListener('click', () => { vals[k] = o; btns.forEach((x, n) => x.classList.toggle('sel', f.options[n] === o)); save(); });
+        return b;
+      });
+      btns.forEach((b, n) => {
+        const o = f.options[n];
+        if (vals[k] === o) b.classList.add('sel');
+        if (reveal && o === q.fr.key[k]) b.classList.add('right');
+        if (reveal && vals[k] === o && o !== q.fr.key[k]) b.classList.add('wrong');
+        box.append(b);
+      });
+      controls[k] = { set disabled(_) {}, set placeholder(_) {} };
+      row.append(box);
+      return;
+    }
+    let input;
+    if (f.kind === 'number' && mathReady) {
+      input = new MathfieldElement();
+      input.smartMode = false; input.mathVirtualKeyboardPolicy = 'manual'; input.menuItems = [];
+      input.className = 'mans'; input.setAttribute('aria-label', f.label || 'Answer');
+      input.value = vals[k] || '';
+      if (reveal) input.readOnly = true;
+      controls[k] = input;
+      input.addEventListener('input', () => { vals[k] = input.value; save(); });
+      input.addEventListener('focus', () => { lastAns = input; });
+      row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
+      hasMath = true;
+      return;
+    }
+    if (f.kind === 'select') {
+      input = el('select', {}, el('option', { value: '' }, 'Choose…'), ...f.options.map((o) => el('option', { value: o }, o)));
+    } else {
+      input = el('input', { type: 'text', autocomplete: 'off', autocapitalize: f.kind === 'text' ? 'characters' : 'off', spellcheck: 'false',
+        inputmode: f.kind === 'number' ? 'decimal' : 'text', class: f.kind === 'number' ? 'num' : 'let', placeholder: f.kind === 'number' ? '' : 'letters' });
+    }
+    input.value = vals[k] || '';
+    if (reveal) input.disabled = true;
+    controls[k] = input;
+    const onIn = () => { vals[k] = input.value; save(); };
+    input.addEventListener('input', onIn); input.addEventListener('change', onIn);
+    row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
+  });
+  applyLocks();
+  if (hasMath && !reveal) { // small symbol row for the answer boxes
+    const firstAns = () => lastAns || wrap.querySelector('math-field.mans');
+    wrap.append(el('div', { class: 'mkeys anskeys' }, ...[['π', '\pi'], ['√', '\sqrt{#?}'], ['a⁄b', '\frac{#@}{#?}'], ['xⁿ', '^{#?}'], ['°', '^{\circ}']].map(([label, latex]) => {
+      const b = el('button', { type: 'button', title: 'Insert ' + label }, label);
+      b.addEventListener('mousedown', (e) => e.preventDefault());
+      b.addEventListener('click', () => { const mf = firstAns(); mf.focus(); mf.insert(latex, { format: 'latex', selectionMode: 'placeholder' }); mf.dispatchEvent(new Event('input')); });
+      return b;
+    })));
+  }
+  if (reveal) {
+    const pts = scoreOf(q, state.answers[i]);
+    if (state.submitted) wrap.append(el('div', { style: 'margin-top:10px' }, el('span', { class: 'tag ' + (pts === 1 ? 'good' : pts > 0 ? 'part' : 'bad') },
+      pts === 1 ? 'Correct' : pts > 0 ? `Partly correct (½ of 1)` : isAnswered(q, state.answers[i]) ? 'Incorrect' : 'No answer')));
+    wrap.append(el('div', { class: 'small', style: 'margin-top:6px' }, 'Correct answer: ', el('strong', { style: 'color:var(--ink)' }, q.fr.display.replace(/(.)̅/g, '$1'))));
+  }
+  return wrap;
+}
+
+/* ---------- per-question Check button and retries ---------- */
+function checkBar(q, i) {
+  if (!state.retries || state.teacher) return el('span');
+  const st = state.status[i], used = state.tries[i] || 0;
+  const bar = el('div', { class: 'checkbar' });
+  if (st === 'correct') bar.append(el('span', { class: 'tag good' }, used ? `Correct on try ${used + 1}` : 'Correct'));
+  else if (st === 'locked') bar.append(el('span', { class: 'tag ' + (scoreOf(q, state.answers[i]) > 0 ? 'part' : 'bad') }, scoreOf(q, state.answers[i]) > 0 ? 'Out of tries (½ credit)' : 'Out of tries'));
+  else if (!state.submitted) {
+    const left = state.retries - used;
+    const btn = el('button', { class: 'btn checkbtn', type: 'button' }, 'Check');
+    btn.addEventListener('click', () => checkQ(i));
+    bar.append(btn, el('span', { class: 'small' }, `${left + 1} ${left === 0 ? 'try' : 'tries'} left`));
+    if (state.flash[i]) bar.append(el('div', { class: 'flash' }, state.flash[i]));
+  }
+  return bar;
+}
+function checkQ(i) {
+  const q = state.qs[i], a = state.answers[i];
+  if (!isAnswered(q, a)) { state.flash[i] = 'Answer the question first, then press Check.'; return rerenderAt(i); }
+  const pts = scoreOf(q, a);
+  state.flash[i] = '';
+  if (pts === 1) state.status[i] = 'correct';
+  else if ((state.tries[i] || 0) < state.retries) {
+    (state.history[i] = state.history[i] || []).push({ stem: q.stem, answer: answerText(q, a) });
+    state.tries[i] = (state.tries[i] || 0) + 1;
+    state.qs[i] = regenQuestion(state.seedStr, q, i, state.tries[i]);
+    state.answers[i] = null;
+    delete state.drawings[String(i)]; delete state.drawings['L' + i]; saveDrawings();
+    const left = state.retries - state.tries[i] + 1;
+    state.flash[i] = `Not quite. Here’s a new version of this question — ${left} ${left === 1 ? 'try' : 'tries'} left.`;
+  } else state.status[i] = 'locked';
+  saveState();
+  rerenderAt(i);
+}
+function rerenderAt(i) {
+  const y = window.scrollY; render(); window.scrollTo(0, y);
+}
+
+function choose(i, j) {
+  state.answers[i] = j;
+  const saved = store.get(state.key) || {};
+  store.set(state.key, { ...saved, answers: state.answers });
+  const y = window.scrollY; render(); window.scrollTo(0, y);
+}
+
+let confirmArmed = false;
+function submit() {
+  const blanks = state.qs.filter((q, i) => !isAnswered(q, state.answers[i])).length;
+  if (blanks && !confirmArmed) {
+    confirmArmed = true;
+    document.getElementById('submitErr').textContent = `${blanks} unanswered. Tap Submit again to turn it in anyway.`;
+    return;
+  }
+  const pts = state.qs.map((q, i) => scoreOf(q, state.answers[i]));
+  const score = pts.reduce((a, b) => a + b, 0);
+  state.submitted = { score, total: state.qs.length, at: Date.now(), saveStatus: 'wait' };
+  saveState();
+  state.meta.scores[state.attempt - 1] = score;
+  store.set(state.base + ':meta', state.meta);
+  render(); window.scrollTo(0, 0);
+  send(pts);
+}
+
+/* ---------- package each question's work for the teacher's Google Doc ---------- */
+function offCanvas(w, h, scale = 1.5) {
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+  const ctx = c.getContext('2d'); ctx.scale(scale, scale);
+  c._w = w; c._h = h; c._ctx = ctx;
+  return c;
+}
+const toPng = (c) => { const x = c._ctx; x.save(); x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, c._w, c._h); x.restore(); return c.toDataURL('image/png').split(',')[1]; };
+function answerText(q, a) {
+  if (q.mode !== 'fr') return a === null || a === undefined || Array.isArray(a) ? '(no answer)' : `${LETTERS[a]}. ${q.choices[a]}`;
+  if (!Array.isArray(a) || !isAnswered(q, a)) return '(no answer)';
+  if (q.twoPart) return a[0] + (a[0] !== 'Not possible' ? `;  △${normLetters(a[1])} ≅ △${normLetters(a[2])}` : '');
+  return q.fr.fields.map((f, k) => `${f.label ? f.label + ' ' : ''}${f.prefix || ''}${(f.kind === 'number' && /[\\{}]/.test(a[k] || '') ? latexToText(a[k]) : a[k]) || '—'}${f.suffix || ''}`).join(',  ');
+}
+function exportWork(pts) {
+  return state.qs.map((q, i) => {
+    let fig = null, pad = null;
+    try {
+      if (q.draw) {
+        const graph = q.topic.startsWith('Graphs');
+        const L = state.drawings['L' + i] || (q.size ? [q.size[0], q.size[1], false] : graph ? [620, 330, false] : [560, 300, false]);
+        const c = offCanvas(L[0], L[1]); c._stack = L[2]; q.draw(c);
+        paintStrokes(c._ctx, state.drawings[String(i)] || [], L[0], L[1]);
+        fig = toPng(c);
+      }
+      const ws = state.drawings['w' + i] || [];
+      const PL = state.drawings['Lw' + i] || PAD;
+      if (ws.length) { const c = offCanvas(PL[0], PL[1]); paintGrid(c); paintStrokes(c._ctx, ws, PL[0], PL[1]); pad = toPng(c); }
+    } catch (e) { /* never block a submission over a picture */ }
+    const correct = q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`;
+    return { n: i + 1, topic: q.topic, stem: q.stem, answer: answerText(q, state.answers[i]), correct, pts: pts[i], typed: workLines(i).map(latexToText).filter(Boolean).join('\n'), fig, pad,
+      tries: (state.tries[i] || 0) + 1, history: state.history[i] || [] };
+  });
+}
+
+async function send(pts) {
+  const sub = state.submitted;
+  if (!CONFIG.SCRIPT_URL) { sub.saveStatus = 'none'; return refreshStatus(); }
+  const payload = {
+    set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, subject: SUBJECTS[SETS[state.setKey].subject] || '', setTitle: SETS[state.setKey].title, period: state.period, name: state.name,
+    score: sub.score, total: sub.total, percent: Math.round((100 * sub.score) / sub.total),
+    detail: state.qs.map((q, i) => { const a = state.answers[i];
+      const tr = state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '';
+      if (pts[i] === 1) return `${i + 1}✓${tr}`;
+      if (!isAnswered(q, a)) return `${i + 1}✗${tr}–`;
+      return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}` + (q.mode === 'fr' ? '(' + a.filter((x) => x !== '').join(',').slice(0, 24) + ')' : LETTERS[a]); }).join(' '),
+    minutes: Math.round((Date.now() - state.started) / 6000) / 10, tabAways: state.tabAways,
+    version: state.version + (state.attempts > 1 ? ` · attempt ${state.attempt} of ${state.attempts}` : ''),
+    work: CONFIG.SEND_WORK ? exportWork(pts) : null,
+  };
+  try {
+    await fetch(CONFIG.SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+    sub.saveStatus = 'ok';
+  } catch (e) { sub.saveStatus = 'fail'; }
+  store.set(state.key, { ...(store.get(state.key) || {}), submitted: sub });
+  refreshStatus();
+}
+function refreshStatus() {
+  const s = document.getElementById('saveStatus'); if (!s) return;
+  const st = state.submitted.saveStatus;
+  s.className = 'status ' + (st === 'ok' ? 'ok' : st === 'fail' ? 'fail' : 'wait');
+  s.textContent = st === 'ok' ? `Saved — ${CONFIG.TEACHER_NAME} has your score.`
+    : st === 'fail' ? `Your score could not be saved. Show this screen to ${CONFIG.TEACHER_NAME}.`
+    : st === 'none' ? 'Score not sent (no gradebook connected).' : 'Saving your score…';
+  if (st === 'none') s.className = 'status wait';
+}
+function resultsCard() {
+  const { score, total, at } = state.submitted;
+  const multi = state.attempts > 1;
+  const scores = (state.meta.scores || []).filter((x) => x !== null && x !== undefined);
+  const best = scores.length ? Math.max(...scores) : score;
+  const card = el('div', { class: 'card' },
+    el('div', { class: 'small' }, multi ? `Attempt ${state.attempt} of ${state.attempts} · your score` : 'Your score'),
+    el('div', { class: 'score' }, `${fmt(score)} / ${total}`),
+    multi && scores.length > 1 ? el('div', { style: 'font-weight:600' }, `Best score so far: ${fmt(best)} / ${total}`) : '',
+    el('div', { class: 'small' }, `Turned in ${new Date(at).toLocaleString()} · Version ${state.version}`),
+    el('div', { id: 'saveStatus', class: 'status wait' }, ''));
+  if (state.attempt < state.attempts) {
+    const next = state.attempt + 1;
+    card.append(el('button', { class: 'btn', type: 'button', onclick: () => {
+      state.meta.attempt = next; store.set(state.base + ':meta', state.meta);
+      begin(state.setKey, state.period, state.name, false); window.scrollTo(0, 0);
+    } }, `Start attempt ${next} of ${state.attempts} (new questions)`));
+  } else if (multi) card.append(el('p', { class: 'small' }, 'You have used all of your attempts.'));
+  setTimeout(refreshStatus, 0);
+  return card;
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state && !state.submitted && !state.teacher) {
+    state.tabAways++;
+    const saved = store.get(state.key) || {};
+    store.set(state.key, { ...saved, tabAways: state.tabAways });
+  }
+});
+let lastW = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(window._rt);
+  window._rt = setTimeout(() => { if (state && Math.abs(app.clientWidth - lastW) > 30) { lastW = app.clientWidth; const y = window.scrollY; render(); window.scrollTo(0, y); } }, 200);
+});
+
+/* ---------- teacher tools: menu + assignment builder ---------- */
+function teacherMenu() {
+  if (CUSTOM_KEY || SETS[params.get('set')]) { document.getElementById('title').textContent = 'Answer key'; return startScreen(true); }
+  document.getElementById('title').textContent = 'Teacher tools';
+  app.innerHTML = '';
+  app.append(el('div', { class: 'card' },
+    el('p', {}, 'What would you like to do?'),
+    el('button', { class: 'btn', onclick: builder }, 'Build an assignment'), ' ',
+    el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key')));
+}
+
+function builder() {
+  document.getElementById('title').textContent = 'Build an assignment';
+  document.getElementById('subtitle').textContent = 'Choose question types and how many of each, then copy the link.';
+  app.innerHTML = '';
+  const saved = store.get('builder:last') || {};
+  const counts = Object.assign({}, saved.counts || {});
+  const formats = Object.assign({}, saved.formats || {});
+  const titleIn = el('input', { type: 'text', value: saved.title || '', placeholder: 'e.g. 5.6 Quiz Review' });
+  const subjSel = el('select', {}, ...Object.entries(SUBJECTS).map(([k, v]) => el('option', { value: k }, v)));
+  subjSel.value = saved.subject || 'geometry';
+  const orderSel = el('select', {}, el('option', { value: 'grouped' }, 'Grouped by type (in the order listed)'), el('option', { value: 'mixed' }, 'Mixed up (different order for each student)'));
+  orderSel.value = saved.order || 'grouped';
+  const numIn = (val, min, max) => el('input', { type: 'number', min: String(min), max: String(max), value: String(val), style: 'width:80px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
+  const retriesIn = numIn(saved.retries ?? 0, 0, 5), attemptsIn = numIn(saved.attempts ?? 1, 1, 10);
+  app.append(el('div', { class: 'card' },
+    el('label', {}, 'Assignment title'), titleIn,
+    el('label', {}, 'Subject (which gradebook tab scores go to)'), subjSel,
+    el('label', {}, 'Question order'), orderSel,
+    el('label', {}, 'Retries on a missed question'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, retriesIn,
+      el('span', { class: 'small' }, '0 = graded only at Submit. 1 or more adds a Check button; each retry is a new version of the question.')),
+    el('label', {}, 'Attempts at the whole assignment'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, attemptsIn,
+      el('span', { class: 'small' }, '1 = one try. Each new attempt has all new numbers; every attempt is recorded.'))));
+
+  const list = el('div', { class: 'card' });
+  const totalEl = el('strong', {}, '0');
+  let section = null;
+  QUESTION_TYPES.forEach((t) => {
+    if (t.section !== section) { section = t.section; list.append(el('h3', { style: 'margin:18px 0 6px;font-size:16px' }, section)); }
+    const num = el('input', { type: 'number', min: '0', max: '20', value: String(counts[t.id] || 0), style: 'width:70px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px', 'aria-label': `How many ${t.label}` });
+    const prevBox = el('div', { class: 'hidden' });
+    let seed = 1;
+    const prevBtn = el('button', { class: 'btn secondary', style: 'margin:0;padding:7px 12px;font-size:14px', type: 'button', onclick: () => {
+      prevBox.classList.remove('hidden'); prevBox.innerHTML = '';
+      prevBox.append(previewQuestion(applyMode(TEMPLATES[t.id](mulberry32(Date.now() % 100000 + seed++)), prevBtn._fmt ? prevBtn._fmt.value : 'mc')));
+      prevBtn.textContent = 'Another example';
+    } }, 'Preview');
+    num.addEventListener('input', () => { counts[t.id] = Math.max(0, Math.min(20, Math.floor(+num.value || 0))); update(); });
+    const fmtSel = el('select', { 'aria-label': `Format for ${t.label}`, style: 'width:auto;padding:7px 8px;font-size:14px' },
+      el('option', { value: 'mc' }, 'Multiple choice'), el('option', { value: 'fr' }, 'Free response'));
+    fmtSel.value = formats[t.id] || 'mc';
+    fmtSel.addEventListener('input', () => { formats[t.id] = fmtSel.value; update(); });
+    list.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' },
+      num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc)), fmtSel, prevBtn), prevBox);
+    prevBtn._fmt = fmtSel;
+  });
+  app.append(list);
+
+  const linkIn = el('input', { type: 'text', readonly: 'readonly', style: 'font-size:14px' });
+  const keyLink = el('a', { target: '_blank', rel: 'noopener' }, 'Open the answer key for this assignment');
+  const tryLink = el('a', { target: '_blank', rel: 'noopener' }, 'Try it as a student');
+  const codeOut = el('code', { style: 'display:block;white-space:pre-wrap;word-break:break-all;padding:8px;margin-top:6px;font-size:12px' });
+  const msg = el('div', { class: 'err' });
+  const copyBtn = el('button', { class: 'btn', type: 'button', onclick: async () => {
+    if (!linkIn.value) return;
+    try { await navigator.clipboard.writeText(linkIn.value); copyBtn.textContent = 'Copied!'; }
+    catch { linkIn.select(); copyBtn.textContent = 'Press Ctrl+C to copy'; }
+    setTimeout(() => (copyBtn.textContent = 'Copy link'), 1800);
+  } }, 'Copy link');
+  const out = el('div', { class: 'card' },
+    el('div', {}, 'Total questions: ', totalEl), msg,
+    el('label', {}, 'Student link (post this in Google Classroom)'), linkIn, copyBtn,
+    el('p', { class: 'small', style: 'margin-top:14px' }, tryLink, ' · ', keyLink),
+    el('details', { style: 'margin-top:10px' }, el('summary', { class: 'small' }, 'Make it a permanent menu item (optional)'),
+      el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut));
+  app.append(out);
+  [titleIn, subjSel, orderSel, retriesIn, attemptsIn].forEach((x) => x.addEventListener('input', update));
+
+  function update() {
+    const items = QUESTION_TYPES.filter((t) => counts[t.id] > 0).map((t) => [t.id, counts[t.id], formats[t.id] === 'fr' ? 'fr' : 'mc']);
+    const total = items.reduce((a, [, n]) => a + n, 0);
+    totalEl.textContent = String(total);
+    const title = titleIn.value.trim() || 'Custom Practice';
+    store.set('builder:last', { counts, formats, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1 });
+    if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
+    msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
+    const q = new URLSearchParams();
+    q.set('mix', items.map(([id, n, f]) => `${id}.${n}${f === 'fr' ? '.fr' : ''}`).join('_'));
+    q.set('title', title); q.set('subject', subjSel.value);
+    if (orderSel.value === 'mixed') q.set('order', 'mixed');
+    const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), at = Math.max(1, Math.min(10, Math.floor(+attemptsIn.value || 1)));
+    if (rt) q.set('retries', String(rt));
+    if (at > 1) q.set('attempts', String(at));
+    const url = location.origin + location.pathname + '?' + q.toString();
+    linkIn.value = url; tryLink.href = url; keyLink.href = url + '&teacher=1';
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''} },`;
+  }
+  update();
+}
+
+function previewQuestion(q) {
+  const W = contentWidth() - 20;
+  const box = el('div', { class: 'q', style: 'margin:6px 0 12px' });
+  box.append(textCanvas(q.stem, W));
+  if (q.draw) {
+    const graph = q.topic.startsWith('Graphs');
+    const cv = q.size ? makeCanvas(q.size[0], q.size[1]) : makeCanvas(graph ? 620 : 560, graph ? 330 : 300);
+    cv.classList.add('diagram'); q.draw(cv); box.append(cv);
+  }
+  if (q.mode === 'fr') {
+    box.append(el('div', { class: 'fr' }, el('div', { class: 'frrow' }, ...q.fr.fields.map((f) => el('label', { class: 'frfield', style: f.part ? 'flex-basis:100%' : '' },
+      f.part ? el('span', { class: 'frpart', style: 'margin:6px 8px 0 0' }, f.part) : '',
+      f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '',
+      f.kind === 'choice' ? el('span', { class: 'small' }, f.options.map((o, j) => `${LETTERS[j]}. ${o}`).join('   ')) :
+      f.kind === 'select' ? el('select', { disabled: 'disabled' }, el('option', {}, 'Choose…')) : el('input', { disabled: 'disabled', class: f.kind === 'number' ? 'num' : 'let' }),
+      f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''))),
+      el('div', { class: 'small', style: 'margin-top:6px' }, 'Correct answer: ', el('strong', {}, q.fr.display.replace(/(.)\u0305/g, '$1')))), el('div', { class: 'sol' }, q.solution));
+    return box;
+  }
+  const ch = el('div', { class: 'choices' });
+  q.choices.forEach((c, j) => ch.append(el('div', { class: 'choice' + (j === q.answer ? ' right' : '') }, el('span', { class: 'letter' }, LETTERS[j]), textCanvas(c, Math.min(W - 70, 500), '17px Georgia, "Times New Roman", serif', 24))));
+  box.append(ch, el('div', { class: 'sol' }, q.solution));
+  return box;
+}
+
+/* ---------- entry ---------- */
+(function init() {
+  lastW = app.clientWidth;
+  if (params.has('makehash')) {
+    app.append(el('div', { class: 'card' }, el('p', {}, 'Paste this into TEACHER_PIN_HASH:'), el('p', {}, el('code', {}, String(cyrb53(params.get('makehash')))))));
+    return;
+  }
+  if (params.has('teacher')) {
+    document.getElementById('title').textContent = 'Teacher tools';
+    const pin = el('input', { type: 'password', placeholder: 'Teacher PIN' });
+    const err = el('div', { class: 'err' });
+    app.append(el('div', { class: 'card' }, el('label', {}, 'Teacher PIN'), pin,
+      el('button', { class: 'btn', onclick: () => {
+        if (String(cyrb53(pin.value)) === CONFIG.TEACHER_PIN_HASH) teacherMenu(); else err.textContent = 'Wrong PIN.';
+      } }, 'Continue'), err));
+    pin.addEventListener('keydown', (e) => { if (e.key === 'Enter') app.querySelector('.btn').click(); });
+    return;
+  }
+  startScreen(false);
+})();
+
+window.__practice = { TEMPLATES, generate, SETS, mulberry32, cyrb53 }; // used for testing
+</script>
+</body>
+</html>
