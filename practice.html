@@ -195,6 +195,7 @@ const CONFIG = {
 //   Pre-Calc 3.2: triCosSSS / triCosSAS (#5–24), triParallelogram (#25–30), triWhichLaw (#31–36), triHeron (#37–44), triCosWord (word problems, like #45)
 //   Pre-Calc 4.1: cxEqual (#7–8), cxAddSub (#9–16), cxMultiply (#17–24), cxConjugate (#25–32), cxDivide (#33–40), cxSqrtNeg (#41–48), cxQuadratic (#49–58)
 //   Pre-Calc 4.2: cxNumSolutions (#5–8), cxDiscriminant (#9–14), cxSolveQuad (#15–24), cxQuartic (#25–28), cxLinearFactors (#33–48), cxGivenZero (#49–58)
+//   Pre-Calc 4.3: cpRead (#5–10), cpAbs (#11–16), cpAddSub (#17–28), cpConjugate (#29–34), cpDistance (#35–38)
 //   Pre-Calc 3.4: vecDot (#5–10), vecDotProps (#11–22), vecMagnitude (#23–28), vecAngle (#29–42), vecTriangle (#43–46), vecDotFromAngle (#47–50)
 //   other: dilation, composite, trigGraph
 const SUBJECTS = {
@@ -223,6 +224,7 @@ const SETS = {
   'precalc-3-4':   { subject: 'precalc',  title: '3.4 Vectors and Dot Products', items: [['vecDot', 2], ['vecDotProps', 3], ['vecMagnitude', 2], ['vecAngle', 3], ['vecTriangle', 1], ['vecDotFromAngle', 2]] },
   'precalc-4-1':   { subject: 'precalc',  title: '4.1 Complex Numbers', items: [['cxEqual', 1], ['cxAddSub', 2], ['cxMultiply', 2], ['cxConjugate', 2], ['cxDivide', 3], ['cxSqrtNeg', 2], ['cxQuadratic', 3]] },
   'precalc-4-2':   { subject: 'precalc',  title: '4.2 Complex Solutions of Equations', items: [['cxNumSolutions', 1], ['cxDiscriminant', 2], ['cxSolveQuad', 3], ['cxQuartic', 2], ['cxLinearFactors', 4], ['cxGivenZero', 3]] },
+  'precalc-4-3':   { subject: 'precalc',  title: '4.3 The Complex Plane', items: [['cpRead', 2], ['cpAbs', 3], ['cpAddSub', 4], ['cpConjugate', 2], ['cpDistance', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -3229,6 +3231,105 @@ TEMPLATES.cxQuadratic = (r) => {
   }
 };
 
+/* ---------- 4.3 The Complex Plane ---------- */
+function drawCxPlane(cv, pts) { // pts: [{ z: [a, b], label }]
+  const ctx = cv._ctx, W = cv._w, H = cv._h;
+  const R = Math.max(4, ...pts.flatMap((p) => p.z.map((x) => Math.abs(x) + 1)));
+  const step = R > 8 ? 2 : 1, lim = Math.ceil(R / step) * step;
+  const m = 34, S = Math.min(W, H) - 2 * m, ox = (W - S) / 2, oy = (H - S) / 2;
+  const X = (x) => ox + ((x + lim) / (2 * lim)) * S, Y = (y) => oy + ((lim - y) / (2 * lim)) * S;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#e1ded6'; ctx.lineWidth = 1;
+  for (let k = -lim; k <= lim; k += step) { ctx.beginPath(); ctx.moveTo(X(k), Y(-lim)); ctx.lineTo(X(k), Y(lim)); ctx.stroke(); ctx.beginPath(); ctx.moveTo(X(-lim), Y(k)); ctx.lineTo(X(lim), Y(k)); ctx.stroke(); }
+  ctx.strokeStyle = '#1d1d1b'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(X(-lim), Y(0)); ctx.lineTo(X(lim) + 8, Y(0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(X(0), Y(-lim)); ctx.lineTo(X(0), Y(lim) - 8); ctx.stroke();
+  ctx.fillStyle = '#1d1d1b'; ctx.font = '12px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let k = -lim; k <= lim; k += step) if (k) { ctx.fillText(fmt(k), X(k), Y(0) + 4); }
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let k = -lim; k <= lim; k += step) if (k) ctx.fillText(fmt(k), X(0) - 4, Y(k));
+  ctx.font = 'italic 13px Georgia, serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText('Real axis', X(lim) + 8, Y(0) - 4);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('Imaginary axis', X(0) + 6, Y(lim) - 14);
+  ctx.font = '15px Georgia, serif';
+  pts.forEach(({ z, label }) => {
+    ctx.fillStyle = '#1f5fa8'; ctx.beginPath(); ctx.arc(X(z[0]), Y(z[1]), 5, 0, 2 * Math.PI); ctx.fill();
+    if (label) { ctx.fillStyle = '#1f5fa8'; ctx.textAlign = z[0] < 0 ? 'right' : 'left'; ctx.textBaseline = z[1] < 0 ? 'top' : 'bottom'; ctx.fillText(label, X(z[0]) + (z[0] < 0 ? -7 : 7), Y(z[1]) + (z[1] < 0 ? 5 : -5)); }
+  });
+}
+const cxZ = (a, b) => cx(Sd(a), Sd(b));
+const ptLab = (a, b) => `(${fmt(a)}, ${fmt(b)})`;
+const rootText = (n2) => exactRatio(1, n2, 1); // √n2 simplified: { text, latex, val }
+const rootFR = (label, n2) => { const e = rootText(n2); return { fields: [{ kind: 'number', label }], key: [e.latex], display: e.text, check: (v) => { const z = parseCx(v[0]); return !!z && Math.abs(z[1]) < 1e-12 && Math.abs(z[0] - e.val) < 1e-6 * (1 + e.val); } }; };
+// #5–10: read a point in the complex plane
+TEMPLATES.cpRead = (r) => {
+  const a = ri(r, -5, 5), b = ri(r, -5, 5); if (!a && !b) return TEMPLATES.cpRead(r);
+  const z = cxZ(a, b);
+  return {
+    topic: 'The complex plane', stem: 'Which complex number is plotted in the complex plane?',
+    ...cxMC(r, z, [cxZ(b, a), cxZ(a, -b), cxZ(-a, b), cxZ(-b, -a)], (i) => cxText(cxZ(a + i + 1, b))),
+    fr: cxFR('z =', z), draw: (cv) => drawCxPlane(cv, [{ z: [a, b] }]), size: [380, 380],
+    solution: `The point is ${ptLab(a, b)}: real part ${fmt(a)} (left/right), imaginary part ${fmt(b)} (up/down). So z = ${cxText(z)}.`,
+  };
+};
+// #11–16: absolute value
+TEMPLATES.cpAbs = (r) => {
+  const a = ri(r, -12, 12), b = ri(r, -12, 12); if (a * a + b * b < 2) return TEMPLATES.cpAbs(r);
+  const z = cxZ(a, b), n2 = a * a + b * b, e = rootText(n2);
+  const wrong = [String(Math.abs(a) + Math.abs(b)), String(n2), a * a - b * b > 0 ? rootText(a * a - b * b).text : String(Math.abs(a - b) || 1), rootText(n2 + 1).text].filter((x) => x !== e.text);
+  return {
+    topic: 'Absolute value', stem: `Plot the complex number and find its absolute value.   ${cxText(z)}`,
+    ...buildChoices(r, e.text, [...new Set(wrong)], (i) => String(i + 20)),
+    frStem: `Find the absolute value (the exact value).   |${cxText(z)}|`, fr: rootFR('|z| =', n2),
+    draw: (cv) => drawCxPlane(cv, [{ z: [a, b], label: ptLab(a, b) }]), size: [380, 380],
+    solution: `|a + bi| = √(a² + b²) = √(${a < 0 ? `(${fmt(a)})` : fmt(a)}² + ${b < 0 ? `(${fmt(b)})` : fmt(b)}²) = √${n2}${e.text !== '√' + n2 ? ' = ' + e.text : ''}\nThis is the distance from the origin to ${ptLab(a, b)}.`,
+  };
+};
+// #17–28: sums and differences in the complex plane
+TEMPLATES.cpAddSub = (r) => {
+  const add = r() < 0.5, pic = r() < 0.4;
+  const z1 = [ri(r, -6, 8), nz(r, -6, 6)], z2 = [ri(r, -6, 6), ri(r, -6, 6)];
+  if (!z2[0] && !z2[1]) return TEMPLATES.cpAddSub(r);
+  const s = add ? [z1[0] + z2[0], z1[1] + z2[1]] : [z1[0] - z2[0], z1[1] - z2[1]], z = cxZ(...s);
+  const expr = `${cxInP(...z1)} ${add ? '+' : MINUS} ${cxInP(...z2)}`;
+  const wrong = add ? [cxZ(z1[0] + z2[1], z1[1] + z2[0]), cxZ(z1[0] - z2[0], z1[1] - z2[1]), cxZ(-s[0], s[1])] : [cxZ(z1[0] + z2[0], z1[1] + z2[1]), cxZ(z1[0] - z2[0], z1[1] + z2[1]), cxZ(z2[0] - z1[0], z2[1] - z1[1])];
+  return {
+    topic: add ? 'Adding in the complex plane' : 'Subtracting in the complex plane',
+    stem: pic ? (add ? 'Find the sum of the two complex numbers plotted in the complex plane.' : `Find z₁ − z₂, where z₁ is the complex number plotted at ${ptLab(...z1)} and z₂ is the one plotted at ${ptLab(...z2)}.`)
+      : `Find the ${add ? 'sum' : 'difference'} of the complex numbers in the complex plane.   ${expr}`,
+    ...cxMC(r, z, wrong), fr: cxFR('=', z),
+    draw: pic ? (cv) => drawCxPlane(cv, [{ z: z1, label: ptLab(...z1) }, { z: z2, label: ptLab(...z2) }]) : undefined, size: pic ? [400, 400] : undefined,
+    solution: `${pic ? `The points stand for ${cxText(cxZ(...z1))} and ${cxText(cxZ(...z2))}.\n` : ''}${add ? 'Add' : 'Subtract'} the real parts and the imaginary parts: (${fmt(z1[0])} ${add ? '+' : MINUS} ${z2[0] < 0 ? `(${fmt(z2[0])})` : fmt(z2[0])}) + (${fmt(z1[1])} ${add ? '+' : MINUS} ${z2[1] < 0 ? `(${fmt(z2[1])})` : fmt(z2[1])})i = ${cxText(z)}\nIn the plane, ${add ? 'adding is like adding the vectors to the two points (the parallelogram rule)' : 'z₁ − z₂ is the vector from the second point to the first'}.`,
+  };
+};
+// #29–34: conjugates
+TEMPLATES.cpConjugate = (r) => {
+  const a = ri(r, -8, 8), b = ri(r, -8, 8); if (!b) return TEMPLATES.cpConjugate(r);
+  const z = cxZ(a, b), c = cxZ(a, -b);
+  return {
+    topic: 'Conjugates in the plane', stem: `Plot the complex number and its complex conjugate. Write the conjugate as a complex number.   ${cxText(z)}`,
+    ...cxMC(r, c, [cxZ(-a, b), cxZ(-a, -b), cxZ(b, a)].filter((w) => !cxClose(w.v, z.v, 1e-9)), (i) => cxText(cxZ(a + i + 1, -b))),
+    fr: cxFR('Conjugate:', c),
+    draw: (cv) => drawCxPlane(cv, [{ z: [a, b], label: cxText(z) }]), size: [380, 380],
+    solution: `The conjugate of a + bi is a − bi: ${cxText(c)}.\nIn the plane, the conjugate is the reflection of ${ptLab(a, b)} across the real axis, to ${ptLab(a, -b)}.`,
+  };
+};
+// #35–38: distance between two complex numbers
+TEMPLATES.cpDistance = (r) => {
+  const z1 = [ri(r, -8, 8), ri(r, -8, 8)], z2 = [ri(r, -8, 8), ri(r, -8, 8)];
+  const dx = z1[0] - z2[0], dy = z1[1] - z2[1]; if (dx * dx + dy * dy < 2) return TEMPLATES.cpDistance(r);
+  const n2 = dx * dx + dy * dy, e = rootText(n2);
+  const sx = z1[0] + z2[0], sy = z1[1] + z2[1];
+  const wrong = [rootText(sx * sx + sy * sy || 1).text, String(Math.abs(dx) + Math.abs(dy)), String(n2), rootText(Math.abs(dx * dx - dy * dy) || 2).text];
+  const txt = `${cxText(cxZ(...z1))},  ${cxText(cxZ(...z2))}`;
+  return {
+    topic: 'Distance in the complex plane', stem: `Find the distance between the complex numbers in the complex plane.   ${txt}`,
+    ...buildChoices(r, e.text, [...new Set(wrong)].filter((x) => x !== e.text), (i) => String(i + 30)),
+    frStem: `Find the distance between the complex numbers in the complex plane (the exact value).   ${txt}`, fr: rootFR('Distance =', n2),
+    solution: `Distance = |z₁ − z₂| = |${cxText(cxZ(dx, dy))}| = √(${dx < 0 ? `(${fmt(dx)})` : fmt(dx)}² + ${dy < 0 ? `(${fmt(dy)})` : fmt(dy)}²) = √${n2}${e.text !== '√' + n2 ? ' = ' + e.text : ''}`,
+  };
+};
+
 /* 4.2 */
 // #5–8: number of solutions
 TEMPLATES.cxNumSolutions = (r) => {
@@ -4443,6 +4544,11 @@ const QUESTION_TYPES = [
   { id: 'cxQuartic', subject: 'precalc',  section: '4.2 Complex Solutions of Equations', label: 'Quartics like x⁴ − 6x² − 7', desc: 'Factor as a quadratic in x² (#25–28)' },
   { id: 'cxLinearFactors', subject: 'precalc',  section: '4.2 Complex Solutions of Equations', label: 'Linear factors and zeros', desc: 'Factor completely; list the zeros (#33–48)' },
   { id: 'cxGivenZero', subject: 'precalc',  section: '4.2 Complex Solutions of Equations', label: 'Using a given zero', desc: 'Conjugate pairs (#49–58)' },
+  { id: 'cpRead', subject: 'precalc',  section: '4.3 The Complex Plane', label: 'Reading the complex plane', desc: 'Which number is plotted? (#5–10)' },
+  { id: 'cpAbs', subject: 'precalc',  section: '4.3 The Complex Plane', label: 'Absolute value', desc: '|a + bi| (#11–16)' },
+  { id: 'cpAddSub', subject: 'precalc',  section: '4.3 The Complex Plane', label: 'Adding and subtracting', desc: 'Sums and differences, some from a graph (#17–28)' },
+  { id: 'cpConjugate', subject: 'precalc',  section: '4.3 The Complex Plane', label: 'Conjugates in the plane', desc: 'Reflect across the real axis (#29–34)' },
+  { id: 'cpDistance', subject: 'precalc',  section: '4.3 The Complex Plane', label: 'Distance', desc: 'Between two complex numbers (#35–38)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
@@ -5271,9 +5377,29 @@ function builder() {
 
   const list = el('div', { class: 'card' });
   const totalEl = el('strong', {}, '0');
-  let section = null;
+  // each section folds up; sections with questions chosen start open
+  const openSaved = store.get('builder:open') || {}, secs = {};
+  const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
+  const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
+  const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set('builder:open', openSaved); };
+  list.append(el('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-bottom:6px' },
+    el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px;font-size:14px', onclick: () => setAll(true) }, 'Expand all'),
+    el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px;font-size:14px', onclick: () => setAll(false) }, 'Collapse all')));
+  let section = null, secBody = null;
   QUESTION_TYPES.forEach((t) => {
-    if (t.section !== section) { section = t.section; list.append(el('h3', { style: 'margin:18px 0 6px;font-size:16px' }, section)); }
+    if (t.section !== section) {
+      section = t.section;
+      const sec = section, badge = el('span', { class: 'small', style: 'margin-left:auto;font-weight:600;color:var(--accent, #1f5fa8)' });
+      const sum = el('summary', { style: 'display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 4px;font-size:16px;font-weight:600;list-style:none' },
+        el('span', { class: 'secarrow', style: 'display:inline-block;width:14px;transition:transform .15s' }, '▸'), el('span', {}, sec), badge);
+      secBody = el('div', {});
+      const box = el('details', { style: 'border-top:1px solid var(--line)' }, sum, secBody);
+      secs[sec] = { ids: [], badge, box };
+      const arrow = sum.querySelector('.secarrow');
+      box.addEventListener('toggle', () => { arrow.style.transform = box.open ? 'rotate(90deg)' : ''; openSaved[sec] = box.open; store.set('builder:open', openSaved); });
+      list.append(box);
+    }
+    secs[section].ids.push(t.id);
     const num = el('input', { type: 'number', min: '0', max: '20', value: String(counts[t.id] || 0), style: 'width:70px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px', 'aria-label': `How many ${t.label}` });
     const prevBox = el('div', { class: 'hidden' });
     let seed = 1;
@@ -5283,7 +5409,7 @@ function builder() {
       prevBox.append(previewQuestion(applyMode(TEMPLATES[t.id](mulberry32(Date.now() % 100000 + seed++)), f === 'both' ? (seed % 2 ? 'mc' : 'fr') : f)));
       prevBtn.textContent = 'Another example';
     } }, 'Preview');
-    num.addEventListener('input', () => { counts[t.id] = Math.max(0, Math.min(20, Math.floor(+num.value || 0))); update(); });
+    num.addEventListener('input', () => { counts[t.id] = Math.max(0, Math.min(20, Math.floor(+num.value || 0))); refreshBadges(); update(); });
     const fmtSel = el('select', { 'aria-label': `Format for ${t.label}`, style: 'width:auto;padding:7px 8px;font-size:14px' },
       el('option', { value: 'mc' }, 'Multiple choice'), el('option', { value: 'fr' }, 'Free response'), el('option', { value: 'both' }, 'Some of each'));
     fmtSel.value = formats[t.id] || 'mc';
@@ -5293,7 +5419,7 @@ function builder() {
     const split = el('div', { style: 'flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-left:82px' },
       el('span', { class: 'small' }, 'Free response:'), frIn, splitNote);
     const showSplit = () => {
-      split.classList.toggle('hidden', fmtSel.value !== 'both');
+      split.style.display = fmtSel.value === 'both' ? 'flex' : 'none';
       const n = counts[t.id] || 0, fr = Math.min(n, frCounts[t.id] || 0);
       splitNote.textContent = `→ ${n - fr} multiple choice + ${fr} free response`;
     };
@@ -5301,11 +5427,13 @@ function builder() {
     frIn.addEventListener('input', () => { frCounts[t.id] = Math.max(0, Math.min(20, Math.floor(+frIn.value || 0))); showSplit(); update(); });
     num.addEventListener('input', showSplit);
     showSplit();
-    list.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' },
+    secBody.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' },
       num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc)),
       t.writtenOnly ? el('span', { class: 'small', style: 'padding:7px 8px' }, 'Written proof') : fmtSel, prevBtn, t.writtenOnly ? '' : split), prevBox);
     prevBtn._fmt = fmtSel;
   });
+  Object.entries(secs).forEach(([sec, S]) => { S.box.open = openSaved[sec] ?? S.ids.some((id) => counts[id] > 0); });
+  refreshBadges();
   app.append(list);
 
   const linkIn = el('input', { type: 'text', readonly: 'readonly', style: 'font-size:14px' });
