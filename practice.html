@@ -193,6 +193,7 @@ const CONFIG = {
 //                 trigHalfExact (#33–38), trigHalfValues (#39–42), trigProdToSum (#47–50), trigSumToProd (#51–54)
 //   Pre-Calc P.1–P.10: p1…–p10… templates (Chapter P Prerequisites)
 //   Pre-Calc 1.1–1.8: t1…–t8… templates (Chapter 1 Trigonometry)
+//   Pre-Calc 5.1–5.5: e1…–e5… templates (Chapter 5 Exponential and Logarithmic Functions)
 //   Pre-Calc 3.1: triSinesAAS (#5–22), triSinesSSA (#23–32), triAmbiguousB (#33–36), triAreaSAS (#37–44), triSinesWord (word problems, #45+)
 //   Pre-Calc 3.2: triCosSSS / triCosSAS (#5–24), triParallelogram (#25–30), triWhichLaw (#31–36), triHeron (#37–44), triCosWord (word problems, like #45)
 //   Pre-Calc 4.1: cxEqual (#7–8), cxAddSub (#9–16), cxMultiply (#17–24), cxConjugate (#25–32), cxDivide (#33–40), cxSqrtNeg (#41–48), cxQuadratic (#49–58)
@@ -249,6 +250,11 @@ const SETS = {
   'precalc-4-3':   { subject: 'precalc',  title: '4.3 The Complex Plane', items: [['cpRead', 2], ['cpAbs', 3], ['cpAddSub', 4], ['cpConjugate', 2], ['cpDistance', 3]] },
   'precalc-4-4':   { subject: 'precalc',  title: '4.4 Trigonometric Form of a Complex Number', items: [['tfToTrig', 4], ['tfToStandard', 3], ['tfMultiply', 3], ['tfDivide', 3]] },
   'precalc-4-5':   { subject: 'precalc',  title: "4.5 DeMoivre's Theorem", items: [['dmPower', 3], ['dmPowerStd', 3], ['dmSquareRoots', 2], ['dmNthRoots', 3], ['dmSolveEq', 3]] },
+  'precalc-5-1':   { subject: 'precalc',  title: '5.1 Exponential Functions and Their Graphs', items: [['e1Eval', 3], ['e1OneToOne', 3], ['e1Transform', 3], ['e1Match', 3]] },
+  'precalc-5-2':   { subject: 'precalc',  title: '5.2 Logarithmic Functions and Their Graphs', items: [['e2ToExp', 2], ['e2ToLog', 2], ['e2Eval', 2], ['e2Calc', 1], ['e2Props', 2], ['e2OneToOne', 2], ['e2Domain', 2], ['e2Match', 1]] },
+  'precalc-5-3':   { subject: 'precalc',  title: '5.3 Properties of Logarithms', items: [['e3ChangeBase', 1], ['e3CalcCB', 1], ['e3Terms', 2], ['e3Exact', 2], ['e3Approx', 2], ['e3Expand', 3], ['e3Condense', 3]] },
+  'precalc-5-4':   { subject: 'precalc',  title: '5.4 Exponential and Logarithmic Equations', items: [['e4Check', 2], ['e4Simple', 3], ['e4ExpEq', 4], ['e4LogEq', 4]] },
+  'precalc-5-5':   { subject: 'precalc',  title: '5.5 Exponential and Logarithmic Models', items: [['e5Solve', 1], ['e5Continuous', 3], ['e5Double', 2], ['e5Fit', 2], ['e5Model', 2]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -3432,6 +3438,718 @@ TEMPLATES.t8Word = (r) => {
 };
 
 /* ==== CHAPTER 1 END ==== */
+/* ==== CHAPTER 5 BEGIN ==== */
+/* ---------- Chapter 5: reading answers with logarithms ---------- */
+KEYROWS_P.logs = [['log□', '\\log_{#?}'], ['log', '\\log '], ['ln', '\\ln '], ['e', 'e'], ['xⁿ', '^{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['∛', '\\sqrt[3]{#?}'], ['( )', '\\left(#?\\right)'], ['none', '\\text{no solution}']];
+const SUPMAP = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-', '⁺': '+', 'ˣ': 'x', 'ᵗ': 't', 'ⁿ': 'n', 'ʳ': 'r', '⁽': '(', '⁾': ')' };
+const SUBMAP = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9', '.': '.' };
+// LaTeX or plain text → a string with LOG[base] and LN tokens, or null
+function lgPrep(raw) {
+  let s = String(raw ?? '');
+  s = s.replace(/\\operatorname\{(log|ln)\}/g, '\\$1').replace(/\\mathrm\{(log|ln)\}/g, '\\$1');
+  // \log_{b} / \log_b
+  s = s.replace(/\\log_\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g, ' LOG[$1] ').replace(/\\log_([0-9a-zA-Z])/g, ' LOG[$1] ').replace(/\\log(?![a-zA-Z])/g, ' LOG[10] ').replace(/\\ln(?![a-zA-Z])/g, ' LN ');
+  // plain text: log₂, log_3, log_(1/5), log, ln
+  s = s.replace(/log([₀-₉.]+)/g, (m, d) => ` LOG[${[...d].map((c) => SUBMAP[c]).join('')}] `)
+    .replace(/log_\(([^()]*)\)/g, ' LOG[$1] ').replace(/log_\{?([0-9.]+|[a-zA-Zπ])\}?/g, ' LOG[$1] ')
+    .replace(/(^|[^A-Za-z])log(?![A-Za-z[])/g, '$1 LOG[10] ').replace(/(^|[^A-Za-z])ln(?![A-Za-z])/g, '$1 LN ');
+  s = s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺ˣᵗⁿʳ⁽⁾]+/g, (m) => `^(${[...m].map((c) => SUPMAP[c]).join('')})`);
+  if (/\\/.test(s)) { const p = pxPlain(s); if (p == null) return null; s = p; }
+  else s = s.replace(/[−–]/g, '-').replace(/[·×]/g, '*').replace(/÷/g, '/').replace(/√/g, 'sqrt ').replace(/∛/g, 'root3 ').replace(/∜/g, 'root4 ').replace(/\{/g, '(').replace(/\}/g, ')');
+  return s.replace(/\s+/g, ' ').trim();
+}
+// parse → AST; vars: allowed single letters (case-sensitive); 'e' is Euler's number unless it is a variable
+function lgParse(raw, vars = []) {
+  const s0 = lgPrep(raw); if (s0 == null || !s0) return null;
+  const toks = []; let i = 0; const s = s0;
+  while (i < s.length) {
+    const c = s[i], r = s.slice(i); let m;
+    if (c === ' ') { i++; continue; }
+    if (r.startsWith('LOG[')) { let d = 0, j = i + 3; for (; j < s.length; j++) { if (s[j] === '[') d++; else if (s[j] === ']' && --d === 0) break; } if (j >= s.length) return null; toks.push({ t: 'fn', f: 'log', base: s.slice(i + 4, j) }); i = j + 1; continue; }
+    if (r.startsWith('LN')) { toks.push({ t: 'fn', f: 'ln' }); i += 2; continue; }
+    if ((m = /^\d*\.?\d+/.exec(r))) { toks.push({ t: 'n', v: +m[0] }); i += m[0].length; continue; }
+    if ((m = /^root(\d+)/.exec(r))) { toks.push({ t: 'fn', f: 'root', k: +m[1] }); i += m[0].length; continue; }
+    if (r.startsWith('sqrt')) { toks.push({ t: 'fn', f: 'root', k: 2 }); i += 4; continue; }
+    if (r.startsWith('pi') || c === 'π') { toks.push({ t: 'n', v: Math.PI }); i += c === 'π' ? 1 : 2; continue; }
+    if (/[a-zA-Z]/.test(c)) { if (vars.includes(c)) toks.push({ t: 'v', v: c }); else if (c === 'e') toks.push({ t: 'n', v: Math.E, e: true }); else return null; i++; continue; }
+    if ('+-*/^()|'.includes(c)) { toks.push({ t: c }); i++; continue; }
+    return null;
+  }
+  let k = 0, absD = 0;
+  const is = (t) => k < toks.length && toks[k].t === t;
+  const starts = () => k < toks.length && (['n', 'v', '(', 'fn'].includes(toks[k].t) || (toks[k].t === '|' && absD === 0));
+  const fail = () => { throw new Error('p'); };
+  function expr() { let a = term(); while (is('+') || is('-')) { const op = toks[k++].t; a = { t: op, a, b: term() }; } return a; }
+  function term() { let a = unary(); for (;;) { if (is('*') || is('/')) { const op = toks[k++].t; a = { t: op, a, b: unary() }; } else if (starts()) a = { t: '*', a, b: power() }; else return a; } }
+  function unary() { if (is('-')) { k++; return { t: 'neg', a: unary() }; } if (is('+')) { k++; return unary(); } return power(); }
+  function power() { const b = primary(); if (is('^')) { k++; return { t: '^', a: b, b: unary() }; } return b; }
+  function fnArg() { // ln(…) or ln 7x: the following factors joined by implicit multiplication
+    if (is('(')) { k++; const a = expr(); if (!is(')')) fail(); k++; if (is('^')) { k++; return { a, pow: unary() }; } return { a }; }
+    let a = power(); while (starts() && !(toks[k].t === 'fn')) a = { t: '*', a, b: power() }; return { a };
+  }
+  function primary() {
+    const t = toks[k]; if (!t) fail();
+    if (t.t === 'n') { k++; return { t: 'n', v: t.v, e: t.e }; }
+    if (t.t === 'v') { k++; return { t: 'v', v: t.v }; }
+    if (t.t === '(') { k++; const a = expr(); if (!is(')')) fail(); k++; return { t: 'p', a }; }
+    if (t.t === '|') { k++; absD++; const a = expr(); if (!is('|')) fail(); k++; absD--; return { t: 'abs', a }; }
+    if (t.t === 'fn') {
+      k++;
+      if (t.f === 'root') { const a = is('(') ? (k++, (() => { const x = expr(); if (!is(')')) fail(); k++; return x; })()) : power(); return { t: 'root', k: t.k, a }; }
+      const base = t.f === 'ln' ? { t: 'n', v: Math.E, e: true } : (() => { const B = lgParse(t.base, vars); if (!B) fail(); return B; })();
+      const A = fnArg(); const node = { t: 'log', base, a: A.a, ln: t.f === 'ln', b10: t.f === 'log' && t.base === '10' };
+      return A.pow ? { t: '^', a: node, b: A.pow } : node;
+    }
+    fail();
+  }
+  try { const a = expr(); return k === toks.length ? a : null; } catch { return null; }
+}
+function lgEval(n, env = {}) {
+  const ev = (m) => lgEval(m, env);
+  switch (n.t) {
+    case 'n': return n.v; case 'v': return env[n.v]; case 'p': return ev(n.a); case 'neg': return -ev(n.a); case 'abs': return Math.abs(ev(n.a));
+    case '+': return ev(n.a) + ev(n.b); case '-': return ev(n.a) - ev(n.b); case '*': return ev(n.a) * ev(n.b); case '/': return ev(n.a) / ev(n.b);
+    case '^': { const b = ev(n.a), p = ev(n.b); return pxPow(b, p); }
+    case 'root': { const a = ev(n.a); return n.k % 2 ? Math.sign(a) * Math.pow(Math.abs(a), 1 / n.k) : Math.pow(a, 1 / n.k); }
+    case 'log': { const b = ev(n.base), a = ev(n.a); if (!(a > 0) || !(b > 0) || b === 1) return NaN; return Math.log(a) / Math.log(b); }
+  }
+  return NaN;
+}
+const lgConst = (raw) => { const n = lgParse(String(raw ?? '').replace(/^\s*[a-zA-Z]\s*=/, '')); if (!n) return NaN; const v = lgEval(n); return isFinite(v) ? v : NaN; };
+const lgOk = (raw, val, tol = 1e-6) => { const v = lgConst(raw); return isFinite(v) && Math.abs(v - val) <= (tol <= 1e-6 ? tol * Math.max(1, Math.abs(val)) : tol); };
+const exOrRoundOk = (raw, val, dp = 3) => lgOk(raw, val) || lgOk(raw, val, 1.01 * 10 ** -dp + 1e-12);
+// walk the tree
+const lgNodes = (n, out = []) => { out.push(n); for (const k of ['a', 'b', 'base']) if (n[k]) lgNodes(n[k], out); return out; };
+// numeric equivalence with positive variable values
+function lgEquiv(raw, truth, vars, samples) {
+  const n = lgParse(String(raw ?? '').replace(/^\s*[a-zA-Z]\s*=/, ''), vars); if (!n) return null;
+  for (const env of samples) { const t = truth(env); if (!isFinite(t)) continue; const v = lgEval(n, env); if (!isFinite(v) || Math.abs(v - t) > 1e-7 * Math.max(1, Math.abs(t))) return null; }
+  return n;
+}
+// expanded: every log's argument is a single variable, a number, or a linear (x ± c)
+const simpleArg = (a) => { while (a.t === 'p') a = a.a; if (a.t === 'n' || a.t === 'v') return true; if ((a.t === '+' || a.t === '-') && [a.a, a.b].every((x) => { while (x.t === 'p') x = x.a; return x.t === 'v' || x.t === 'n'; })) return true; return false; };
+const isExpanded = (n) => lgNodes(n).filter((m) => m.t === 'log').every((m) => simpleArg(m.a) && !lgNodes(m.a).some((x) => x.t === 'log'));
+const isSingleLog = (n) => { while (n.t === 'p') n = n.a; return n.t === 'log' && lgNodes(n).filter((m) => m.t === 'log').length === 1; };
+// text helpers
+const SUPC = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '-': '⁻', '−': '⁻', '+': '⁺', x: 'ˣ', t: 'ᵗ', n: 'ⁿ', r: 'ʳ', '(': '⁽', ')': '⁾' };
+const SUBC = { 0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉' };
+const powT = (base0, ex) => { const base = /[\/−]|^-/.test(base0) && !/^\(.*\)$/.test(base0) ? `(${base0})` : base0; const e = String(ex).replace(/ /g, ''); return /^[0-9xtnr+\-−()]+$/.test(e) ? base + [...e].map((c) => SUPC[c]).join('') : `${base}^(${String(ex)})`; };
+const logT = (b) => (b === 10 ? 'log' : b === 'e' ? 'ln' : /^\d+$/.test(String(b)) ? 'log' + [...String(b)].map((c) => SUBC[c]).join('') : `log_${/^[a-z]$/.test(String(b)) ? b : `(${b})`}`);
+const logL = (b) => (b === 10 ? '\\log' : b === 'e' ? '\\ln' : `\\log_{${b}}`);
+const d3 = (v) => rT(v, 3);
+
+/* ---------- 5.1 Exponential Functions and Their Graphs ---------- */
+TEMPLATES.e1Eval = (r) => {
+  const k = ri(r, 0, 5);
+  let text, f, xs, x;
+  if (k === 0) { const b = pick(r, [0.9, 3, 2, 1.2, 5, 0.5, 2.5, 1.06]); x = pick(r, [1.4, 2 / 5, -1.5, 3.2, -0.6, 2.7]); text = `f(x) = ${powT(fmt(b), 'x')}`; f = (t) => b ** t; }
+  else if (k === 1) { const a = pick(r, [5000, 200, 1500, 800]), b = pick(r, [2, 1.2, 1.05, 0.8]); x = pick(r, [-1.5, 24, 3.5, 10, 6]); const m = pick(r, [1, 12, 4]); text = `f(x) = ${a}(${powT(fmt(b), m === 1 ? 'x' : m + 'x')})`; f = (t) => a * b ** (m * t); if (m * Math.abs(x) > 60) return TEMPLATES.e1Eval(r); }
+  else if (k === 2) { x = pick(r, [1.9, -0.7, 3.2, 0.25, -2.4]); text = 'f(x) = eˣ'; f = Math.exp; }
+  else if (k === 3) { const a = pick(r, [1.5, 2, 0.5, 3]); x = pick(r, [240, 10, 7, -3, 4.6]); if (x > 50) x = 24; text = `f(x) = ${fmt(a)}e^(x/2)`; f = (t) => a * Math.exp(t / 2); }
+  else if (k === 4) { const a = pick(r, [5000, 250, 1000, 600]), c = pick(r, [0.06, 0.05, 0.035, 0.08]); x = pick(r, [6, 20, 10, 15]); text = `f(x) = ${a}e^(${c}x)`; f = (t) => a * Math.exp(c * t); }
+  else { const a = pick(r, [2, 3, 4]), c = pick(r, [-1.5, 0.4, -0.2]); x = pick(r, [2, -1.2, 3]); text = `f(x) = ${a}e^(${fmt(c).replace(MINUS, '−')}x)`; f = (t) => a * Math.exp(c * t); }
+  const xT = Number.isInteger(x * 10) ? fmt(x) : fracT(x), v = f(x), correct = d3(v);
+  const wrongs = [d3(f(-x)), d3(v * 1.1), d3(f(x + 1)), d3(f(1) * x)].filter((w) => w !== correct && Math.abs(parseFloat(w.replace(MINUS, '-')) - v) > 0.002);
+  return {
+    topic: 'Evaluating exponential functions', stem: `Evaluate the function at the given value of x. Round to three decimal places.   ${text},   x = ${xT}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => d3(v + i + 1)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: `f(${xT}) ≈` }], key: [correct.replace(MINUS, '-')], display: correct, check: (vv) => lgOk(vv[0], v, 0.0011 * Math.max(1, Math.abs(v) / 1000)) },
+    solution: `Substitute x = ${xT}: ${text.replace('f(x) = ', '')} with x = ${xT} ≈ ${correct}`,
+  };
+};
+TEMPLATES.e1OneToOne = (r) => {
+  for (;;) {
+    const B = pick(r, [2, 3, 5, 7, 10]), u = pick(r, [1, 1, 2, 3, -1, -2]), p = pick(r, [1, 1, 2, 3, -1]), q = ri(r, -3, 3), m = pick(r, [1, 2, 3, 4, 5, -1, -2, -3]);
+    const L = B ** Math.abs(u), R = B ** Math.abs(m); if (L > 400 || R > 2500) continue;
+    const x = (m / u - q) / p; if (!fracParts(x) || fracParts(x)[1] > 6) continue;
+    const baseT = u > 0 ? String(L) : `(1/${L})`, rhsT = m > 0 ? String(R) : `1/${R}`;
+    const exT = `${p === 1 ? '' : p === -1 ? MINUS : p}x${q ? ` ${q > 0 ? '+' : MINUS} ${Math.abs(q)}` : ''}`;
+    const lhs = powT(baseT, exT), eq = r() < 0.3 ? `${rhsT} = ${lhs}` : `${lhs} = ${rhsT}`;
+    const correct = `x = ${fracT(x)}`;
+    const wrongs = [-x, (m - q) / p, (m * u - q) / p, x + 1].filter((w) => Math.abs(w - x) > 1e-9).map((w) => `x = ${fracT(w)}`);
+    return {
+      topic: 'One-to-One Property (exponents)', stem: `Use the One-to-One Property to solve the equation for x.   ${eq}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => `x = ${fracT(x + i + 2)}`),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'x =' }], key: [fracL(x)], display: correct, check: (v) => lgOk(v[0], x) },
+      solution: `Write both sides as powers of ${B}: ${B}^(${u === 1 ? exT : `${fmt(u)}(${exT})`}) = ${B}^(${fmt(m)}). Set the exponents equal: ${u === 1 ? exT : `${fmt(u)}(${exT})`} = ${fmt(m)}, so x = ${fracT(x)}.`,
+    };
+  }
+};
+// f(x) = s·a^(r(x − h)) + k
+function expEq(aT, a, s, rr, h, k) {
+  const ex = rr === 1 ? (h ? `x ${h > 0 ? '−' : '+'} ${Math.abs(h)}` : 'x') : (h ? `−x ${h > 0 ? '+' : '−'} ${Math.abs(h)}` : '−x');
+  const t = `${s < 0 ? MINUS : ''}${powT(aT, ex.replace(/−/g, '-'))}${k ? ` ${k > 0 ? '+' : MINUS} ${Math.abs(k)}` : ''}`.replace(/\^\((.*)\)/, (m, e) => `^(${e.replace(/-/g, '−')})`);
+  return { t, f: (x) => s * a ** (rr * (x - h)) + k };
+}
+const EXP_BASES = [[2, '2'], [3, '3'], [10, '10'], [0.3, '0.3'], [3.5, '(7/2)'], [4, '4'], [0.5, '(1/2)'], [1.5, '(3/2)']];
+TEMPLATES.e1Transform = (r) => {
+  for (;;) {
+    const [a, aT] = pick(r, EXP_BASES);
+    const P = { s: r() < 0.3 ? -1 : 1, rr: r() < 0.3 ? -1 : 1, h: r() < 0.5 ? nz(r, -4, 4) : 0, k: r() < 0.6 ? nz(r, -5, 5) : 0 };
+    const nT = (P.s < 0) + (P.rr < 0) + !!P.h + !!P.k; if (nT === 0 || nT > 2) continue;
+    const G = expEq(aT, a, P.s, P.rr, P.h, P.k);
+    const desc = (Q) => { const L = []; if (Q.rr < 0) L.push('a reflection in the y-axis'); if (Q.h) L.push(`a shift ${Math.abs(Q.h)} unit${Math.abs(Q.h) === 1 ? '' : 's'} to the ${Q.h > 0 ? 'right' : 'left'}`); if (Q.s < 0) L.push('a reflection in the x-axis'); if (Q.k) L.push(`a shift ${Math.abs(Q.k)} unit${Math.abs(Q.k) === 1 ? '' : 's'} ${Q.k > 0 ? 'up' : 'down'}`); const t = L.join(', then '); return t[0].toUpperCase() + t.slice(1) + '.'; };
+    const same = (Q) => [-1.3, 0.4, 1.7, 2.9].every((x) => Math.abs(expEq(aT, a, Q.s, Q.rr, Q.h, Q.k).f(x) - G.f(x)) < 1e-9);
+    const alts = [{ ...P, h: -P.h }, { ...P, k: -P.k }, { ...P, s: -P.s }, { ...P, rr: -P.rr }, { ...P, h: P.k, k: P.h }].filter((Q) => (Q.s < 0) + (Q.rr < 0) + !!Q.h + !!Q.k > 0 && !same(Q));
+    const correct = desc(P), wrongs = [...new Set(alts.map(desc))].filter((w) => w !== correct);
+    if (wrongs.length < 3) continue;
+    const opts = shuffle(r, [correct, ...wrongs.slice(0, 3)]);
+    return {
+      topic: 'Transformations of exponential graphs', stem: `Describe the transformations of the graph of f that yield the graph of g.   f(x) = ${powT(aT, 'x')},   g(x) = ${G.t}`,
+      ...buildChoices(r, correct, wrongs.slice(0, 3), () => null),
+      fr: FR.select('Transformation:', opts, correct),
+      draw: plotQ({ xr: [-6, 6], yr: [-6, 8], curves: [{ f: (x) => a ** x, color: '#9a968c' }, { f: G.f }], pts: [] }), size: [380, 420],
+      solution: `${correct} (Gray: f;  blue: g.)`,
+    };
+  }
+};
+const EXP_POOL = [['2ˣ', (x) => 2 ** x], ['2⁻ˣ', (x) => 2 ** -x], ['2ˣ + 1', (x) => 2 ** x + 1], ['2ˣ − 2', (x) => 2 ** x - 2], ['−2ˣ', (x) => -(2 ** x)], ['2ˣ⁻²', (x) => 2 ** (x - 2)], ['2¹⁻ˣ', (x) => 2 ** (1 - x)], ['2ˣ⁺¹', (x) => 2 ** (x + 1)], ['3ˣ', (x) => 3 ** x], ['−2⁻ˣ', (x) => -(2 ** -x)], ['2⁻ˣ + 2', (x) => 2 ** -x + 2], ['2ˣ⁺² − 3', (x) => 2 ** (x + 2) - 3]];
+TEMPLATES.e1Match = (r) => {
+  for (;;) {
+    const set = shuffle(r, EXP_POOL).slice(0, 4);
+    if (set.some(([, f], i) => set.some(([, g], j) => j > i && [0, 1, -1].every((x) => Math.abs(f(x) - g(x)) < 1e-9)))) continue;
+    const [t, f] = set[0], opts = set.map(([u]) => `f(x) = ${u}`);
+    return {
+      topic: 'Matching exponential graphs', stem: 'Which function is shown in the graph?',
+      ...buildChoices(r, opts[0], opts.slice(1), () => null),
+      fr: FR.select('The graph is', shuffle(r, opts), opts[0]),
+      draw: plotQ({ xr: [-5, 5], yr: [-6, 8], curves: [{ f }], pts: [{ p: [0, f(0)], label: `(0, ${fracT(f(0))})` }] }), size: [380, 420],
+      solution: `Check a point: the graph passes through (0, ${fracT(f(0))}) and ${f(1) > f(0) ? 'rises' : 'falls'} from left to right; f(x) = ${t} has f(0) = ${fracT(f(0))} and f(1) = ${fracT(f(1))}.`,
+    };
+  }
+};
+
+/* ---------- 5.2 Logarithmic Functions and Their Graphs ---------- */
+// log_b a = c with b, a, c exact; or natural logs with decimals
+function logFact(r) {
+  if (r() < 0.25) { // natural
+    const k = r();
+    if (k < 0.5) { const a = pick(r, [[0.5, '1/2'], [7, '7'], [250, '250'], [3, '3'], [10, '10'], [0.2, '1/5']]); return { b: 'e', bT: 'e', a: a[0], aT: a[1], c: Math.log(a[0]), cT: `${rT(Math.log(a[0]), 3)}…` }; }
+    const c = pick(r, [[2, '2'], [-0.75, '−3/4'], [0.5, '1/2'], [3, '3'], [-1, '−1']]); return { b: 'e', bT: 'e', a: Math.exp(c[0]), aT: `${rT(Math.exp(c[0]), 4)}…`, c: c[0], cT: c[1] };
+  }
+  for (;;) {
+    const B = pick(r, [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 16, 25, 27, 32, 64]), e = pick(r, [1, 2, 3, 4, -1, -2, -3, 0, 1 / 2, 2 / 5, 3 / 2, 1 / 3, 2 / 3]);
+    const a = B ** e; if (!fracParts(a) || Math.abs(a) > 100000 || fracParts(a)[1] > 1000) continue;
+    if (!Number.isInteger(e) && !Number.isInteger(a) && !fracParts(1 / a)) continue;
+    return { b: B, bT: String(B), a, aT: fracT(a), c: e, cT: fracT(e) };
+  }
+}
+TEMPLATES.e2ToExp = (r) => {
+  const F = logFact(r), nat = F.b === 'e';
+  const lhs = `${logT(F.b)} ${/\//.test(F.aT) ? `(${F.aT})` : F.aT} = ${F.cT}`;
+  const P = (b, c, a) => `${powT(b, c)} = ${a}`;
+  const C = P(F.bT, F.cT, F.aT);
+  const trueEq = (w) => { const [L, R] = w.split(' = '); const l = lgConst(L.replace(/…/g, '')), rr = lgConst(R.replace(/…/g, '')); return isFinite(l) && isFinite(rr) && Math.abs(l - rr) < 1e-3 * Math.max(1, Math.abs(rr)); };
+  const wrongs = [P(F.cT, F.bT, F.aT), P(F.aT, F.cT, F.bT), P(F.bT, F.aT, F.cT), P(F.bT, fracT(-F.c || 2), F.aT)].filter((w) => w !== C && !trueEq(w));
+  const okB = (v) => (nat ? /^e$/.test(pxWords(v)) || lgOk(v, Math.E) : lgOk(v, F.b)), okC = (v) => lgOk(v, F.c, nat ? 0.0011 : 1e-6), okA = (v) => lgOk(v, F.a, nat ? Math.max(0.0011, F.a * 0.0011) : 1e-6);
+  return {
+    topic: 'Logarithmic to exponential form', stem: `Write the logarithmic equation in exponential form.   ${lhs}`,
+    ...buildChoices(r, C, [...new Set(wrongs)], (i) => P(F.bT, fmt(i + 5), F.aT)),
+    frStem: `Write the logarithmic equation in exponential form: (base)^(exponent) = (value).   ${lhs}`,
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: 'Base:' }, { kind: 'expr', keys: 'logs', label: 'Exponent:' }, { kind: 'expr', keys: 'logs', label: 'Value:' }], key: [nat ? 'e' : String(F.b), nat ? rT(F.c, 3) : fracL(F.c), nat ? rT(F.a, 4) : fracL(F.a)], display: C,
+      check: (v) => okB(v[0]) && okC(v[1]) && okA(v[2]), score: (v) => [okB(v[0]), okC(v[1]), okA(v[2])].filter(Boolean).length / 3 },
+    solution: `${logT(F.b)} a = c means ${F.bT}^c = a. So ${C}.`,
+  };
+};
+TEMPLATES.e2ToLog = (r) => {
+  const F = logFact(r), nat = F.b === 'e';
+  const P = (b, c, a) => `${powT(b, c)} = ${a}`;
+  const given = P(F.bT, F.cT, F.aT);
+  const L = (b, a, c) => `${logT(b)} ${/\//.test(String(a)) ? `(${a})` : a} = ${c}`;
+  const correct = L(F.b, F.aT, F.cT);
+  const okBase = (t) => !/^[−-]|^0|^1$/.test(String(t));
+  const wrongs = [L(F.b, F.cT, F.aT), nat ? `ln ${F.cT} = ${F.aT}` : okBase(F.cT) ? L(/^\d+$/.test(F.cT) ? +F.cT : F.cT, F.aT, F.bT) : null, nat ? `log ${F.aT} = ${F.cT}` : okBase(F.aT) ? L(/^\d+$/.test(F.aT) ? +F.aT : F.aT, F.bT, F.cT) : null, nat ? null : L(F.b, F.aT, fracT(-F.c || 1))].filter((w) => w && w !== correct);
+  const okB = (v) => (nat ? /^e$/.test(pxWords(v)) || lgOk(v, Math.E) : lgOk(v, F.b)), okA = (v) => lgOk(v, F.a, nat ? Math.max(0.0011, F.a * 0.0011) : 1e-6), okC = (v) => lgOk(v, F.c, nat ? 0.0011 : 1e-6);
+  return {
+    topic: 'Exponential to logarithmic form', stem: `Write the exponential equation in logarithmic form.   ${given}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => !/undefined|NaN/.test(w)), (i) => L(F.b, F.aT, fmt(i + 5))),
+    frStem: `Write the exponential equation in logarithmic form: log of (value) with base (base) = (exponent).   ${given}`,
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: 'Base:' }, { kind: 'expr', keys: 'logs', label: 'Value inside the log:' }, { kind: 'expr', keys: 'logs', label: 'Logarithm equals:' }], key: [nat ? 'e' : String(F.b), nat ? rT(F.a, 4) : fracL(F.a), nat ? rT(F.c, 3) : fracL(F.c)], display: correct,
+      check: (v) => okB(v[0]) && okA(v[1]) && okC(v[2]), score: (v) => [okB(v[0]), okA(v[1]), okC(v[2])].filter(Boolean).length / 3 },
+    solution: `bᶜ = a means ${logT('b')} a = c. So ${correct}.`,
+  };
+};
+TEMPLATES.e2Eval = (r) => {
+  for (;;) {
+    const F = logFact(r); if (F.b === 'e') continue;
+    const sym = r() < 0.15;
+    if (sym) { const k = pick(r, [[0.5, '√b', '1/2'], [-2, 'a⁻²', '−2'], [3, 'b³', '3'], [1 / 3, '∛a', '1/3']]); const base = k[1].includes('b') ? 'b' : 'a';
+      return { topic: 'Evaluating logarithms', stem: `Evaluate the logarithm at the given value of x without using a calculator.   g(x) = log_${base} x,   x = ${k[1]}`, ...buildChoices(r, k[2], ['2', fracT(1 / k[0]), fracT(-k[0])].filter((w) => w !== k[2]), (i) => fmt(i + 4)),
+        fr: { fields: [{ kind: 'expr', keys: 'logs', label: `g(${k[1]}) =` }], key: [fracL(k[0])], display: k[2], check: (v) => lgOk(v[0], k[0]) }, solution: `log_${base} ${base}^k = k, so the value is ${k[2]}.` }; }
+    const correct = F.cT;
+    const wrongs = [fracT(1 / F.c || 2), fracT(-F.c), fracT(F.a / F.b)].filter((w) => w !== correct && !/Infinity|NaN/.test(w));
+    return {
+      topic: 'Evaluating logarithms', stem: `Evaluate the logarithm at the given value of x without using a calculator.   f(x) = ${logT(F.b)} x,   x = ${F.aT}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => fmt(F.c + i + 2)),
+      fr: { fields: [{ kind: 'expr', keys: 'logs', label: `f(${F.aT}) =` }], key: [fracL(F.c)], display: correct, check: (v) => lgOk(v[0], F.c) },
+      solution: `${logT(F.b)} ${F.aT} asks: ${F.b} to what power is ${F.aT}? ${powT(String(F.b), F.cT)} = ${F.aT}`.replace(/\^\(([^)]*)\)/, '^($1)') + `, so the value is ${correct}.`,
+    };
+  }
+};
+TEMPLATES.e2Calc = (r) => {
+  const nat = r() < 0.5, x = pick(r, [12.5, 96.75, 7 / 8, 1 / 500, 18, 0.74, Math.sqrt(5), 2 * Math.sqrt(3) - 1, 3.6, 250]);
+  const xT = x === Math.sqrt(5) ? '√5' : x === 2 * Math.sqrt(3) - 1 ? `2√3 ${MINUS} 1` : x === 1 / 500 ? '1/500' : x === 7 / 8 ? '7/8' : String(x);
+  const v = nat ? 8 * Math.log(x) : Math.log10(x), correct = d3(v);
+  const wrongs = [d3(nat ? 8 * Math.log10(x) : Math.log(x)), d3(nat ? Math.log(8 * x) : Math.log10(x) * 10), d3(-v)].filter((w) => w !== correct);
+  return {
+    topic: 'Logarithms on a calculator', stem: `Use a calculator to evaluate the function at the given value of x. Round to three decimal places.   f(x) = ${nat ? '8 ln x' : 'log x'},   x = ${xT}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => d3(v + i + 1)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: `f(${xT}) ≈` }], key: [correct.replace(MINUS, '-')], display: correct, check: (vv) => lgOk(vv[0], v, 0.0011) },
+    solution: `${nat ? `8 ln(${xT}) = 8 × ${rT(Math.log(x), 5)}` : `log(${xT})`} ≈ ${correct}`,
+  };
+};
+TEMPLATES.e2Props = (r) => {
+  const k = ri(r, 0, 9), a = pick(r, [3, 5, 7, 8, 12]), n = pick(r, [2, 3, 4, -2, 5]);
+  const forms = [
+    [`${logT(a)} ${a}`, 1, `log_a a = 1`], [`${logT(pick(r, [7, 9, 6]))} 1`, 0, `log_a 1 = 0`], [`log_π ${powT('π', String(n).replace('-', '−'))}`, n, `log_a aˣ = x`],
+    [`${a}^(${logT(a)} ${Math.abs(n) + 1})`, Math.abs(n) + 1, `a^(log_a x) = x`], [`e^(ln ${a})`, a, `e^(ln x) = x`],
+    [`ln(1/${powT('e', String(Math.abs(n)))})`, -Math.abs(n), `ln(1/eⁿ) = ln e⁻ⁿ = −n`], [`2.5 ln 1`, 0, `ln 1 = 0`], [`ln e^(ln e)`, 1, `ln e = 1, so ln e¹ = 1`], [`e^(ln(1/e))`, 1 / Math.E, `e^(ln x) = x with x = 1/e`], [`(ln e)/π`, 1 / Math.PI, `ln e = 1, so the value is 1/π`],
+  ];
+  const [t, v, why] = forms[k];
+  const vT = v === 1 / Math.E ? '1/e' : v === 1 / Math.PI ? '1/π' : fracT(v);
+  const vL = v === 1 / Math.E ? '\\frac{1}{e}' : v === 1 / Math.PI ? '\\frac{1}{\\pi}' : fracL(v);
+  const wrongs = ['0', '1', 'e', String(a), fmt(-v)].filter((w) => w !== vT);
+  return {
+    topic: 'Properties of logarithms', stem: `Use the properties of logarithms to simplify the expression.   ${t}`,
+    ...buildChoices(r, vT, shuffle(r, [...new Set(wrongs)]).slice(0, 3), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: '=' }], key: [vL], display: vT, check: (vv) => lgOk(vv[0], v) },
+    solution: `${why}. So ${t} = ${vT}.`,
+  };
+};
+TEMPLATES.e2OneToOne = (r) => {
+  const b = pick(r, [2, 3, 5, 10, 'e']), k = ri(r, 0, 1);
+  let eq, sols, why;
+  if (k === 0) { const q = nz(r, -6, 6), m = ri(r, 2, 15); if (m - q <= 0 || m - q === 0) return TEMPLATES.e2OneToOne(r); eq = `${logT(b)}(x ${q > 0 ? '+' : MINUS} ${Math.abs(q)}) = ${logT(b)} ${m}`; sols = [m - q]; why = `x ${q > 0 ? '+' : MINUS} ${Math.abs(q)} = ${m}, so x = ${m - q}.`; }
+  else { const r1 = ri(r, 1, 6), r2 = -ri(r, 1, 6); const p = -(r1 + r2), m = -r1 * r2; const inner = polyT([1, p, 0]); eq = r() < 0.3 ? `${logT(b)} ${m} = ${logT(b)}(${inner})` : `${logT(b)}(${inner}) = ${logT(b)} ${m}`; sols = [...new Set([r1, r2])]; why = `${inner} = ${m}, so ${polyT([1, p, -m])} = 0 and x = ${sols.map(fmt).join(', ')}. Both make ${inner} = ${m} > 0, so both check.`; }
+  const correct = `x = ${sols.map(fmt).join(', ')}`;
+  const wrongs = [`x = ${sols.map((s) => fmt(-s)).join(', ')}`, `x = ${fmt(sols[0])}`, `x = ${sols.map((s) => fmt(s + 1)).join(', ')}`, `x = ${sols.map((s) => fmt(s * 2)).join(', ')}`].filter((w) => w !== correct && !realListOk(w.replace('x = ', '').replace(/−/g, '-'), sols));
+  return {
+    topic: 'One-to-One Property (logarithms)', stem: `Use the One-to-One Property to solve the equation for x.   ${eq}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => `x = ${fmt(i + 20)}`),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'x =' }], key: [sols.join(',')], display: correct.replace('x = ', ''), check: (v) => realListOk(v[0], sols) },
+    solution: `Logs with the same base are equal only when their arguments are equal: ${why}`,
+  };
+};
+// y = s·log_b(r·x − h) + k
+function logGraph(r) {
+  for (;;) {
+    const b = pick(r, [2, 3, 4, 5, 6, 10, 'e']), s = r() < 0.25 ? -1 : 1, rr = r() < 0.2 ? -1 : 1, h = r() < 0.6 ? nz(r, -5, 5) : 0, k = r() < 0.4 ? nz(r, -3, 4) : 0;
+    const B = b === 'e' ? Math.E : b; if (b === 'e' && k) continue;
+    if (Math.abs(B ** (-k / s)) > 200) continue;
+    const innerT = rr === 1 ? (h ? `x ${h > 0 ? MINUS : '+'} ${Math.abs(h)}` : 'x') : (h ? `${fmt(h)} ${MINUS} x` : `${MINUS}x`);
+    const t = `${s < 0 ? MINUS : ''}${logT(b)}${innerT === 'x' ? ' x' : `(${innerT})`}${k ? ` ${k > 0 ? '+' : MINUS} ${Math.abs(k)}` : ''}`;
+    // inside = rr·(x − h) > 0
+    const va = h, dom = rr === 1 ? [{ a: h, b: Infinity, ca: false, cb: false }] : [{ a: -Infinity, b: h, ca: false, cb: false }];
+    const xi = h + rr * B ** (-k / s); if (!fracParts(xi) || fracParts(xi)[1] > 64) continue;
+    const f = (x) => s * Math.log(rr * (x - h)) / Math.log(B) + k;
+    return { b, t, va, dom, xi, f };
+  }
+}
+TEMPLATES.e2Domain = (r) => {
+  const G = logGraph(r);
+  const xiT = exactT(G.xi);
+  const T = (D, X, A) => `Domain ${D};  x-intercept (${X}, 0);  vertical asymptote x = ${A}`, correct = T(setText(G.dom), xiT, fmt(G.va));
+  const flipD = G.dom[0].a === -Infinity ? [{ a: G.va, b: Infinity, ca: false, cb: false }] : [{ a: -Infinity, b: G.va, ca: false, cb: false }];
+  const wrongs = [T(setText(flipD), xiT, fmt(G.va)), T(setText(G.dom), exactT(G.xi + 1), fmt(G.va)), T(setText(G.dom.map((I) => ({ ...I, a: isFinite(I.a) ? -I.a : I.a, b: isFinite(I.b) ? -I.b : I.b }))), xiT, fmt(-G.va))].filter((w) => w !== correct);
+  const okX = (v) => onePointOk(v, [G.xi, 0]) || lgOk(v, G.xi, 1e-6);
+  const okA = (v) => lgOk(String(v).replace(/^\s*x\s*=/, ''), G.va);
+  const ok = (v) => [setEq(parseSet(v[0]), G.dom), okX(v[1]), okA(v[2])];
+  return {
+    topic: 'Domain, intercept, asymptote', stem: `Find the domain, x-intercept, and vertical asymptote of the logarithmic function.   f(x) = ${G.t}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(setText(G.dom), xiT, fmt(G.va + i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'set', label: 'Domain:' }, { kind: 'expr', keys: 'logs', label: 'x-intercept: x =' }, { kind: 'expr', keys: 'num', label: 'Vertical asymptote: x =' }], key: [setLatex(G.dom), exactL(G.xi), String(G.va)], display: correct,
+      check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 3 },
+    draw: r() < 0.5 ? plotQ({ xr: [Math.min(-2, G.va - 6), Math.max(8, G.va + 6)], yr: [-6, 6], curves: [{ f: G.f }], pts: [] }) : undefined, size: [380, 380],
+    solution: `The argument must be positive, which gives the domain ${setText(G.dom)}; the vertical asymptote is where the argument is 0: x = ${fmt(G.va)}.\nx-intercept: set f(x) = 0 and solve: x = ${xiT}.`,
+  };
+};
+const LOG3_POOL = [['log₃ x', (x) => Math.log(x) / Math.log(3)], ['log₃ x + 2', (x) => Math.log(x) / Math.log(3) + 2], ['log₃(x − 1)', (x) => Math.log(x - 1) / Math.log(3)], ['log₃(1 − x)', (x) => Math.log(1 - x) / Math.log(3)], ['−log₃ x', (x) => -Math.log(x) / Math.log(3)],
+  ['log₃(x + 2)', (x) => Math.log(x + 2) / Math.log(3)], ['log₃ x − 1', (x) => Math.log(x) / Math.log(3) - 1], ['log₃(−x)', (x) => Math.log(-x) / Math.log(3)], ['−log₃(x + 1)', (x) => -Math.log(x + 1) / Math.log(3)]];
+TEMPLATES.e2Match = (r) => {
+  const set = shuffle(r, LOG3_POOL).slice(0, 4), [t, f] = set[0], opts = set.map(([u]) => `f(x) = ${u}`);
+  return {
+    topic: 'Matching logarithmic graphs', stem: 'Use the graph of g(x) = log₃ x to identify the function shown. Which function is graphed?',
+    ...buildChoices(r, opts[0], opts.slice(1), () => null),
+    fr: FR.select('The graph is', shuffle(r, opts), opts[0]),
+    draw: plotQ({ xr: [-5, 6], yr: [-4, 5], curves: [{ f }], pts: [] }), size: [380, 380],
+    solution: `The graph matches f(x) = ${t}: check the vertical asymptote and the point where it crosses the x-axis.`,
+  };
+};
+
+/* ---------- 5.3 Properties of Logarithms ---------- */
+const lgListOk = (raw, vals, tol = 1e-6) => {
+  const w = pxWords(raw);
+  if (/nosolution|none|norealsolution|notpossible/.test(w)) return !vals.length;
+  const parts = splitAnswers(raw); if (parts === 'none') return !vals.length;
+  if (!parts.length || parts.length !== vals.length) return false;
+  const used = new Set();
+  return parts.every((p) => { const v = lgConst(p); const k = vals.findIndex((t, i) => !used.has(i) && (Math.abs(v - t) <= 1e-6 * Math.max(1, Math.abs(t)) || Math.abs(v - t) <= tol)); if (k < 0) return false; used.add(k); return true; });
+};
+const argT = (t) => (/[\/ ]|^−/.test(t) ? `(${t})` : t);
+TEMPLATES.e3ChangeBase = (r) => {
+  const opts = [[5, '5'], [3, '3'], [7, '7'], [2.6, '2.6'], [0.2, '1/5'], ['x', 'x']];
+  const [b, bT] = pick(r, opts), [a, aT] = b === 'x' ? pick(r, [[0.3, '3/10'], [12, '12'], [5, '5']]) : pick(r, [[16, '16'], [4, '4'], [0.3, '3/10'], ['x', 'x'], [12, '12'], [9, '9']]);
+  const val = (env) => Math.log(a === 'x' ? env.x : a) / Math.log(b === 'x' ? env.x : b);
+  const L = (fn, t) => `${fn} ${argT(t)}`;
+  const T = (A, B) => `(a) ${L('log', A)}/${L('log', B)};  (b) ${L('ln', A)}/${L('ln', B)}`, correct = T(aT, bT);
+  const samples = [{ x: 2.3 }, { x: 4.1 }, { x: 0.6 }, { x: 7.7 }];
+  const ok = (raw, kind) => { const n = lgEquiv(raw, val, ['x'], samples); if (!n) return false; const logs = lgNodes(n).filter((m) => m.t === 'log'); return logs.length >= 1 && logs.every((m) => (kind === 'ln' ? m.ln : m.b10)); };
+  const LL = (fn, t) => `${fn === 'ln' ? '\\ln' : '\\log'}\\left(${t === 'x' ? 'x' : /\//.test(t) ? `\\frac{${t.split('/')[0]}}{${t.split('/')[1]}}` : t}\\right)`;
+  return {
+    topic: 'Change-of-base formula', stem: `Rewrite the logarithm as a ratio of (a) common logarithms and (b) natural logarithms.   ${logT(b === 0.2 ? '1/5' : b === 2.6 ? '2.6' : b)} ${argT(aT)}`,
+    ...buildChoices(r, correct, [T(bT, aT), `(a) log ${argT(aT)} − log ${argT(bT)};  (b) ln ${argT(aT)} − ln ${argT(bT)}`, `(a) log(${aT}/${bT});  (b) ln(${aT}/${bT})`], () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: '(a) Common logs:' }, { kind: 'expr', keys: 'logs', label: '(b) Natural logs:' }], key: [`\\frac{${LL('log', aT)}}{${LL('log', bT)}}`, `\\frac{${LL('ln', aT)}}{${LL('ln', bT)}}`], display: correct,
+      check: (v) => ok(v[0], 'log') && ok(v[1], 'ln'), score: (v) => (ok(v[0], 'log') ? 0.5 : 0) + (ok(v[1], 'ln') ? 0.5 : 0) },
+    solution: `Change of base: log_b a = (log a)/(log b) = (ln a)/(ln b).\n${correct}`,
+  };
+};
+TEMPLATES.e3CalcCB = (r) => {
+  const [b, bT] = pick(r, [[3, '3'], [0.4, '0.4'], [Math.PI, 'π'], [2 / 3, '2/3'], [7, '7'], [0.5, '1/2'], [5, '5'], [1.5, '1.5']]), a = pick(r, [17, 12, 0.5, 0.125, 250, 0.03, 9.6, 40]);
+  const v = Math.log(a) / Math.log(b), correct = d3(v);
+  const wrongs = [d3(Math.log(b) / Math.log(a)), d3(Math.log10(a / b)), d3(Math.log(a)), d3(-v)].filter((w) => w !== correct);
+  const bText = /^\d+$/.test(bT) ? logT(+bT) : `log_${bT === 'π' ? 'π' : `(${bT})`}`;
+  return {
+    topic: 'Using change of base', stem: `Evaluate the logarithm using the change-of-base formula. Round to three decimal places.   ${bText} ${String(a)}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => d3(v + i + 1)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: '≈' }], key: [correct.replace(MINUS, '-')], display: correct, check: (vv) => lgOk(vv[0], v, 0.0011) },
+    solution: `${bText} ${fmt(a)} = (ln ${fmt(a)})/(ln ${argT(bT)}) ≈ ${rT(Math.log(a), 4)}/${rT(Math.log(b), 4)} ≈ ${correct}`,
+  };
+};
+TEMPLATES.e3Terms = (r) => {
+  for (;;) {
+    const k = pick(r, [0, 0, 1, 2, -1]), m = ri(r, -2, 2), n = ri(r, -2, 2); if (!m && !n) continue;
+    const N = 3 ** k * 5 ** m * 7 ** n, p = fracParts(N); if (!p || p[0] > 400 || p[1] > 400) continue;
+    const L5 = Math.log(5) / Math.log(3), L7 = Math.log(7) / Math.log(3), val = k + m * L5 + n * L7;
+    const term = (c, t, first) => (c === 0 ? '' : `${first ? (c < 0 ? MINUS : '') : c < 0 ? ` ${MINUS} ` : ' + '}${Math.abs(c) === 1 ? '' : Math.abs(c) + ' '}${t}`);
+    const ans = (kk, mm, nn) => { let s = kk ? fmt(kk) : ''; s += term(mm, 'log₃ 5', !s); s += term(nn, 'log₃ 7', !s); return s || '0'; };
+    const correct = ans(k, m, n);
+    const wrongs = [ans(k, n, m), ans(0, m, n), ans(k, -m, -n), ans(k + 1, m, n)].filter((w) => w !== correct);
+    const ok = (raw) => { const nd = lgEquiv(raw, () => val, [], [{}]); if (!nd) return false; return lgNodes(nd).filter((x) => x.t === 'log').every((x) => Math.abs(lgEval(x.base) - 3) < 1e-9 && [3, 5, 7].some((a) => Math.abs(lgEval(x.a) - a) < 1e-9)); };
+    const keyL = (() => { let s = k ? String(k) : ''; const t = (c, a) => (c === 0 ? '' : `${c < 0 ? '-' : s ? '+' : ''}${Math.abs(c) === 1 ? '' : Math.abs(c)}\\log_{3}${a}`); s += t(m, 5); s += t(n, 7); return s; })();
+    return {
+      topic: 'Writing in terms of log₃ 5 and log₃ 7', stem: `Use the properties of logarithms to write the logarithm in terms of log₃ 5 and log₃ 7.   log₃ ${argT(fracT(N))}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => ans(k + i + 2, m, n)),
+      fr: { fields: [{ kind: 'expr', keys: 'logs', label: `log₃ ${argT(fracT(N))} =` }], key: [keyL], display: correct, check: (v) => ok(v[0]) },
+      solution: `${fracT(N)} = ${[[3, k], [5, m], [7, n]].filter(([, e]) => e).map(([b, e]) => (e === 1 ? b : powT(String(b), String(e)))).join(' · ')}, and log₃ 3 = 1. Product, quotient, and power rules give ${correct}.`,
+    };
+  }
+};
+const ROOTSYM = { 2: '√', 3: '∛', 4: '∜' };
+TEMPLATES.e3Exact = (r) => {
+  const k = ri(r, 0, 4);
+  let t, v, why, L;
+  if (k === 0) { // log_B (k-th root of c^j)
+    for (;;) {
+      const c = pick(r, [2, 3, 5, 6, 10]), p = pick(r, [1, 1, 2, 3]), B = c ** p, j = pick(r, [1, 2, 3, 4, -1, -2, -3]), q = pick(r, [1, 1, 2, 3, 4]);
+      if (B > 64 || c ** Math.abs(j) > 1000) continue; v = j / (q * p); const inner = j > 0 ? String(c ** j) : `1/${c ** -j}`;
+      t = `${logT(B)} ${q === 1 ? argT(inner) : `${ROOTSYM[q]}${argT(inner)}`}`; why = `${q === 1 ? inner : `${ROOTSYM[q]}${argT(inner)}`} = ${powT(String(c), fracT(j / q))} and ${B} = ${powT(String(c), String(p))}`.replace(/\^\(([^)]*)\)/g, '^($1)') + `, so the value is ${fracT(j / q)}/${p} = ${fracT(v)}.`.replace(`/${1} =`, ' ='); break;
+    }
+  } else if (k === 1) { const j = pick(r, [1, 2, 3, 5, -1, -3]), q = pick(r, [2, 3, 4]); v = j / q; t = j > 0 ? `ln ${ROOTSYM[q]}(${powT('e', String(j))})`.replace('(e)', 'e') : `ln(1/${ROOTSYM[q]}${-j === 1 ? 'e' : `(${powT('e', String(-j))})`})`; why = `The argument is e^(${fracT(v)}), and ln eˣ = x, so the value is ${fracT(v)}.`; }
+  else if (k === 2) { const p = ri(r, 2, 7), q = ri(r, 1, 6), c = pick(r, [1, 2, 3]), plus = r() < 0.5; v = plus ? c * p + q : c * p - q; t = `${c === 1 ? '' : c + ' '}ln ${powT('e', String(p))} ${plus ? '+' : MINUS} ln ${powT('e', String(q))}`; why = `ln eⁿ = n: ${c === 1 ? '' : c + '·'}${p} ${plus ? '+' : '−'} ${q} = ${v}.`; }
+  else if (k === 3) { // log_b a1 ± log_b a2 that combine to a power of b
+    for (;;) { const b = pick(r, [2, 3, 4, 5, 6]), m = pick(r, [1, 2, 3]), plus = r() < 0.5, a1 = pick(r, [2, 3, 4, 5, 6, 8, 9, 12, 15, 25, 75, 32]);
+      const a2 = plus ? b ** m / a1 : a1 / b ** m; if (!Number.isInteger(a2) || a2 < 2 || a2 === b) continue;
+      v = m; t = `${logT(b)} ${a1} ${plus ? '+' : MINUS} ${logT(b)} ${a2}`; why = `${plus ? 'Product' : 'Quotient'} rule: ${logT(b)} ${plus ? `(${a1} · ${a2})` : `(${a1}/${a2})`} = ${logT(b)} ${b ** m} = ${m}.`; break; }
+  } else { const b = pick(r, [2, 3, 5]), a = -pick(r, [2, 8, 27, 9, 25]); v = null; t = `${logT(b)}(${fmt(a)})`; why = 'The logarithm of a negative number is not defined (the domain of a logarithm is x > 0), so it is not possible.'; }
+  const vT = v === null ? 'Not possible' : fracT(v);
+  const wrongs = (v === null ? ['3', `${MINUS}3`, `${MINUS}1`] : [fracT(-v), fracT(v === 0 ? 1 : 1 / v), fracT(v + 1), 'Not possible']).filter((w) => w !== vT);
+  return {
+    topic: 'Exact values of logarithms', stem: `Find the exact value of the logarithmic expression without using a calculator. (If this is not possible, say so.)   ${t}`,
+    ...buildChoices(r, vT, [...new Set(wrongs)], (i) => fmt(i + 4)),
+    fr: { fields: [{ kind: 'expr', keys: 'invans', label: '=' }], key: [v === null ? '\\text{not possible}' : fracL(v)], display: vT, check: (x) => (v === null ? NOPE_RE.test(pxWords(x[0])) : lgOk(x[0], v)) },
+    solution: why,
+  };
+};
+TEMPLATES.e3Approx = (r) => {
+  const L = { 2: 0.3562, 3: 0.5646, 5: 0.8271 };
+  for (;;) {
+    const i = ri(r, -2, 2), j = ri(r, -1, 2), k = ri(r, -2, 1), mb = pick(r, [0, 0, 0, 1, 2]), E = pick(r, [1, 1, 1, 0.5, 1 / 3, -2]);
+    if (!i && !j && !k) continue; if (E === -2 && (Math.abs(i) + Math.abs(j) + Math.abs(k) > 1 || i < 0 || j < 0 || k < 0)) continue;
+    const N = 2 ** i * 3 ** j * 5 ** k, p = fracParts(N); if (!p || p[0] > 100 || p[1] > 100 || N === 1) continue;
+    const pow10 = p[1] > 1 && 100 % p[1] === 0 && p[0] < p[1] && r() < 0.5;
+    const nT = pow10 ? String(N) : fracT(N), core = `${nT}${mb ? (mb === 1 ? 'b' : powT('b', String(mb))) : ''}`;
+    const coreP = /\//.test(core) && mb ? `(${core})` : core;
+    const t = E === 1 ? argT(coreP) : E === -2 ? powT(`(${core})`, '−2') : `${ROOTSYM[Math.round(1 / E)]}${/^\d+$|^b$/.test(core) ? core : `(${core})`}`;
+    const v = E * (i * L[2] + j * L[3] + k * L[5] + mb), correct = rT(v, 4);
+    const wrongs = [rT(v / E * (E === 1 ? 2 : 1), 4), rT(i * L[2] * j * L[3] || -v, 4), rT(E * (i * L[2] + j * L[3] + k * L[5]), 4), rT(-v, 4)].filter((w) => w !== correct);
+    return {
+      topic: 'Approximating with log properties', stem: `Approximate the logarithm using the properties of logarithms, given log_b 2 ≈ 0.3562, log_b 3 ≈ 0.5646, and log_b 5 ≈ 0.8271. Round to four decimal places.   log_b ${t}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (ii) => rT(v + ii + 1, 4)),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: `log_b ${t} ≈` }], key: [correct.replace(MINUS, '-')], display: correct, check: (x) => lgOk(x[0], v, 0.00015) },
+      solution: `${t} = ${E !== 1 ? `(${core})^(${fracT(E)}), ` : ''}${[[2, i], [3, j], [5, k]].filter(([, e]) => e).map(([b, e]) => (e === 1 ? String(b) : powT(String(b), String(e)))).join(' · ')}${mb ? ` · ${mb === 1 ? 'b' : powT('b', String(mb))}` : ''}${E !== 1 ? ` (all to the ${fracT(E)})` : ''}.\nlog_b = ${E !== 1 ? `${fracT(E)}·(` : ''}${[[2, i], [3, j], [5, k]].filter(([, e]) => e).map(([b, e], n) => `${n ? (e < 0 ? ' − ' : ' + ') : e < 0 ? MINUS : ''}${Math.abs(e) === 1 ? '' : Math.abs(e)}(${L[b]})`).join('')}${mb ? ` + ${mb}` : ''}${E !== 1 ? ')' : ''} ≈ ${correct}`,
+    };
+  }
+};
+// atoms for expanding/condensing
+const ATOMS = [{ t: 'x', l: 'x', f: (e) => e.x }, { t: 'y', l: 'y', f: (e) => e.y }, { t: 'z', l: 'z', f: (e) => e.z }, { t: '(z − 1)', l: '\\left(z-1\\right)', f: (e) => e.z - 1, bare: 'z − 1' }, { t: '(x + 3)', l: '\\left(x+3\\right)', f: (e) => e.x + 3, bare: 'x + 3' }, { t: '(x − 2)', l: '\\left(x-2\\right)', f: (e) => e.x - 2, bare: 'x − 2' }];
+const ENVS = [{ x: 3.7, y: 2.2, z: 1.6, b: 2.9 }, { x: 5.1, y: 4.3, z: 3.3, b: 6.2 }, { x: 2.6, y: 1.4, z: 2.7, b: 3.4 }, { x: 8.2, y: 6.9, z: 1.2, b: 9.7 }];
+const LBASES = ['e', 'e', 10, 2, 3, 4, 5, 8, 'b'];
+const lbVal = (b, env) => (b === 'e' ? Math.E : b === 'b' ? env.b : b);
+const coefT = (c, first) => { const a = Math.abs(c), p = fracParts(a); const s = a === 1 ? '' : p[1] === 1 ? `${a} ` : `(${p[0]}/${p[1]}) `; return `${first ? (c < 0 ? MINUS : '') : c < 0 ? ` ${MINUS} ` : ' + '}${s}`; };
+const coefL = (c, first) => { const a = Math.abs(c), p = fracParts(a); const s = a === 1 ? '' : p[1] === 1 ? `${a}` : `\\frac{${p[0]}}{${p[1]}}`; return `${first ? (c < 0 ? '-' : '') : c < 0 ? '-' : '+'}${s}`; };
+const lgTermT = (b, at) => `${logT(b)} ${at}`, lgTermL = (b, al) => `${logL(b)}${/^\\left/.test(al) ? al : ` ${al}`}`;
+// a sum of c·log(atom) as text and LaTeX
+const sumT = (b, terms) => terms.map(([c, A], i) => coefT(c, !i) + lgTermT(b, A.t)).join('');
+const sumL = (b, terms) => terms.map(([c, A], i) => coefL(c, !i) + lgTermL(b, A.l)).join('');
+// atom^c as text: integer powers with superscripts, 1/2 → √, 1/3 → ∛, 2/3 → ∛(x²)
+function powAtom(A, c) {
+  const a = Math.abs(c), p = fracParts(a), base = A.bare ? `(${A.bare})` : A.t;
+  const sup = (n) => (n === 1 ? base : powT(base, String(n)));
+  if (p[1] === 1) return sup(p[0]);
+  return `${ROOTSYM[p[1]]}${p[0] === 1 && !A.bare ? base : `(${p[0] === 1 ? A.bare || base : sup(p[0])})`}`;
+}
+TEMPLATES.e3Expand = (r) => {
+  for (;;) {
+    const b = pick(r, LBASES), nAt = ri(r, 1, 3), atoms = shuffle(r, ATOMS).slice(0, nAt), cNum = r() < 0.35 ? pick(r, [3, 5, 7, 11, 13]) : null;
+    const pows = atoms.map(() => pick(r, [1, 1, 2, 3, 4])), dens = atoms.map((_, i) => i > 0 && r() < 0.5);
+    if (cNum && dens.every((d) => !d) && atoms.length === 1 && pows[0] > 1) continue;
+    const q = pick(r, [1, 1, 1, 2, 3]), P = q === 1 && r() < 0.15 ? 3 : 1;
+    const numF = [...(cNum ? [String(cNum)] : []), ...atoms.map((A, i) => (!dens[i] ? (pows[i] === 1 ? A.t : powT(A.bare ? `(${A.bare})` : A.t, String(pows[i]))) : null)).filter(Boolean)];
+    const denF = atoms.map((A, i) => (dens[i] ? (pows[i] === 1 ? A.t : powT(A.bare ? `(${A.bare})` : A.t, String(pows[i]))) : null)).filter(Boolean);
+    if (!numF.length) numF.push('1');
+    let inner = numF.join('').replace(/^1(?=[a-z(])/, ''); if (denF.length) inner = `${inner}/${denF.length > 1 ? `(${denF.join('')})` : denF.join('')}`;
+    const outer = P !== 1 ? `[${powT(`(${inner})`, String(P))}]` : q > 1 ? `${ROOTSYM[q]}${/^[a-z]$|^\d+$/.test(inner) ? inner : `(${inner})`}` : inner;
+    const single = /^([a-z]|\d+)$/.test(inner) || (/^\([^()]*\)$/.test(inner));
+    const text = `${logT(b)} ${P === 1 && q === 1 && !single ? (/\(/.test(inner) ? `[${inner}]` : `(${inner})`) : outer}`;
+    const terms = [...(cNum ? [[P / q, { t: String(cNum), l: String(cNum), f: () => cNum }]] : []), ...atoms.map((A, i) => [(dens[i] ? -1 : 1) * pows[i] * P / q, A])];
+    const truth = (e) => terms.reduce((s, [c, A]) => s + c * Math.log(A.f(e)), 0) / Math.log(lbVal(b, e));
+    const correct = sumT(b, terms);
+    const alt1 = sumT(b, terms.map(([c, A]) => [c * q / P, A])), alt2 = sumT(b, terms.map(([c, A]) => [Math.abs(c), A])), alt3 = sumT(b, terms.map(([c, A], i) => [i ? c : c * 2, A]));
+    const ok = (raw) => { const n = lgEquiv(raw, truth, ['x', 'y', 'z', 'b'], ENVS); return !!n && isExpanded(n); };
+    return {
+      topic: 'Expanding logarithms', stem: `Use the properties of logarithms to expand the expression as a sum, difference, and/or constant multiple of logarithms. (Assume all variables are positive.)   ${text}`,
+      ...buildChoices(r, correct, [...new Set([alt1, alt2, alt3])].filter((w) => w !== correct), (i) => sumT(b, terms.map(([c, A], k) => [k === 0 ? c + i + 1 : c, A]))),
+      fr: { fields: [{ kind: 'expr', keys: 'logs', label: `${text} =` }], key: [sumL(b, terms)], display: correct, check: (v) => ok(v[0]) },
+      solution: `Product rule: log(uv) = log u + log v. Quotient rule: log(u/v) = log u − log v. Power rule: log uⁿ = n log u${q > 1 ? ` (a ${q === 2 ? 'square' : 'cube'} root is the power 1/${q})` : ''}.\n${text} = ${correct}`,
+    };
+  }
+};
+TEMPLATES.e3Condense = (r) => {
+  for (;;) {
+    const b = pick(r, LBASES), n = ri(r, 2, 3), atoms = shuffle(r, ATOMS).slice(0, n);
+    const cs = atoms.map(() => pick(r, [1, 1, 2, 3, 4, -1, -2, -3, 1 / 2, 1 / 3, 2 / 3, -1 / 2]));
+    if (cs.every((c) => c < 0) || cs[0] < 0) continue;
+    const useNum = r() < 0.3, num = pick(r, [2, 3, 8, 5]), cn = pick(r, [1, 2, -1, 3]);
+    const terms = [...(useNum ? [[cn, { t: String(num), l: String(num), f: () => num, isNum: true }]] : []), ...atoms.map((A, i) => [cs[i], A])];
+    const tr = (k) => terms.filter(([c]) => (k ? c > 0 : c < 0));
+    const numPart = (list) => { let coef = 1, rest = []; list.forEach(([c, A]) => { if (A.isNum && Number.isInteger(c)) coef *= num ** Math.abs(c); else rest.push(powAtom(A, c)); }); return { s: `${coef !== 1 ? coef : ''}${rest.join('')}` || '1' }; };
+    const N = numPart(tr(true)), D = tr(false).length ? numPart(tr(false)) : null;
+    if (useNum && !Number.isInteger(cn)) continue;
+    const multi = (x) => { const f = x.replace(/\([^()]*\)/g, 'P').replace(/[√∛](P|[a-z])/g, 'R'); return (f.match(/[a-zPR]/g) || []).length + (/^\d/.test(f) && /[a-zPR]/.test(f) ? 1 : 0) > 1; };
+    const arg = D ? `${N.s}/${multi(D.s) ? `(${D.s})` : D.s}` : N.s;
+    const correct = `${logT(b)} ${/^[a-z]$|^\d+$/.test(arg) ? arg : `(${arg})`}`;
+    const truth = (e) => terms.reduce((s, [c, A]) => s + c * Math.log(A.f(e)), 0) / Math.log(lbVal(b, e));
+    const given = sumT(b, terms);
+    const ok = (raw) => { const nd = lgEquiv(raw, truth, ['x', 'y', 'z', 'b'], ENVS); return !!nd && isSingleLog(nd); };
+    const bad1 = `${logT(b)} (${terms.map(([, A]) => A.bare ? `(${A.bare})` : A.t).join('')})`, bad2 = D ? `${logT(b)} (${D.s}/${N.s})` : `${logT(b)} (${arg})${powT('', '2')}`, bad3 = `${logT(b)} (${tr(true).concat(tr(false)).map(([c, A]) => powAtom(A, Math.abs(c))).join('')})`;
+    if (new Set([correct, bad1, bad2, bad3]).size < 3) continue;
+    return {
+      topic: 'Condensing logarithms', stem: `Condense the expression to the logarithm of a single quantity.   ${given}`,
+      ...buildChoices(r, correct, [...new Set([bad1, bad2, bad3])].filter((w) => w !== correct && !lgEquiv(w.replace(/−/g, '-'), truth, ['x', 'y', 'z', 'b'], ENVS)), (i) => `${logT(b)} (${arg})${powT('', String(i + 3))}`),
+      fr: { fields: [{ kind: 'expr', keys: 'logs', label: `${given} =` }], key: [correct.replace(/−/g, '-')], display: correct, check: (v) => ok(v[0]) },
+      solution: `Use the power rule to move each coefficient into an exponent, then the product rule (+) and quotient rule (−):\n${given} = ${correct}`,
+    };
+  }
+};
+
+/* ---------- 5.4 Exponential and Logarithmic Equations ---------- */
+TEMPLATES.e4Check = (r) => {
+  for (;;) {
+    const k = ri(r, 0, 3);
+    let eq, F, cands;
+    if (k === 0) { const b = pick(r, [2, 3, 4, 5]), p = pick(r, [1, 2, 3]), q = ri(r, -9, 5), m = pick(r, [2, 3, 4]); const x = (m - q) / p; eq = `${powT(String(b), `${p === 1 ? '' : p}x${q ? (q > 0 ? '+' : '−') + Math.abs(q) : ''}`)} = ${b ** m}`; F = (x0) => b ** (p * x0 + q) - b ** m; cands = [`x = ${fracT(x)}`, `x = (1/${p})(${logT(b)} ${b ** m}${q ? ` ${q > 0 ? '−' : '+'} ${Math.abs(q)}` : ''})`.replace('(1/1)', ''), `x = ${fracT(x + 1)}`, `x = ${fracT((m + q) / p)}`]; }
+    else if (k === 1) { const a = pick(r, [2, 3, 4, 5]), c = pick(r, [20, 60, 45, 36]), h = pick(r, [1, 2]); eq = `${a}${powT('e', `x−${h}`)} = ${c}`; F = (x0) => a * Math.exp(x0 - h) - c; cands = [`x = ${h} + ln ${fracT(c / a)}`, `x = ln ${fracT(c / a + h)}`, `x = ${h} + ln ${c}`, `x = ln ${fracT(c / a)} − ${h}`]; }
+    else if (k === 2) { const b = pick(r, [2, 3, 5, 10]), h = ri(r, 1, 6), c = pick(r, [2, 3, 4, 5, 10]); if (b ** c > 20000) continue; eq = `${logT(b)}(x + ${h}) = ${c}`; F = (x0) => Math.log(x0 + h) / Math.log(b) - c; cands = [`x = ${b ** c - h}`, `x = ${powT(String(b), String(c))} − ${h}`, `x = ${c ** b - h}`, `x = ${b * c - h}`]; }
+    else { const p = pick(r, [2, 3]), q = ri(r, 1, 5), c = pick(r, [5.8, 2.5, 3.1, 4]); eq = `ln(${p}x + ${q}) = ${fmt(c)}`; F = (x0) => Math.log(p * x0 + q) - c; cands = [`x = (1/${p})(−${q} + e^(${fmt(c)}))`, `x = (1/${p})(−${q} + ln ${fmt(c)})`, `x = (1/${p})(${q} + e^(${fmt(c)}))`]; }
+    const isSol = (t) => { const v = lgConst(t.replace(/^x = /, '').replace(/−/g, '-')); return isFinite(v) && Math.abs(F(v)) < 1e-6 * Math.max(1, Math.abs(F(v + 1) - F(v))); };
+    const C = [...new Set(cands)]; const good = C.filter(isSol), bad = C.filter((t) => !isSol(t)); if (!good.length || !bad.length) continue;
+    const pair = r() < 0.25 && good.length > 1 ? shuffle(r, good).slice(0, 2) : shuffle(r, [pick(r, good), pick(r, bad)]);
+    const yn = pair.map((t) => (isSol(t) ? 'Yes' : 'No')), T = (a, b2) => `(a) ${a}, (b) ${b2}`, correct = T(...yn);
+    const ok = (v) => [v[0] === yn[0], v[1] === yn[1]];
+    return {
+      topic: 'Checking solutions', stem: `Determine whether each x-value is a solution (or an approximate solution) of the equation.   ${eq}    (a) ${pair[0]}   (b) ${pair[1]}`,
+      ...buildChoices(r, correct, [T('Yes', 'Yes'), T('Yes', 'No'), T('No', 'Yes'), T('No', 'No')].filter((w) => w !== correct), () => null),
+      fr: { fields: [{ kind: 'select', label: `(a) ${pair[0]}: solution?`, options: ['Yes', 'No'] }, { kind: 'select', label: `(b) ${pair[1]}: solution?`, options: ['Yes', 'No'] }], key: yn, display: correct, check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+      solution: pair.map((t, i) => `(${'ab'[i]}) ${t} ≈ ${rT(lgConst(t.replace(/^x = /, '').replace(/−/g, '-')), 4)}: substituting ${isSol(t) ? 'makes both sides equal, so it is a solution' : 'does not make both sides equal, so it is not a solution'}.`).join('\n'),
+    };
+  }
+};
+TEMPLATES.e4Simple = (r) => {
+  const k = ri(r, 0, 7);
+  let eq, v, exT, exL, why;
+  if (k === 0) { const b = pick(r, [2, 3, 4, 5]), m = pick(r, [2, 3, 4, -1, -2]); const inv = r() < 0.4; eq = `${inv ? `(1/${b})ˣ` : `${b}ˣ`} = ${fracT(b ** m)}`; v = inv ? -m : m; exT = fmt(v); exL = String(v); why = `Write ${fracT(b ** m)} as a power of ${inv ? `1/${b}` : b}: x = ${fmt(v)}.`; }
+  else if (k === 1) { const a = pick(r, [2, 3, 7, 10]); eq = `${a === 10 ? 'log x − log 10' : `ln x − ln ${a}`} = 0`; v = a; exT = String(a); exL = String(a); why = `${a === 10 ? 'log x = log 10' : `ln x = ln ${a}`}, so x = ${a}.`; }
+  else if (k === 2) { const a = pick(r, [2, 3, 5, 0.5, 1 / 3]); eq = `eˣ = ${fracT(a)}`; v = Math.log(a); exT = `ln ${argT(fracT(a))} ≈ ${d3(v)}`; exL = `\\ln ${fracL(a)}`; why = `Take ln of both sides: x = ln ${argT(fracT(a))} ≈ ${d3(v)}.`; }
+  else if (k === 3) { const c = pick(r, [-1, -2, 2, 3, 1 / 2]); eq = `ln x = ${fracT(c)}`; v = Math.exp(c); exT = `${powT('e', fracT(c))} ≈ ${d3(v)}`; exL = `e^{${fracL(c)}}`; why = `Exponentiate: x = ${powT('e', fracT(c))} ≈ ${d3(v)}.`; }
+  else if (k === 4) { const c = pick(r, [-2, -1, 2, 3]); eq = `log x = ${fmt(c)}`; v = 10 ** c; exT = fracT(v); exL = fracL(v); why = `x = ${powT('10', fmt(c))} = ${fracT(v)}.`; }
+  else if (k === 5) { const b = pick(r, [2, 3, 4, 5]), c = pick(r, [2, 3, -1]); eq = `${logT(b)} x = ${fmt(c)}`; v = b ** c; exT = fracT(v); exL = fracL(v); why = `x = ${powT(String(b), fmt(c))} = ${fracT(v)}.`; }
+  else if (k === 6) { const b = pick(r, [5, 3, 7, 4, 9]); eq = `${logT(b)} x = 1/2`; v = Math.sqrt(b); exT = Number.isInteger(v) ? String(v) : `√${b}`; exL = Number.isInteger(v) ? String(v) : `\\sqrt{${b}}`; why = `x = ${powT(String(b), '1/2')} = ${exT}.`.replace('^(1/2)', '^(1/2)'); }
+  else { const b = pick(r, [2, 3, 5]), m = pick(r, [3, 4, 5]); eq = `(1/${b})ˣ = ${b ** m}`; v = -m; exT = fmt(v); exL = String(v); why = `(1/${b})ˣ = ${b}⁻ˣ = ${powT(String(b), String(m))}, so x = ${fmt(v)}.`; }
+  const correct = `x = ${exT}`;
+  const wrongs = [`x = ${fracT(-v)}`, `x = ${niceV(v + 1)}`, `x = ${fracT(v * 2)}`, `x = ${niceV(1 / v)}`].filter((w) => w !== correct && !w.includes(d3(v)) && !/Infinity|NaN/.test(w));
+  return {
+    topic: 'Solving simple equations', stem: `Solve for x.   ${eq}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => `x = ${fmt(i + 7)}`),
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: 'x =' }], key: [exL], display: exT, check: (x) => exOrRoundOk(x[0], v) },
+    solution: why,
+  };
+};
+// exact-text helpers for answers like ln 5/ln 3
+const niceV = (v) => (Math.abs(v - Math.round(v)) < 1e-9 ? fmt(v) : d3(v));
+const solsT = (S) => (S.length ? S.map((s) => `${s.t}${s.t !== niceV(s.v) ? ` ≈ ${d3(s.v)}` : ''}`).join(',  ') : 'No solution');
+TEMPLATES.e4ExpEq = (r) => {
+  for (;;) {
+    const k = ri(r, 0, 8);
+    let eq, S, why;
+    if (k === 0) { const A = pick(r, [2, 3, 4, 5, 8]), b = pick(r, [3, 2, 5, 10, 7]), C = A * pick(r, [5, 7, 3, 12, 40]); eq = `${A}(${b}ˣ) = ${C}`; const q = C / A; S = [{ v: Math.log(q) / Math.log(b), t: b === 10 ? `log ${q}` : `ln ${q}/ln ${b}` }]; why = `Divide by ${A}: ${b}ˣ = ${q}. Take logs: x = ${S[0].t}.`; }
+    else if (k === 1) { const b = pick(r, [5, 3, 2, 7]), c = ri(r, 2, 12), d = c + pick(r, [18, 20, 31, 9, 40]); eq = `${b}ˣ + ${c} = ${d}`; S = [{ v: Math.log(d - c) / Math.log(b), t: `ln ${d - c}/ln ${b}` }]; why = `${b}ˣ = ${d - c}, so x = ${S[0].t}.`; }
+    else if (k === 2) { const b = pick(r, [3, 7, 2]), p = pick(r, [2, -3, 1]), C = pick(r, [400, 242, 100, 50]); eq = `${powT(String(b), `${p}−x`)} = ${C}`; S = [{ v: p - Math.log(C) / Math.log(b), t: `${p} − ln ${C}/ln ${b}`.replace(/^-/, '−') }]; why = `Take logs: ${p} − x = ln ${C}/ln ${b}, so x = ${S[0].t}.`; }
+    else if (k === 3) { const A = pick(r, [500, 100, 50, 200]), kk = pick(r, [-2, -1, 3, 2]), C = A * pick(r, [0.25, 0.5, 2, 3, 0.2]); const kx = kk === 1 ? 'x' : kk === -1 ? '−x' : `${fmt(kk)}x`; eq = `${A}e^(${kx}) = ${fmt(C)}`; const q = C / A; const qq = kk > 0 ? q : 1 / q; S = [{ v: Math.log(q) / kk, t: `ln(${fracT(qq)})${Math.abs(kk) === 1 ? '' : `/${Math.abs(kk)}`}`.replace(/^ln\((\d+)\)/, 'ln $1') }]; why = `Divide: e^(${kx}) = ${fracT(q)}. Take ln: ${kx} = ln(${fracT(q)}), so x = ${S[0].t}.`; }
+    else if (k === 4) { const a = ri(r, 3, 15), c = pick(r, [2, 3, 4]); const t = ri(r, 1, a - 1); eq = `${a} − ${c}eˣ = ${a - c * t}`; S = [{ v: Math.log(t), t: t === 1 ? '0' : `ln ${t}` }]; why = `${c}eˣ = ${c * t}, so eˣ = ${t} and x = ${S[0].t}.`; }
+    else if (k === 5) { const [r1, r2] = pick(r, [[2, -1], [3, -2], [4, -3], [-1, 2]]); const c = -r1 * r2; eq = r() < 0.5 ? `eˣ = e^(x² − ${c})` : `e^(x² − ${c}) = eˣ`; S = [r1, r2].sort((p, q) => p - q).map((v) => ({ v, t: fmt(v) })); why = `One-to-One Property: x = x² − ${c}, so x² − x − ${c} = 0 and x = ${S.map((s) => s.t).join(', ')}.`; }
+    else if (k === 6) { const m = pick(r, [2, 3, 4, 5, 6]), n = pick(r, [-1, 1, 2, 3, 5, -2]); if (m === n) continue; const p = -(m + n), q = m * n; eq = `e²ˣ ${p < 0 ? MINUS : '+'} ${Math.abs(p) === 1 ? '' : Math.abs(p)}eˣ ${q < 0 ? MINUS : '+'} ${Math.abs(q)} = 0`; S = [m, n].filter((u) => u > 0).sort((a, b) => a - b).map((u) => ({ v: Math.log(u), t: u === 1 ? '0' : `ln ${u}` })); why = `Factor as a quadratic in eˣ: (eˣ − ${m})(eˣ ${n < 0 ? '+' : '−'} ${Math.abs(n)}) = 0. eˣ = ${m}${n > 0 ? ` or eˣ = ${n}` : ` (eˣ = ${n} is impossible)`}, so x = ${S.map((s) => s.t).join(', ')}.`; }
+    else if (k === 7) { const c = pick(r, [5, 4, 2, 10]), kind = r() < 0.5; if (kind) { eq = `1/(1 − eˣ) = ${c}`; const q = 1 - 1 / c; S = [{ v: Math.log(q), t: `ln(${fracT(q)})` }]; why = `1 − eˣ = 1/${c}, so eˣ = ${fracT(q)} and x = ${S[0].t}.`; } else { const N = pick(r, [100, 50, 400]); eq = `${N}/(1 + e²ˣ) = ${c}`; const q = N / c - 1; S = [{ v: Math.log(q) / 2, t: `(1/2) ln ${fmt(q)}` }]; why = `1 + e²ˣ = ${fmt(N / c)}, so e²ˣ = ${fmt(q)} and x = ${S[0].t}.`; } }
+    else { const rr = pick(r, [0.065, 0.1, 0.08, 0.05]), n = pick(r, [12, 365, 4]), K = pick(r, [2, 3, 4]); eq = `(1 + ${rr}/${n})^(${n}t) = ${K}`; S = [{ v: Math.log(K) / (n * Math.log(1 + rr / n)), t: `ln ${K}/(${n} ln(1 + ${rr}/${n}))` }]; why = `Take ln: ${n}t · ln(1 + ${rr}/${n}) = ln ${K}, so t = ${S[0].t}.`; }
+    const vals = S.map((s) => s.v), correct = (k === 8 ? 't' : 'x') + ' = ' + solsT(S);
+    const W = (arr) => (k === 8 ? 't' : 'x') + ' = ' + (arr.length ? arr.map(niceV).join(',  ') : 'No solution');
+    const wrongs = [W(vals.map((v) => -v)), W(vals.map((v) => v + 1)), W(vals.map((v) => v * 2)), vals.length > 1 ? W(vals.slice(0, 1)) : W([vals[0] / 2])].filter((w) => w !== correct);
+    return {
+      topic: 'Exponential equations', stem: `Solve the exponential equation algebraically. Approximate the result to three decimal places, if necessary.   ${eq}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => W(vals.map((v) => v + i + 2))),
+      fr: { fields: [{ kind: 'expr', keys: 'logs', label: `${k === 8 ? 't' : 'x'} =` }], key: [S.map((s) => d3(s.v).replace(MINUS, '-')).join(',')], display: solsT(S), check: (x) => lgListOk(x[0], vals, 0.0011) },
+      solution: why + (S.some((s) => s.t !== d3(s.v)) ? `\n≈ ${S.map((s) => d3(s.v)).join(', ')}` : ''),
+    };
+  }
+};
+TEMPLATES.e4LogEq = (r) => {
+  for (;;) {
+    const k = ri(r, 0, 8);
+    let eq, S, why;
+    const keep = (xs, test) => [...new Set(xs.map((x) => Math.round(x * 1e9) / 1e9))].filter(test).sort((a, b) => a - b);
+    if (k === 0) { const c = pick(r, [-3, -1, 2, 0.5]); eq = `ln x = ${fmt(c)}`; S = [{ v: Math.exp(c), t: powT('e', fmt(c)) }]; why = `x = ${S[0].t}.`; }
+    else if (k === 1) { const a = pick(r, [6, 2, 3, 5]), c = pick(r, [2.1, 1, 3, 0.5]); eq = `${fmt(c)} = ln ${a}x`; S = [{ v: Math.exp(c) / a, t: `${powT('e', fmt(c))}/${a}` }]; why = `${a}x = ${powT('e', fmt(c))}, so x = ${S[0].t}.`; }
+    else if (k === 2) { const a = ri(r, 1, 6), kk = pick(r, [2, 4, 8]), d = a + kk * pick(r, [2, -2, 1, -1]), plus = r() < 0.5; eq = `${a} ${plus ? '+' : MINUS} ${kk} ln x = ${fmt(d)}`; const L = plus ? (d - a) / kk : (a - d) / kk; S = [{ v: Math.exp(L), t: powT('e', fracT(L)) }]; why = `${plus ? '' : MINUS}${kk} ln x = ${fmt(d - a)}, so ln x = ${fracT(L)} and x = ${S[0].t}.`; }
+    else if (k === 3) { const m = pick(r, [3, 2, 4, 5]), c = pick(r, [2, 1, 3]); eq = `log ${m}z = ${c}`; S = [{ v: 10 ** c / m, t: fracT(10 ** c / m) }]; why = `${m}z = ${10 ** c}, so z = ${S[0].t}.`; }
+    else if (k === 4) { const h = ri(r, 2, 8), kk = 4, d = pick(r, [11, 9, 5, 7]); eq = `${kk} log(x − ${h}) = ${d}`; S = [{ v: h + 10 ** (d / kk), t: `${h} + ${powT('10', fracT(d / kk))}` }]; why = `log(x − ${h}) = ${fracT(d / kk)}, so x − ${h} = ${powT('10', fracT(d / kk))} and x = ${S[0].t}.`; }
+    else if (k === 5) { const p = ri(r, 2, 5), q = ri(r, -6, 6), s2 = 1, t2 = ri(r, -12, 12); if (p === s2) continue; const x = (t2 - q) / (p - s2); const ok = p * x + q > 0 && s2 * x + t2 > 0; eq = `log(${polyT([p, q])}) = log(${polyT([s2, t2])})`; S = ok ? [{ v: x, t: fracT(x) }] : []; why = `${polyT([p, q])} = ${polyT([s2, t2])} gives x = ${fracT(x)}.${ok ? ' Both arguments are positive there, so it checks.' : ` But then ${p * x + q <= 0 ? polyT([p, q]) : polyT([s2, t2])} ≤ 0, so it is extraneous — no solution.`}`; }
+    else if (k === 6) { const b = pick(r, [2, 3, 10, 'e']), p = ri(r, 1, 4), q = ri(r, 2, 12); const A = p - 1, C = -q, D = A * A - 4 * C; if (D < 0 || !Number.isInteger(Math.sqrt(D))) continue; const xs = [(-A + Math.sqrt(D)) / 2, (-A - Math.sqrt(D)) / 2]; const good = keep(xs, (x) => x > 0 && x + p > 0 && x + q > 0); eq = `${logT(b)} x + ${logT(b)}(x + ${p}) = ${logT(b)}(x + ${q})`; S = good.map((v) => ({ v, t: fracT(v) })); why = `Product rule: x(x + ${p}) = x + ${q}, so ${polyT([1, A, C])} = 0 and x = ${xs.map(fracT).join(' or ')}. Only ${good.length ? good.map(fracT).join(', ') : 'none'} make${good.length === 1 ? 's' : ''} every argument positive.`; }
+    else if (k === 7) { const b = pick(r, [4, 9, 2, 3]), p = ri(r, 1, 3), c = pick(r, [1 / 2, 1, 2]); const B = b ** c; if (B === 1) continue; const x = (p * B) / (B - 1); eq = `${logT(b)} x − ${logT(b)}(x − ${p}) = ${fracT(c)}`; S = x > p ? [{ v: x, t: fracParts(x) ? fracT(x) : d3(x) }] : []; why = `Quotient rule: x/(x − ${p}) = ${powT(String(b), fracT(c))} = ${fracT(B)}, so x = ${fracT(x)}.`; }
+    else { const a = pick(r, [5, 3, 2]); const A = a + 2, C = a + 1, D = A * A - 4 * C; const xs = D >= 0 ? [(-A + Math.sqrt(D)) / 2, (-A - Math.sqrt(D)) / 2] : []; const good = keep(xs, (x) => x > 1); eq = `ln(x + ${a}) = ln(x − 1) − ln(x + 1)`; S = good.map((v) => ({ v, t: d3(v) })); why = `Quotient rule: x + ${a} = (x − 1)/(x + 1), so ${polyT([1, A, C])} = 0${xs.length ? `, x = ${xs.map((x) => d3(x)).join(' or ')}` : ''}. ${good.length ? '' : 'Neither makes x − 1 > 0, so there is no solution.'}`; }
+    const vals = S.map((s) => s.v), v0 = k === 3 ? 'z' : 'x', correct = `${v0} = ${solsT(S)}`.replace(`${v0} = No solution`, 'No solution');
+    const W = (arr) => (arr.length ? `${v0} = ${arr.map(niceV).join(',  ')}` : 'No solution');
+    const wrongs = [vals.length ? 'No solution' : W([pick(r, [2, 3, -2])]), W(vals.map((v) => -v)), W(vals.map((v) => v + 1)), W(vals.map((v) => v * 2))].filter((w) => w !== correct && !(w === 'No solution' && !vals.length));
+    return {
+      topic: 'Logarithmic equations', stem: `Solve the logarithmic equation algebraically, if possible. Approximate the result to three decimal places, if necessary.   ${eq}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => W(vals.map((v) => v + i + 3))),
+      fr: { fields: [{ kind: 'expr', keys: 'logs', label: `${v0} =` }], key: [vals.length ? vals.map((v) => d3(v).replace(MINUS, '-')).join(',') : '\\text{no solution}'], display: solsT(S), check: (x) => lgListOk(x[0], vals, 0.0011) },
+      solution: why,
+    };
+  }
+};
+
+/* ---------- 5.5 Exponential and Logarithmic Models ---------- */
+TEMPLATES.e5Solve = (r) => {
+  const cont = r() < 0.5, env = [{ A: 2500, P: 1300, r: 0.06, t: 7, n: 12 }, { A: 900, P: 400, r: 0.045, t: 11, n: 4 }, { A: 1200, P: 1100, r: 0.08, t: 3, n: 365 }];
+  const Pf = cont ? (e) => e.A * Math.exp(-e.r * e.t) : (e) => e.A / (1 + e.r / e.n) ** (e.n * e.t);
+  const Tf = cont ? (e) => Math.log(e.A / e.P) / e.r : (e) => Math.log(e.A / e.P) / (e.n * Math.log(1 + e.r / e.n));
+  const fT = cont ? 'A = Pe^(rt)' : 'A = P(1 + r/n)^(nt)';
+  const Pt = cont ? 'P = A/e^(rt) = Ae^(−rt)' : 'P = A/(1 + r/n)^(nt)', Tt = cont ? 't = ln(A/P)/r' : 't = ln(A/P)/(n ln(1 + r/n))';
+  const T = (p, t) => `${p};  ${t}`, correct = T(Pt, Tt);
+  const wrongs = cont ? [T('P = Ae^(rt)', Tt), T(Pt, 't = ln(P/A)/r'), T(Pt, 't = r ln(A/P)')] : [T('P = A(1 + r/n)^(nt)', Tt), T(Pt, 't = ln(A/P)/(ln(1 + r/n))'), T(Pt, 't = ln(A − P)/(n ln(1 + r/n))')];
+  const vars = ['A', 'P', 'r', 't', 'n'];
+  const okP = (raw) => !!lgEquiv(String(raw).replace(/^\s*P\s*=/, ''), Pf, vars, env), okT = (raw) => !!lgEquiv(String(raw).replace(/^\s*t\s*=/, ''), Tf, vars, env);
+  return {
+    topic: 'Solving a formula', stem: `Solve the compound interest formula for P and for t.   ${fT}`,
+    ...buildChoices(r, correct, wrongs, () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: 'P =' }, { kind: 'expr', keys: 'logs', label: 't =' }], key: cont ? ['Ae^{-rt}', '\\frac{\\ln\\left(\\frac{A}{P}\\right)}{r}'] : ['\\frac{A}{\\left(1+\\frac{r}{n}\\right)^{nt}}', '\\frac{\\ln\\left(\\frac{A}{P}\\right)}{n\\ln\\left(1+\\frac{r}{n}\\right)}'], display: correct,
+      check: (v) => okP(v[0]) && okT(v[1]), score: (v) => (okP(v[0]) ? 0.5 : 0) + (okT(v[1]) ? 0.5 : 0) },
+    solution: `For P: divide both sides by ${cont ? 'e^(rt)' : '(1 + r/n)^(nt)'}. For t: divide by P, take ln of both sides, ${cont ? 'and divide by r' : 'use the power rule, and divide by n ln(1 + r/n)'}.\n${correct}`,
+  };
+};
+const money = (v) => `$${(Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const moneyOk = (raw, v) => lgOk(String(raw).replace(/[$,]|\\\$/g, ''), v, Math.max(0.011, 0.003 * v));
+const rateOk = (raw, pct) => { let v = lgConst(String(raw).replace(/\\%|%/g, '')); if (!isFinite(v)) return false; if (v < 0.5 && pct >= 1) v *= 100; return Math.abs(v - pct) <= 0.011 + 0.002 * pct; };
+const yrOk = (raw, t) => lgOk(raw, t, Math.max(0.011, 0.003 * t));
+TEMPLATES.e5Continuous = (r) => {
+  const P = pick(r, [500, 750, 1000, 2000, 5000, 10000]), rr = pick(r, [0.035, 0.105, 0.045, 0.06, 0.0725, 0.08, 0.025]);
+  const t2 = Math.log(2) / rr, A10 = P * Math.exp(10 * rr), kase = ri(r, 0, 4);
+  const row = { P: money(P), r: `${fmt(rr * 100)}%`, t: `${rT(t2, 2)} yr`, A: money(A10) };
+  const givenKeys = [['P', 'r'], ['P', 't'], ['P', 'A'], ['r', 'A'], ['t', 'A']][kase], ask = ['P', 'r', 't', 'A'].filter((k) => !givenKeys.includes(k));
+  if (givenKeys.includes('t')) row.t = `${rT(t2, 2)} yr`;
+  const names = { P: 'Initial investment', r: 'Annual % rate', t: 'Time to double', A: 'Amount after 10 years' };
+  // if the time is given, the rate comes from the rounded time (like the book's 7¾ yr)
+  const tG = givenKeys.includes('t') ? Math.round(t2 * 100) / 100 : t2, rG = givenKeys.includes('t') ? Math.log(2) / tG : rr;
+  const AG = givenKeys.includes('A') ? Math.round(A10 * 100) / 100 : P * Math.exp(10 * rG);
+  const truth = { P: givenKeys.includes('A') && !givenKeys.includes('P') ? AG / Math.exp(10 * rG) : P, r: givenKeys.includes('A') && givenKeys.includes('P') ? Math.log(AG / P) / 10 * 100 : rG * 100, t: givenKeys.includes('A') && givenKeys.includes('P') ? Math.log(2) / (Math.log(AG / P) / 10) : tG, A: AG };
+  const show = (k, v) => (k === 'P' || k === 'A' ? money(v) : k === 'r' ? `${rT(v, 2)}%` : `${rT(v, 2)} yr`);
+  const T = (o) => ask.map((k) => `${names[k]}: ${show(k, o[k])}`).join(';  '), correct = T(truth);
+  const wrongs = [T({ ...truth, t: truth.t / 2, A: P * (1 + rG * 10), r: truth.r / 10, P: truth.P * 1.1 }), T({ ...truth, t: 2 / rG / 100, A: P * 2, r: truth.r * 2, P: truth.P / 2 }), T({ ...truth, t: Math.log(2) * rG, A: P * Math.exp(rG), r: truth.r / 2, P: AG / 2 })].filter((w) => w !== correct);
+  const okF = (k, v) => (k === 'P' || k === 'A' ? moneyOk(v, truth[k]) : k === 'r' ? rateOk(v, truth.r) : yrOk(v, truth.t));
+  return {
+    topic: 'Continuous compounding', stem: `Find the missing values, assuming continuously compounded interest (A = Pe^(rt)). Round money to the nearest cent, the rate to two decimal places of a percent, and the time to two decimal places.   ${givenKeys.map((k) => `${names[k]}: ${row[k]}`).join(';   ')}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T({ ...truth, [ask[0]]: truth[ask[0]] * (1.2 + i / 10) })),
+    fr: { fields: ask.map((k) => ({ kind: 'expr', keys: 'num', label: `${names[k]}${k === 'r' ? ' (%)' : k === 't' ? ' (years)' : ' ($)'}:` })), key: ask.map((k) => (k === 'P' || k === 'A' ? rT(truth[k], 2) : rT(truth[k], 2))), display: correct,
+      check: (v) => ask.every((k, i) => okF(k, v[i])), score: (v) => ask.filter((k, i) => okF(k, v[i])).length / ask.length },
+    solution: `Doubling: 2P = Pe^(rt) ⇒ t = ln 2 / r. After 10 years: A = Pe^(10r).\n${givenKeys.includes('t') ? `r = ln 2 / ${rT(tG, 2)} ≈ ${rT(rG * 100, 2)}%.\n` : ''}${givenKeys.includes('A') && givenKeys.includes('P') ? `r = ln(A/P)/10 ≈ ${rT(truth.r, 2)}%.\n` : ''}${correct}`,
+  };
+};
+TEMPLATES.e5Double = (r) => {
+  const rr = pick(r, [0.1, 0.065, 0.05, 0.08, 0.04, 0.12, 0.06]), K = r() < 0.7 ? 2 : 3, word = K === 2 ? 'double' : 'triple';
+  const ts = [Math.log(K) / Math.log(1 + rr), Math.log(K) / (12 * Math.log(1 + rr / 12)), Math.log(K) / (365 * Math.log(1 + rr / 365)), Math.log(K) / rr];
+  const labs = ['(a) annually', '(b) monthly', '(c) daily', '(d) continuously'];
+  const T = (arr) => arr.map((t, i) => `${labs[i]} ${rT(t, 2)} yr`).join(';  '), correct = T(ts);
+  const wrongs = [T(ts.map((t) => t / Math.log(K) * Math.log(2) * (K === 2 ? 2 : 1))), T([K / rr, K / rr, K / rr, K / rr].map((t) => t / 2)), T(ts.map((t, i) => (i < 3 ? t * 1.08 : t)))].filter((w) => w !== correct);
+  const ok = (v, i) => yrOk(v[i], ts[i]);
+  return {
+    topic: 'Time to double or triple', stem: `Determine the time necessary for P dollars to ${word} when it is invested at interest rate r = ${fmt(rr * 100)}% compounded (a) annually, (b) monthly, (c) daily, and (d) continuously. Round to two decimal places.`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(ts.map((t) => t + i + 1))),
+    fr: { fields: labs.map((l) => ({ kind: 'expr', keys: 'num', label: `${l}: t ≈`, suffix: ' years' })), key: ts.map((t) => rT(t, 2)), display: correct,
+      check: (v) => ts.every((_, i) => ok(v, i)), score: (v) => ts.filter((_, i) => ok(v, i)).length / 4 },
+    solution: `${K}P = P(1 + r/n)^(nt) ⇒ t = ln ${K}/(n ln(1 + r/n)); continuously: ${K}P = Pe^(rt) ⇒ t = ln ${K}/r.\n${correct}`,
+  };
+};
+TEMPLATES.e5Fit = (r) => {
+  for (;;) {
+    const [a, aT] = pick(r, [[1, '1'], [0.5, '1/2'], [5, '5'], [2, '2'], [3, '3']]), x1 = pick(r, [2, 3, 4, 5]), m = pick(r, [10, 0.2, 0.25, 4, 3, 0.5, 2, 5]);
+    const y1 = a * m; if (!fracParts(y1)) continue;
+    const b = Math.log(m) / x1, bT = `(1/${x1}) ln ${argT(fracT(m))}`;
+    const eqT = (A, B) => `y = ${A === 1 ? '' : fracT(A).includes('/') ? `(${fracT(A)})` : fracT(A)}e^(${rT(B, 4)}x)`, correct = eqT(a, b);
+    const wrongs = [eqT(a, m / x1), eqT(a, Math.log(x1) / m), eqT(y1, b), eqT(a, Math.log(y1) / x1)].filter((w) => w !== correct);
+    const table = r() < 0.4;
+    const okA = (v) => lgOk(v, a), okB = (v) => lgOk(v, b, 0.00011);
+    return {
+      topic: 'Finding an exponential model', stem: `Find the exponential model y = ae^(bx) that fits the points ${table ? 'in the table' : 'shown in the graph'}: (0, ${aT}) and (${x1}, ${fracT(y1)}).`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => eqT(a, b + (i + 1) * 0.1)),
+      frStem: `Find the exponential model y = ae^(bx) that fits the points (0, ${aT}) and (${x1}, ${fracT(y1)}). Give b exactly or to four decimal places.`,
+      fr: { fields: [{ kind: 'expr', keys: 'logs', label: 'a =' }, { kind: 'expr', keys: 'logs', label: 'b =' }], key: [fracL(a), `\\frac{1}{${x1}}\\ln ${fracL(m)}`], display: `a = ${aT},  b = ${bT} ≈ ${rT(b, 4)}`,
+        check: (v) => okA(v[0]) && okB(v[1]), score: (v) => (okA(v[0]) ? 0.5 : 0) + (okB(v[1]) ? 0.5 : 0) },
+      draw: table ? undefined : plotQ({ xr: [-1, x1 + 2], yr: [-1, Math.max(a, y1) + 2], curves: [{ f: (x) => a * Math.exp(b * x) }], pts: [{ p: [0, a], label: `(0, ${aT})` }, { p: [x1, y1], label: `(${x1}, ${fracT(y1)})` }] }), size: [380, 380],
+      solution: `At x = 0: y = a, so a = ${aT}. Then ${fracT(y1)} = ${/\//.test(aT) ? `(${aT})` : aT === '1' ? '' : aT}e^(${x1}b) ⇒ e^(${x1}b) = ${fracT(m)} ⇒ b = ${bT} ≈ ${rT(b, 4)}.\n${correct}`,
+    };
+  }
+};
+TEMPLATES.e5Model = (r) => {
+  const S = pick(r, [
+    { what: 'The population P (in thousands) of a county', y0: 1971, a: 75.9, k: 0.0316, unit: 'thousand people', tgt: 380, tgtT: '380,000 people' },
+    { what: 'The number of visitors V (in thousands) to a website each year', y0: 2010, a: 41.5, k: 0.118, unit: 'thousand visitors', tgt: 900, tgtT: '900,000 visitors' },
+    { what: 'The value V (in thousands of dollars) of a house', y0: 2000, a: 112, k: 0.042, unit: 'thousand dollars', tgt: 350, tgtT: '$350,000' },
+    { what: 'The number of cell phone subscribers S (in millions) in a country', y0: 1995, a: 28.5, k: 0.087, unit: 'million subscribers', tgt: 300, tgtT: '300 million' },
+  ]);
+  const year = S.y0 + pick(r, [9, 19, 24, 29, 39]), t = year - S.y0 + 1, v = S.a * Math.exp(S.k * t), tt = Math.log(S.tgt / S.a) / S.k;
+  if (v > S.tgt) return TEMPLATES.e5Model(r);
+  const T = (x, y) => `(a) ${rT(x, 1)} ${S.unit};  (b) t ≈ ${rT(y, 2)}`, correct = T(v, tt);
+  const wrongs = [T(S.a * Math.exp(S.k * (t - 1)), tt), T(v, Math.log(S.tgt) / S.k), T(S.a * S.k * t, tt), T(v, (S.tgt / S.a) / S.k)].filter((w) => w !== correct);
+  const okV = (x) => lgOk(x, v, Math.max(0.051, 0.002 * v)), okT = (x) => yrOk(x, tt);
+  return {
+    topic: 'Exponential growth models', stem: `${S.what} can be modeled by y = ${S.a}e^(${S.k}t), where t = 1 corresponds to ${S.y0}. (a) Use the model to estimate the value in ${year}. (b) Find t when the value reaches ${S.tgtT}. Round (a) to one decimal place and (b) to two.`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(v + 10 * (i + 1), tt)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: `(a) In ${year}:`, suffix: ` ${S.unit}` }, { kind: 'expr', keys: 'logs', label: '(b) t ≈' }], key: [rT(v, 1), rT(tt, 2)], display: correct,
+      check: (x) => okV(x[0]) && okT(x[1]), score: (x) => (okV(x[0]) ? 0.5 : 0) + (okT(x[1]) ? 0.5 : 0) },
+    solution: `(a) ${year} is t = ${t}: y = ${S.a}e^(${S.k} · ${t}) ≈ ${rT(v, 1)} ${S.unit}.\n(b) ${S.tgt} = ${S.a}e^(${S.k}t) ⇒ t = ln(${S.tgt}/${S.a})/${S.k} ≈ ${rT(tt, 2)} (during ${S.y0 + Math.ceil(tt) - 1}).`,
+  };
+};
+
+/* ==== CHAPTER 5 END ==== */
 /* ---------- 2.1 Using Fundamental Identities ---------- */
 // Expressions are written in a small plain notation with X for the variable, e.g. 'sin^2 X/(1 + cos X)'.
 // The same parser reads a student's answer (LaTeX from the math editor, or plain text) so answers are graded
@@ -7828,6 +8546,34 @@ const QUESTION_TYPES = [
   { id: 'dmSquareRoots', subject: 'precalc',  section: "4.5 DeMoivre's Theorem", label: 'Square roots', desc: 'Of a complex number (#29–36)' },
   { id: 'dmNthRoots', subject: 'precalc',  section: "4.5 DeMoivre's Theorem", label: 'nth roots', desc: 'All n roots in trigonometric form (#37–52)' },
   { id: 'dmSolveEq', subject: 'precalc',  section: "4.5 DeMoivre's Theorem", label: 'Solving xⁿ = c', desc: 'Like x³ − 27 = 0 (#53–64)' },
+  { id: 'e1Eval', subject: 'precalc',  section: '5.1 Exponential Functions and Their Graphs', label: 'Evaluating exponential functions', desc: 'Including base e (#5–8, 29–32)' },
+  { id: 'e1OneToOne', subject: 'precalc',  section: '5.1 Exponential Functions and Their Graphs', label: 'One-to-One Property', desc: 'Like 3^(x+1) = 27 (#21–24)' },
+  { id: 'e1Transform', subject: 'precalc',  section: '5.1 Exponential Functions and Their Graphs', label: 'Transformations of aˣ', desc: '(#25–28)' },
+  { id: 'e1Match', subject: 'precalc',  section: '5.1 Exponential Functions and Their Graphs', label: 'Matching exponential graphs', desc: '(#9–12)' },
+  { id: 'e2ToExp', subject: 'precalc',  section: '5.2 Logarithmic Functions and Their Graphs', label: 'Logarithmic to exponential form', desc: '(#7–10, 49–52)' },
+  { id: 'e2ToLog', subject: 'precalc',  section: '5.2 Logarithmic Functions and Their Graphs', label: 'Exponential to logarithmic form', desc: '(#11–14, 53–56)' },
+  { id: 'e2Eval', subject: 'precalc',  section: '5.2 Logarithmic Functions and Their Graphs', label: 'Evaluating logarithms', desc: 'Without a calculator (#15–20)' },
+  { id: 'e2Calc', subject: 'precalc',  section: '5.2 Logarithmic Functions and Their Graphs', label: 'Logarithms on a calculator', desc: '(#21–24, 57–60)' },
+  { id: 'e2Props', subject: 'precalc',  section: '5.2 Logarithmic Functions and Their Graphs', label: 'Properties of logarithms', desc: 'Like 5^(log₅ 3) (#25–28, 61–66)' },
+  { id: 'e2OneToOne', subject: 'precalc',  section: '5.2 Logarithmic Functions and Their Graphs', label: 'One-to-One Property', desc: '(#29–32, 73–76)' },
+  { id: 'e2Domain', subject: 'precalc',  section: '5.2 Logarithmic Functions and Their Graphs', label: 'Domain, intercept, asymptote', desc: '(#41–48, 67–70)' },
+  { id: 'e2Match', subject: 'precalc',  section: '5.2 Logarithmic Functions and Their Graphs', label: 'Matching log graphs', desc: '(#37–40)' },
+  { id: 'e3ChangeBase', subject: 'precalc',  section: '5.3 Properties of Logarithms', label: 'Change of base', desc: 'Common and natural logs (#5–8)' },
+  { id: 'e3CalcCB', subject: 'precalc',  section: '5.3 Properties of Logarithms', label: 'Change-of-base calculator', desc: '(#9–12)' },
+  { id: 'e3Terms', subject: 'precalc',  section: '5.3 Properties of Logarithms', label: 'In terms of log₃ 5 and log₃ 7', desc: '(#13–18)' },
+  { id: 'e3Exact', subject: 'precalc',  section: '5.3 Properties of Logarithms', label: 'Exact values', desc: '(#19–32)' },
+  { id: 'e3Approx', subject: 'precalc',  section: '5.3 Properties of Logarithms', label: 'Approximating with given values', desc: '(#33–40)' },
+  { id: 'e3Expand', subject: 'precalc',  section: '5.3 Properties of Logarithms', label: 'Expanding logarithms', desc: '(#41–62)' },
+  { id: 'e3Condense', subject: 'precalc',  section: '5.3 Properties of Logarithms', label: 'Condensing logarithms', desc: '(#63–76)' },
+  { id: 'e4Check', subject: 'precalc',  section: '5.4 Exponential and Logarithmic Equations', label: 'Checking solutions', desc: '(#5–8)' },
+  { id: 'e4Simple', subject: 'precalc',  section: '5.4 Exponential and Logarithmic Equations', label: 'Simple equations', desc: '(#9–18)' },
+  { id: 'e4ExpEq', subject: 'precalc',  section: '5.4 Exponential and Logarithmic Equations', label: 'Exponential equations', desc: '(#21–44)' },
+  { id: 'e4LogEq', subject: 'precalc',  section: '5.4 Exponential and Logarithmic Equations', label: 'Logarithmic equations', desc: 'Including extraneous solutions (#45–58)' },
+  { id: 'e5Solve', subject: 'precalc',  section: '5.5 Exponential and Logarithmic Models', label: 'Solving for P and t', desc: '(#5–6)' },
+  { id: 'e5Continuous', subject: 'precalc',  section: '5.5 Exponential and Logarithmic Models', label: 'Continuous compounding table', desc: '(#7–12)' },
+  { id: 'e5Double', subject: 'precalc',  section: '5.5 Exponential and Logarithmic Models', label: 'Time to double or triple', desc: 'Annually, monthly, daily, continuously (#13–15)' },
+  { id: 'e5Fit', subject: 'precalc',  section: '5.5 Exponential and Logarithmic Models', label: 'Finding an exponential model', desc: 'Through two points (#19–22)' },
+  { id: 'e5Model', subject: 'precalc',  section: '5.5 Exponential and Logarithmic Models', label: 'Growth model word problems', desc: '(#17–18)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
