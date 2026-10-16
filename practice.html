@@ -58,6 +58,8 @@
   .anskeys { margin-top: 8px; }
   .anskeys button { min-width: 34px; padding: 3px 7px; font-size: 15px; }
   math-field.mans { display: inline-block; min-width: 96px; min-height: 40px; padding: 2px 8px; font-size: 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; vertical-align: middle; }
+  math-field.mans.wide { min-width: 260px; }
+  input.expr { min-width: 240px; font: 18px Georgia, serif; }
   math-field.mans:focus-within { border-color: var(--accent); }
   math-field.mans[read-only] { background: #f3f1ec; }
   .mrow { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
@@ -167,6 +169,7 @@ const CONFIG = {
 //   5.1: angleSum, extAngleAlgebra, extAngleRatio, classifyTriangle
 //   5.2: congStatement (#1-2), correspondingParts (#3-6), findXY (#7-8), congReason (#9-10), thirdAngle (#13-14)
 //   5.3–5.6: triCongruence (marked figures), triCongruenceGiven ("Given:" text, unmarked figure)
+//   Pre-Calc 2.1: trigIdentityFill (#1–4), trigEvaluate (#5–10), trigSimplify (#11–20, 31–38), trigFactor (#21–30), trigAddSub (#39–44)
 //   other: dilation, composite, trigGraph
 const SUBJECTS = {
   geometry: 'Geometry',
@@ -181,6 +184,7 @@ const SETS = {
   'geo-5-3-6':     { subject: 'geometry', title: '5.3–5.6 Triangle Congruence (SSS, SAS, ASA, AAS, HL)', items: [['triCongruence', 9], ['triCongruenceGiven', 3]] },
   // ----- Pre-Calculus -----
   'precalc-trig':  { subject: 'precalc',  title: 'Graphs of Sine and Cosine', items: [['trigGraph', 6]] },
+  'precalc-2-1':   { subject: 'precalc',  title: '2.1 Using Fundamental Identities', items: [['trigIdentityFill', 3], ['trigEvaluate', 3], ['trigSimplify', 4], ['trigFactor', 2], ['trigAddSub', 2]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -473,6 +477,412 @@ TEMPLATES.trigGraph = (r) => {
       frStem: 'The graph of a function of the form y = a cos(bx) + c, where a > 0 and b > 0, is shown in the standard (x, y) coordinate plane. What are the values of a, b, and c? (Fractions like 1/2 are OK.)',
       fr: FR.nums(['a', 'b', 'c'], [a, b.n / b.d, c], `a = ${a}, b = ${b.d === 1 ? b.n : b.n + '/' + b.d}, c = ${fmt(c)}`),
       solution: `The maximum is ${fmt(a + c)} and the minimum is ${fmt(c - a)}. Midline: c = (${fmt(a + c)} + ${c - a < 0 ? '(' + fmt(c - a) + ')' : fmt(c - a)}) / 2 = ${fmt(c)}. Amplitude: a = ${fmt(a + c)} ${MINUS} ${fmt(c)} = ${a}. A maximum to the next minimum is half a period, so the period is 2 · ${minX} and b = ${b.d === 1 ? b.n : b.n + '/' + b.d}. The graph starts at a maximum when x = 0, so it is a cosine graph: ${correct}.`,
+    };
+  }
+};
+
+/* ---------- 2.1 Using Fundamental Identities ---------- */
+// Expressions are written in a small plain notation with X for the variable, e.g. 'sin^2 X/(1 + cos X)'.
+// The same parser reads a student's answer (LaTeX from the math editor, or plain text) so answers are graded
+// by checking equivalence at many angle values: any equivalent, fully simplified form is accepted.
+const TRIG_FNS = ['sin', 'cos', 'tan', 'csc', 'sec', 'cot'];
+const SUPD = { 2: '²', 3: '³', 4: '⁴' };
+const trigVar = (s, v) => s.replace(/X/g, v);
+const prettyTrig = (s, v) => trigVar(s, v).replace(/\^(\d)/g, (m, d) => SUPD[d] || '^' + d).replace(/-/g, MINUS).replace(/pi/g, 'π').replace(/\*/g, ' · ');
+const latexTrig = (s, v) => trigVar(s, v).replace(/(sin|cos|tan|csc|sec|cot)/g, '\\$1').replace(/pi/g, '\\pi').replace(/θ/g, '\\theta ')
+  .replace(/β/g, '\\beta ').replace(/α/g, '\\alpha ').replace(/\^(\d)/g, '^{$1}').replace(/\*/g, '\\cdot ');
+
+function latexToPlain(s) {
+  s = String(s || '');
+  if (/\\placeholder/.test(s)) return '';
+  const grab = (str, i) => { // str[i] === '{' → [inside, index after the closing brace]
+    let depth = 0;
+    for (let j = i; j < str.length; j++) {
+      if (str[j] === '{') depth++;
+      else if (str[j] === '}' && --depth === 0) return [str.slice(i + 1, j), j + 1];
+    }
+    return null;
+  };
+  for (let guard = 0, k; (k = s.search(/\\[dt]?frac/)) >= 0 && guard < 60; guard++) {
+    let j = k + /^\\[dt]?frac\s*/.exec(s.slice(k))[0].length;
+    const arg = (jj) => { while (s[jj] === ' ') jj++; return s[jj] === '{' ? grab(s, jj) : s[jj] ? [s[jj], jj + 1] : null; };
+    const A = arg(j); if (!A) return '';
+    const B = arg(A[1]); if (!B) return '';
+    s = s.slice(0, k) + '((' + A[0] + ')/(' + B[0] + '))' + s.slice(B[1]);
+  }
+  s = s.replace(/\\(?:left|right|mleft|mright|bigl|bigr|Bigl|Bigr|big|Big)(?![a-zA-Z])\s*/g, '')
+    .replace(/\\(?:operatorname|mathrm|text|mathit)\{([^{}]*)\}/g, ' $1 ')
+    .replace(/\\(sin|cos|tan|csc|sec|cot|theta|alpha|beta|phi|varphi|vartheta|pi|sqrt)/g, ' $1 ')
+    .replace(/\\(?:cdot|times)/g, '*').replace(/\\div/g, '/').replace(/\\lparen/g, '(').replace(/\\rparen/g, ')')
+    .replace(/\\[,;:! ]/g, ' ').replace(/~/g, ' ')
+    .replace(/[{[]/g, '(').replace(/[}\]]/g, ')');
+  return /\\/.test(s) ? '' : s;
+}
+function tokTrig(s) {
+  s = s.replace(/[−–]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/π/g, ' pi ').replace(/√/g, ' sqrt ')
+    .replace(/²/g, '^2').replace(/³/g, '^3').replace(/⁴/g, '^4').replace(/θ|α|β|φ/g, ' x ').toLowerCase();
+  const out = [];
+  for (let i = 0; i < s.length;) {
+    const rest = s.slice(i);
+    let m;
+    if (/\s/.test(s[i])) { i++; continue; }
+    if ((m = /^\d*\.?\d+/.exec(rest))) { out.push({ t: 'n', v: +m[0] }); i += m[0].length; continue; }
+    if ((m = /^(sin|cos|tan|csc|sec|cot)/.exec(rest))) { out.push({ t: 'f', v: m[1] }); i += 3; continue; }
+    if ((m = /^(theta|alpha|beta|varphi|phi|vartheta)/.exec(rest))) { out.push({ t: 'v' }); i += m[0].length; continue; }
+    if (rest.startsWith('sqrt')) { out.push({ t: 'sqrt' }); i += 4; continue; }
+    if (rest.startsWith('pi')) { out.push({ t: 'n', v: Math.PI }); i += 2; continue; }
+    if (/[xut]/.test(s[i])) { out.push({ t: 'v' }); i++; continue; }
+    if ('+-*/^()'.includes(s[i])) { out.push({ t: s[i] }); i++; continue; }
+    return null;
+  }
+  return out;
+}
+// → syntax tree, or null if it can't be read
+function parseTrig(src) {
+  const raw = String(src == null ? '' : src);
+  const toks = tokTrig(/[\\{}]/.test(raw) ? latexToPlain(raw) : raw);
+  if (!toks || !toks.length) return null;
+  let i = 0;
+  const is = (t) => i < toks.length && toks[i].t === t;
+  const startsPrimary = () => i < toks.length && ['n', 'v', '(', 'f', 'sqrt'].includes(toks[i].t);
+  function expr() { let a = term(); while (is('+') || is('-')) { const op = toks[i++].t; a = { t: op, a, b: term() }; } return a; }
+  function term() {
+    let a = unary();
+    for (;;) {
+      if (is('*') || is('/')) { const op = toks[i++].t; a = { t: op, a, b: unary() }; }
+      else if (startsPrimary()) a = { t: '*', a, b: power() };
+      else return a;
+    }
+  }
+  function unary() { if (is('-')) { i++; return { t: 'neg', a: unary() }; } if (is('+')) { i++; return unary(); } return power(); }
+  function power() { const b = primary(); if (is('^')) { i++; return { t: '^', a: b, b: unary() }; } return b; }
+  function primary() {
+    const t = toks[i];
+    if (!t) throw 0;
+    if (t.t === 'n') { i++; return { t: 'n', v: t.v }; }
+    if (t.t === 'v') { i++; return { t: 'v' }; }
+    if (t.t === '(') { i++; const e = expr(); if (!is(')')) throw 0; i++; return { t: 'p', a: e }; }
+    if (t.t === 'sqrt') { i++; return { t: 'sqrt', a: primary() }; }
+    if (t.t === 'f') {
+      i++;
+      let p = null;
+      if (is('^')) { i++; if (is('-')) { i++; p = { t: 'neg', a: primary() }; } else p = primary(); }
+      let arg;
+      if (p && !(is('(') || is('n') || is('v') || is('-'))) { // math editor put the argument in the exponent: sin^{2x} → sin²(x)
+        let q = p; while (q.t === 'p') q = q.a;
+        if (q.t === '*' && q.a.t === 'n') return { t: '^', a: { t: 'f', f: t.v, a: q.b }, b: q.a };
+      }
+      if (is('(')) arg = primary();
+      else { // bare argument: sin x, sin 2x, sin −x
+        let neg = false;
+        if (is('-')) { neg = true; i++; }
+        if (!(is('n') || is('v'))) throw 0;
+        arg = primary();
+        while (is('n') || is('v')) arg = { t: '*', a: arg, b: primary() };
+        if (neg) arg = { t: 'neg', a: arg };
+      }
+      const node = { t: 'f', f: t.v, a: arg };
+      return p ? { t: '^', a: node, b: p } : node;
+    }
+    throw 0;
+  }
+  try { const e = expr(); return i === toks.length ? e : null; } catch { return null; }
+}
+function evalTrig(n, x) {
+  switch (n.t) {
+    case 'n': return n.v;
+    case 'v': return x;
+    case 'p': return evalTrig(n.a, x);
+    case 'neg': return -evalTrig(n.a, x);
+    case '+': return evalTrig(n.a, x) + evalTrig(n.b, x);
+    case '-': return evalTrig(n.a, x) - evalTrig(n.b, x);
+    case '*': return evalTrig(n.a, x) * evalTrig(n.b, x);
+    case '/': return evalTrig(n.a, x) / evalTrig(n.b, x);
+    case '^': return Math.pow(evalTrig(n.a, x), evalTrig(n.b, x));
+    case 'sqrt': return Math.sqrt(evalTrig(n.a, x));
+    case 'f': {
+      const v = evalTrig(n.a, x);
+      return { sin: Math.sin(v), cos: Math.cos(v), tan: Math.tan(v), csc: 1 / Math.sin(v), sec: 1 / Math.cos(v), cot: Math.cos(v) / Math.sin(v) }[n.f];
+    }
+  }
+  return NaN;
+}
+function trigInfo(n, info = { fns: 0, names: new Set(), simpleArgs: true, hasVar: false }) {
+  if (n.t === 'v') info.hasVar = true;
+  if (n.t === 'f') {
+    info.fns++; info.names.add(n.f);
+    let a = n.a; while (a.t === 'p') a = a.a;
+    if (a.t !== 'v') info.simpleArgs = false;
+  }
+  if (n.a) trigInfo(n.a, info);
+  if (n.b) trigInfo(n.b, info);
+  return info;
+}
+const TRIG_PTS = [0.37, 0.81, 1.23, 1.97, 2.46, 2.89, 3.58, 4.12, 4.43, 5.39, 5.93, -0.66];
+function trigEquiv(a, b) { // same value at every test angle where b is defined
+  let n = 0;
+  for (const x of TRIG_PTS) {
+    const v = evalTrig(b, x);
+    if (!isFinite(v) || Math.abs(v) > 1e5) continue;
+    const u = evalTrig(a, x);
+    if (!isFinite(u) || Math.abs(u - v) > 1e-7 * Math.max(1, Math.abs(v))) return false;
+    n++;
+  }
+  return n >= 6;
+}
+const sameTrig = (s1, s2) => { const a = parseTrig(s1), b = parseTrig(s2); return !!(a && b && trigEquiv(a, b) && trigEquiv(b, a)); };
+function isFactored(n) { // a product of at least two non-constant factors, or (sum)^k
+  while (n.t === 'p' || n.t === 'neg') n = n.a;
+  if (n.t === '^') { let b = n.a; while (b.t === 'p') b = b.a; return (b.t === '+' || b.t === '-') && !trigInfo(n.b).hasVar && evalTrig(n.b, 0) >= 2; }
+  if (n.t !== '*') return false;
+  const fac = [];
+  const flat = (m) => { while (m.t === 'p') m = m.a; if (m.t === '*') { flat(m.a); flat(m.b); } else fac.push(m); };
+  flat(n);
+  return fac.filter((f) => trigInfo(f).hasVar).length >= 2;
+}
+// Grade a typed expression. opts: maxFns (most trig functions allowed), ban (function names not allowed), factor (must be factored)
+function trigAnswerOk(input, ansAst, { maxFns = 99, ban = [], factor = false } = {}) {
+  const p = parseTrig(input);
+  if (!p || !trigEquiv(p, ansAst)) return false;
+  const info = trigInfo(p);
+  if (info.fns > maxFns || !info.simpleArgs || ban.some((f) => info.names.has(f))) return false;
+  return !factor || isFactored(p);
+}
+FR.trig = (label, ans, v, opts = {}) => {
+  const ast = parseTrig(trigVar(ans, v));
+  const maxFns = opts.maxFns != null ? opts.maxFns : trigInfo(ast).fns;
+  return { fields: [{ kind: 'expr', label }], check: (vals) => trigAnswerOk(vals[0], ast, { ...opts, maxFns }),
+    display: prettyTrig(ans, v), key: [latexTrig(ans, v)] };
+};
+
+// Multiple-choice distractors that look like the answer: reciprocal, cofunction, and sign swaps, then a pool
+const RECIP = { sin: 'csc', csc: 'sin', cos: 'sec', sec: 'cos', tan: 'cot', cot: 'tan' };
+const COFN = { sin: 'cos', cos: 'sin', tan: 'cot', cot: 'tan', sec: 'csc', csc: 'sec' };
+const swapFns = (s, map) => s.replace(/sin|cos|tan|csc|sec|cot/g, (f) => map[f]);
+const flipSign = (s) => (s.startsWith('-') ? s.slice(1) : /^[^+-]*$/.test(s.slice(1)) ? '-' + s : '-(' + s + ')');
+const TRIG_POOL = ['sin X', 'cos X', 'tan X', 'csc X', 'sec X', 'cot X', '1', '-1', 'sin^2 X', 'cos^2 X', 'tan^2 X', 'sec^2 X', 'csc^2 X', 'cot^2 X',
+  '-sin X', '-cos X', '-tan X', '-cot X', '2 sec X', '2 csc X', 'sec X csc X', 'sin X cos X', '2 sec^2 X', '2 csc^2 X', '0', '2'];
+function trigChoices(r, ans, v, extra = []) {
+  const seen = [parseTrig(trigVar(ans, v))];
+  const ok = (s) => {
+    const p = parseTrig(trigVar(s, v));
+    if (!p || seen.some((q) => trigEquiv(p, q) && trigEquiv(q, p))) return false;
+    seen.push(p); return true;
+  };
+  const cands = [...extra, swapFns(ans, RECIP), swapFns(ans, COFN), flipSign(ans)].filter(ok);
+  for (const s of shuffle(r, TRIG_POOL)) { if (cands.length >= 3) break; if (ok(s)) cands.push(s); }
+  return buildChoices(r, prettyTrig(ans, v), cands.slice(0, 3).map((s) => prettyTrig(s, v)), (i) => String(i + 3));
+}
+const TRIG_VARS = ['x', 'x', 'θ', 'β', 'u', 'α'];
+
+// #1–4: complete the identity
+const TRIG_IDS = [
+  ['1/tan X', 'cot X', 'Reciprocal'], ['1/sin X', 'csc X', 'Reciprocal'], ['1/cos X', 'sec X', 'Reciprocal'],
+  ['1/csc X', 'sin X', 'Reciprocal'], ['1/sec X', 'cos X', 'Reciprocal'], ['1/cot X', 'tan X', 'Reciprocal'],
+  ['sin X/cos X', 'tan X', 'Quotient'], ['cos X/sin X', 'cot X', 'Quotient'],
+  ['sin^2 X + cos^2 X', '1', 'Pythagorean'], ['1 + tan^2 X', 'sec^2 X', 'Pythagorean'], ['1 + cot^2 X', 'csc^2 X', 'Pythagorean'],
+  ['sec^2 X - 1', 'tan^2 X', 'Pythagorean'], ['csc^2 X - 1', 'cot^2 X', 'Pythagorean'], ['1 - sin^2 X', 'cos^2 X', 'Pythagorean'], ['1 - cos^2 X', 'sin^2 X', 'Pythagorean'],
+  ['sin(pi/2 - X)', 'cos X', 'Cofunction'], ['cos(pi/2 - X)', 'sin X', 'Cofunction'], ['tan(pi/2 - X)', 'cot X', 'Cofunction'],
+  ['cot(pi/2 - X)', 'tan X', 'Cofunction'], ['sec(pi/2 - X)', 'csc X', 'Cofunction'], ['csc(pi/2 - X)', 'sec X', 'Cofunction'],
+  ['sin(-X)', '-sin X', 'Even/Odd'], ['cos(-X)', 'cos X', 'Even/Odd'], ['tan(-X)', '-tan X', 'Even/Odd'],
+  ['csc(-X)', '-csc X', 'Even/Odd'], ['sec(-X)', 'sec X', 'Even/Odd'], ['cot(-X)', '-cot X', 'Even/Odd'],
+];
+const ID_WHY = {
+  Reciprocal: 'This is a reciprocal identity.',
+  Quotient: 'This is a quotient identity.',
+  Pythagorean: 'This comes from the Pythagorean identities: sin²u + cos²u = 1, 1 + tan²u = sec²u, and 1 + cot²u = csc²u.',
+  Cofunction: 'This is a cofunction identity: a function of (π/2 − u) equals its cofunction of u.',
+  'Even/Odd': 'Cosine and secant are even functions; sine, cosecant, tangent, and cotangent are odd, so f(−u) = −f(u).',
+};
+TEMPLATES.trigIdentityFill = (r) => {
+  const [given, ans, kind] = pick(r, TRIG_IDS), v = pick(r, TRIG_VARS);
+  const givenFns = (given.match(/sin|cos|tan|csc|sec|cot/g) || []);
+  const extra = kind === 'Even/Odd' ? [flipSign(ans)] : kind === 'Pythagorean' && ans !== '1' ? [swapFns(ans, RECIP)] : [];
+  return {
+    topic: 'Fundamental identities',
+    stem: `Fill in the blank to complete the trigonometric identity:   ${prettyTrig(given, v)} = ____`,
+    ...trigChoices(r, ans, v, extra),
+    fr: FR.trig('', ans, v, { ban: givenFns.filter((f) => !ans.includes(f)) }),
+    solution: `${ID_WHY[kind]} ${prettyTrig(given, v)} = ${prettyTrig(ans, v)}.`,
+  };
+};
+
+// #5–10: given one value and a sign condition, find the others
+function sqrtParts(n) { let k = 1, m = n; for (let p = 2; p * p <= m; p++) while (m % (p * p) === 0) { m /= p * p; k *= p; } return [k, m]; }
+function exactRatio(s, N2, D2) { // s · √(N2/D2), rationalized and reduced
+  const g = gcd(N2, D2), a = N2 / g, b = D2 / g;
+  const [k, m] = sqrtParts(a * b);
+  const h = gcd(k, b), num = k / h, den = b / h;
+  const top = m === 1 ? String(num) : (num === 1 ? '' : num) + '√' + m;
+  const topL = m === 1 ? String(num) : (num === 1 ? '' : num) + '\\sqrt{' + m + '}';
+  return { val: (s * num * Math.sqrt(m)) / den, text: (s < 0 ? MINUS : '') + top + (den === 1 ? '' : '/' + den),
+    latex: (s < 0 ? '-' : '') + (den === 1 ? topL : '\\frac{' + topL + '}{' + den + '}') };
+}
+const sqrtText = (s, n2) => { const [k, m] = sqrtParts(n2); return (s < 0 ? MINUS : '') + (m === 1 ? String(k) : (k === 1 ? '' : k) + '√' + m); };
+const SIDES = { sin: ['y', 'r'], cos: ['x', 'r'], tan: ['y', 'x'], csc: ['r', 'y'], sec: ['r', 'x'], cot: ['x', 'y'] };
+const QUAD_SIGN = { 1: [1, 1], 2: [-1, 1], 3: [-1, -1], 4: [1, -1] };
+const trigSign = (f, Q) => { const [sx, sy] = QUAD_SIGN[Q]; return { sin: sy, csc: sy, cos: sx, sec: sx, tan: sx * sy, cot: sx * sy }[f]; };
+TEMPLATES.trigEvaluate = (r) => {
+  for (let t = 0; t < 2000; t++) {
+    const f = pick(r, TRIG_FNS), v = pick(r, ['x', 'x', 'θ', 'θ', 'β']);
+    const p = ri(r, 1, 9), q = ri(r, 1, 9);
+    if (gcd(p, q) !== 1 || p === q) continue;
+    const [nS, dS] = SIDES[f];
+    const sq = {};
+    sq[nS] = p * p; sq[dS] = q * q;
+    if (sq.r != null) { const leg = nS === 'r' ? dS : nS; if (sq.r <= sq[leg]) continue; sq[leg === 'x' ? 'y' : 'x'] = sq.r - sq[leg]; }
+    else sq.r = sq.x + sq.y;
+    if (sq.r > 100) continue; // keep radicals friendly (√65, not √145)
+    const Q = ri(r, 1, 4), [sx, sy] = QUAD_SIGN[Q];
+    const sgn = { x: sx, y: sy, r: 1 };
+    const val = (g) => { const [a, b] = SIDES[g]; return exactRatio(sgn[a] * sgn[b], sq[a], sq[b]); };
+    const twins = [1, 2, 3, 4].filter((k) => trigSign(f, k) === trigSign(f, Q));
+    const conds = TRIG_FNS.filter((g) => g !== f && g !== RECIP[f] && trigSign(g, twins[0]) !== trigSign(g, twins[1]));
+    const g = pick(r, conds);
+    const cond = `${g} ${v} ${trigSign(g, Q) > 0 ? '>' : '<'} 0`;
+    const given = `${f} ${v} = ${val(f).text}`;
+    const others = TRIG_FNS.filter((h) => h !== f);
+    const [t1, t2] = shuffle(r, others);
+    // MC distractors: wrong sign, reciprocal, cofunction
+    const T = val(t1);
+    const vals = [T];
+    const cands = [];
+    const addV = (e) => { if (!vals.some((w) => Math.abs(w.val - e.val) < 1e-9)) { vals.push(e); cands.push(e.text); } };
+    const [a1, b1] = SIDES[t1], [a2, b2] = SIDES[RECIP[t1]], [a3, b3] = SIDES[COFN[t1]];
+    addV(exactRatio(-sgn[a1] * sgn[b1], sq[a1], sq[b1]));
+    addV(exactRatio(sgn[a2] * sgn[b2], sq[a2], sq[b2]));
+    addV(exactRatio(sgn[a3] * sgn[b3], sq[a3], sq[b3]));
+    addV(exactRatio(-sgn[a3] * sgn[b3], sq[a3], sq[b3]));
+    addV(exactRatio(-sgn[a2] * sgn[b2], sq[a2], sq[b2]));
+    if (cands.length < 3) continue;
+    const side = (k) => `${k} = ${sqrtText(sgn[k], sq[k])}`;
+    const all = TRIG_FNS.map((h) => `${h} ${v} = ${val(h).text}`).join(',  ');
+    const missing = ['x', 'y', 'r'].find((k) => k !== nS && k !== dS);
+    const exactCheck = (e) => (s) => { const n = parseTrig(s); if (!n || trigInfo(n).hasVar) return false; const w = evalTrig(n, 0); return isFinite(w) && Math.abs(w - e.val) < 1e-6; };
+    const e1 = val(t1), e2 = val(t2), c1 = exactCheck(e1), c2 = exactCheck(e2);
+    return {
+      topic: 'Trig values from conditions',
+      stem: `Given ${given} and ${cond}, find the exact value of ${t1} ${v}.`,
+      ...buildChoices(r, T.text, cands, (i) => String(i + 2)),
+      frStem: `Given ${given} and ${cond}, find the exact values of ${t1} ${v} and ${t2} ${v}. (Fractions and √ are OK.)`,
+      fr: { fields: [{ kind: 'number', label: `${t1} ${v} =` }, { kind: 'number', label: `${t2} ${v} =` }],
+        check: (vv) => c1(vv[0]) && c2(vv[1]), score: (vv) => (c1(vv[0]) ? 0.5 : 0) + (c2(vv[1]) ? 0.5 : 0),
+        display: `${t1} ${v} = ${e1.text},  ${t2} ${v} = ${e2.text}`, key: [e1.latex, e2.latex] },
+      solution: `${f} ${v} ${val(f).val > 0 ? '> 0' : '< 0'} and ${cond}, so the angle ${v} lies in Quadrant ${['I', 'II', 'III', 'IV'][Q - 1]}, where a point (x, y) on its terminal side has x ${sx > 0 ? '> 0' : '< 0'} and y ${sy > 0 ? '> 0' : '< 0'}. ` +
+        `From ${f} ${v} = ${SIDES[f][0]}/${SIDES[f][1]}, use ${side(nS)} and ${side(dS)}. ` +
+        `Then x² + y² = r² gives ${side(missing)}. So ${all}.`,
+    };
+  }
+};
+
+// #11–20 and #31–38: simplify. [expression, simplest form, why]
+const TRIG_SIMPLIFY = [
+  ['cot X sin X', 'cos X', 'cot X sin X = (cos X/sin X) · sin X = cos X'],
+  ['tan X cos X', 'sin X', 'tan X cos X = (sin X/cos X) · cos X = sin X'],
+  ['csc X tan X', 'sec X', 'csc X tan X = (1/sin X) · (sin X/cos X) = 1/cos X = sec X'],
+  ['cot X sec X', 'csc X', 'cot X sec X = (cos X/sin X) · (1/cos X) = 1/sin X = csc X'],
+  ['sin X sec X', 'tan X', 'sin X sec X = sin X · (1/cos X) = tan X'],
+  ['cos X csc X', 'cot X', 'cos X csc X = cos X · (1/sin X) = cot X'],
+  ['(1 - sin^2 X)/cos X', 'cos X', '1 - sin^2 X = cos^2 X, and cos^2 X/cos X = cos X'],
+  ['(1 - cos^2 X)/sin X', 'sin X', '1 - cos^2 X = sin^2 X, and sin^2 X/sin X = sin X'],
+  ['(sec^2 X - 1)/tan X', 'tan X', 'sec^2 X - 1 = tan^2 X, and tan^2 X/tan X = tan X'],
+  ['(csc^2 X - 1)/cot X', 'cot X', 'csc^2 X - 1 = cot^2 X, and cot^2 X/cot X = cot X'],
+  ['tan^2 X - sec^2 X', '-1', '1 + tan^2 X = sec^2 X, so tan^2 X - sec^2 X = -1'],
+  ['csc^2 X - cot^2 X', '1', '1 + cot^2 X = csc^2 X, so csc^2 X - cot^2 X = 1'],
+  ['sec X - sin X tan X', 'cos X', 'sec X - sin X tan X = 1/cos X - sin^2 X/cos X = (1 - sin^2 X)/cos X = cos^2 X/cos X = cos X'],
+  ['csc X - cos X cot X', 'sin X', 'csc X - cos X cot X = 1/sin X - cos^2 X/sin X = (1 - cos^2 X)/sin X = sin^2 X/sin X = sin X'],
+  ['sin X + cos X cot X', 'csc X', 'sin X + cos X cot X = sin X + cos^2 X/sin X = (sin^2 X + cos^2 X)/sin X = 1/sin X = csc X'],
+  ['cos X + sin X tan X', 'sec X', 'cos X + sin X tan X = cos X + sin^2 X/cos X = (cos^2 X + sin^2 X)/cos X = 1/cos X = sec X'],
+  ['cos^2 X (1 + tan^2 X)', '1', '1 + tan^2 X = sec^2 X, and cos^2 X sec^2 X = 1'],
+  ['sin^2 X (1 + cot^2 X)', '1', '1 + cot^2 X = csc^2 X, and sin^2 X csc^2 X = 1'],
+  ['cos^2 X (sec^2 X - 1)', 'sin^2 X', 'sec^2 X - 1 = tan^2 X, and cos^2 X tan^2 X = cos^2 X · sin^2 X/cos^2 X = sin^2 X'],
+  ['cot^2 X (sec^2 X - 1)', '1', 'sec^2 X - 1 = tan^2 X, and cot^2 X tan^2 X = 1'],
+  ['tan X/sec X', 'sin X', 'tan X/sec X = (sin X/cos X) · cos X = sin X'],
+  ['cot X/csc X', 'cos X', 'cot X/csc X = (cos X/sin X) · sin X = cos X'],
+  ['csc X/sec X', 'cot X', 'csc X/sec X = (1/sin X) · cos X = cos X/sin X = cot X'],
+  ['sec X/csc X', 'tan X', 'sec X/csc X = (1/cos X) · sin X = sin X/cos X = tan X'],
+  ['sin(-X)/cos(-X)', '-tan X', 'sin(-X) = -sin X and cos(-X) = cos X, so the quotient is -sin X/cos X = -tan X'],
+  ['cos(-X)/sin(-X)', '-cot X', 'cos(-X) = cos X and sin(-X) = -sin X, so the quotient is -cos X/sin X = -cot X'],
+  ['tan(-X) cos X', '-sin X', 'tan(-X) = -tan X, and -tan X cos X = -(sin X/cos X) · cos X = -sin X'],
+  ['cos(pi/2 - X) csc X', '1', 'cos(pi/2 - X) = sin X, and sin X csc X = 1'],
+  ['cot(pi/2 - X) cos X', 'sin X', 'cot(pi/2 - X) = tan X, and tan X cos X = sin X'],
+  ['sin(pi/2 - X) sec X', '1', 'sin(pi/2 - X) = cos X, and cos X sec X = 1'],
+  ['(1 + sin X)(1 - sin X)', 'cos^2 X', '(1 + sin X)(1 - sin X) = 1 - sin^2 X = cos^2 X'],
+  ['(sec X + 1)(sec X - 1)', 'tan^2 X', '(sec X + 1)(sec X - 1) = sec^2 X - 1 = tan^2 X'],
+  ['(csc X - 1)(csc X + 1)', 'cot^2 X', '(csc X - 1)(csc X + 1) = csc^2 X - 1 = cot^2 X'],
+  ['sin^2 X sec^2 X', 'tan^2 X', 'sin^2 X sec^2 X = sin^2 X/cos^2 X = tan^2 X'],
+  ['cos^2 X csc^2 X', 'cot^2 X', 'cos^2 X csc^2 X = cos^2 X/sin^2 X = cot^2 X'],
+  ['1 - sin X cos X tan X', 'cos^2 X', 'sin X cos X tan X = sin X cos X · sin X/cos X = sin^2 X, and 1 - sin^2 X = cos^2 X'],
+  ['cos X/(1 - sin^2 X)', 'sec X', '1 - sin^2 X = cos^2 X, and cos X/cos^2 X = 1/cos X = sec X'],
+  ['sin X csc X - sin^2 X', 'cos^2 X', 'sin X csc X = 1, and 1 - sin^2 X = cos^2 X'],
+  ['sec X sin X/tan X', '1', 'sec X sin X = sin X/cos X = tan X, and tan X/tan X = 1'],
+];
+// #21–30: factor and simplify
+const TRIG_FACTOR_SIMPLIFY = [
+  ['tan^2 X - tan^2 X sin^2 X', 'sin^2 X', 'tan^2 X(1 - sin^2 X) = tan^2 X cos^2 X = sin^2 X'],
+  ['sin^2 X csc^2 X - sin^2 X', 'cos^2 X', 'sin^2 X(csc^2 X - 1) = sin^2 X cot^2 X = sin^2 X · cos^2 X/sin^2 X = cos^2 X'],
+  ['sin^2 X sec^2 X - sin^2 X', 'sin^2 X tan^2 X', 'sin^2 X(sec^2 X - 1) = sin^2 X tan^2 X'],
+  ['cos^2 X + cos^2 X tan^2 X', '1', 'cos^2 X(1 + tan^2 X) = cos^2 X sec^2 X = 1'],
+  ['sec^2 X tan^2 X + sec^2 X', 'sec^4 X', 'sec^2 X(tan^2 X + 1) = sec^2 X · sec^2 X = sec^4 X'],
+  ['1 - 2 cos^2 X + cos^4 X', 'sin^4 X', '(1 - cos^2 X)^2 = (sin^2 X)^2 = sin^4 X'],
+  ['cot^2 X csc^2 X - cot^2 X', 'cot^4 X', 'cot^2 X(csc^2 X - 1) = cot^2 X · cot^2 X = cot^4 X'],
+  ['tan^4 X + 2 tan^2 X + 1', 'sec^4 X', '(tan^2 X + 1)^2 = (sec^2 X)^2 = sec^4 X'],
+  ['cos X - cos X sin^2 X', 'cos^3 X', 'cos X(1 - sin^2 X) = cos X · cos^2 X = cos^3 X'],
+  ['sin X + sin X cot^2 X', 'csc X', 'sin X(1 + cot^2 X) = sin X csc^2 X = csc X'],
+];
+// #39–44: add or subtract, then simplify
+const TRIG_ADDSUB = [
+  ['1/(1 + cos X) + 1/(1 - cos X)', '2 csc^2 X', 'Common denominator (1 + cos X)(1 - cos X) = 1 - cos^2 X = sin^2 X. Numerator: (1 - cos X) + (1 + cos X) = 2. So 2/sin^2 X = 2 csc^2 X'],
+  ['1/(1 - sin X) + 1/(1 + sin X)', '2 sec^2 X', 'Common denominator (1 - sin X)(1 + sin X) = 1 - sin^2 X = cos^2 X. Numerator: 2. So 2/cos^2 X = 2 sec^2 X'],
+  ['1/(sec X + 1) - 1/(sec X - 1)', '-2 cot^2 X', 'Common denominator sec^2 X - 1 = tan^2 X. Numerator: (sec X - 1) - (sec X + 1) = -2. So -2/tan^2 X = -2 cot^2 X'],
+  ['1/(csc X - 1) - 1/(csc X + 1)', '2 tan^2 X', 'Common denominator csc^2 X - 1 = cot^2 X. Numerator: (csc X + 1) - (csc X - 1) = 2. So 2/cot^2 X = 2 tan^2 X'],
+  ['cos X/(1 + sin X) + (1 + sin X)/cos X', '2 sec X', 'Numerator over cos X(1 + sin X): cos^2 X + 1 + 2 sin X + sin^2 X = 2 + 2 sin X = 2(1 + sin X). Cancel (1 + sin X): 2/cos X = 2 sec X'],
+  ['tan X - sec^2 X/tan X', '-cot X', 'Over tan X: (tan^2 X - sec^2 X)/tan X = -1/tan X = -cot X'],
+  ['sin X/(1 - cos X) + sin X/(1 + cos X)', '2 csc X', 'Over 1 - cos^2 X = sin^2 X: sin X(1 + cos X) + sin X(1 - cos X) = 2 sin X. So 2 sin X/sin^2 X = 2/sin X = 2 csc X'],
+  ['cos X/(1 - sin X) - cos X/(1 + sin X)', '2 tan X', 'Over 1 - sin^2 X = cos^2 X: cos X(1 + sin X) - cos X(1 - sin X) = 2 sin X cos X. So 2 sin X cos X/cos^2 X = 2 tan X'],
+  ['tan X + cos X/(1 + sin X)', 'sec X', 'Over cos X(1 + sin X): sin X(1 + sin X) + cos^2 X = sin X + sin^2 X + cos^2 X = sin X + 1. Cancel (1 + sin X): 1/cos X = sec X'],
+  ['(1 + cos X)/sin X + sin X/(1 + cos X)', '2 csc X', 'Over sin X(1 + cos X): (1 + cos X)^2 + sin^2 X = 2 + 2 cos X = 2(1 + cos X). Cancel (1 + cos X): 2/sin X = 2 csc X'],
+  ['sin X/cos X + cos X/sin X', 'sec X csc X', 'Over sin X cos X: sin^2 X + cos^2 X = 1. So 1/(sin X cos X) = sec X csc X'],
+];
+const simpTpl = (bank, topic, word) => (r) => {
+  const [e, ans, why] = pick(r, bank), v = pick(r, TRIG_VARS);
+  return {
+    topic,
+    stem: `${word} ${prettyTrig(e, v)}`,
+    ...trigChoices(r, ans, v),
+    frStem: `${word} ${prettyTrig(e, v)}   (Simplify completely: use as few trig functions as possible.)`,
+    fr: FR.trig('', ans, v),
+    solution: `${prettyTrig(why, v)}.`,
+  };
+};
+TEMPLATES.trigSimplify = simpTpl(TRIG_SIMPLIFY, 'Simplifying with identities', 'Use the fundamental identities to simplify the expression:  ');
+TEMPLATES.trigAddSub = simpTpl(TRIG_ADDSUB, 'Adding/subtracting trig fractions', 'Perform the addition or subtraction and use the fundamental identities to simplify:  ');
+const factorSimplify = simpTpl(TRIG_FACTOR_SIMPLIFY, 'Factoring trig expressions', 'Factor the expression and use the fundamental identities to simplify:  ');
+// Factor a quadratic in one trig function: (a f + b)(c f + d)
+TEMPLATES.trigFactor = (r) => {
+  if (r() < 0.5) return factorSimplify(r);
+  for (let t = 0; t < 2000; t++) {
+    const fn = pick(r, TRIG_FNS), v = pick(r, ['x', 'x', 'θ']);
+    const a = ri(r, 1, 3), c = ri(r, 1, 3), b = ri(r, -5, 5), d = ri(r, -5, 5);
+    if (!b || !d || gcd(a, Math.abs(b)) !== 1 || gcd(c, Math.abs(d)) !== 1 || (a === c && b === d)) continue;
+    if (a > c || (a === c && b > d)) continue; // one ordering of each pair
+    const A = a * c, B = a * d + b * c, C = b * d;
+    const co = (k) => (k === 1 ? '' : String(k) + ' ');
+    const lin = (k, m) => `${co(k)}${fn} X ${m < 0 ? '-' : '+'} ${Math.abs(m)}`;
+    const poly = `${co(A)}${fn}^2 X` + (B ? ` ${B < 0 ? '-' : '+'} ${Math.abs(B) === 1 ? '' : Math.abs(B)}${fn} X` : '') + ` ${C < 0 ? '-' : '+'} ${Math.abs(C)}`;
+    const ans = `(${lin(a, b)})(${lin(c, d)})`;
+    const wrong = [`(${lin(a, -b)})(${lin(c, -d)})`, `(${lin(a, d)})(${lin(c, b)})`, `(${lin(a, -d)})(${lin(c, -b)})`, `(${lin(a, b)})(${lin(c, -d)})`, `(${lin(a, -b)})(${lin(c, d)})`];
+    const seen = [parseTrig(trigVar(ans, v))];
+    const cands = wrong.filter((w) => { const p = parseTrig(trigVar(w, v)); if (seen.some((s) => trigEquiv(p, s))) return false; seen.push(p); return true; });
+    if (cands.length < 3) continue;
+    const u = `${fn} ${v}`;
+    return {
+      topic: 'Factoring trig expressions',
+      stem: `Factor the expression completely:  ${prettyTrig(poly, v)}`,
+      ...buildChoices(r, prettyTrig(ans, v), shuffle(r, cands).slice(0, 3).map((w) => prettyTrig(w, v)), (i) => String(i)),
+      fr: FR.trig('', ans, v, { factor: true, maxFns: 99 }),
+      solution: `Think of it as a quadratic in ${u}: let w = ${u}, so the expression is ${prettyTrig(poly.replace(new RegExp(fn + '\\^2 X', 'g'), 'w^2').replace(new RegExp(fn + ' X', 'g'), 'w'), v)}. ` +
+        `It factors as ${prettyTrig(ans.replace(new RegExp(fn + ' X', 'g'), 'w'), v)}. Replace w with ${u}: ${prettyTrig(ans, v)}.`,
     };
   }
 };
@@ -1261,6 +1671,11 @@ const QUESTION_TYPES = [
   { id: 'triCongruence',      subject: 'geometry', section: '5.3–5.6 Triangle Congruence', label: 'Prove congruent (marked figure)', desc: 'Part A: SSS, SAS, ASA, AAS, HL, or not possible. Part B: write the congruence statement' },
   { id: 'triCongruenceGiven', subject: 'geometry', section: '5.3–5.6 Triangle Congruence', label: 'Prove congruent (“Given:” text)', desc: 'Same two parts, with the facts given in words instead of marks' },
   { id: 'trigGraph',          subject: 'precalc',  section: 'Trigonometry', label: 'Graphs of sine and cosine', desc: 'Find a, b, c from a graph' },
+  { id: 'trigIdentityFill',   subject: 'precalc',  section: '2.1 Using Fundamental Identities', label: 'Complete the identity', desc: 'Reciprocal, quotient, Pythagorean, cofunction, even/odd (#1–4)' },
+  { id: 'trigEvaluate',       subject: 'precalc',  section: '2.1 Using Fundamental Identities', label: 'Values from given conditions', desc: 'Given sec x = −5/2 and tan x < 0, find exact values (#5–10)' },
+  { id: 'trigSimplify',       subject: 'precalc',  section: '2.1 Using Fundamental Identities', label: 'Simplify', desc: 'Use the identities to simplify (#11–20, 31–38)' },
+  { id: 'trigFactor',         subject: 'precalc',  section: '2.1 Using Fundamental Identities', label: 'Factor', desc: 'Factor a trig quadratic, or factor and simplify (#21–30)' },
+  { id: 'trigAddSub',         subject: 'precalc',  section: '2.1 Using Fundamental Identities', label: 'Add or subtract fractions', desc: 'Combine and simplify (#39–44)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
@@ -1702,7 +2117,7 @@ function frArea(q, i) {
   const vals = state.teacher ? q.fr.key.slice() : Array.isArray(state.answers[i]) ? state.answers[i].slice() : q.fr.fields.map(() => '');
   const wrap = el('div', { class: 'fr' });
   const controls = [];
-  let row = null, lastAns = null, hasMath = false;
+  let row = null, lastAns = null, hasMath = false, hasExpr = false;
   const applyLocks = () => q.fr.fields.forEach((f, k) => {
     if (!f.lockWhen || reveal) return;
     const locked = f.lockWhen(vals);
@@ -1742,24 +2157,27 @@ function frArea(q, i) {
       return;
     }
     let input;
-    if (f.kind === 'number' && mathReady) {
+    if ((f.kind === 'number' || f.kind === 'expr') && mathReady) {
       input = new MathfieldElement();
       input.smartMode = false; input.mathVirtualKeyboardPolicy = 'manual'; input.menuItems = [];
-      input.className = 'mans'; input.setAttribute('aria-label', f.label || 'Answer');
+      input.className = 'mans' + (f.kind === 'expr' ? ' wide' : ''); input.setAttribute('aria-label', f.label || 'Answer');
       input.value = vals[k] || '';
       if (reveal) input.readOnly = true;
       controls[k] = input;
       input.addEventListener('input', () => { vals[k] = input.value; save(); });
+      // in the math editor a space jumps out of a fraction (1/sin x would become (1/sin)·x), so ignore spaces in expression answers
+      if (f.kind === 'expr') input.addEventListener('keydown', (e) => { if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); } }, true);
       input.addEventListener('focus', () => { lastAns = input; });
       row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
-      hasMath = true;
+      hasMath = true; if (f.kind === 'expr') hasExpr = true;
       return;
     }
     if (f.kind === 'select') {
       input = el('select', {}, el('option', { value: '' }, 'Choose…'), ...f.options.map((o) => el('option', { value: o }, o)));
     } else {
       input = el('input', { type: 'text', autocomplete: 'off', autocapitalize: f.kind === 'text' ? 'characters' : 'off', spellcheck: 'false',
-        inputmode: f.kind === 'number' ? 'decimal' : 'text', class: f.kind === 'number' ? 'num' : 'let', placeholder: f.kind === 'number' ? '' : 'letters' });
+        inputmode: f.kind === 'number' ? 'decimal' : 'text', class: f.kind === 'number' ? 'num' : f.kind === 'expr' ? 'expr' : 'let', placeholder: f.kind === 'number' ? '' : f.kind === 'expr' ? 'e.g. sin^2 x / cos x' : 'letters' });
+      if (f.kind === 'expr') input.autocapitalize = 'off';
     }
     input.value = vals[k] || '';
     if (reveal) input.disabled = true;
@@ -1771,7 +2189,10 @@ function frArea(q, i) {
   applyLocks();
   if (hasMath && !reveal) { // small symbol row for the answer boxes
     const firstAns = () => lastAns || wrap.querySelector('math-field.mans');
-    wrap.append(el('div', { class: 'mkeys anskeys' }, ...[['π', '\pi'], ['√', '\sqrt{#?}'], ['a⁄b', '\frac{#@}{#?}'], ['xⁿ', '^{#?}'], ['°', '^{\circ}']].map(([label, latex]) => {
+    const keys = hasExpr
+      ? [['sin', '\sin '], ['cos', '\cos '], ['tan', '\tan '], ['csc', '\csc '], ['sec', '\sec '], ['cot', '\cot '], ['θ', '\theta '], ['x²', '^{2}'], ['a⁄b', '\frac{#@}{#?}'], ['π', '\pi']]
+      : [['π', '\pi'], ['√', '\sqrt{#?}'], ['a⁄b', '\frac{#@}{#?}'], ['xⁿ', '^{#?}'], ['°', '^{\circ}']];
+    wrap.append(el('div', { class: 'mkeys anskeys' }, ...keys.map(([label, latex]) => {
       const b = el('button', { type: 'button', title: 'Insert ' + label }, label);
       b.addEventListener('mousedown', (e) => e.preventDefault());
       b.addEventListener('click', () => { const mf = firstAns(); mf.focus(); mf.insert(latex, { format: 'latex', selectionMode: 'placeholder' }); mf.dispatchEvent(new Event('input')); });
@@ -1865,7 +2286,7 @@ function answerText(q, a) {
   if (q.mode !== 'fr') return a === null || a === undefined || Array.isArray(a) ? '(no answer)' : `${LETTERS[a]}. ${q.choices[a]}`;
   if (!Array.isArray(a) || !isAnswered(q, a)) return '(no answer)';
   if (q.twoPart) return a[0] + (a[0] !== 'Not possible' ? `;  △${normLetters(a[1])} ≅ △${normLetters(a[2])}` : '');
-  return q.fr.fields.map((f, k) => `${f.label ? f.label + ' ' : ''}${f.prefix || ''}${(f.kind === 'number' && /[\\{}]/.test(a[k] || '') ? latexToText(a[k]) : a[k]) || '—'}${f.suffix || ''}`).join(',  ');
+  return q.fr.fields.map((f, k) => `${f.label ? f.label + ' ' : ''}${f.prefix || ''}${((f.kind === 'number' || f.kind === 'expr') && /[\\{}]/.test(a[k] || '') ? latexToText(a[k]) : a[k]) || '—'}${f.suffix || ''}`).join(',  ');
 }
 function exportWork(pts) {
   return state.qs.map((q, i) => {
