@@ -261,6 +261,7 @@ const SETS = {
   'precalc-6-4':   { subject: 'precalc',  title: '6.4 Hyperbolas', items: [['c4Match', 2], ['c4Std', 3], ['c4Props', 3], ['c4Asym', 3], ['c4Classify', 3]] },
   'precalc-6-5':   { subject: 'precalc',  title: '6.5 Rotation of Conics', items: [['r5Point', 3], ['r5Angle', 3], ['r5Rotate', 4], ['r5Classify', 2], ['r5Match', 2]] },
   'precalc-6-6':   { subject: 'precalc',  title: '6.6 Parametric Equations', items: [['p6Table', 2], ['p6Orient', 2], ['p6Elim', 7], ['p6Find', 3]] },
+  'precalc-6-7':   { subject: 'precalc',  title: '6.7 Polar Coordinates', items: [['q7Rep', 2], ['q7ToRect', 2], ['q7ToPolar', 2], ['q7RectToPolar', 3], ['q7PolarToRect', 3], ['q7Describe', 2]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -5081,7 +5082,7 @@ function curveEqOk(raw, onPts, offPts) {
   const F = (x, y) => lgEval(L, { x, y }) - lgEval(R, { x, y });
   if (!onPts.every(([x, y]) => { const v = F(x, y); return isFinite(v) && Math.abs(v) < 1e-6 * Math.max(1, Math.abs(lgEval(L, { x, y }))); })) return false;
   const off = offPts.filter(([x, y]) => { const v = F(x, y); return !isFinite(v) || Math.abs(v) > 1e-6; }).length;
-  return off >= offPts.length * 0.6;
+  return off >= offPts.length * 0.45;
 }
 const P6_RESTR = ['None needed', 'x ≥ 0', 'x > 0', 'x ≤ 0'];
 const tT = (c, v = 't') => lnSumT([[c, null, v]]); // "3t", "−t"
@@ -5256,6 +5257,151 @@ TEMPLATES.p6Find = (r) => {
     frStem: `Find a set of parametric equations to represent ${given}. Use ${par === 't' ? 't' : 'θ (or t)'} as the parameter. (Many answers are possible.)`,
     fr: { fields: [{ kind: 'expr', keys: 'wave', label: 'x =' }, { kind: 'expr', keys: 'wave', label: 'y =' }], key: [xL, yL], display: correct, check },
     solution: `${why}\n${correct}  (Other answers are possible.)`,
+  };
+};
+
+/* ---------- 6.7 Polar Coordinates ---------- */
+KEYROWS_P.ppt = [['( , )', '\\left(#?,#?\\right)'], ['π', '\\pi'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}']];
+KEYROWS_P.polar = [['θ', '\\theta'], ['sin', '\\sin\\left(#?\\right)'], ['cos', '\\cos\\left(#?\\right)'], ['csc', '\\csc\\left(#?\\right)'], ['sec', '\\sec\\left(#?\\right)'], ['xⁿ', '^{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['π', '\\pi']];
+const slopeX = (m) => (m === 1 ? '' : m === -1 ? MINUS : /\//.test(exactT(Math.abs(m))) ? `${m < 0 ? MINUS : ''}(${exactT(Math.abs(m))})` : exactT(m)); // coefficient of x
+const POL_ANG = [30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
+const polT = (r, d) => `(${exactT(r)}, ${d === 0 ? '0' : radT(d)})`;
+const polL = (r, d) => `\\left(${exactL(r)},${d === 0 ? '0' : radL(d)}\\right)`;
+// a polar answer (r, θ) matches exactly (or to 3 decimals); θ compared as given (not mod 2π)
+function polOk(raw, r, d, tol = 0.0006) { const P = parsePoints(raw); if (!P || P.length !== 1) return false; return Math.abs(P[0][0] - r) <= tol && Math.abs(P[0][1] - d * D2R) <= tol; }
+TEMPLATES.q7Rep = (r) => {
+  const R = ri(r, 1, 6) * pick(r, [1, 1, -1]), d = pick(r, POL_ANG.concat([-30, -45, -120, -150])), k = ri(r, 0, 2);
+  // targets: (a) r > 0, −2π < θ < 0;  (b) r < 0, 0 ≤ θ < 2π;  (c) r > 0, 2π ≤ θ < 4π
+  const base = R > 0 ? d : d + 180; // equivalent angle with positive r
+  const norm = (x, lo) => { let y = x; while (y < lo) y += 360; while (y >= lo + 360) y -= 360; return y; };
+  let want, cond;
+  if (k === 0) { want = [Math.abs(R), norm(base, -360)]; if (want[1] === 0) want[1] = -360; cond = 'r > 0 and −2π < θ < 0'; if (want[1] <= -360) return TEMPLATES.q7Rep(r); }
+  else if (k === 1) { want = [-Math.abs(R), norm(base + 180, 0)]; cond = 'r < 0 and 0 ≤ θ < 2π'; }
+  else { want = [Math.abs(R), norm(base, 360)]; cond = 'r > 0 and 2π ≤ θ < 4π'; }
+  const correct = polT(...want);
+  const wrongs = [polT(want[0], norm(want[1] + 180, k === 0 ? -360 : k === 1 ? 0 : 360)), polT(-want[0], want[1]), polT(want[0], -want[1]), polT(want[0], norm(want[1] + 90, k === 0 ? -360 : k === 1 ? 0 : 360))].filter((w) => w !== correct);
+  return {
+    topic: 'Multiple polar representations', stem: `The point ${polT(R, d)} is given in polar coordinates. Find another polar representation of the point with ${cond}.`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => polT(want[0], want[1] + 360 * (i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'ppt', label: '(r, θ) =' }], key: [polL(...want)], display: correct, check: (v) => polOk(v[0], ...want) },
+    solution: `(r, θ) is the same point as (r, θ + 2nπ) and as (−r, θ + π + 2nπ).\n${k === 1 ? `Change the sign of r and add or subtract π: ` : `Add or subtract 2π${R < 0 ? ' (after changing −r to r and adding π)' : ''}: `}${correct}`,
+  };
+};
+TEMPLATES.q7ToRect = (r) => {
+  if (r() < 0.25) { // decimal
+    const R = pick(r, [4.5, -3.2, 2.5, 6, -1.8]), th = pick(r, [1.3, 2.4, -0.8, 3.5, 5.2, 0.6]);
+    const x = R * Math.cos(th), y = R * Math.sin(th), correct = `(${rT(x, 3)}, ${rT(y, 3)})`;
+    const wrongs = [`(${rT(y, 3)}, ${rT(x, 3)})`, `(${rT(R * Math.cos(th * D2R), 3)}, ${rT(R * Math.sin(th * D2R), 3)})`, `(${rT(-x, 3)}, ${rT(-y, 3)})`, `(${rT(x, 3)}, ${rT(-y, 3)})`];
+    return {
+      topic: 'Polar to rectangular coordinates', stem: `Convert the polar coordinates to rectangular coordinates. Round to three decimal places.   (${fmt(R)}, ${fmt(th)})`,
+      ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => `(${rT(x + i + 1, 3)}, ${rT(y, 3)})`),
+      fr: { fields: [{ kind: 'expr', keys: 'ppt', label: '(x, y) =' }], key: [`\\left(${rT(x, 3).replace(MINUS, '-')},${rT(y, 3).replace(MINUS, '-')}\\right)`], display: correct, check: (v) => ptsOk(v[0], [[x, y]]) },
+      solution: `x = r cos θ = ${fmt(R)} cos ${fmt(th)} ≈ ${rT(x, 3)};  y = r sin θ = ${fmt(R)} sin ${fmt(th)} ≈ ${rT(y, 3)} (radian mode)`,
+    };
+  }
+  const R = ri(r, 1, 8) * pick(r, [1, 1, -1]), d = pick(r, POL_ANG.concat([0, -45, -60, -150]));
+  const snap = (v) => (Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v) : v);
+  const x = snap(R * Math.cos(d * D2R)), y = snap(R * Math.sin(d * D2R)), T = (a, b) => `(${exactT(snap(a))}, ${exactT(snap(b))})`, correct = T(x, y);
+  const wrongs = [T(y, x), T(-x, -y), T(x, -y), T(-x, y)].filter((w) => w !== correct);
+  return {
+    topic: 'Polar to rectangular coordinates', stem: `Convert the polar coordinates to rectangular coordinates.   ${polT(R, d)}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(x + i + 1, y)),
+    fr: { fields: [{ kind: 'expr', keys: 'ppt', label: '(x, y) =' }], key: [`\\left(${exactL(x)},${exactL(y)}\\right)`], display: correct, check: (v) => ptsOk(v[0], [[x, y]]) },
+    solution: `x = r cos θ = ${exactT(R)} cos(${d === 0 ? '0' : radT(d)}) = ${exactT(x)};  y = r sin θ = ${exactT(R)} sin(${d === 0 ? '0' : radT(d)}) = ${exactT(y)}`,
+  };
+};
+TEMPLATES.q7ToPolar = (r) => {
+  let x, y, Rv, d, exact = true;
+  if (r() < 0.65) { const R = ri(r, 1, 6), dd = pick(r, POL_ANG); x = Math.round(R * Math.cos(dd * D2R) * 1e9) / 1e9; y = Math.round(R * Math.sin(dd * D2R) * 1e9) / 1e9;
+    // keep only points with a clean rectangular form (integers or k√3, k√2)
+    if (!fracParts(x * x) || !fracParts(y * y)) return TEMPLATES.q7ToPolar(r); Rv = R; d = dd; }
+  else { [x, y] = pick(r, [[3, 4], [-5, 12], [6, -8], [-3, -4], [7, 24], [-8, 15], [2, 5], [-1, 3], [4, -1]]); Rv = Math.hypot(x, y); d = Math.atan2(y, x) / D2R; if (d < 0) d += 360; exact = Math.abs(d / 15 - Math.round(d / 15)) < 1e-9; }
+  const ptText = `(${exactT(x)}, ${exactT(y)})`;
+  const T = (R, dd) => (exact ? polT(R, dd) : `(${exactT(R)}, ${rT(dd * D2R, 3)})`), correct = T(Rv, d);
+  const w2 = (dd) => ((dd % 360) + 360) % 360;
+  const wrongs = [T(Rv, w2(Math.atan(y / x) / D2R)), T(Rv, w2(90 - d)), T(Rv * Rv, d), T(Rv, w2(d + 180))].filter((w) => w !== correct);
+  return {
+    topic: 'Rectangular to polar coordinates', stem: `Convert the rectangular coordinates to polar coordinates with r > 0 and 0 ≤ θ < 2π.${exact ? '' : ' Round θ to three decimal places.'}   ${ptText}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(Rv + i + 1, d)),
+    fr: { fields: [{ kind: 'expr', keys: 'ppt', label: '(r, θ) =' }], key: [exact ? polL(Rv, d) : `\\left(${exactL(Rv)},${rT(d * D2R, 3)}\\right)`], display: correct, check: (v) => polOk(v[0], Rv, d) },
+    solution: `r = √(x² + y²) = ${exactT(Rv)}. tan θ = y/x = ${x === 0 ? 'undefined' : exactT(y / x)}, and ${ptText} is ${d === 0 || d === 90 || d === 180 || d === 270 ? 'on an axis' : `in Quadrant ${ROMAN[quadOf(d)]}`}, so θ ${exact ? '=' : '≈'} ${exact ? radT(d) : rT(d * D2R, 3)}.\n${correct}`,
+  };
+};
+// rectangular equations ↔ polar equations: { rect, rectL, pol, polL, F(x,y), f(θ) (r as a function, may be NaN), r2: f gives r² }
+function polPair(r) {
+  const k = ri(r, 0, 8);
+  if (k === 0) { const a = ri(r, 2, 9); return { rect: `x² + y² = ${a * a}`, rectL: `x^2+y^2=${a * a}`, pol: `r = ${a}`, polL: `r=${a}`, F: (x, y) => x * x + y * y - a * a, f: () => a }; }
+  if (k === 1) { const c = ri(r, 1, 9) * pick(r, [1, -1]); return { rect: `y = ${fmt(c)}`, rectL: `y=${c}`, pol: `r = ${c === 1 ? '' : c === -1 ? MINUS : fmt(c)}${c === 1 || c === -1 ? '' : ' '}csc θ`, polL: `r=${c === 1 ? '' : c === -1 ? '-' : c}\\csc\\theta`, F: (x, y) => y - c, f: (t) => c / Math.sin(t) }; }
+  if (k === 2) { const c = ri(r, 1, 9) * pick(r, [1, -1]); return { rect: `x = ${fmt(c)}`, rectL: `x=${c}`, pol: `r = ${c === 1 ? '' : c === -1 ? MINUS : fmt(c) + ' '}sec θ`, polL: `r=${c === 1 ? '' : c === -1 ? '-' : c}\\sec\\theta`, F: (x, y) => x - c, f: (t) => c / Math.cos(t) }; }
+  if (k === 3) { const a = ri(r, 1, 5) * pick(r, [1, -1]), onX = r() < 0.5; // x² + y² − 2ax = 0 ↔ r = 2a cos θ
+    const t2 = 2 * a; return onX ? { rect: `x² + y² ${t2 > 0 ? MINUS : '+'} ${Math.abs(t2)}x = 0`, rectL: `x^2+y^2${t2 > 0 ? '-' : '+'}${Math.abs(t2)}x=0`, pol: `r = ${fmt(t2)} cos θ`, polL: `r=${t2}\\cos\\theta`, F: (x, y) => x * x + y * y - t2 * x, f: (t) => t2 * Math.cos(t) }
+      : { rect: `x² + y² ${t2 > 0 ? MINUS : '+'} ${Math.abs(t2)}y = 0`, rectL: `x^2+y^2${t2 > 0 ? '-' : '+'}${Math.abs(t2)}y=0`, pol: `r = ${fmt(t2)} sin θ`, polL: `r=${t2}\\sin\\theta`, F: (x, y) => x * x + y * y - t2 * y, f: (t) => t2 * Math.sin(t) }; }
+  if (k === 4) { // line Ax + By + C = 0 ↔ r = −C/(A cos θ + B sin θ)
+    let A, B, C; do { A = ri(r, -6, 6); B = ri(r, -6, 6); C = ri(r, -9, 9); } while (!A || !B || !C || cgcd(cgcd(A, B), C) !== 1);
+    const tm = (c, f, first) => `${first ? (c < 0 ? MINUS : '') : c < 0 ? ` ${MINUS} ` : ' + '}${Math.abs(c) === 1 ? '' : Math.abs(c) + ' '}${f} θ`, den = tm(A, 'cos', true) + tm(B, 'sin', false);
+    return { rect: `${lnSumT([[A, null, 'x'], [B, null, 'y'], [C, null, '']])} = 0`, rectL: '', pol: `r = ${fmt(-C)}/(${den.trim()})`, polL: `r=\\frac{${-C}}{${A}\\cos\\theta${B > 0 ? '+' : ''}${B}\\sin\\theta}`, F: (x, y) => A * x + B * y + C, f: (t) => -C / (A * Math.cos(t) + B * Math.sin(t)) }; }
+  if (k === 5) { const d = pick(r, [30, 45, 60, 120, 135, 150]), m = snap3(Math.tan(d * D2R)); // θ = const ↔ y = mx
+    return { rect: `y = ${slopeX(m)}x`, rectL: `y=${m === 1 ? '' : m === -1 ? '-' : exactL(m)}x`, pol: `θ = ${radT(d)}`, polL: `\\theta=${radL(d)}`, F: (x, y) => y - m * x, theta: d }; }
+  if (k === 6) { const a = pick(r, [8, 16, 4, 9]); return { rect: `xy = ${a}`, rectL: `xy=${a}`, pol: `r² = ${2 * a} csc 2θ`, polL: `r^2=${2 * a}\\csc\\left(2\\theta\\right)`, F: (x, y) => x * y - a, f: (t) => (2 * a) / Math.sin(2 * t), r2: true }; }
+  if (k === 7) { const a = pick(r, [8, 4, 12, 2]); return { rect: `y² = ${a}x`, rectL: `y^2=${a}x`, pol: `r = ${a} csc θ cot θ`, polL: `r=${a}\\csc\\theta\\cot\\theta`, F: (x, y) => y * y - a * x, f: (t) => (a * Math.cos(t)) / Math.sin(t) ** 2 }; }
+  // conic r = ep/(1 − e cos θ) with e = 1 → parabola y² = 2p x + p²  (book #92: r = 4/(1 − cos θ) ↔ y² = 8x + 16)
+  const p = pick(r, [2, 4, 6]);
+  return { rect: `y² = ${2 * p}x + ${p * p}`, rectL: `y^2=${2 * p}x+${p * p}`, pol: `r = ${p}/(1 ${MINUS} cos θ)`, polL: `r=\\frac{${p}}{1-\\cos\\theta}`, F: (x, y) => y * y - 2 * p * x - p * p, f: (t) => p / (1 - Math.cos(t)) };
+}
+// a typed polar equation traces the curve F = 0
+function polEqOk(raw, P) {
+  let s = String(raw || '').replace(/\\left|\\right/g, '');
+  const th = /^\s*\\theta\s*=\s*(.*)$/.exec(s) || /^\s*θ\s*=\s*(.*)$/.exec(s);
+  if (th) { const v = pxConst(th[1]); return P.theta !== undefined && isFinite(v) && [0, 1, -1].some((n) => Math.abs(v - (P.theta * D2R + n * Math.PI)) < 1e-6); }
+  const m = /^\s*r\s*(\^\{?2\}?)?\s*=\s*(.*)$/.exec(s); if (!m) return false;
+  const n = parseTrig(m[2]); if (!n) return false;
+  let good = 0, bad = 0;
+  for (let j = 0; j < 60; j++) { const t = 0.05 + j * 0.103; let v = evalTrig(n, t); if (!isFinite(v) || Math.abs(v) > 1e4) continue; if (m[1]) { if (v < 0) continue; v = Math.sqrt(v); }
+    const x = v * Math.cos(t), y = v * Math.sin(t); if (Math.hypot(x, y) < 1e-9) continue; const e = P.F(x, y); if (Math.abs(e) > 1e-6 * Math.max(1, Math.abs(x) + Math.abs(y)) ** 2) bad++; else good++; }
+  return !bad && good >= 15;
+}
+TEMPLATES.q7RectToPolar = (r) => {
+  let P; do P = polPair(r); while (P.theta !== undefined || /\/\(/.test(P.pol) && r() < 0.5);
+  const ok = (v) => polEqOk(v[0], P);
+  const alts = [];
+  for (let i = 0; i < 12 && alts.length < 5; i++) { const Q = polPair(r); if (Q.pol !== P.pol && Q.theta === undefined) alts.push(Q.pol); }
+  return {
+    topic: 'Rectangular equation to polar form', stem: `Convert the rectangular equation to polar form.   ${P.rect}`,
+    ...buildChoices(r, P.pol, [...new Set(alts)].filter((a) => a !== P.pol), (i) => P.pol.replace(/(\d+)/, (m) => String(+m + i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'polar', label: 'Polar form:' }], key: [P.polL], display: P.pol, check: ok },
+    solution: `Substitute x = r cos θ and y = r sin θ (and x² + y² = r²), then solve for r:\n${P.pol}`,
+  };
+};
+TEMPLATES.q7PolarToRect = (r) => {
+  const P = polPair(r);
+  const ts = []; for (let j = 0; j < 50; j++) ts.push(0.07 + j * 0.121);
+  const on = P.theta !== undefined ? [-3, -1.5, 1, 2.5, 4].map((t) => [t * Math.cos(P.theta * D2R), t * Math.sin(P.theta * D2R)])
+    : ts.map((t) => { let v = P.f(t); if (P.r2) { if (!(v >= 0)) return null; v = Math.sqrt(v); } return [v * Math.cos(t), v * Math.sin(t)]; }).filter((p) => p && isFinite(p[0]) && isFinite(p[1]) && Math.hypot(...p) < 1e3);
+  const off = on.flatMap(([x, y]) => [[x, y + 0.37], [x + 0.41, y]]);
+  const alts = []; for (let i = 0; i < 14 && alts.length < 5; i++) { const Q = polPair(r); if (Q.rect !== P.rect) alts.push(Q.rect); }
+  return {
+    topic: 'Polar equation to rectangular form', stem: `Convert the polar equation to rectangular form.   ${P.pol}`,
+    ...buildChoices(r, P.rect, [...new Set(alts)].filter((a) => a !== P.rect), (i) => P.rect.replace(/(\d+)/, (m) => String(+m + i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'func', label: 'Rectangular form:' }], key: [P.rectL || P.rect.replace(/−/g, '-').replace(/ /g, '')], display: P.rect, check: (v) => curveEqOk(v[0], on, off) },
+    solution: `Use r cos θ = x, r sin θ = y, and r² = x² + y² (multiply by r or r² first if needed):\n${P.rect}`,
+  };
+};
+// describe the graph (#93–100)
+TEMPLATES.q7Describe = (r) => {
+  const k = ri(r, 0, 4);
+  let pol, rect, desc;
+  const a = ri(r, 2, 9);
+  if (k === 0) { pol = `r = ${a}`; rect = `x² + y² = ${a * a}`; desc = `Circle with center (0, 0) and radius ${a}`; }
+  else if (k === 1) { const d = pick(r, [30, 45, 60, 120, 135, 150]); pol = `θ = ${radT(d)}`; const m = snap3(Math.tan(d * D2R)); rect = `y = ${slopeX(m)}x`; desc = `Line through the origin with inclination ${radT(d)}`; }
+  else if (k === 2) { pol = `r = ${a} sec θ`; rect = `x = ${a}`; desc = `Vertical line ${a} units to the right of the pole`; }
+  else if (k === 3) { pol = `r = ${a} csc θ`; rect = `y = ${a}`; desc = `Horizontal line ${a} units above the pole`; }
+  else { const s = pick(r, [1, -1]), sin = r() < 0.5; pol = `r = ${s < 0 ? MINUS : ''}${2 * a} ${sin ? 'sin' : 'cos'} θ`; rect = `x² + y² ${s > 0 ? MINUS : '+'} ${2 * a}${sin ? 'y' : 'x'} = 0`; desc = `Circle with center ${sin ? ptT([0, s * a]) : ptT([s * a, 0])} and radius ${a}`; }
+  const pool = [`Circle with center (0, 0) and radius ${a}`, `Circle with center (0, 0) and radius ${a * a}`, `Vertical line ${a} units to the right of the pole`, `Horizontal line ${a} units above the pole`, `Circle with center (${a}, 0) and radius ${a}`, `Circle with center (0, ${a}) and radius ${a}`, `Circle with center (${MINUS}${a}, 0) and radius ${a}`, `Circle with center (0, ${MINUS}${a}) and radius ${a}`, `Line through the origin with inclination ${radT(pick(r, [30, 60, 135]))}`];
+  const opts = [desc, ...shuffle(r, pool.filter((p) => p !== desc)).slice(0, 3)];
+  return {
+    topic: 'Describing a polar graph', stem: `Describe the graph of the polar equation.   ${pol}`,
+    ...buildChoices(r, desc, opts.slice(1), () => null), fr: FR.select('The graph is a', shuffle(r, opts), desc),
+    solution: `In rectangular form: ${rect}. ${desc}.`,
   };
 };
 
@@ -9717,6 +9863,12 @@ const QUESTION_TYPES = [
   { id: 'p6Orient', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Orientation of a curve', desc: '(#7–12)' },
   { id: 'p6Elim', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Eliminating the parameter', desc: 'Rectangular equation and domain (#13–36)' },
   { id: 'p6Find', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Finding parametric equations', desc: 'Line, circle, ellipse' },
+  { id: 'q7Rep', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Multiple polar representations', desc: '(r, θ) with given conditions' },
+  { id: 'q7ToRect', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Polar to rectangular coordinates', desc: 'Points' },
+  { id: 'q7ToPolar', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Rectangular to polar coordinates', desc: 'Points, r > 0 and 0 ≤ θ < 2π' },
+  { id: 'q7RectToPolar', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Rectangular equation to polar form', desc: '' },
+  { id: 'q7PolarToRect', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Polar equation to rectangular form', desc: '(#79–92)' },
+  { id: 'q7Describe', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Describing a polar graph', desc: '(#93–100)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
