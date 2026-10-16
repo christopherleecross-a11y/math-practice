@@ -196,6 +196,8 @@ const CONFIG = {
 //   Pre-Calc 4.1: cxEqual (#7–8), cxAddSub (#9–16), cxMultiply (#17–24), cxConjugate (#25–32), cxDivide (#33–40), cxSqrtNeg (#41–48), cxQuadratic (#49–58)
 //   Pre-Calc 4.2: cxNumSolutions (#5–8), cxDiscriminant (#9–14), cxSolveQuad (#15–24), cxQuartic (#25–28), cxLinearFactors (#33–48), cxGivenZero (#49–58)
 //   Pre-Calc 4.3: cpRead (#5–10), cpAbs (#11–16), cpAddSub (#17–28), cpConjugate (#29–34), cpDistance (#35–38)
+//   Pre-Calc 4.4: tfToTrig (#5–28), tfToStandard (#29–38), tfMultiply (#43–48), tfDivide (#49–54)
+//   Pre-Calc 4.5: dmPower (#5–14), dmPowerStd (#15–24), dmSquareRoots (#29–36), dmNthRoots (#37–52), dmSolveEq (#53–64)
 //   Pre-Calc 3.4: vecDot (#5–10), vecDotProps (#11–22), vecMagnitude (#23–28), vecAngle (#29–42), vecTriangle (#43–46), vecDotFromAngle (#47–50)
 //   other: dilation, composite, trigGraph
 const SUBJECTS = {
@@ -225,6 +227,8 @@ const SETS = {
   'precalc-4-1':   { subject: 'precalc',  title: '4.1 Complex Numbers', items: [['cxEqual', 1], ['cxAddSub', 2], ['cxMultiply', 2], ['cxConjugate', 2], ['cxDivide', 3], ['cxSqrtNeg', 2], ['cxQuadratic', 3]] },
   'precalc-4-2':   { subject: 'precalc',  title: '4.2 Complex Solutions of Equations', items: [['cxNumSolutions', 1], ['cxDiscriminant', 2], ['cxSolveQuad', 3], ['cxQuartic', 2], ['cxLinearFactors', 4], ['cxGivenZero', 3]] },
   'precalc-4-3':   { subject: 'precalc',  title: '4.3 The Complex Plane', items: [['cpRead', 2], ['cpAbs', 3], ['cpAddSub', 4], ['cpConjugate', 2], ['cpDistance', 3]] },
+  'precalc-4-4':   { subject: 'precalc',  title: '4.4 Trigonometric Form of a Complex Number', items: [['tfToTrig', 4], ['tfToStandard', 3], ['tfMultiply', 3], ['tfDivide', 3]] },
+  'precalc-4-5':   { subject: 'precalc',  title: "4.5 DeMoivre's Theorem", items: [['dmPower', 3], ['dmPowerStd', 3], ['dmSquareRoots', 2], ['dmNthRoots', 3], ['dmSolveEq', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -533,7 +537,7 @@ const latexTrig = (s, v) => trigVar(s, v).replace(/(sin|cos|tan|csc|sec|cot)/g, 
   .replace(/β/g, '\\beta ').replace(/α/g, '\\alpha ').replace(/\^(\d)/g, '^{$1}').replace(/\*/g, '\\cdot ');
 
 function latexToPlain(s) {
-  s = String(s || '');
+  s = String(s || '').replace(/\\surd\s*\{?(\d+(?:\.\d+)?)\}?/g, '\\sqrt{$1}'); // a typed √ key on the keyboard
   if (/\\placeholder/.test(s)) return '';
   const grab = (str, i) => { // str[i] === '{' → [inside, index after the closing brace]
     let depth = 0;
@@ -3514,6 +3518,256 @@ TEMPLATES.cxGivenZero = (r) => {
   }
 };
 
+/* ---------- 4.4 Trigonometric Form and 4.5 DeMoivre's Theorem ---------- */
+const sMul = (a, b) => Sd(a.n * b.n, a.d * b.d, a.m * b.m);
+const sPow = (s, n) => Sd(s.n ** n, s.d ** n, s.m ** n);
+const normDeg = (d) => ((d % 360) + 360) % 360;
+// exact cos and sin of an angle that is a multiple of 30° or 45° (null otherwise)
+function cisExact(deg) {
+  const d = normDeg(deg), c = Math.cos(d * D2R), s = Math.sin(d * D2R);
+  const ref = Math.round(Math.acos(Math.min(1, Math.abs(c))) / D2R);
+  const base = { 0: [Sd(1), Sd(0)], 30: [Sd(1, 2, 3), Sd(1, 2)], 45: [Sd(1, 2, 2), Sd(1, 2, 2)], 60: [Sd(1, 2), Sd(1, 2, 3)], 90: [Sd(0), Sd(1)] }[ref];
+  if (!base || Math.abs(Math.cos(ref * D2R) - Math.abs(c)) > 1e-9) return null;
+  const sg = (v, x) => (x < -1e-12 ? sNeg(v) : v);
+  return [sg(base[0], c), sg(base[1], s)];
+}
+const cisStd = (rS, deg) => { const [c, s] = cisExact(deg); return cx(sMul(rS, c), sMul(rS, s)); };
+// angle text in degrees or radians
+const angT = (deg, unit) => (unit === 'rad' ? piText(frc(normDeg(deg), 180)) : `${fmt(deg)}°`);
+const angL = (deg, unit) => (unit === 'rad' ? piLatex(frc(normDeg(deg), 180)) : `${fmt(deg)}^{\\circ}`);
+const rTF = (rS, latex) => (rS.n === rS.d && rS.m === 1 ? '' : rS.d === 1 ? sAbsText(rS, latex) : latex ? sAbsText(rS, true) : `(${sAbsText(rS)})`);
+const tfText = (rS, deg, unit) => `${rTF(rS)}(cos ${angT(deg, unit)} + i sin ${angT(deg, unit)})`;
+const tfLatex = (rS, deg, unit) => `${rTF(rS, true)}\\left(\\cos ${angL(deg, unit)}+i\\sin ${angL(deg, unit)}\\right)`;
+const tfTextNum = (r, deg) => `${r}(cos ${deg}° + i sin ${deg}°)`;
+// read r(cos θ + i sin θ); returns { r, th } (th in radians) or null
+function parseTF(raw) {
+  let s = String(raw || '').replace(/\^\{\\circ\}|\^\\circ|\\circ|\\degree|\^\{°\}/g, '°').replace(/\\left|\\right/g, '');
+  if (/[\\{}]/.test(s)) s = latexToPlain(s);
+  s = s.replace(/[−–]/g, '-').replace(/[·*]/g, '').replace(/\s+/g, '').replace(/√/g, 'sqrt').replace(/π/g, 'pi').replace(/\[/g, '(').replace(/\]/g, ')');
+  const k = s.indexOf('cos'); if (k < 0) return null;
+  let pre = s.slice(0, k), j = s.lastIndexOf('+isin'), skip = 5;
+  if (j < 0) { j = s.lastIndexOf('+sin'); skip = 4; if (j < 0) return null; }
+  let A = s.slice(k + 3, j), B = s.slice(j + skip);
+  if (skip === 4) { if (!/i\)?$/.test(B)) return null; B = B.replace(/i(\)?)$/, '$1'); }
+  if (pre.endsWith('(')) { pre = pre.slice(0, -1); if (!B.endsWith(')')) return null; B = B.slice(0, -1); }
+  const val = (e) => { const n = parseTrig(e); if (!n) return NaN; const I = trigInfo(n); if (I.hasVar || I.fns) return NaN; return evalTrig(n, 0); };
+  const ang = (e) => { const deg = /°/.test(e); const v = val(e.replace(/°/g, '')); return deg ? v * D2R : v; };
+  const r = pre ? val(pre) : 1, a = ang(A), b = ang(B);
+  if (![r, a, b].every(isFinite) || r <= 0) return null;
+  const wrap = (x) => Math.abs(Math.atan2(Math.sin(x), Math.cos(x)));
+  if (wrap(a - b) > 1e-6) return null;
+  return { r, th: a };
+}
+const tfOk = (raw, r, th, rTol = 1e-6, thTol = 1e-6) => { const p = parseTF(raw); if (!p) return false; const d = Math.atan2(Math.sin(p.th - th), Math.cos(p.th - th)); return Math.abs(p.r - r) <= rTol * Math.max(1, r) && Math.abs(d) <= thTol; };
+const tfFR = (label, rS, deg, unit, opts = {}) => ({ fields: [{ kind: 'expr', keys: 'trigform', label }], key: [opts.key || tfLatex(rS, deg, unit)], display: opts.display || tfText(rS, deg, unit),
+  check: (v) => tfOk(v[0], opts.r ?? sVal(rS), deg * D2R, opts.rTol, opts.thTol) });
+// a list of trig forms, any order
+function tfListOk(raw, roots, rTol = 1e-6, thTol = 1e-6) {
+  const parts = splitAnswers(raw); if (parts === 'none' || parts.length !== roots.length) return false;
+  const used = new Set();
+  return parts.every((p) => { const k = roots.findIndex((R, i) => !used.has(i) && tfOk(p, R.r, R.th, rTol, thTol)); if (k < 0) return false; used.add(k); return true; });
+}
+const cxNear = (raw, v, tol) => { const p = parseCx(String(raw || '').replace(/^\s*[a-z]\s*=/i, '')); return !!p && Math.abs(p[0] - v[0]) <= tol && Math.abs(p[1] - v[1]) <= tol; };
+const TF_ANGLES = [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
+
+// 4.4 #5–28: write in trigonometric form
+TEMPLATES.tfToTrig = (r) => {
+  for (let t = 0; t < 100; t++) {
+    const exact = r() < 0.75;
+    let z, rS, deg, rVal, dText, rText;
+    if (exact) {
+      deg = pick(r, TF_ANGLES); const k = pick(r, [1, 1, 2, 3, 4, 5, 6]);
+      rS = deg % 90 === 0 ? Sd(k * pick(r, [1, 2, 3])) : deg % 45 === 0 ? Sd(k, 1, 2) : Sd(2 * k);
+      z = cisStd(rS, deg); rVal = sVal(rS); dText = `${deg}°`; rText = sAbsText(rS);
+    } else {
+      const a = nz(r, -9, 9), b = nz(r, -9, 9); if (Math.abs(a) === Math.abs(b)) continue;
+      z = cxZ(a, b); rS = Sd(1, 1, a * a + b * b); rVal = sVal(rS); deg = normDeg(Math.atan2(b, a) / D2R);
+      dText = `${(Math.round(deg * 100) / 100).toFixed(2)}°`; rText = sAbsText(rS);
+    }
+    const [x, y] = z.v, refd = Math.atan(Math.abs(y / x || 0)) / D2R;
+    const T = (rr, d) => `${rr === '1' ? '' : rr}(cos ${d} + i sin ${d})`;
+    const dd = (v) => (exact ? `${fmt(normDeg(v))}°` : `${(Math.round(normDeg(v) * 100) / 100).toFixed(2)}°`);
+    const correct = T(rText, dText);
+    const cands = [T(rText, dd(refd)), T(rText, dd(deg + 180)), T(rText, dd(90 - deg)), T(fmt(Math.abs(x) + Math.abs(y)), dText), T(fmt(Math.round(x * x + y * y)), dText)];
+    const intro = `Write the complex number in trigonometric form.${exact ? '' : ' Round the angle to two decimal places (degrees).'}   z = ${cxText(z)}`;
+    return {
+      topic: 'Trigonometric form', stem: intro,
+      ...buildChoices(r, correct, [...new Set(cands)].filter((c) => c !== correct), (i) => T(rText, dd(deg + 30 * (i + 1)))),
+      frStem: `${intro}\n(Use r(cos θ + i sin θ); θ in degrees or radians.)`,
+      fr: { fields: [{ kind: 'expr', keys: 'trigform', label: 'z =' }], key: [exact ? tfLatex(rS, deg, 'deg') : `\\sqrt{${rS.m * (rS.n / rS.d) ** 2}}\\left(\\cos ${dText.replace('°', '')}^{\\circ}+i\\sin ${dText.replace('°', '')}^{\\circ}\\right)`], display: correct,
+        check: (v) => tfOk(v[0], rVal, deg * D2R, exact ? 1e-6 : 0.006, exact ? 1e-6 : 0.006 * D2R) },
+      draw: r() < 0.3 ? (cv) => drawCxPlane(cv, [{ z: z.v, label: 'z = ' + cxText(z) }]) : undefined, size: [380, 380],
+      solution: `r = √(a² + b²) = √(${fmt(Math.round(x * x * 1e6) / 1e6)} + ${fmt(Math.round(y * y * 1e6) / 1e6)}) = ${rText}\n` +
+        `tan θ = b/a, and ${cxText(z)} is ${x > 1e-9 && y >= 0 ? 'on the positive real axis or in Quadrant I' : x < -1e-9 && y >= 0 ? (Math.abs(y) < 1e-9 ? 'on the negative real axis' : 'in Quadrant II') : x < -1e-9 ? 'in Quadrant III' : x > 1e-9 ? 'in Quadrant IV' : y > 0 ? 'on the positive imaginary axis' : 'on the negative imaginary axis'}, so θ ${exact ? '=' : '≈'} ${dText}${exact && deg % 15 === 0 ? ` (${angT(deg, 'rad')} radians)` : ''}.\nz ${exact ? '=' : '≈'} ${correct}`,
+    };
+  }
+};
+// 4.4 #29–38: write in standard form
+TEMPLATES.tfToStandard = (r) => {
+  if (r() < 0.2) { // degrees and minutes; round
+    const d = ri(r, 1, 359), m = pick(r, [10, 15, 20, 30, 45, 50]), deg = d + m / 60, R = pick(r, [3, 4.5, 5, 7, 9.75, 12]);
+    const v = [R * Math.cos(deg * D2R), R * Math.sin(deg * D2R)], show = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('-', MINUS);
+    const T = (a, b) => `${show(a)} ${b < -0.004 ? MINUS : '+'} ${show(Math.abs(b))}i`;
+    const correct = T(...v), ang = `${d}° ${m}′`;
+    return {
+      topic: 'Trig form to standard form', stem: `Write the standard form of the complex number. Round to two decimal places.   ${fmt(R)}[cos(${ang}) + i sin(${ang})]`,
+      ...buildChoices(r, correct, [T(v[1], v[0]), T(R * Math.cos(d * D2R), R * Math.sin(d * D2R)), T(-v[0], v[1]), T(Math.cos(deg * D2R), Math.sin(deg * D2R))].filter((c) => c !== correct), (i) => T(v[0] + i + 1, v[1])),
+      fr: { fields: [{ kind: 'expr', keys: 'complex', label: 'z ≈' }], key: [`${show(v[0]).replace(MINUS, '-')}${v[1] < 0 ? '-' : '+'}${show(Math.abs(v[1]))}i`], display: correct, check: (vv) => cxNear(vv[0], v, 0.0051 + 1e-9) },
+      solution: `${ang} = ${(Math.round(deg * 10000) / 10000)}°\na = ${fmt(R)} cos(${ang}) ≈ ${show(v[0])},  b = ${fmt(R)} sin(${ang}) ≈ ${show(v[1])}\nz ≈ ${correct}`,
+    };
+  }
+  const unit = r() < 0.5 ? 'deg' : 'rad', deg = pick(r, TF_ANGLES.concat([-30, -45, -60]));
+  const rk = pick(r, ['int', 'int', 'frac', 'root']);
+  const rS = rk === 'int' ? Sd(ri(r, 2, 10)) : rk === 'frac' ? Sd(pick(r, [3, 5, 7, 9]), pick(r, [2, 4])) : Sd(1, 1, pick(r, [8, 12, 18, 48, 2, 3]));
+  const rShown = rk === 'root' ? `√${rS.n ** 2 * rS.m / rS.d ** 2}` : rTF(rS);
+  const z = cisStd(rS, deg);
+  const angShown = deg < 0 ? (unit === 'deg' ? `(${MINUS}${-deg}°)` : `(${MINUS}${piText(frc(-deg, 180))})`) : angT(deg, unit);
+  const given = `${rShown}(cos ${angShown} + i sin ${angShown})`.replace(/^\((cos.*)\)$/, '$1');
+  const [c, s] = cisExact(deg);
+  return {
+    topic: 'Trig form to standard form', stem: `Write the standard form of the complex number.   ${given}`,
+    ...cxMC(r, z, [cx(z.im, z.re), cx(sNeg(z.re), z.im), cx(z.re, sNeg(z.im)), cx(c, s)]),
+    fr: cxFR('z =', z),
+    solution: `cos ${angShown} = ${sText(c)},  sin ${angShown} = ${sText(s)}\nz = ${rShown || '1'}(${sText(c)}) + ${rShown || '1'}(${sText(s)})i = ${cxText(z)}`,
+  };
+};
+// 4.4 #43–54: multiply or divide in trigonometric form
+function tfOp(r, div) {
+  const unit = r() < 0.6 ? 'deg' : 'rad';
+  const R = [[2, 1], [3, 1], [3, 4], [5, 3], [1, 2], [6, 1], [4, 1], [1, 1], [2, 3], [9, 1], [12, 1]];
+  const r1 = pick(r, R), r2 = pick(r, R);
+  const a1 = unit === 'deg' ? 5 * ri(r, 1, 71) : 15 * ri(r, 1, 23), a2 = unit === 'deg' ? 5 * ri(r, 1, 71) : 15 * ri(r, 1, 23);
+  const rr = div ? Qr(r1[0] * r2[1], r1[1] * r2[0]) : Qr(r1[0] * r2[0], r1[1] * r2[1]);
+  const ang = div ? a1 - a2 : a1 + a2, rS = Sd(rr[0], rr[1]);
+  const g = (q, a) => tfText(Sd(q[0], q[1]), a, unit);
+  const shown = (a) => normDeg(a);
+  const correct = tfText(rS, shown(ang), unit);
+  const wrongR = div ? Qr(r2[0] * r1[1], r2[1] * r1[0]) : Qr(r1[0] * r2[1] + r2[0] * r1[1], r1[1] * r2[1]);
+  const cands = [tfText(Sd(wrongR[0], wrongR[1]), shown(ang), unit), tfText(rS, shown(div ? a1 + a2 : a1 - a2), unit), tfText(Sd(wrongR[0], wrongR[1]), shown(div ? a1 + a2 : a1 - a2), unit)];
+  if (unit === 'deg' && a1 * a2 <= 3600) cands.push(tfText(rS, shown(div ? a1 / a2 : a1 * a2), unit));
+  const stem = div ? `Find the quotient. Leave the result in trigonometric form.   [${g(r1, a1)}] ÷ [${g(r2, a2)}]` : `Find the product. Leave the result in trigonometric form.   [${g(r1, a1)}][${g(r2, a2)}]`;
+  const cl = (s) => s.replace(/\[\((cos[^\]]*)\)\]/g, '($1)');
+  return {
+    topic: div ? 'Dividing in trig form' : 'Multiplying in trig form', stem: cl(stem),
+    ...buildChoices(r, correct, [...new Set(cands)].filter((c) => c !== correct && !tfOk(c, sVal(rS), ang * D2R)), (i) => tfText(rS, shown(ang + 15 * (i + 1)), unit)),
+    fr: tfFR('=', rS, shown(ang), unit),
+    solution: div ? `Divide the moduli and subtract the angles: r = ${fracText(r1)} ÷ ${fracText(r2)} = ${fracText(rr)},  θ = ${angT(a1, unit)} − ${angT(a2, unit)} = ${unit === 'deg' ? fmt(ang) + '°' : (ang < 0 ? MINUS : '') + piText(frc(Math.abs(ang), 180))}${ang < 0 || ang >= 360 ? ` (same as ${angT(shown(ang), unit)})` : ''}\nResult: ${correct}`
+      : `Multiply the moduli and add the angles: r = (${fracText(r1)})(${fracText(r2)}) = ${fracText(rr)},  θ = ${angT(a1, unit)} + ${angT(a2, unit)} = ${unit === 'deg' ? fmt(ang) + '°' : piText(frc(ang, 180))}${ang >= 360 ? ` (same as ${angT(shown(ang), unit)})` : ''}\nResult: ${correct}`,
+  };
+}
+const fracText = ([n, d]) => (d === 1 ? fmt(n) : `${n}/${d}`);
+TEMPLATES.tfMultiply = (r) => tfOp(r, false);
+TEMPLATES.tfDivide = (r) => tfOp(r, true);
+
+/* 4.5 DeMoivre's Theorem */
+// #5–14: [r(cos θ + i sin θ)]ⁿ in standard form
+TEMPLATES.dmPower = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const n = ri(r, 3, 12), T = pick(r, TF_ANGLES), j = ri(r, 0, n - 1), th = (T + 360 * j) / n;
+    if (!Number.isInteger(th) || th <= 0 || th >= 360 || th % 5) continue;
+    const unit = r() < 0.5 ? 'deg' : 'rad';
+    const rS = pick(r, [Sd(1), Sd(2), Sd(3), Sd(1, 1, 2), Sd(5), Sd(1, 1, 3)]), R = sPow(rS, n);
+    if (sVal(R) > 100000) continue;
+    const z = cisStd(R, T);
+    const nR = sMul(rS, Sd(n)), wrongAng = cisExact(th) ? cisStd(R, th) : null;
+    const wrongs = [cisStd(nR, T), cx(z.im, z.re), cx(sNeg(z.re), z.im)]; if (wrongAng) wrongs.push(wrongAng);
+    const base = tfText(rS, th, unit);
+    return {
+      topic: "DeMoivre's Theorem", stem: `Use DeMoivre's Theorem to find the power. Write the result in standard form.   [${base}]${String(n).split('').map((c) => SUP[c]).join('')}`.replace(/\[\((cos.*)\)\]/, '($1)'),
+      ...cxMC(r, z, wrongs), fr: cxFR('=', z),
+      solution: `[r(cos θ + i sin θ)]ⁿ = rⁿ(cos nθ + i sin nθ)\nrⁿ = ${sAbsText(rS) || '1'}${String(n).split('').map((c) => SUP[c]).join('')} = ${sAbsText(R)},  nθ = ${n} · ${angT(th, unit)} = ${angT(th * n, unit)}${th * n >= 360 ? ` (same as ${angT(T, unit)})` : ''}\n= ${tfText(R, T, unit)} = ${cxText(z)}`,
+    };
+  }
+};
+// #15–24: (a + bi)ⁿ
+TEMPLATES.dmPowerStd = (r) => {
+  const nice = r() < 0.6, n = ri(r, 3, nice ? 10 : 6);
+  let z, base, why;
+  if (nice) {
+    const opt = pick(r, [[1, 45, '1 + i'], [1, 135, '−1 + i'], [1, 315, '1 − i'], [2, 30, '√3 + i'], [2, 300, '1 − √3 i'], [2, 150, '−√3 + i'], [8, 45, '2 + 2i'], [2, 60, '1 + √3 i']]);
+    const rS = opt[0] === 1 ? Sd(1, 1, 2) : opt[0] === 8 ? Sd(2, 1, 2) : Sd(2);
+    const k = r() < 0.25 ? pick(r, [2, 4]) : 1;
+    const R = sMul(sPow(rS, n), Sd(k)), T = normDeg(opt[1] * n);
+    if (sVal(R) > 200000) return TEMPLATES.dmPowerStd(r);
+    z = cisStd(R, T);
+    base = `${k > 1 ? k : ''}(${opt[2]})${String(n).split('').map((c) => SUP[c]).join('')}`;
+    why = `${opt[2]} = ${tfText(rS, opt[1], 'deg')}\n${base} = ${k > 1 ? k + ' · ' : ''}${sAbsText(sPow(rS, n))}(cos ${opt[1] * n}° + i sin ${opt[1] * n}°) = ${cxText(z)}`;
+  } else {
+    const a = nz(r, -5, 5), b = nz(r, -5, 5); let w = C2(a, b), P = C2(1, 0);
+    for (let k = 0; k < n; k++) P = cMul(P, w);
+    if (Math.abs(P.re[0]) > 1e6 || Math.abs(P.im[0]) > 1e6) return TEMPLATES.dmPowerStd(r);
+    z = cOf(P); base = `${cxInP(a, b)}${String(n).split('').map((c) => SUP[c]).join('')}`;
+    why = `Write ${cxIn(a, b)} in trig form (r = √${a * a + b * b}, θ = arctan(${fmt(b)}/${fmt(a)}) in the right quadrant), raise r to the ${n}th power and multiply θ by ${n}, then convert back.\n(Or multiply it out exactly.)  ${base} = ${cxText(z)}`;
+  }
+  const wrongs = [cx(sNeg(z.re), z.im), cx(z.re, sNeg(z.im)), cx(z.im, z.re), cx(sNeg(z.im), sNeg(z.re))].filter((w) => !cxClose(w.v, z.v, 1e-9));
+  return { topic: "DeMoivre's Theorem", stem: `Use DeMoivre's Theorem to find the power. Write the result in standard form.   ${base}`, ...cxMC(r, z, wrongs), fr: cxFR('=', z), solution: why };
+};
+// #29–36: square roots
+TEMPLATES.dmSquareRoots = (r) => {
+  const R = pick(r, [1, 2, 3, 4, 9, 16, 25, 36, 5]), T = pick(r, [60, 90, 120, 180, 240, 270, 300]);
+  const z = cisStd(Sd(R), T), w = cisStd(Sd(1, 1, R), T / 2), w2 = cx(sNeg(w.re), sNeg(w.im));
+  const correct = `±(${cxText(w)})`;
+  const wr = cisExact(T) ? cisStd(Sd(1, 1, R), T) : w;
+  const cands = [`±(${cxText(wr)})`, `±(${cxText(cx(w.im, w.re))})`, `±(${cxText(cx(w.re, sNeg(w.im)))})`, `±(${cxText(cisStd(Sd(R, 2), T / 2))})`];
+  return {
+    topic: 'Square roots', stem: `Find the square roots of the complex number.   ${cxText(z)}`,
+    ...buildChoices(r, correct, [...new Set(cands)].filter((c) => c !== correct && !cxListCheck(c.replace(/^±\((.*)\)$/, '$1, -($1)'), [w, w2])), (i) => `±(${cxText(cisStd(Sd(1, 1, R + i + 1), T / 2))})`),
+    frStem: `Find the square roots of the complex number. List both, separated by a comma.   ${cxText(z)}`,
+    fr: { fields: [{ kind: 'expr', keys: 'complex', label: 'Roots:' }], key: [`${cxText(w, true)},${cxText(w2, true)}`], display: `${cxText(w)}, ${cxText(w2)}`, check: (v) => cxListCheck(v[0], [w, w2]) },
+    solution: `${cxText(z)} = ${tfText(Sd(R), T, 'deg')}\nSquare roots: ${R === 1 ? '' : sAbsText(Sd(1, 1, R))}(cos(${T}°/2 + 180°k) + i sin(${T}°/2 + 180°k)), k = 0, 1\n= ${tfText(Sd(1, 1, R), T / 2, 'deg')} and ${tfText(Sd(1, 1, R), T / 2 + 180, 'deg')}\n= ${cxText(w)} and ${cxText(w2)}`,
+  };
+};
+// #37–52: nth roots
+TEMPLATES.dmNthRoots = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const n = ri(r, 2, 6), word = { 2: 'Square', 3: 'Cube', 4: 'Fourth', 5: 'Fifth', 6: 'Sixth' }[n];
+    const rho = pick(r, n <= 3 ? [1, 2, 3, 4, 5, 10] : [1, 2, 3]), R = rho ** n;
+    let Th, given;
+    if (r() < 0.5) { Th = pick(r, [0, 90, 180, 270]); given = cxText(cisStd(Sd(R), Th)); }
+    else { Th = pick(r, [60, 120, 150, 210, 240, 300, 30, 45, 135]); const u = r() < 0.5 ? 'deg' : 'rad'; given = tfText(Sd(R), Th, u); }
+    const angs = [...Array(n)].map((_, k) => (Th + 360 * k) / n);
+    if (angs.some((a) => Math.abs(a * 10 - Math.round(a * 10)) > 1e-9)) continue;
+    const roots = angs.map((a) => ({ r: rho, th: a * D2R }));
+    const L = (rr, as) => as.map((a) => tfTextNum(rr === 1 ? '' : fmt(rr), fmt(normDeg(a)))).join(',  ');
+    const correct = L(rho, angs);
+    const cands = [L(R, angs), L(rho, angs.map((_, k) => (360 * k) / n)), L(rho, angs.map((_, k) => Th + (360 * k) / n)), L(rho, angs.map((a, k) => a + (k ? 360 / n / 2 : 0)))];
+    const intro = `${word} roots of ${given}`;
+    return {
+      topic: 'nth roots', stem: `Find the roots and write them in trigonometric form (degrees).   ${intro}`,
+      ...buildChoices(r, correct, [...new Set(cands)].filter((c) => c !== correct && !tfListOk(c, roots)), (i) => L(rho, angs.map((a) => a + 7 * (i + 1)))),
+      frStem: `Find the roots in trigonometric form. List all ${n}, separated by commas (degrees or radians).   ${intro}`,
+      fr: { fields: [{ kind: 'expr', keys: 'trigform', label: 'Roots:' }], key: [angs.map((a) => `${rho === 1 ? '' : rho}\\left(\\cos ${fmt(a)}^{\\circ}+i\\sin ${fmt(a)}^{\\circ}\\right)`).join(',')], display: correct, check: (v) => tfListOk(v[0], roots) },
+      solution: `Write it as ${tfText(Sd(R), Th, 'deg')}.\nThe ${n} roots are ⁿ√r [cos((θ + 360°k)/n) + i sin((θ + 360°k)/n)], k = 0, …, ${n - 1}, with ⁿ√r = ${R}^(1/${n}) = ${rho}.\nAngles: ${angs.map((a) => fmt(a) + '°').join(', ')} (they are ${fmt(360 / n)}° apart).\n${correct}`,
+    };
+  }
+};
+// #53–64: solve xⁿ = c
+TEMPLATES.dmSolveEq = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const n = pick(r, [2, 3, 3, 4, 4, 6]), Th = pick(r, n === 2 ? [90, 180, 270] : n === 3 ? [0, 180, 90, 270] : [0, 180]);
+    const rhoS = pick(r, n === 4 ? [Sd(1), Sd(2), Sd(1, 1, 2), Sd(3)] : n === 6 ? [Sd(1), Sd(2), Sd(1, 1, 2)] : [Sd(1), Sd(2), Sd(3), Sd(5)]);
+    const R = sPow(rhoS, n); if (R.m !== 1 || R.d !== 1) continue;
+    const c = cisStd(R, Th); // xⁿ = c
+    if (n === 2 && Th === 180 && r() < 0.5) continue;
+    const roots = [...Array(n)].map((_, k) => cisStd(rhoS, (Th + 360 * k) / n));
+    if (roots.some((z) => !z)) continue;
+    const sup = SUP[n], neg = cx(sNeg(c.re), sNeg(c.im));
+    const eq = `x${sup} ${sZero(neg.re) && sZero(neg.im) ? '' : (neg.v[0] < 0 || (Math.abs(neg.v[0]) < 1e-12 && neg.v[1] < 0) ? MINUS + ' ' + cxText(cx(sNeg(neg.re), sNeg(neg.im))) : '+ ' + cxText(neg))} = 0`;
+    const L = (zs) => zs.map((z) => cxText(z)).join(',  ');
+    const correct = L(roots);
+    const flip = [...Array(n)].map((_, k) => cisStd(rhoS, (Th + 180 + 360 * k) / n)).filter(Boolean);
+    const cands = [L(roots.filter((z) => Math.abs(z.v[1]) < 1e-9).length ? roots.filter((z) => Math.abs(z.v[1]) < 1e-9) : roots.slice(0, 1)), flip.length === n ? L(flip) : null, L(roots.map((z) => cx(z.im, z.re))), L(roots.map((z, k) => (k ? cx(z.re, sNeg(z.im)) : z)))].filter(Boolean);
+    const okSet = (txt) => cxListCheck(txt.replace(/,  /g, ','), roots);
+    return {
+      topic: 'Solving xⁿ = c', stem: `Find all solutions of the equation.   ${eq}`,
+      ...buildChoices(r, correct, [...new Set(cands)].filter((x) => x !== correct && !okSet(x)), (i) => L(roots.map((z) => cx(Sd(z.re.n + (i + 1) * z.re.d, z.re.d, z.re.m), z.im)))),
+      frStem: `Find all solutions of the equation in standard form, separated by commas (± is fine).   ${eq}`,
+      fr: { fields: [{ kind: 'expr', keys: 'complex', label: 'x =' }], key: [roots.map((z) => cxText(z, true)).join(',')], display: correct, check: (v) => cxListCheck(v[0], roots) },
+      solution: `x${sup} = ${cxText(c)} = ${tfText(R, Th, 'deg')}\nThe ${n} solutions are the ${n === 2 ? 'square' : n === 3 ? 'cube' : n + 'th'} roots, with r = ${sAbsText(rhoS)} and θ = ${roots.map((_, k) => fmt((Th + 360 * k) / n) + '°').join(', ')} (${fmt(360 / n)}° apart).\nx = ${correct}`,
+    };
+  }
+};
+
 /* ---------- 3.4 Vectors and Dot Products ---------- */
 const vecA = ([x, y]) => `⟨${fmt(x)}, ${fmt(y)}⟩`;
 const vecIJ = ([x, y]) => {
@@ -4549,6 +4803,15 @@ const QUESTION_TYPES = [
   { id: 'cpAddSub', subject: 'precalc',  section: '4.3 The Complex Plane', label: 'Adding and subtracting', desc: 'Sums and differences, some from a graph (#17–28)' },
   { id: 'cpConjugate', subject: 'precalc',  section: '4.3 The Complex Plane', label: 'Conjugates in the plane', desc: 'Reflect across the real axis (#29–34)' },
   { id: 'cpDistance', subject: 'precalc',  section: '4.3 The Complex Plane', label: 'Distance', desc: 'Between two complex numbers (#35–38)' },
+  { id: 'tfToTrig', subject: 'precalc',  section: '4.4 Trigonometric Form of a Complex Number', label: 'Write in trigonometric form', desc: 'a + bi → r(cos θ + i sin θ) (#5–28)' },
+  { id: 'tfToStandard', subject: 'precalc',  section: '4.4 Trigonometric Form of a Complex Number', label: 'Write in standard form', desc: 'r(cos θ + i sin θ) → a + bi (#29–38)' },
+  { id: 'tfMultiply', subject: 'precalc',  section: '4.4 Trigonometric Form of a Complex Number', label: 'Multiplying', desc: 'Product in trigonometric form (#43–48)' },
+  { id: 'tfDivide', subject: 'precalc',  section: '4.4 Trigonometric Form of a Complex Number', label: 'Dividing', desc: 'Quotient in trigonometric form (#49–54)' },
+  { id: 'dmPower', subject: 'precalc',  section: "4.5 DeMoivre's Theorem", label: 'Powers in trig form', desc: '[r(cos θ + i sin θ)]ⁿ (#5–14)' },
+  { id: 'dmPowerStd', subject: 'precalc',  section: "4.5 DeMoivre's Theorem", label: 'Powers of a + bi', desc: 'Like (1 + i)⁵ (#15–24)' },
+  { id: 'dmSquareRoots', subject: 'precalc',  section: "4.5 DeMoivre's Theorem", label: 'Square roots', desc: 'Of a complex number (#29–36)' },
+  { id: 'dmNthRoots', subject: 'precalc',  section: "4.5 DeMoivre's Theorem", label: 'nth roots', desc: 'All n roots in trigonometric form (#37–52)' },
+  { id: 'dmSolveEq', subject: 'precalc',  section: "4.5 DeMoivre's Theorem", label: 'Solving xⁿ = c', desc: 'Like x³ − 27 = 0 (#53–64)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
@@ -4996,7 +5259,7 @@ function frArea(q, i) {
   const vals = state.teacher ? q.fr.key.slice() : Array.isArray(state.answers[i]) ? state.answers[i].slice() : q.fr.fields.map(() => '');
   const wrap = el('div', { class: 'fr' });
   const controls = [];
-  let row = null, lastAns = null, hasMath = false, hasExpr = false, hasAngles = false, hasInverse = false, hasDegrees = false, hasVector = false, hasComplex = false;
+  let row = null, lastAns = null, hasMath = false, hasExpr = false, hasAngles = false, hasInverse = false, hasDegrees = false, hasVector = false, hasComplex = false, hasTF = false;
   const applyLocks = () => q.fr.fields.forEach((f, k) => {
     if (!f.lockWhen || reveal) return;
     const locked = f.lockWhen(vals);
@@ -5047,7 +5310,15 @@ function frArea(q, i) {
       input.addEventListener('input', () => {
         if (f.keys) { // typing + − , after a denominator leaves the fraction (π/6+2nπ, not π over 6+2nπ)
           const fixed = fixAngleFracs(input.value);
-          if (fixed !== input.value) { input.value = fixed; try { input.position = input.lastOffset; } catch {} }
+          if (fixed !== input.value) {
+            // the usual case: the key just typed landed at the end of a denominator — step out of the fraction and retype it there
+            const tail = /\\frac\{(?:[^{}]|\{[^{}]*\})*\}\{\s*\d+\s*(\\pm\s*|[+\-,;]|i)\s*\}/.exec(input.value);
+            let done = false;
+            if (tail && fixAngleFracs(input.value.replace(tail[0], '')) === input.value.replace(tail[0], '')) {
+              try { input.executeCommand('deleteBackward'); input.executeCommand('moveAfterParent'); input.insert(tail[1].trim() === '\\pm' ? '\\pm ' : tail[1].trim(), { format: 'latex' }); done = fixAngleFracs(input.value) === input.value; } catch {}
+            }
+            if (!done) { input.value = fixAngleFracs(input.value); try { input.position = input.lastOffset; } catch {} }
+          }
         }
         vals[k] = input.value; save();
       });
@@ -5055,7 +5326,7 @@ function frArea(q, i) {
       if (f.kind === 'expr') input.addEventListener('keydown', (e) => { if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); } }, true);
       input.addEventListener('focus', () => { lastAns = input; });
       row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
-      hasMath = true; if (f.kind === 'expr') { if (f.keys === 'angles') hasAngles = true; else if (f.keys === 'inverse') hasInverse = true; else if (f.keys === 'degrees') hasDegrees = true; else if (f.keys === 'vector') hasVector = true; else if (f.keys === 'complex') hasComplex = true; else hasExpr = true; }
+      hasMath = true; if (f.kind === 'expr') { if (f.keys === 'angles') hasAngles = true; else if (f.keys === 'inverse') hasInverse = true; else if (f.keys === 'degrees') hasDegrees = true; else if (f.keys === 'vector') hasVector = true; else if (f.keys === 'complex') hasComplex = true; else if (f.keys === 'trigform') hasTF = true; else hasExpr = true; }
       return;
     }
     if (f.kind === 'select') {
@@ -5075,7 +5346,8 @@ function frArea(q, i) {
   applyLocks();
   if (hasMath && !reveal) { // small symbol row for the answer boxes
     const firstAns = () => lastAns || wrap.querySelector('math-field.mans');
-    const keys = hasComplex ? [['i', 'i'], ['√', '\\sqrt{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['±', '\\pm '], [',', ',']]
+    const keys = hasTF ? [['( )', '\\left(#?\\right)'], ['cos', '\\cos '], ['sin', '\\sin '], ['i', 'i'], ['°', '^{\\circ}'], ['π', '\\pi'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], [',', ',']]
+      : hasComplex ? [['i', 'i'], ['√', '\\sqrt{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['±', '\\pm '], [',', ',']]
       : hasVector ? [['⟨ ⟩', '\\left\\langle #?\\right\\rangle'], [',', ','], ['i', 'i'], ['j', 'j'], ['√', '\\sqrt{#?}'], ['a⁄b', '\\frac{#@}{#?}']]
       : hasDegrees ? [['°', '^{\\circ}'], ['n', 'n'], [',', ','], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}']]
       : hasInverse ? [['arcsin', '\\arcsin\\left(#?\\right)'], ['arccos', '\\arccos\\left(#?\\right)'], ['arctan', '\\arctan\\left(#?\\right)'], ['π', '\\pi'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['n', 'n'], [',', ',']]
@@ -5385,8 +5657,12 @@ function builder() {
   list.append(el('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-bottom:6px' },
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px;font-size:14px', onclick: () => setAll(true) }, 'Expand all'),
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px;font-size:14px', onclick: () => setAll(false) }, 'Collapse all')));
-  let section = null, secBody = null;
+  let section = null, secBody = null, subject = null;
   QUESTION_TYPES.forEach((t) => {
+    if (t.subject !== subject) {
+      subject = t.subject;
+      list.append(el('h2', { style: `margin:${list.querySelector('details') ? '26px' : '6px'} 0 4px;font-size:20px;padding-bottom:6px;border-bottom:2px solid var(--ink, #1d1d1b)` }, SUBJECTS[subject] || subject));
+    }
     if (t.section !== section) {
       section = t.section;
       const sec = section, badge = el('span', { class: 'small', style: 'margin-left:auto;font-weight:600;color:var(--accent, #1f5fa8)' });
