@@ -263,6 +263,7 @@ const SETS = {
   'precalc-6-6':   { subject: 'precalc',  title: '6.6 Parametric Equations', items: [['p6Table', 2], ['p6Orient', 2], ['p6Elim', 7], ['p6Find', 3]] },
   'precalc-6-7':   { subject: 'precalc',  title: '6.7 Polar Coordinates', items: [['q7Rep', 2], ['q7ToRect', 2], ['q7ToPolar', 2], ['q7RectToPolar', 3], ['q7PolarToRect', 3], ['q7Describe', 2]] },
   'precalc-6-8':   { subject: 'precalc',  title: '6.8 Graphs of Polar Equations', items: [['s8Type', 3], ['s8Match', 2], ['s8Sym', 3], ['s8MaxZero', 3], ['s8Rose', 3]] },
+  'precalc-6-9':   { subject: 'precalc',  title: '6.9 Polar Equations of Conics', items: [['c9Ecc', 2], ['c9Identify', 4], ['c9Match', 2], ['c9Write', 3], ['c9Vertex', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -5368,6 +5369,7 @@ TEMPLATES.q7RectToPolar = (r) => {
   for (let i = 0; i < 12 && alts.length < 5; i++) { const Q = polPair(r); if (Q.pol !== P.pol && Q.theta === undefined) alts.push(Q.pol); }
   return {
     topic: 'Rectangular equation to polar form', stem: `Convert the rectangular equation to polar form.   ${P.rect}`,
+    frStem: /\/\(/.test(P.pol) ? `Convert the rectangular equation to polar form. (When typing, put the denominator in parentheses: r = 2/(3 cos θ − 6 sin θ).)   ${P.rect}` : undefined,
     ...buildChoices(r, P.pol, [...new Set(alts)].filter((a) => a !== P.pol), (i) => P.pol.replace(/(\d+)/, (m) => String(+m + i + 1))),
     fr: { fields: [{ kind: 'expr', keys: 'polar', label: 'Polar form:' }], key: [P.polL], display: P.pol, check: ok },
     solution: `Substitute x = r cos θ and y = r sin θ (and x² + y² = r²), then solve for r:\n${P.pol}`,
@@ -5522,6 +5524,115 @@ TEMPLATES.s8Match = (r) => {
       solution: `The graph is a ${C.type.toLowerCase()}. ${opts[0]} is the only ${C.type.toLowerCase()} among the choices with this size and position.`,
     };
   }
+};
+
+/* ---------- 6.9 Polar Equations of Conics ---------- */
+const CTYPES3 = ['Parabola', 'Ellipse', 'Hyperbola'];
+const conicOfE = (e) => (Math.abs(e - 1) < 1e-12 ? 'Parabola' : e < 1 ? 'Ellipse' : 'Hyperbola');
+// r = ep/(1 + s·e·fn θ) written as N/(B ± A fn θ) with integers
+function pconic(r, want) {
+  const E = { Parabola: [[1, 1]], Ellipse: [[1, 2], [1, 3], [2, 3], [3, 4], [1, 4], [2, 5], [3, 5]], Hyperbola: [[3, 2], [2, 1], [3, 1], [4, 3], [5, 2], [5, 3]] };
+  const type = want || pick(r, CTYPES3), [a, b] = pick(r, E[type]), e = a / b, p = ri(r, 1, 6), fn = pick(r, ['cos', 'sin']), s = pick(r, [1, -1]);
+  const k = r() < 0.3 ? pick(r, [2, 3]) : 1; // scale numerator and denominator
+  const N = a * p * k, B = b * k, A = a * k;
+  const text = `r = ${N}/(${B} ${s > 0 ? '+' : MINUS} ${A === 1 ? '' : A + ' '}${fn} θ)`;
+  const F = fn === 'cos' ? Math.cos : Math.sin;
+  return { type, e, eT: fracT(e), p, fn, s, N, B, A, text, latex: `r=\\frac{${N}}{${B}${s > 0 ? '+' : '-'}${A === 1 ? '' : A}\\${fn}\\theta}`, f: (t) => (e * p) / (1 + s * e * F(t)),
+    dir: fn === 'cos' ? `x = ${s > 0 ? '' : MINUS}${p}` : `y = ${s > 0 ? '' : MINUS}${p}` };
+}
+// a typed polar equation r = … equals the conic as a function of θ
+function pconicOk(raw, f) {
+  const m = /^\s*r\s*=\s*(.*)$/.exec(String(raw || '').replace(/\\left|\\right/g, '')); if (!m) return false;
+  const n = parseTrig(m[1]); if (!n) return false;
+  let good = 0;
+  for (let j = 0; j < 40; j++) { const t = 0.11 + j * 0.157, w = f(t); if (!isFinite(w) || Math.abs(w) > 1e3) continue; const v = evalTrig(n, t); if (!isFinite(v) || Math.abs(v - w) > 1e-6 * Math.max(1, Math.abs(w))) return false; good++; }
+  return good > 20;
+}
+const pconicPlot = (C) => { const lim = C.type === 'Ellipse' ? Math.ceil(Math.max(C.f(0), C.f(Math.PI), C.f(Math.PI / 2), C.f(-Math.PI / 2)) + 1) : C.type === 'Parabola' ? Math.max(6, 3 * C.p) : Math.max(6, Math.ceil(3 * C.e * C.p / (C.e + 1)) * 2);
+  const L = Math.min(lim, 20); return plotQ({ xr: [-L, L], yr: [-L, L], step: L > 12 ? 2 : 1, curves: [{ param: [(t) => { const v = C.f(t); return Math.abs(v) > 4 * L ? [NaN, NaN] : [v * Math.cos(t), v * Math.sin(t)]; }, 0, 2 * Math.PI] }] }); };
+TEMPLATES.c9Identify = (r) => {
+  const C = pconic(r), neg = r() < 0.2; // sometimes written with a negative constant: N/(−B + A fn θ) = −N/(B − A fn θ)
+  const text = neg ? `r = ${C.N}/(${MINUS}${C.B} ${C.s > 0 ? MINUS : '+'} ${C.A === 1 ? '' : C.A + ' '}${C.fn} θ)` : C.text;
+  const T = (t, e) => `${t}, e = ${e}`, correct = T(C.type, C.eT);
+  const wrongs = [T(conicOfE(1 / C.e), fracT(1 / C.e)), T(C.type, fracT(C.A)), T(conicOfE(C.A), fracT(C.A)), ...CTYPES3.filter((x) => x !== C.type).map((x) => T(x, C.eT))].filter((w) => w !== correct);
+  const ok = (v) => [v[0] === C.type, exact3Ok(v[1], C.e)];
+  return {
+    topic: 'Identifying a conic from its polar equation', stem: `Identify the conic and find its eccentricity.   ${text}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(C.type, fracT(C.e + i + 1))),
+    fr: { fields: [{ kind: 'select', label: 'Conic:', options: CTYPES3 }, { kind: 'expr', keys: 'num', label: 'Eccentricity e =' }], key: [C.type, fracL(C.e)], display: correct, check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+    solution: `${neg ? `Multiply numerator and denominator by −1: r = ${MINUS}${C.N}/(${C.B} ${C.s > 0 ? '+' : MINUS} ${C.A === 1 ? '' : C.A + ' '}${C.fn} θ). ` : ''}Divide the numerator and denominator by ${C.B} so the denominator starts with 1: the coefficient of ${C.fn} θ is e = ${`${C.A}/${C.B}` === C.eT ? C.eT : `${C.A}/${C.B} = ${C.eT}`}. ${C.e === 1 ? 'e = 1: a parabola.' : C.e < 1 ? 'e < 1: an ellipse.' : 'e > 1: a hyperbola.'}`,
+  };
+};
+TEMPLATES.c9Ecc = (r) => {
+  const fn = pick(r, ['cos', 'sin']), s = pick(r, [1, -1]), p = pick(r, [2, 3, 4]), eT = pick(r, ['1', '1/2', '3/2', '2', '1/3', '3']);
+  const e = num0(eT), type = conicOfE(e), F = fn === 'cos' ? Math.cos : Math.sin;
+  const f = (t) => (e * p) / (1 + s * e * F(t));
+  const sgn = s > 0 ? '+' : MINUS, base = `r = ${p}e/(1 ${sgn} e ${fn} θ)`;
+  // simplified: e = a/b → r = a·p/(b ± a fn θ)
+  const [a, b] = fracParts(e), disp = `r = ${a * p}/(${b} ${sgn} ${a === 1 ? '' : a + ' '}${fn} θ)`;
+  const T = (d, t) => `${d}; ${t.toLowerCase()}`, correct = T(disp, type);
+  const wrongs = [T(disp, conicOfE(1 / e)), T(`r = ${p}/(${b} ${sgn} ${a === 1 ? '' : a + ' '}${fn} θ)`, type), T(`r = ${a * p}/(${a} ${sgn} ${b === 1 ? '' : b + ' '}${fn} θ)`, conicOfE(1 / e)), T(disp, CTYPES3.find((x) => x !== type && x !== conicOfE(1 / e)))].filter((w) => w !== correct);
+  const ok = (v) => [pconicOk(v[0], f), v[1] === type];
+  return {
+    topic: 'Eccentricity and type of conic', stem: `Write the polar equation of the conic ${base} for e = ${eT}, and identify the type of conic.`,
+    frStem: `Write the polar equation of the conic ${base} for e = ${eT}, and identify the type of conic. (When typing, put the denominator in parentheses: r = 2/(1 − cos θ).)`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(`r = ${a * p + i + 1}/(${b} ${sgn} ${a === 1 ? '' : a + ' '}${fn} θ)`, type)),
+    fr: { fields: [{ kind: 'expr', keys: 'polar', label: 'Equation:' }, { kind: 'select', label: 'Conic:', options: CTYPES3 }], key: [`r=\\frac{${a * p}}{${b}${s > 0 ? '+' : '-'}${a === 1 ? '' : a}\\${fn}\\theta}`, type], display: correct,
+      check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+    solution: `Substitute e = ${eT}: ${disp}${b === 1 ? '' : ` (multiply the top and bottom by ${b})`}. ${e === 1 ? 'e = 1: parabola.' : e < 1 ? 'e < 1: ellipse.' : 'e > 1: hyperbola.'}`,
+  };
+};
+const num0 = (t) => { const p = String(t).split('/'); return p.length === 2 ? +p[0] / +p[1] : +t; };
+TEMPLATES.c9Match = (r) => {
+  for (;;) {
+    const Cs = shuffle(r, CTYPES3.concat([pick(r, CTYPES3)])).map((t) => pconic(r, t)).map((C) => ({ ...C, p: Math.min(C.p, 4) }));
+    // rebuild with the capped p
+    const C2 = Cs.map((C) => { const N = Math.round(C.e * C.p * C.B); return { ...C, N, dir: C.fn === 'cos' ? `x = ${C.s > 0 ? '' : MINUS}${C.p}` : `y = ${C.s > 0 ? '' : MINUS}${C.p}`, text: `r = ${N}/(${C.B} ${C.s > 0 ? '+' : MINUS} ${C.A === 1 ? '' : C.A + ' '}${C.fn} θ)`, f: (t) => (C.e * C.p) / (1 + C.s * C.e * (C.fn === 'cos' ? Math.cos(t) : Math.sin(t))) }; });
+    if (C2.some((C) => !Number.isInteger(C.e * C.p * C.B))) continue;
+    const opts = C2.map((c) => c.text); if (new Set(opts).size < 4) continue;
+    const C = C2[0];
+    return {
+      topic: 'Matching polar conics', stem: 'Which polar equation matches the graph? (The focus is at the pole.)',
+      ...buildChoices(r, opts[0], opts.slice(1), () => null), fr: FR.select('The graph is', shuffle(r, opts), opts[0]),
+      draw: pconicPlot(C), size: [380, 380],
+      solution: `The graph is ${C.type === 'Ellipse' ? 'an ellipse (e < 1)' : C.type === 'Parabola' ? 'a parabola (e = 1)' : 'a hyperbola (e > 1)'} with directrix ${C.dir} (${C.fn === 'cos' ? 'cos θ: vertical directrix' : 'sin θ: horizontal directrix'}, ${C.s > 0 ? (C.fn === 'cos' ? '+: to the right of the pole' : '+: above the pole') : C.fn === 'cos' ? '−: to the left of the pole' : '−: below the pole'}). ${opts[0]}`,
+    };
+  }
+};
+TEMPLATES.c9Write = (r) => {
+  const C = pconic(r), simp = (() => { const [a, b] = fracParts(C.e); return { N: a * C.p, B: b, A: a }; })();
+  const text = `r = ${simp.N}/(${simp.B} ${C.s > 0 ? '+' : MINUS} ${simp.A === 1 ? '' : simp.A + ' '}${C.fn} θ)`;
+  const T = (N, B, s, A, fn) => `r = ${N}/(${B} ${s > 0 ? '+' : MINUS} ${A === 1 ? '' : A + ' '}${fn} θ)`;
+  const other = C.fn === 'cos' ? 'sin' : 'cos';
+  const wrongs = [T(simp.N, simp.B, -C.s, simp.A, C.fn), T(simp.N, simp.B, C.s, simp.A, other), T(C.p, simp.B, C.s, simp.A, C.fn), T(simp.N, simp.A, C.s, simp.B, C.fn)].filter((w) => w !== text);
+  return {
+    topic: 'Writing the polar equation of a conic', stem: `Find a polar equation of the conic with its focus at the pole.   ${C.type};  e = ${C.eT};  directrix: ${C.dir}`,
+    frStem: `Find a polar equation of the conic with its focus at the pole. (When typing, put the denominator in parentheses: r = 2/(1 − cos θ).)   ${C.type};  e = ${C.eT};  directrix: ${C.dir}`,
+    ...buildChoices(r, text, [...new Set(wrongs)], (i) => T(simp.N + i + 1, simp.B, C.s, simp.A, C.fn)),
+    fr: { fields: [{ kind: 'expr', keys: 'polar', label: 'Equation:' }], key: [`r=\\frac{${simp.N}}{${simp.B}${C.s > 0 ? '+' : '-'}${simp.A === 1 ? '' : simp.A}\\${C.fn}\\theta}`], display: text, check: (v) => pconicOk(v[0], C.f) },
+    solution: `The directrix ${C.dir} is ${C.fn === 'cos' ? 'vertical' : 'horizontal'} and ${C.s > 0 ? (C.fn === 'cos' ? 'to the right of' : 'above') : C.fn === 'cos' ? 'to the left of' : 'below'} the pole, so use r = ep/(1 ${C.s > 0 ? '+' : MINUS} e ${C.fn} θ) with p = ${C.p}.\nr = (${C.eT})(${C.p})/(1 ${C.s > 0 ? '+' : MINUS} (${C.eT}) ${C.fn} θ) → ${text}`.replace('((1)', '(1').replace(/\(1\)\(/g, '('),
+  };
+};
+TEMPLATES.c9Vertex = (r) => {
+  const C = pconic(r, pick(r, CTYPES3)), simp = (() => { const [a, b] = fracParts(C.e); return { N: a * C.p, B: b, A: a }; })();
+  const text = `r = ${simp.N}/(${simp.B} ${C.s > 0 ? '+' : MINUS} ${simp.A === 1 ? '' : simp.A + ' '}${C.fn} θ)`;
+  // vertices lie on the axis: θ0 toward the directrix, θ0 + π away from it
+  const th0 = C.fn === 'cos' ? (C.s > 0 ? 0 : 180) : C.s > 0 ? 90 : 270;
+  const near = C.f(th0 * D2R), far = C.f((th0 + 180) * D2R); // far may be negative for a hyperbola
+  const V = (rr, d) => (rr < 0 ? polT(-rr, ((d + 180) % 360)) : polT(rr, d % 360));
+  const verts = C.type === 'Parabola' ? [V(near, th0)] : [V(near, th0), V(far, th0 + 180)];
+  if ([near, far].some((x) => isFinite(x) && !fracParts(x)) ) return TEMPLATES.c9Vertex(r);
+  const T = (N, B, s, A, fn) => `r = ${N}/(${B} ${s > 0 ? '+' : MINUS} ${A === 1 ? '' : A + ' '}${fn} θ)`, other = C.fn === 'cos' ? 'sin' : 'cos';
+  const wrongs = [T(simp.N, simp.B, -C.s, simp.A, C.fn), T(simp.N, simp.B, C.s, simp.A, other), T(simp.N, simp.B, -C.s, simp.A, other), T(simp.N * 2, simp.B, C.s, simp.A, C.fn)].filter((w) => w !== text);
+  return {
+    topic: 'Polar conic from its vertices', stem: `Find a polar equation of the conic with its focus at the pole.   ${C.type};  ${C.type === 'Parabola' ? 'vertex' : 'vertices'}: ${verts.join(', ')}`,
+    frStem: `Find a polar equation of the conic with its focus at the pole. (When typing, put the denominator in parentheses: r = 2/(1 − cos θ).)   ${C.type};  ${C.type === 'Parabola' ? 'vertex' : 'vertices'}: ${verts.join(', ')}`,
+    ...buildChoices(r, text, [...new Set(wrongs)], (i) => T(simp.N + i + 1, simp.B, C.s, simp.A, C.fn)),
+    fr: { fields: [{ kind: 'expr', keys: 'polar', label: 'Equation:' }], key: [`r=\\frac{${simp.N}}{${simp.B}${C.s > 0 ? '+' : '-'}${simp.A === 1 ? '' : simp.A}\\${C.fn}\\theta}`], display: text, check: (v) => pconicOk(v[0], C.f) },
+    solution: C.type === 'Parabola'
+      ? `The vertex ${verts[0]} is halfway between the focus (pole) and the directrix, so p = 2(${exactT(near)}) = ${C.p}, and the directrix is ${C.dir}.\nWith e = 1: ${text}`
+      : `The vertices are on the ${C.fn === 'cos' ? 'polar axis' : 'line θ = π/2'}. In r = ep/(1 ${C.s > 0 ? '+' : MINUS} e ${C.fn} θ), r = ep/(1 + e) at one vertex and ep/(1 − e) at the other${C.type === 'Hyperbola' ? ' (negative for a hyperbola)' : ''}.\nSolving: e = ${C.eT}, p = ${C.p}: ${text}`,
+  };
 };
 
 /* ==== CHAPTER 6 END ==== */
@@ -9993,6 +10104,11 @@ const QUESTION_TYPES = [
   { id: 's8Sym', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Testing for symmetry', desc: 'Polar axis, θ = π/2, pole (#11–16)' },
   { id: 's8MaxZero', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Maximum |r| and zeros', desc: '(#17–20)' },
   { id: 's8Rose', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Rose curves', desc: 'Number and length of petals' },
+  { id: 'c9Ecc', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Eccentricity and type', desc: 'r = 2e/(1 + e cos θ) for given e (#5–8)' },
+  { id: 'c9Identify', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Identifying a conic', desc: 'Type and eccentricity (#13–24)' },
+  { id: 'c9Match', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Matching polar conics', desc: '(#9–12)' },
+  { id: 'c9Write', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Polar equation from e and directrix', desc: '' },
+  { id: 'c9Vertex', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Polar equation from vertices', desc: '' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
