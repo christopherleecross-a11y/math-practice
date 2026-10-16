@@ -259,6 +259,7 @@ const SETS = {
   'precalc-6-2':   { subject: 'precalc',  title: '6.2 Introduction to Conics: Parabolas', items: [['a2Match', 2], ['a2Origin', 3], ['a2Std', 3], ['a2VFD', 3], ['a2Tangent', 2], ['a2Apply', 1]] },
   'precalc-6-3':   { subject: 'precalc',  title: '6.3 Ellipses', items: [['c3Match', 2], ['c3Origin', 3], ['c3Std', 3], ['c3Props', 3], ['c3Ecc', 2], ['c3Apply', 1]] },
   'precalc-6-4':   { subject: 'precalc',  title: '6.4 Hyperbolas', items: [['c4Match', 2], ['c4Std', 3], ['c4Props', 3], ['c4Asym', 3], ['c4Classify', 3]] },
+  'precalc-6-5':   { subject: 'precalc',  title: '6.5 Rotation of Conics', items: [['r5Point', 3], ['r5Angle', 3], ['r5Rotate', 4], ['r5Classify', 2], ['r5Match', 2]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -4892,6 +4893,185 @@ TEMPLATES.c4Classify = (r) => {
   };
 };
 
+/* ---------- 6.5 Rotation of Conics ---------- */
+// numbers q·√k (q rational, k ∈ {1, 2, 3}) for exact coefficients
+const RQ = (q, k = 1) => ({ q, k: q === 0 ? 1 : k });
+const rqMul = (a, b) => { const k = a.k * b.k, s = Math.round(Math.sqrt(k)); if (s * s === k) return RQ(a.q * b.q * s, 1); if (a.k === b.k) return RQ(a.q * b.q * a.k, 1); return RQ(a.q * b.q, k); };
+const rqVal = (a) => a.q * Math.sqrt(a.k);
+const rqScale = (a, m) => RQ(a.q * m, a.k);
+const rqAdd = (a, b) => { if (a.q === 0) return b; if (b.q === 0) return a; if (a.k !== b.k) throw new Error('rq'); return RQ(a.q + b.q, a.k); };
+// rotations: cos θ and sin θ as q√k
+const ROTS = [
+  { deg: 45, c: RQ(1 / 2, 2), s: RQ(1 / 2, 2), cT: '√2/2', sT: '√2/2' },
+  { deg: 30, c: RQ(1 / 2, 3), s: RQ(1 / 2), cT: '√3/2', sT: '1/2' },
+  { deg: 60, c: RQ(1 / 2), s: RQ(1 / 2, 3), cT: '1/2', sT: '√3/2' },
+  { deg: Math.acos(3 / 5) * 180 / Math.PI, c: RQ(3 / 5), s: RQ(4 / 5), cT: '3/5', sT: '4/5' },
+  { deg: Math.acos(4 / 5) * 180 / Math.PI, c: RQ(4 / 5), s: RQ(3 / 5), cT: '4/5', sT: '3/5' },
+];
+// primed conic α x′² + γ y′² + δ x′ + ε y′ + φ = 0 → coefficients in x, y (exact)
+function rotToXY(P, R) {
+  const { c, s } = R, al = RQ(P.al), ga = RQ(P.ga), de = RQ(P.de), ep = RQ(P.ep);
+  const cc = rqMul(c, c), ss = rqMul(s, s), cs = rqMul(c, s);
+  const A = rqAdd(rqMul(al, cc), rqMul(ga, ss)), C = rqAdd(rqMul(al, ss), rqMul(ga, cc)), B = rqScale(rqMul(RQ(P.al - P.ga), cs), 2);
+  const D = rqAdd(rqMul(de, c), rqScale(rqMul(ep, s), -1)), E = rqAdd(rqMul(de, s), rqMul(ep, c));
+  return [A, B, C, D, E, RQ(P.ph)];
+}
+// scale to integer q's, reduce, and write "Ax² + Bxy + Cy² + Dx + Ey + F = 0"
+function rotEqT(co) {
+  let L = 1; for (const a of co) if (a.q) L = clcm(L, fracParts(a.q)[1]);
+  let v = co.map((a) => rqScale(a, L)); const g = v.filter((a) => a.q).map((a) => Math.round(Math.abs(a.q))).reduce((x, y) => cgcd(x, y));
+  v = v.map((a) => rqScale(a, 1 / g)); if (v[0].q < 0 || (v[0].q === 0 && v[2].q < 0)) v = v.map((a) => rqScale(a, -1));
+  const abs = (a) => { const n = fmt(Math.abs(a.q)); return a.k === 1 ? n : `${n === '1' ? '' : n}√${a.k}`; };
+  const vars = ['x²', 'xy', 'y²', 'x', 'y', ''];
+  const t = lnSumT(v.map((a, i) => [a.q, a.k === 1 || i === 5 ? null : abs(a), vars[i]]));
+  return { t: `${t} = 0`, v };
+}
+const PRIME = (t) => t.replace(/x²/g, '(x′)²').replace(/y²/g, '(y′)²').replace(/(?<![′(])x(?![′²])/g, 'x′').replace(/(?<![′(])y(?![′²])/g, 'y′');
+// strip primes from a typed answer (x′, x', x^{\prime}, x^{\prime2})
+const unprime = (raw) => String(raw || '').replace(/\^\{\\prime\s*\}/g, '').replace(/\^\{\\prime\s*([^}]*)\}/g, '^{$1}').replace(/\^\\prime/g, '').replace(/\\prime/g, '').replace(/[′']/g, '');
+KEYROWS_P.rot = [['(x′)²', '\\left(x^{\\prime}\\right)^2'], ['(y′)²', '\\left(y^{\\prime}\\right)^2'], ['x′', "x^{\\prime}"], ['y′', "y^{\\prime}"], ['xⁿ', '^{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['( )', '\\left(#?\\right)']];
+// a random primed conic: { kind, P (coefficients), std (conic or parabola object), stdT }
+function rotTarget(r, R, kind) {
+  if (kind === 'xy') { // xy = k, θ = 45°
+    const k = pick(r, [1, 2, 3, 4, -1, -2, -3, -4]);
+    const C = { t: 'h', h: 0, k: 0, A: 2 * Math.abs(k), B: 2 * Math.abs(k), tr: k > 0 ? 'x' : 'y' };
+    return { C, eq: `xy ${k > 0 ? MINUS : '+'} ${Math.abs(k)} = 0`, std: conT(C), ok: (raw) => conOk(unprime(raw), C), key: conL(C) };
+  }
+  if (kind === 'par') {
+    const p = pick(r, [1, 2, 1 / 2, 3, -1, -2]) * (R.deg === 45 ? 1 : 1), vert = r() < 0.5;
+    const Q = { ax: vert ? 'v' : 'h', h: 0, k: 0, p };
+    const P = vert ? { al: 1, ga: 0, de: 0, ep: -4 * p, ph: 0 } : { al: 0, ga: 1, de: -4 * p, ep: 0, ph: 0 };
+    return { P, Q, std: parT(Q), ok: (raw) => parOk(unprime(raw), Q), key: parL(Q) };
+  }
+  let a2, b2;
+  do { a2 = pick(r, [1, 2, 3, 4, 6, 8, 9, 16]); b2 = pick(r, [1, 2, 3, 4, 6, 8, 9, 16]); } while (a2 === b2);
+  const C = kind === 'ell' ? { t: 'e', h: 0, k: 0, A: a2, B: b2 } : { t: 'h', h: 0, k: 0, A: a2, B: b2, tr: pick(r, ['x', 'y']) };
+  const P = kind === 'ell' ? { al: b2, ga: a2, de: 0, ep: 0, ph: -a2 * b2 } : C.tr === 'x' ? { al: b2, ga: -a2, de: 0, ep: 0, ph: -a2 * b2 } : { al: -b2, ga: a2, de: 0, ep: 0, ph: -a2 * b2 };
+  return { P, C, std: conT(C), ok: (raw) => conOk(unprime(raw), C), key: conL(C) };
+}
+const rotDegT = (d) => (Math.abs(d - Math.round(d)) < 1e-9 ? `${Math.round(d)}°` : `≈ ${rT(d, 3)}°`);
+TEMPLATES.r5Point = (r) => {
+  const R = pick(r, [ROTS[0], ROTS[1], ROTS[2], { deg: 90 }]);
+  let x, y; do { x = ri(r, -4, 4); y = ri(r, -4, 4); } while (!x && !y);
+  // x′ = x cos θ + y sin θ,  y′ = −x sin θ + y cos θ — write each as (p + q√k)/2
+  const half = (p, q, k) => { // (p + q√k)/2 exact text/latex/value
+    const v = (p + q * Math.sqrt(k)) / 2;
+    const neg = () => half(-p, -q, k);
+    if (q === 0) return { t: fracT(p / 2), l: fracL(p / 2), v, neg };
+    if (p === 0) { const e = exactRatio(Math.sign(q), q * q * k, 4); return { t: e.text, l: e.latex, v, neg }; }
+    const g = cgcd(cgcd(Math.abs(p), Math.abs(q)), 2), P2 = p / g, Q2 = q / g, d = 2 / g, rt = `${Math.abs(Q2) === 1 ? '' : Math.abs(Q2)}√${k}`;
+    const num = `${P2 < 0 ? MINUS : ''}${Math.abs(P2)} ${Q2 < 0 ? MINUS : '+'} ${rt}`, numL = `${P2}${Q2 < 0 ? '-' : '+'}${Math.abs(Q2) === 1 ? '' : Math.abs(Q2)}\\sqrt{${k}}`;
+    return d === 1 ? { t: num, l: numL, v, neg } : { t: `(${num})/${d}`, l: `\\frac{${numL}}{${d}}`, v, neg };
+  };
+  let X, Y, how;
+  if (R.deg === 90) { X = half(2 * y, 0, 1); Y = half(-2 * x, 0, 1); how = `cos 90° = 0, sin 90° = 1: x′ = y = ${fmt(y)}, y′ = −x = ${fmt(-x)}`; }
+  else if (R.deg === 45) { X = half(0, x + y, 2); Y = half(0, y - x, 2); how = `cos 45° = sin 45° = √2/2: x′ = (√2/2)(x + y), y′ = (√2/2)(y − x)`; }
+  else if (R.deg === 30) { X = half(y, x, 3); Y = half(-x, y, 3); how = `cos 30° = √3/2, sin 30° = 1/2: x′ = (√3x + y)/2, y′ = (−x + √3y)/2`; }
+  else { X = half(x, y, 3); Y = half(y, -x, 3); how = `cos 60° = 1/2, sin 60° = √3/2: x′ = (x + √3y)/2, y′ = (−√3x + y)/2`; }
+  const T = (a, b) => `(x′, y′) = (${a}, ${b})`, correct = T(X.t, Y.t);
+  const neg = (o) => o.neg().t;
+  const wrongs = [T(Y.t, X.t), T(X.t, neg(Y)), T(neg(X), Y.t), T(neg(Y), X.t)].filter((w) => w !== correct);
+  return {
+    topic: 'Point in a rotated coordinate system', stem: `The x′y′-coordinate system is rotated θ degrees from the xy-coordinate system. Find the coordinates of the point in the rotated coordinate system.   θ = ${R.deg}°,   ${ptT([x, y])}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(X.t, fracT(Y.v + i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'point', label: '(x′, y′) =' }], key: [`\\left(${X.l},${Y.l}\\right)`], display: correct, check: (v) => ptsOk(v[0], [[X.v, Y.v]]) },
+    solution: `x′ = x cos θ + y sin θ and y′ = −x sin θ + y cos θ.\n${how}\nWith (x, y) = ${ptT([x, y])}: ${correct}`,
+  };
+};
+// angle of rotation from A, B, C: cot 2θ = (A − C)/B
+const rotAngle = (A, B, C) => { if (Math.abs(A - C) < 1e-12) return 45; let d = Math.atan(B / (A - C)) / D2R; if (d < 0) d += 180; return d / 2; };
+TEMPLATES.r5Angle = (r) => {
+  let eq, A, B, C;
+  if (r() < 0.55) {
+    const R = pick(r, ROTS), kind = pick(r, R.deg === 45 ? ['ell', 'hyp', 'par', 'xy'] : ['ell', 'hyp', 'par']), T = rotTarget(r, R, kind);
+    if (kind === 'xy') { eq = T.eq; A = 0; B = 1; C = 0; }
+    else { const e = rotEqT(rotToXY(T.P, R)); eq = e.t; [A, B, C] = e.v.slice(0, 3).map(rqVal); }
+  } else {
+    for (;;) { A = ri(r, -6, 24); B = ri(r, -24, 24); C = ri(r, -6, 24); if (B && A !== C && cgcd(cgcd(A, B), C) === 1) break; }
+    eq = `${lnSumT([[A, null, 'x²'], [B, null, 'xy'], [C, null, 'y²']])} = ${ri(r, 2, 40)}`;
+  }
+  const d = rotAngle(A, B, C), exact = [30, 45, 60].some((s) => Math.abs(d - s) < 1e-7);
+  const correct = `θ ${exact ? '=' : '≈'} ${exact ? Math.round(d) + '°' : rT(d, 3) + '°'}`;
+  const T2 = (w) => { const x = ((w % 90) + 90) % 90; return Math.abs(x - Math.round(x)) < 1e-7 ? `θ = ${Math.round(x)}°` : `θ ≈ ${rT(x, 3)}°`; };
+  const tan2 = B / (A - C);
+  const wrongs = [2 * d, 90 - d, Math.atan(tan2) / D2R, Math.atan(B / (C - A)) / D2R / 2 + 90, Math.atan(1 / tan2) / D2R / 2].map(T2).filter((w) => w !== correct && !/θ = 0°/.test(w));
+  const cot = Math.abs(A - C) < 1e-12 ? '0' : (() => { const v = (A - C) / B; return fracParts(v) ? fracT(v) : rT(v, 3); })();
+  return {
+    topic: 'Angle of rotation', stem: `Find the angle θ (0° < θ < 90°) through which the axes should be rotated to eliminate the xy-term. Round to three decimal places if needed.   ${eq}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T2(d + 7 * (i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'ang', label: 'θ (degrees) =' }], key: [exact ? `${Math.round(d)}^{\\circ}` : `${rT(d, 3)}^{\\circ}`], display: correct, check: (v) => angOk(v[0], d, 'deg', 0.00051) },
+    solution: `cot 2θ = (A − C)/B = ${Math.abs(A - C) < 1e-12 ? `0/${fmt(B)} = 0` : cot}${Math.abs(A - C) < 1e-12 ? ', so 2θ = 90°' : `, so tan 2θ = ${fracParts(tan2) ? fracT(tan2) : rT(tan2, 3)} and 2θ ${exact ? '=' : '≈'} ${exact ? Math.round(2 * d) : rT(2 * d, 3)}° (0° < 2θ < 180°)`}.\n${correct}`,
+  };
+};
+TEMPLATES.r5Rotate = (r) => {
+  const R = pick(r, ROTS), kind = pick(r, R.deg === 45 ? ['ell', 'hyp', 'par', 'xy', 'xy'] : ['ell', 'hyp', 'par']), T = rotTarget(r, R, kind);
+  const eq = kind === 'xy' ? T.eq : rotEqT(rotToXY(T.P, R)).t, std = PRIME(T.std);
+  let wrongs;
+  if (T.C) wrongs = conWrongs(T.C).map((W) => PRIME(conT(W)));
+  else wrongs = parWrongs(T.Q).filter((W) => W.h === 0 && W.k === 0).map((W) => PRIME(parT(W)));
+  const ex = Math.abs(R.deg - Math.round(R.deg)) < 1e-9;
+  return {
+    topic: 'Rotating axes to eliminate the xy-term', stem: `Rotate the axes to eliminate the xy-term. Then write the equation in standard form.   ${eq}`,
+    frStem: `Rotate the axes to eliminate the xy-term. Then write the equation in standard form in x′ and y′ (use the (x′)², (y′)², x′, and y′ keys).   ${eq}`,
+    ...buildChoices(r, std, [...new Set(wrongs)].filter((w) => w !== std), (i) => PRIME(T.C ? conT({ ...T.C, A: T.C.A + i + 1 }) : parT({ ...T.Q, p: T.Q.p * (i + 3) }))),
+    fr: { fields: [{ kind: 'expr', keys: 'rot', label: 'Standard form:' }], key: [T.key.replace(/x/g, "x'").replace(/y/g, "y'")], display: std, check: (v) => T.ok(v[0]) },
+    solution: `cot 2θ = (A − C)/B gives θ = ${ex ? `${Math.round(R.deg)}°` : `${rT(R.deg, 3)}° (cos θ = ${R.cT}, sin θ = ${R.sT})`}.\nSubstitute x = x′ cos θ − y′ sin θ = (${R.cT})x′ − (${R.sT})y′ and y = x′ sin θ + y′ cos θ = (${R.sT})x′ + (${R.cT})y′, then simplify:\n${std}`,
+  };
+};
+const ROT_CLASS = ['Ellipse or circle', 'Parabola', 'Hyperbola'];
+TEMPLATES.r5Classify = (r) => {
+  const want = pick(r, ROT_CLASS);
+  let A, B, C;
+  for (;;) {
+    if (want === 'Parabola') { const p = ri(r, 1, 4), q = ri(r, 1, 4), m = pick(r, [1, 1, 2]); A = m * p * p; C = m * q * q; B = 2 * m * p * q * pick(r, [1, -1]); }
+    else { A = ri(r, -6, 12); B = ri(r, -12, 12); C = ri(r, -6, 12); }
+    if (!B || !A || !C) continue;
+    const d = B * B - 4 * A * C, got = d < 0 ? 'Ellipse or circle' : d === 0 ? 'Parabola' : 'Hyperbola';
+    if (got !== want) continue;
+    if (want === 'Ellipse or circle' && A < 0) { A = -A; B = -B; C = -C; }
+    break;
+  }
+  let D = ri(r, -12, 12), E = ri(r, -12, 12), F;
+  if (want === 'Parabola') { const p = Math.sqrt(A), q = Math.sign(B) * Math.sqrt(C); if (D * q === E * p) D += 1; F = ri(r, -20, 20); }
+  else { // pick F so the graph is a real, nondegenerate conic
+    const det = 4 * A * C - B * B, x0 = (B * E - 2 * C * D) / det, y0 = (B * D - 2 * A * E) / det, m = A * x0 * x0 + B * x0 * y0 + C * y0 * y0 + D * x0 + E * y0;
+    F = want === 'Hyperbola' ? Math.round(-m) + pick(r, [-7, -3, 2, 5, 9]) : Math.floor(-m) - ri(r, 4, 30);
+    if (Math.abs(F + m) < 1e-9) F += 1;
+  }
+  const eq = `${lnSumT([[A, null, 'x²'], [B, null, 'xy'], [C, null, 'y²'], [D, null, 'x'], [E, null, 'y'], [F, null, '']])} = 0`;
+  return {
+    topic: 'Using the discriminant', stem: `Use the discriminant to classify the graph of the equation.   ${eq}`,
+    ...buildChoices(r, want, ROT_CLASS.filter((x) => x !== want), () => null), fr: FR.select('The graph is', ROT_CLASS, want),
+    solution: `A = ${fmt(A)}, B = ${fmt(B)}, C = ${fmt(C)}. B² − 4AC = ${B * B} − 4(${fmt(A)})(${fmt(C)}) = ${B * B - 4 * A * C}, which is ${B * B - 4 * A * C < 0 ? 'negative: an ellipse or circle' : B * B - 4 * A * C === 0 ? 'zero: a parabola' : 'positive: a hyperbola'}.`,
+  };
+};
+// graph a primed conic rotated by θ (with dashed-looking x′, y′ axes in gray)
+function rotCurves(T, R) {
+  const c = Math.cos(R.deg * D2R), s = Math.sin(R.deg * D2R), rot = ([u, v]) => [u * c - v * s, u * s + v * c];
+  let prim;
+  if (T.Q) { const p = T.Q.p; prim = T.Q.ax === 'v' ? [(t) => [t, (t * t) / (4 * p)]] : [(t) => [(t * t) / (4 * p), t]]; }
+  else if (T.C.t === 'e') prim = [(t) => [Math.sqrt(T.C.A) * Math.cos(t), Math.sqrt(T.C.B) * Math.sin(t)]];
+  else { const a = Math.sqrt(T.C.tr === 'x' ? T.C.A : T.C.B), b = Math.sqrt(T.C.tr === 'x' ? T.C.B : T.C.A); prim = [1, -1].map((sg) => (t) => (T.C.tr === 'x' ? [sg * a * Math.cosh(t), b * Math.sinh(t)] : [b * Math.sinh(t), sg * a * Math.cosh(t)])); }
+  const span = T.Q || T.C.t === 'h' ? [-4, 4] : [0, 2 * Math.PI];
+  const curves = prim.map((g) => ({ param: [(t) => rot(g(t)), T.Q ? -12 : span[0], T.Q ? 12 : span[1]] }));
+  return [{ param: [(t) => rot([t, 0]), -12, 12], color: '#b9b4a8' }, { param: [(t) => rot([0, t]), -12, 12], color: '#b9b4a8' }, ...curves];
+}
+TEMPLATES.r5Match = (r) => {
+  for (;;) {
+    const kinds = shuffle(r, ['ell', 'hyp', 'par', 'xy']);
+    const items = kinds.map((k) => { const R = k === 'xy' ? ROTS[0] : pick(r, k === 'hyp' ? ROTS.slice(1) : ROTS); const T = rotTarget(r, R, k); return { R, T, eq: k === 'xy' ? T.eq : rotEqT(rotToXY(T.P, R)).t }; });
+    const opts = items.map((x) => x.eq); if (new Set(opts).size < 4) continue;
+    const { R, T } = items[0];
+    if (T.C && T.C.t !== 'h' && Math.max(T.C.A, T.C.B) > 16) continue;
+    return {
+      topic: 'Matching rotated conics', stem: 'Which equation matches the graph? (The gray lines are the rotated x′- and y′-axes.)',
+      ...buildChoices(r, opts[0], opts.slice(1), () => null), fr: FR.select('The graph is', shuffle(r, opts), opts[0]),
+      draw: plotQ({ xr: [-6, 6], yr: [-6, 6], curves: rotCurves(T, R) }), size: [380, 380],
+      solution: `The graph is ${T.Q ? 'a parabola' : T.C.t === 'e' ? 'an ellipse' : 'a hyperbola'}, so B² − 4AC must be ${T.Q ? 'zero' : T.C.t === 'e' ? 'negative' : 'positive'}. Only ${opts[0]} fits${items.some((x, i) => i && (x.T.Q ? 'p' : x.T.C.t) === (T.Q ? 'p' : T.C.t)) ? ' with this tilt and size' : ''}.`,
+    };
+  }
+};
+
 /* ==== CHAPTER 6 END ==== */
 /* ---------- 2.1 Using Fundamental Identities ---------- */
 // Expressions are written in a small plain notation with X for the variable, e.g. 'sin^2 X/(1 + cos X)'.
@@ -9341,6 +9521,11 @@ const QUESTION_TYPES = [
   { id: 'c4Props', subject: 'precalc',  section: '6.4 Hyperbolas', label: 'Center, vertices, foci, asymptotes', desc: 'Standard or general form (#19–30)' },
   { id: 'c4Asym', subject: 'precalc',  section: '6.4 Hyperbolas', label: 'Hyperbola from asymptotes', desc: '(#37–46)' },
   { id: 'c4Classify', subject: 'precalc',  section: '6.4 Hyperbolas', label: 'Classifying conics', desc: 'Circle, parabola, ellipse, or hyperbola (#47–56)' },
+  { id: 'r5Point', subject: 'precalc',  section: '6.5 Rotation of Conics', label: 'Point in a rotated system', desc: '(x, y) → (x′, y′) (#5–12)' },
+  { id: 'r5Angle', subject: 'precalc',  section: '6.5 Rotation of Conics', label: 'Angle of rotation', desc: 'cot 2θ = (A − C)/B (#25–30)' },
+  { id: 'r5Rotate', subject: 'precalc',  section: '6.5 Rotation of Conics', label: 'Rotating to eliminate the xy-term', desc: 'Standard form in x′ and y′ (#13–24)' },
+  { id: 'r5Classify', subject: 'precalc',  section: '6.5 Rotation of Conics', label: 'Using the discriminant', desc: 'B² − 4AC' },
+  { id: 'r5Match', subject: 'precalc',  section: '6.5 Rotation of Conics', label: 'Matching rotated conics', desc: '(#31–36)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
