@@ -260,6 +260,7 @@ const SETS = {
   'precalc-6-3':   { subject: 'precalc',  title: '6.3 Ellipses', items: [['c3Match', 2], ['c3Origin', 3], ['c3Std', 3], ['c3Props', 3], ['c3Ecc', 2], ['c3Apply', 1]] },
   'precalc-6-4':   { subject: 'precalc',  title: '6.4 Hyperbolas', items: [['c4Match', 2], ['c4Std', 3], ['c4Props', 3], ['c4Asym', 3], ['c4Classify', 3]] },
   'precalc-6-5':   { subject: 'precalc',  title: '6.5 Rotation of Conics', items: [['r5Point', 3], ['r5Angle', 3], ['r5Rotate', 4], ['r5Classify', 2], ['r5Match', 2]] },
+  'precalc-6-6':   { subject: 'precalc',  title: '6.6 Parametric Equations', items: [['p6Table', 2], ['p6Orient', 2], ['p6Elim', 7], ['p6Find', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -5072,6 +5073,192 @@ TEMPLATES.r5Match = (r) => {
   }
 };
 
+/* ---------- 6.6 Parametric Equations ---------- */
+// a typed equation in x and y holds on the curve and not off it
+function curveEqOk(raw, onPts, offPts) {
+  const s = String(raw || ''), parts = s.split('='); if (parts.length !== 2) return false;
+  const [L, R] = parts.map((q) => lgParse(q.replace(/\\left|\\right/g, ''), ['x', 'y'])); if (!L || !R) return false;
+  const F = (x, y) => lgEval(L, { x, y }) - lgEval(R, { x, y });
+  if (!onPts.every(([x, y]) => { const v = F(x, y); return isFinite(v) && Math.abs(v) < 1e-6 * Math.max(1, Math.abs(lgEval(L, { x, y }))); })) return false;
+  const off = offPts.filter(([x, y]) => { const v = F(x, y); return !isFinite(v) || Math.abs(v) > 1e-6; }).length;
+  return off >= offPts.length * 0.6;
+}
+const P6_RESTR = ['None needed', 'x ≥ 0', 'x > 0', 'x ≤ 0'];
+const tT = (c, v = 't') => lnSumT([[c, null, v]]); // "3t", "−t"
+// parametric pairs for eliminating the parameter: { xT, yT, x(t), y(t), t0, t1, ans, ansL, restr, why, wrongs }
+function p6Pair(r) {
+  const k = ri(r, 0, 9);
+  if (k === 0) { // line
+    let a, b, c, d; do { a = ri(r, -3, 4); b = ri(r, -5, 5); c = ri(r, -4, 4); d = ri(r, -5, 5); } while (!a || !c);
+    const m = c / a, B = d - m * b;
+    return { xT: lnSumT([[a, null, 't'], [b, null, '']]), yT: lnSumT([[c, null, 't'], [d, null, '']]), x: (t) => a * t + b, y: (t) => c * t + d, t0: -5, t1: 5,
+      ans: lineText(m, B), ansL: lineLatex(m, B), restr: 'None needed', why: `Solve x = ${lnSumT([[a, null, 't'], [b, null, '']])} for t: t = (x ${b > 0 ? MINUS : '+'} ${Math.abs(b) || 0})/${fmt(a)}. Substitute into y.`.replace(/\(x [−+] 0\)\/1|\(x [−+] 0\)/, 'x'),
+      wrongs: [lineText(1 / m, d - b / m), lineText(m, d + m * b), lineText(-m, B)] };
+  }
+  if (k === 1) { // x = a t, y = t² → y = x²/a²
+    const a = pick(r, [2, 3, 1 / 4, 1 / 2, -2, 4]), c = 1 / (a * a);
+    const yT = c === 1 ? 'x²' : fracParts(c)[1] === 1 ? `${fmt(c)}x²` : `x²/${fmt(1 / c)}`;
+    return { xT: a === 1 / 4 ? '(1/4)t' : a === 1 / 2 ? '(1/2)t' : tT(a), yT: 't²', x: (t) => a * t, y: (t) => t * t, t0: -4, t1: 4, ans: `y = ${yT}`, ansL: c >= 1 ? `y=${fmt(c)}x^2` : `y=\\frac{x^2}{${fmt(1 / c)}}`, restr: 'None needed',
+      why: `t = x/${fracT(a)}, so y = (x/${fracT(a)})² = ${yT}.`.replace('x/1/4', '4x').replace('x/1/2', '2x'), wrongs: [`y = ${fmt(a * a)}x²`, `y = x²/${fmt(Math.abs(a))}`.replace('/1/4', '/(1/4)').replace('/1/2', '/(1/2)'), `x = ${yT.replace('x', 'y')}`] };
+  }
+  if (k === 2) { // x = t², y = c t → x = y²/c²
+    const c = pick(r, [2, -2, 3, 1 / 3, 4, -1]), q = 1 / (c * c);
+    const xT2 = q === 1 ? 'y²' : fracParts(q)[1] === 1 ? `${fmt(q)}y²` : `y²/${fmt(1 / q)}`;
+    return { xT: r() < 0.5 ? 't²' : `${MINUS}t²`, yT: c === 1 / 3 ? 't/3' : tT(c), x: null, y: (t) => c * t, t0: -4, t1: 4, neg: null, ans: null, restr: 'None needed', c, xT2 };
+  }
+  if (k === 3) { // x = √(t + c), y = t + d → y = x² − c + d, x ≥ 0
+    const c = pick(r, [0, 0, 2, -3, 1]), d = pick(r, [-1, 1, 3, 0, -2]), e = d - c;
+    const xT = c === 0 ? '√t' : `√(t ${c > 0 ? '+' : MINUS} ${Math.abs(c)})`, sgn = pick(r, [1, -1]);
+    const yT = lnSumT([[sgn, null, 't'], [sgn === 1 ? d : -d, null, '']]);
+    // y = sgn·t ± d with t = x² − c
+    const yv = (t) => sgn * t + (sgn === 1 ? d : -d), C0 = sgn * -c + (sgn === 1 ? d : -d);
+    return { xT, yT, x: (t) => Math.sqrt(t + c), y: yv, t0: -c, t1: -c + 25, ans: `y = ${lnSumT([[sgn, null, 'x²'], [C0, null, '']])}, x ≥ 0`, ansEq: `y = ${lnSumT([[sgn, null, 'x²'], [C0, null, '']])}`, ansL: `y=${sgn < 0 ? '-' : ''}x^2${C0 ? (C0 > 0 ? '+' : '-') + Math.abs(C0) : ''}`, restr: 'x ≥ 0',
+      why: `Square x = ${xT}: x² = t${c ? ` ${c > 0 ? '+' : MINUS} ${Math.abs(c)}` : ''}, so t = x²${c ? ` ${c > 0 ? MINUS : '+'} ${Math.abs(c)}` : ''}. Substitute into y. Because x = ${xT} is never negative, the domain is x ≥ 0.`,
+      wrongs: [`y = ${lnSumT([[sgn, null, 'x²'], [C0, null, '']])}`, `y = ${lnSumT([[sgn, null, 'x²'], [C0 + 2 * sgn * c || C0 + 1, null, '']])}, x ≥ 0`, `y = ${lnSumT([[sgn, null, 'x'], [C0, null, '']])}, x ≥ 0`] };
+  }
+  if (k === 4) { // x = t + a, y = t/(t + a) → y = (x − a)/x
+    const a = pick(r, [1, -1, 2, -2, 3]);
+    return { xT: `t ${a > 0 ? '+' : MINUS} ${Math.abs(a)}`, yT: `t/(t ${a > 0 ? '+' : MINUS} ${Math.abs(a)})`, x: (t) => t + a, y: (t) => t / (t + a), t0: -6, t1: 6, skip: (t) => Math.abs(t + a) < 0.2,
+      ans: `y = (x ${a > 0 ? MINUS : '+'} ${Math.abs(a)})/x`, ansL: `y=\\frac{x${a > 0 ? '-' : '+'}${Math.abs(a)}}{x}`, restr: 'None needed',
+      why: `t = x ${a > 0 ? MINUS : '+'} ${Math.abs(a)}, and t ${a > 0 ? '+' : MINUS} ${Math.abs(a)} = x, so y = (x ${a > 0 ? MINUS : '+'} ${Math.abs(a)})/x.`,
+      wrongs: [`y = x/(x ${a > 0 ? MINUS : '+'} ${Math.abs(a)})`, `y = (x ${a > 0 ? '+' : MINUS} ${Math.abs(a)})/x`, `y = (x ${a > 0 ? MINUS : '+'} ${Math.abs(a)})/x, x > 0`] };
+  }
+  if (k === 5 || k === 6) { // ellipse / circle
+    const a = ri(r, 1, 6), b = k === 6 ? a : ri(r, 1, 6), h = r() < 0.4 ? 0 : ri(r, -6, 6), kk = r() < 0.4 ? 0 : ri(r, -6, 6);
+    const C = { t: 'e', h, k: kk, A: a * a, B: b * b };
+    const trT = (c, A, fn) => `${c ? fmt(c) + ' + ' : ''}${A === 1 ? '' : A + ' '}${fn} θ`;
+    return { xT: trT(h, a, 'cos'), yT: trT(kk, b, 'sin'), x: (t) => h + a * Math.cos(t), y: (t) => kk + b * Math.sin(t), t0: 0, t1: 6.28,
+      ans: conT(C).replace(/\(x − 0\)|\(y − 0\)/g, (m) => m[1]), ansL: conL(C), restr: 'None needed', theta: true,
+      why: `cos θ = ${h ? `(x ${h > 0 ? MINUS : '+'} ${Math.abs(h)})` : 'x'}${a === 1 ? '' : '/' + a} and sin θ = ${kk ? `(y ${kk > 0 ? MINUS : '+'} ${Math.abs(kk)})` : 'y'}${b === 1 ? '' : '/' + b}. Use cos² θ + sin² θ = 1.`,
+      wrongs: [conT({ ...C, A: a, B: b }), conT({ ...C, h: -h, k: -kk }), conT({ ...C, A: b * b, B: a * a }), conT({ ...C, t: 'h', tr: 'x' })] };
+  }
+  if (k === 7) { // sec/tan or cot/csc → hyperbola
+    const a = ri(r, 1, 5), b = ri(r, 1, 5), sec = r() < 0.5;
+    const C = sec ? { t: 'h', h: 0, k: 0, tr: 'x', A: a * a, B: b * b } : { t: 'h', h: 0, k: 0, tr: 'y', A: a * a, B: b * b };
+    const sc = (t) => 1 / Math.cos(t), tn = Math.tan, ct = (t) => 1 / Math.tan(t), cs = (t) => 1 / Math.sin(t);
+    return { xT: `${a === 1 ? '' : a} ${sec ? 'sec' : 'cot'} θ`.trim(), yT: `${b === 1 ? '' : b} ${sec ? 'tan' : 'csc'} θ`.trim(), x: (t) => a * (sec ? sc(t) : ct(t)), y: (t) => b * (sec ? tn(t) : cs(t)), t0: 0.1, t1: 6.2, skip: (t) => Math.abs(Math.cos(t)) < 0.15 || Math.abs(Math.sin(t)) < 0.15,
+      ans: conT(C), ansL: conL(C), restr: 'None needed', theta: true,
+      why: sec ? `sec θ = x/${a}, tan θ = y/${b}. Use sec² θ − tan² θ = 1.` : `csc θ = y/${b}, cot θ = x/${a}. Use csc² θ − cot² θ = 1.`,
+      wrongs: [conT({ ...C, tr: sec ? 'y' : 'x' }), conT({ ...C, t: 'e' }), conT({ ...C, A: a, B: b })] };
+  }
+  if (k === 8) { // exponentials
+    const n = pick(r, [2, 3, 2, 4]), neg = r() < 0.4;
+    return { xT: neg ? 'e^(−t)' : 'eᵗ', yT: `e^(${n}t)`, x: (t) => Math.exp(neg ? -t : t), y: (t) => Math.exp(n * t), t0: -1.5, t1: 1.2,
+      ans: neg ? `y = 1/x${'⁰¹²³⁴'[n]}, x > 0` : `y = x${'⁰¹²³⁴'[n]}, x > 0`, ansEq: neg ? `y = 1/x${'⁰¹²³⁴'[n]}` : `y = x${'⁰¹²³⁴'[n]}`, ansL: neg ? `y=\\frac{1}{x^${n}}` : `y=x^${n}`, restr: 'x > 0',
+      why: `e^(${n}t) = (${neg ? 'e^(−t)' : 'eᵗ'})^${neg ? `(−${n})` : n} = ${neg ? `x^(−${n})` : `x^${n}`}. Because x = ${neg ? 'e^(−t)' : 'eᵗ'} is always positive, the domain is x > 0.`,
+      wrongs: [neg ? `y = 1/x${'⁰¹²³⁴'[n]}` : `y = x${'⁰¹²³⁴'[n]}`, neg ? `y = x${'⁰¹²³⁴'[n]}, x > 0` : `y = 1/x${'⁰¹²³⁴'[n]}, x > 0`, `y = ${n}x, x > 0`] };
+  }
+  // k === 9: x = t^n, y = n ln t → y = ln x, x > 0
+  const n = pick(r, [2, 3, 4]);
+  return { xT: `t${'⁰¹²³⁴'[n]}`, yT: `${n} ln t`, x: (t) => t ** n, y: (t) => n * Math.log(t), t0: 0.2, t1: 4,
+    ans: 'y = ln x, x > 0', ansEq: 'y = ln x', ansL: 'y=\\ln x', restr: 'x > 0',
+    why: `${n} ln t = ln t${'⁰¹²³⁴'[n]} = ln x. The parameter must satisfy t > 0, so x = t${'⁰¹²³⁴'[n]} > 0.`, wrongs: ['y = ln x', `y = ${n} ln x, x > 0`, `y = ln x${'⁰¹²³⁴'[n]}, x > 0`] };
+}
+TEMPLATES.p6Elim = (r) => {
+  let P = p6Pair(r);
+  if (P.c !== undefined) { // x = ±t², y = c t
+    const s = P.xT.startsWith(MINUS) ? -1 : 1, c = P.c, q = 1 / (c * c), cf = s * q;
+    const rhs = cf === 1 ? 'y²' : cf === -1 ? `${MINUS}y²` : fracParts(Math.abs(cf))[1] === 1 ? `${fmt(cf)}y²` : `${s < 0 ? MINUS : ''}y²/${fmt(1 / q)}`;
+    P = { ...P, x: (t) => s * t * t, ans: `x = ${rhs}`, ansL: `x=${cf === 1 ? '' : cf === -1 ? '-' : Math.abs(cf) >= 1 ? fmt(cf).replace(MINUS, '-') : (s < 0 ? '-' : '') + `\\frac{1}{${fmt(1 / q)}}`}y^2`,
+      why: `From y = ${P.yT}, t = y/${fracT(c)}. Substitute: x = ${s < 0 ? MINUS : ''}(y/${fracT(c)})² = ${rhs}.`, wrongs: [`y = ${rhs.replace('y', 'x')}`, `x = ${s < 0 ? MINUS : ''}${c * c === 1 ? 2 : fmt(c * c)}y²`, `x = ${s < 0 ? '' : MINUS}${rhs.replace(MINUS, '')}`] };
+  }
+  const ts = []; for (let j = 0; j <= 40; j++) { const t = P.t0 + ((P.t1 - P.t0) * (j + 0.31)) / 41; if (P.skip && P.skip(t)) continue; ts.push(t); }
+  const on = ts.map((t) => [P.x(t), P.y(t)]).filter(([x, y]) => isFinite(x) && isFinite(y) && Math.abs(x) < 1e4 && Math.abs(y) < 1e4);
+  const off = on.flatMap(([x, y]) => [[x, y + 0.37], [x + 0.41, y]]);
+  const eqText = P.ansEq || P.ans, correct = P.ans;
+  const ok = (v) => [curveEqOk(v[0], on, off), v[1] === P.restr];
+  const par = P.theta ? 'θ' : 't';
+  return {
+    topic: 'Eliminating the parameter', stem: `Eliminate the parameter and write the corresponding rectangular equation. Adjust the domain of the rectangular equation, if necessary.   x = ${P.xT},   y = ${P.yT}`,
+    ...buildChoices(r, correct, [...new Set(P.wrongs)].filter((w) => w !== correct), (i) => `${correct.split(',')[0]}, x ${['≥ 1', '≤ 0', '> 2'][i % 3]}`),
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: 'Equation:' }, { kind: 'select', label: 'Domain restriction:', options: P6_RESTR }], key: [P.ansL, P.restr], display: correct,
+      check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+    solution: `${P.why}\n${correct}${P.restr === 'None needed' ? ` (no domain adjustment needed: as ${par} varies, x takes all the values the rectangular equation allows)` : ''}`,
+  };
+};
+// table of points
+TEMPLATES.p6Table = (r) => {
+  const k = ri(r, 0, 2);
+  let xT, yT, X, Y, ts, tsT, par = 't';
+  if (k === 0) { const c = pick(r, [3, 2, 1, -1]); xT = '√t'; yT = `${c} ${MINUS} t`.replace(/^(−?)1 − t/, '$11 − t'); X = (t) => Math.sqrt(t); Y = (t) => c - t; ts = [0, 1, 2, 3, 4]; }
+  else if (k === 1) { const a = pick(r, [2, 3]), b = pick(r, [1, -1, 3]); xT = 't²'; yT = lnSumT([[a, null, 't'], [b, null, '']]); X = (t) => t * t; Y = (t) => a * t + b; ts = [-2, -1, 0, 1, 2]; }
+  else { const a = pick(r, [4, 2]), b = pick(r, [2, 3]); par = 'θ'; xT = `${a} cos² θ`; yT = `${b} sin θ`; X = (t) => a * Math.cos(t) ** 2; Y = (t) => b * Math.sin(t); ts = [-Math.PI / 2, -Math.PI / 4, 0, Math.PI / 4, Math.PI / 2]; }
+  const idx = shuffle(r, [0, 1, 2, 3, 4]).slice(0, 3).sort((a, b) => a - b), use = idx.map((i) => ts[i]);
+  const tLab = (t) => (par === 'θ' ? (t === 0 ? '0' : `${t < 0 ? MINUS : ''}${radT(Math.abs(t) / D2R)}`) : fmt(t));
+  const snap = (v) => (Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v) : v);
+  const P = use.map((t) => [snap(X(t)), snap(Y(t))]), PT = (p) => `(${exactT(p[0])}, ${exactT(p[1])})`, PL = (p) => `\\left(${exactL(p[0])},${exactL(p[1])}\\right)`;
+  const T = (L) => L.map(PT).join(',  '), correct = T(P);
+  const wrongs = [T(P.map(([a, b]) => [b, a])), T(use.map((t) => [snap(X(-t)), snap(Y(t))])), T(use.map((t) => [snap(X(t)), snap(Y(-t))])), T(use.map((t) => [snap(X(t + (par === 'θ' ? Math.PI / 4 : 1))), snap(Y(t))]))].filter((w) => w !== correct && !/NaN/.test(w));
+  const ok = (v) => P.map((p, i) => ptsOk(v[i], [p]));
+  return {
+    topic: 'Points from parametric equations', stem: `Find the point (x, y) for each value of ${par}.   x = ${xT},   y = ${yT};   ${par} = ${use.map(tLab).join(', ')}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(P.map(([a, b]) => [a + i + 1, b]))),
+    fr: { fields: use.map((t) => ({ kind: 'expr', keys: 'point', label: `${par} = ${tLab(t)}:` })), key: P.map(PL), display: correct,
+      check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 3 },
+    solution: use.map((t, i) => `${par} = ${tLab(t)}: x = ${exactT(P[i][0])}, y = ${exactT(P[i][1])}`).join('\n'),
+  };
+};
+// orientation
+TEMPLATES.p6Orient = (r) => {
+  const k = ri(r, 0, 2);
+  let xT, yT, X, Y, t0, t1, opts, ans, why, par = 't';
+  if (k === 0) { let a, b, c, d; do { a = ri(r, -3, 3); b = ri(r, -4, 4); c = ri(r, -5, 5); d = ri(r, -4, 4); } while (!a || !c);
+    xT = lnSumT([[a, null, 't'], [b, null, '']]); yT = lnSumT([[c, null, 't'], [d, null, '']]); X = (t) => a * t + b; Y = (t) => c * t + d; t0 = -4; t1 = 4; opts = ['Left to right', 'Right to left']; ans = a > 0 ? opts[0] : opts[1];
+    why = `As t increases, x = ${xT} ${a > 0 ? 'increases' : 'decreases'}, so the point moves ${a > 0 ? 'left to right' : 'right to left'} along the line.`; }
+  else if (k === 1) { const s = pick(r, [1, -1]), c = pick(r, [3, 2, -2, -3, 1]); xT = s > 0 ? 't²' : `${MINUS}t²`; yT = tT(c); X = (t) => s * t * t; Y = (t) => c * t; t0 = -3; t1 = 3; opts = ['Upward', 'Downward']; ans = c > 0 ? opts[0] : opts[1];
+    why = `As t increases, y = ${yT} ${c > 0 ? 'increases' : 'decreases'}, so the point moves ${c > 0 ? 'upward' : 'downward'} along the parabola.`; }
+  else { par = 'θ'; const a = ri(r, 1, 4), b = ri(r, 1, 4), v = ri(r, 0, 3);
+    const forms = [[`${a} cos θ`, `${b} sin θ`, (t) => a * Math.cos(t), (t) => b * Math.sin(t), 'Counterclockwise'], [`${a} sin θ`, `${b} cos θ`, (t) => a * Math.sin(t), (t) => b * Math.cos(t), 'Clockwise'],
+      [`${a} cos θ`, `${MINUS}${b} sin θ`, (t) => a * Math.cos(t), (t) => -b * Math.sin(t), 'Clockwise'], [`${MINUS}${a} sin θ`, `${b} cos θ`, (t) => -a * Math.sin(t), (t) => b * Math.cos(t), 'Counterclockwise']];
+    [xT, yT, X, Y, ans] = forms[v]; xT = xT.replace(/(^|−)1 /, '$1'); yT = yT.replace(/(^|−)1 /, '$1'); t0 = 0; t1 = 2 * Math.PI; opts = ['Counterclockwise', 'Clockwise'];
+    const p0 = [X(0), Y(0)], p1 = [X(Math.PI / 2), Y(Math.PI / 2)];
+    why = `At θ = 0 the point is ${ptT(p0)}; at θ = π/2 it is ${ptT(p1)}. Moving from the first to the second goes ${ans.toLowerCase()}.`; }
+  return {
+    topic: 'Orientation of a curve', stem: `The curve x = ${xT}, y = ${yT} is shown. As ${par} increases, in which direction is the curve traced?`,
+    ...buildChoices(r, ans, opts.filter((o) => o !== ans), () => null), fr: FR.select('Orientation:', opts, ans),
+    draw: plotQ({ xr: [-6, 6], yr: [-6, 6], curves: [{ param: [(t) => [X(t), Y(t)], t0, t1] }] }), size: [360, 360],
+    solution: why,
+  };
+};
+// finding parametric equations
+function paramOk(raw, f) { const s = String(raw || '').replace(/^\s*[xy]\s*=/, '').replace(/\\theta/g, 't'); const n = parseTrig(s); if (!n) return null; return (t) => evalTrig(n, t); }
+TEMPLATES.p6Find = (r) => {
+  const k = ri(r, 0, 2);
+  let given, F, xT, yT, xL, yL, wrongs, why, par;
+  if (k === 0) { // line through two points
+    let p, q; do { p = [ri(r, -6, 6), ri(r, -6, 6)]; q = [ri(r, -6, 6), ri(r, -6, 6)]; } while (p[0] === q[0] && p[1] === q[1]);
+    par = 't'; const dx = q[0] - p[0], dy = q[1] - p[1];
+    given = `the line through ${ptT(p)} and ${ptT(q)}`; F = (x, y) => (x - p[0]) * dy - (y - p[1]) * dx;
+    xT = lnSumT([[p[0], null, ''], [dx, null, 't']]) || '0'; yT = lnSumT([[p[1], null, ''], [dy, null, 't']]) || '0';
+    const L = (a, b) => `${a}${b ? `${b > 0 ? '+' : '-'}${Math.abs(b) === 1 ? '' : Math.abs(b)}t` : ''}`; xL = L(p[0], dx); yL = L(p[1], dy);
+    const T = (a, b, c, d) => `x = ${lnSumT([[a, null, ''], [b, null, 't']])}, y = ${lnSumT([[c, null, ''], [d, null, 't']])}`;
+    wrongs = [T(p[0], dy, p[1], dx), T(p[0], dx, p[1], -dy), T(q[0], p[0], q[1], p[1]), T(p[0], -dx, p[1], dy)];
+    why = `Use x = x₁ + t(x₂ − x₁) and y = y₁ + t(y₂ − y₁) with ${ptT(p)} and ${ptT(q)}.`;
+  } else {
+    const h = ri(r, -5, 5), kk = ri(r, -5, 5), a = ri(r, 1, 6), b = k === 1 ? a : ri(r, 1, 6); par = 'θ';
+    if (k === 2 && a === b) return TEMPLATES.p6Find(r);
+    given = k === 1 ? `the circle with center ${ptT([h, kk])} and radius ${a}` : `the ellipse with center ${ptT([h, kk])}, ${a > b ? 'horizontal' : 'vertical'} major axis of length ${2 * Math.max(a, b)}, and minor axis of length ${2 * Math.min(a, b)}`;
+    F = (x, y) => (x - h) ** 2 / (a * a) + (y - kk) ** 2 / (b * b) - 1;
+    const tx = (c, A, fn) => `${c ? fmt(c) + ' + ' : ''}${A === 1 ? '' : A + ' '}${fn} θ`;
+    xT = tx(h, a, 'cos'); yT = tx(kk, b, 'sin');
+    xL = `${h || ''}${h ? '+' : ''}${a === 1 ? '' : a}\\cos\\left(\\theta\\right)`; yL = `${kk || ''}${kk ? '+' : ''}${b === 1 ? '' : b}\\sin\\left(\\theta\\right)`;
+    const T = (c1, A, c2, B) => `x = ${tx(c1, A, 'cos')}, y = ${tx(c2, B, 'sin')}`;
+    wrongs = [T(h, a * a, kk, b * b), T(-h, a, -kk, b), T(kk, a, h, b), k === 2 ? T(h, b, kk, a) : T(h, 2 * a, kk, 2 * b)];
+    why = k === 1 ? `x = h + r cos θ, y = k + r sin θ with (h, k) = ${ptT([h, kk])} and r = ${a}.` : `x = h + a cos θ, y = k + b sin θ, where ${a > b ? 'a' : 'b'} is half the major axis and ${a > b ? 'b' : 'a'} is half the minor axis.`;
+  }
+  const correct = `x = ${xT}, y = ${yT}`;
+  const asFR = (w) => check(w.split(', ').map((s) => s.replace(/^[xy] = /, '').replace(/θ/g, 't').replace(/−/g, '-')));
+  const check = (v) => { const X = paramOk(v[0]), Y = paramOk(v[1]); if (!X || !Y) return false; const pts = []; for (let j = 0; j < 40; j++) { const t = -9.7 + j * 0.53; const x = X(t), y = Y(t); if (!isFinite(x) || !isFinite(y)) return false; if (Math.abs(F(x, y)) > 1e-6 * Math.max(1, Math.abs(x) + Math.abs(y))) return false; pts.push([x, y]); }
+    const spread = Math.max(...pts.map((p) => Math.hypot(p[0] - pts[0][0], p[1] - pts[0][1]))); return spread > 0.5; };
+  return {
+    topic: 'Finding parametric equations', stem: `Find a set of parametric equations to represent ${given}.`,
+    ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct && !asFR(w)), (i) => { const c = [`x = ${xT}, y = ${yT} ${i % 2 ? '+' : MINUS} ${(i >> 1) + 1}`, `x = ${xT} ${i % 2 ? '+' : MINUS} ${(i >> 1) + 1}, y = ${yT}`][i % 4 < 2 ? 0 : 1]; return asFR(c) ? null : c; }),
+    frStem: `Find a set of parametric equations to represent ${given}. Use ${par === 't' ? 't' : 'θ (or t)'} as the parameter. (Many answers are possible.)`,
+    fr: { fields: [{ kind: 'expr', keys: 'wave', label: 'x =' }, { kind: 'expr', keys: 'wave', label: 'y =' }], key: [xL, yL], display: correct, check },
+    solution: `${why}\n${correct}  (Other answers are possible.)`,
+  };
+};
+
 /* ==== CHAPTER 6 END ==== */
 /* ---------- 2.1 Using Fundamental Identities ---------- */
 // Expressions are written in a small plain notation with X for the variable, e.g. 'sin^2 X/(1 + cos X)'.
@@ -9526,6 +9713,10 @@ const QUESTION_TYPES = [
   { id: 'r5Rotate', subject: 'precalc',  section: '6.5 Rotation of Conics', label: 'Rotating to eliminate the xy-term', desc: 'Standard form in x′ and y′ (#13–24)' },
   { id: 'r5Classify', subject: 'precalc',  section: '6.5 Rotation of Conics', label: 'Using the discriminant', desc: 'B² − 4AC' },
   { id: 'r5Match', subject: 'precalc',  section: '6.5 Rotation of Conics', label: 'Matching rotated conics', desc: '(#31–36)' },
+  { id: 'p6Table', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Points from parametric equations', desc: 'Table of values (#5–6)' },
+  { id: 'p6Orient', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Orientation of a curve', desc: '(#7–12)' },
+  { id: 'p6Elim', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Eliminating the parameter', desc: 'Rectangular equation and domain (#13–36)' },
+  { id: 'p6Find', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Finding parametric equations', desc: 'Line, circle, ellipse' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
