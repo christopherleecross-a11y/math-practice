@@ -45,6 +45,10 @@
   .checkbtn { margin: 0; padding: 8px 18px; }
   .flash { flex-basis: 100%; color: var(--warn); background: #fdf3dc; border-radius: 8px; padding: 8px 12px; font-size: 15px; }
   .work { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .worktoggle { display: inline-flex; align-items: center; gap: 4px; font: 600 14px system-ui, sans-serif; color: var(--accent); background: #fff; border: 1px dashed var(--accent); border-radius: 8px; padding: 7px 14px; }
+  .worktoggle.open { border-style: solid; margin-bottom: 10px; }
+  .worktoggle .chev { font-size: 12px; }
+  .workhas { margin-left: 8px; font-weight: 600; color: var(--good); background: var(--good-soft); border-radius: 99px; padding: 1px 8px; font-size: 12px; }
   .worktitle { font-weight: 700; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
   .work textarea { width: 100%; margin-top: 8px; padding: 10px 12px; font: 16px system-ui, sans-serif; border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
   .mkeys { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
@@ -87,6 +91,8 @@
   .tag.part { background: #fdf3dc; color: var(--warn); }
   .small { font-size: 13px; color: var(--muted); }
   .hidden { display: none; }
+  .q.wm { background-image: var(--wm); background-repeat: repeat; }
+  .q.wm .choice:not(.sel):not(.right):not(.wrong) { background: transparent; }
   #shield { position: fixed; inset: 0; z-index: 9999; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; }
   .shieldcard { max-width: 460px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 28px; text-align: center; }
   .shieldcard h2 { margin: 8px 0; font-size: 22px; }
@@ -143,6 +149,8 @@ const CONFIG = {
   // LOCKDOWN = questions only show in full screen; right-click/copy/print are blocked; leaving the page
   //            (other tab, other app, Google Lens panel, exiting full screen) hides the questions and is counted.
   LOCKDOWN: true,
+  // WATERMARK = faint student name, period, and date repeated across every question, so a shared screenshot shows whose it is.
+  WATERMARK: true,
   ATTEMPTS: 1,
 
   // Teacher answer-key PIN, stored as a hash. Default PIN is 1234.
@@ -1406,15 +1414,27 @@ function saveState() {
     tries: state.tries, status: state.status, history: state.history, submitted: state.submitted });
 }
 
+function watermarkCss() {
+  const d = new Date();
+  const text = `${state.name} · ${state.period} period · ${d.getMonth() + 1}/${d.getDate()}`;
+  const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const L = text.length * 8.4;                                   // approx. width of the text line in px
+  const w = Math.round(L * 0.94 + 56), h = Math.round(L * 0.34 + 48); // tile just fits the slanted line
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><text x="${w / 2}" y="${h / 2 + 5}" text-anchor="middle" ` +
+    `transform="rotate(-20 ${w / 2} ${h / 2})" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#1d1d1b" fill-opacity="0.09">${esc}</text></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
 function render() {
   app.innerHTML = '';
   const { qs, answers, submitted, teacher } = state;
+  const wm = !teacher && CONFIG.WATERMARK !== false;
+  if (wm) app.style.setProperty('--wm', watermarkCss()); else app.style.removeProperty('--wm');
   const W = contentWidth();
   if (submitted) app.append(resultsCard());
   if (teacher) app.append(el('div', { class: 'card' }, el('strong', {}, 'Answer key'), el('p', { class: 'small' }, `Version ${state.version}. This is exactly what this student sees.`)));
   qs.forEach((q, i) => {
     const locked = !!state.status[i];
-    const box = el('div', { class: 'q', id: 'q' + i });
+    const box = el('div', { class: 'q' + (wm ? ' wm' : ''), id: 'q' + i });
     box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic)));
     box.append(textCanvas(q.stem, W));
     if (q.draw) {
@@ -1535,10 +1555,26 @@ const PAD = [640, 260];
 const coarse = (() => { try { return matchMedia('(pointer: coarse)').matches; } catch { return false; } })();
 function workArea(q, i) {
   const done = !!state.submitted;
-  const wrap = el('div', { class: 'work' }, el('div', { class: 'worktitle' }, 'Show your work'));
   const strokes = state.drawings['w' + i] || [];
   const typed = workLines(i).filter((l) => l.trim()).length > 0;
-  if (done && !strokes.length && !typed) { wrap.append(el('div', { class: 'small' }, 'No work shown.')); return wrap; }
+  const has = strokes.length > 0 || typed;
+  const wrap = el('div', { class: 'work' });
+  if (done && !has) { wrap.append(el('div', { class: 'worktitle' }, 'Show your work'), el('div', { class: 'small' }, 'No work shown.')); return wrap; }
+  state.workOpen = state.workOpen || {};
+  const open = !!state.workOpen[i];
+  // closed by default: just a button (with a note if there is already work saved)
+  const toggle = el('button', { type: 'button', class: 'worktoggle' + (open ? ' open' : '') },
+    el('span', { class: 'chev' }, open ? '▾' : '▸'), ' ',
+    done ? (open ? 'Hide your work' : 'View your work') : open ? 'Hide work space' : '✎ Show your work',
+    has && !open ? el('span', { class: 'workhas' }, '✓ work saved') : '');
+  toggle.addEventListener('click', () => {
+    state.workOpen[i] = !open;
+    const fresh = workArea(q, i);
+    wrap.replaceWith(fresh);
+    if (!open) { const t = fresh.querySelector('math-field.mline, textarea'); if (t && !coarse) setTimeout(() => t.focus && t.focus({ preventScroll: true }), 0); }
+  });
+  wrap.append(toggle);
+  if (!open) return wrap;
   if (!done || strokes.length) {
     const L = done && state.drawings['Lw' + i] ? state.drawings['Lw' + i] : contentWidth() < 480 ? [360, 300] : PAD; // taller pad on phones
     const pad = makeCanvas(L[0], L[1]); paintGrid(pad);
