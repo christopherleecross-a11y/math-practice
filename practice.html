@@ -161,6 +161,9 @@ const CONFIG = {
   // SAME_FOR_EVERYONE = true gives every student the identical questions (same numbers, same order).
   // Usually set per assignment instead: same: true in SETS, or the builder's "Same questions for everyone" box.
   SAME_FOR_EVERYONE: false,
+  // HINTS = true puts a Hint button on every question in every assignment. Usually set per assignment instead:
+  // hints: true in SETS, or the builder's "Hints" box. Using a hint never changes the score; the gradebook detail shows (hint).
+  HINTS: false,
   // AI_GRADING = true lets "Prove the identity" questions be graded by Claude through your Apps Script
   // (needs an Anthropic API key saved in the script — see PracticeResults.gs). false = step checker only.
   AI_GRADING: true,
@@ -178,7 +181,7 @@ const CONFIG = {
 //   A subject's list only:   practice.html?subject=geometry   (or precalc, act)
 // Each item is [question type, how many] or [question type, how many, 'fr'] for free response.
 // Optional per assignment: retries: 2 (Check button + new versions), attempts: 3 (whole-assignment tries),
-//   same: true (every student gets identical questions).
+//   same: true (every student gets identical questions), hints: true (a Hint button on every question).
 // Types:
 //   5.1: angleSum, extAngleAlgebra, extAngleRatio, classifyTriangle
 //   5.2: congStatement (#1-2), correspondingParts (#3-6), findXY (#7-8), congReason (#9-10), thirdAngle (#13-14)
@@ -10304,10 +10307,10 @@ let CUSTOM_KEY = null;
   const shuffleQs = q.get('order') === 'mixed';
   const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
-  const same = q.get('same') === '1';
+  const same = q.get('same') === '1', hints = q.get('hints') === '1';
   CUSTOM_KEY = 'custom-' + cyrb53(`${mix}|${title}|${shuffleQs}` + (same ? '|same' : '')).toString(36).slice(-8);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints };
 })();
 
 /* ---------- question generation ---------- */
@@ -10350,6 +10353,7 @@ const setting = (setKey, name) => {
   if (name === 'attempts') return CONFIG.ALLOW_RETAKE ? 99 : CONFIG.ATTEMPTS || 1;
   if (name === 'lockdown') return CONFIG.LOCKDOWN !== false;
   if (name === 'same') return !!CONFIG.SAME_FOR_EVERYONE;
+  if (name === 'hints') return !!CONFIG.HINTS;
   return CONFIG.RETRIES || 0;
 };
 
@@ -10431,7 +10435,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1) {
   const saved = teacher ? {} : store.get(key) || {};
   const tries = saved.tries || {};
   Object.keys(tries).forEach((i) => { if (tries[i] > 0 && qs[i]) qs[i] = regenQuestion(seedStr, qs[i], +i, tries[i]); });
-  state = { setKey, period, name, qs, version, seedStr, key, base, meta, attempt, attempts, retries, teacher,
+  state = { setKey, period, name, qs, version, seedStr, key, base, meta, attempt, attempts, retries, teacher, hints: !!setting(setKey, 'hints'), hintUsed: saved.hintUsed || {},
     answers: saved.answers || Array(qs.length).fill(null),
     submitted: !teacher && saved.submitted ? saved.submitted : null,
     started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
@@ -10445,7 +10449,7 @@ function saveState() {
   if (state.teacher) return;
   const saved = store.get(state.key) || {};
   store.set(state.key, { ...saved, answers: state.answers, started: state.started, tabAways: state.tabAways,
-    tries: state.tries, status: state.status, history: state.history, submitted: state.submitted, ai: state.ai });
+    tries: state.tries, status: state.status, history: state.history, submitted: state.submitted, ai: state.ai, hintUsed: state.hintUsed });
 }
 
 function watermarkCss() {
@@ -10480,6 +10484,7 @@ function render() {
       q.draw(cv); box.append(drawable(cv, String(i), { readOnly: !!submitted || !!teacher || locked }));
     }
     const showSol = ((submitted || locked) && CONFIG.SHOW_SOLUTIONS) || teacher;
+    if (state.hints) box.append(hintBar(q, i));
     if (q.mode === 'fr') { box.append(frArea(q, i)); box.append(checkBar(q, i)); if (!teacher && !q.proofQ) box.append(workArea(q, i)); if (showSol) box.append(el('div', { class: 'sol' }, q.solution)); app.append(box); return; }
     const ch = el('div', { class: 'choices' });
     q.choices.forEach((c, j) => {
@@ -10850,6 +10855,48 @@ function frArea(q, i) {
   return wrap;
 }
 
+/* ---------- hints (teacher turns them on per assignment) ---------- */
+// split at top-level commas/semicolons (not inside parentheses)
+function hintSplit(s) {
+  const out = []; let d = 0, k = 0;
+  for (let i = 0; i < s.length; i++) { const c = s[i]; if ('([{'.includes(c)) d++; else if (')]}'.includes(c)) d--; else if (d === 0 && (c === ',' || c === ';')) { out.push(s.slice(k, i)); k = i + 1; } }
+  out.push(s.slice(k)); return out.map((t) => t.trim()).filter(Boolean);
+}
+// the first line of the worked solution, with the answer itself replaced by "?"
+function hintFor(q) {
+  if (q.hint) return q.hint;
+  const lines = String(q.solution || '').split('\n').map((l) => l.trim()).filter(Boolean); if (!lines.length) return '';
+  let s = lines[0].replace(/(.)̅/g, '$1');
+  const m = /^(.+?[.!?])(?=\s+[A-Z(√∠△]|$)/.exec(s); if (m && m[1].length >= 25) s = m[1];
+  const disp = [q.fr ? q.fr.display : '', q.choices ? q.choices[q.answer] : ''].filter(Boolean).map((t) => String(t).replace(/(.)̅/g, '$1'));
+  const toks = new Set();
+  const add = (p) => {
+    if (p.length > 12 && p.length <= 90) toks.add(p.replace(/\s*\((?:[A-Z][^()]*)\)$/, '').replace(/\.$/, ''));
+    p = p.replace(/\s*\((?:[A-Z][^()]*)\)$/, '').replace(/°|\b(units?|feet|inches|miles|kilometers|radians?)\b/g, '').trim();
+    const parts = p.split(/\s*[=≈]\s*/).map((x) => x.trim()).filter(Boolean);
+    if (parts.length > 1) { parts.forEach((x, i) => { if (i || !/^[a-zA-Zθ′'₀-₉]{1,3}$|\(.*\)$/.test(x)) add(x); }); return; }
+    if (p && p.length <= 60) toks.add(p); const t = /^\((.*)\)$/.exec(p); if (t) hintSplit(t[1]).forEach(add);
+  };
+  for (const d of disp) for (const p of hintSplit(d.replace(/ and /g, ', '))) add(p);
+  [...toks].sort((a, b) => b.length - a.length).forEach((t) => {
+    const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pre = /^[\w−-]/.test(t) ? '(?<![\\w./√])' : '', post = /[\wπ]$/.test(t) ? '(?![\\w/θπ√²³]|\\.\\d)' : '';
+    s = s.replace(new RegExp(pre + esc + post, 'gi'), '?');
+  });
+  return s.replace(/[?\s.,;:]/g, '').length < 8 ? `Think about the key idea for this kind of problem: ${q.topic.toLowerCase()}.` : s;
+}
+function hintBar(q, i) {
+  const shown = state.teacher || state.hintUsed[i];
+  const bar = el('div', { class: 'hintbar', style: 'margin:8px 0 4px' });
+  if (shown) bar.append(el('div', { class: 'hintbox', style: 'background:#fff7e0;border:1px solid #e8cf86;border-radius:8px;padding:8px 12px;font-size:15px' },
+    el('strong', {}, state.teacher ? 'Hint (students see this after pressing Hint): ' : 'Hint: '), hintFor(q)));
+  else if (!state.submitted && !state.status[i]) {
+    const b = el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 14px;font-size:14px' }, '💡 Hint');
+    b.addEventListener('click', () => { state.hintUsed[i] = true; saveState(); rerenderAt(i); });
+    bar.append(b);
+  }
+  return bar;
+}
 /* ---------- per-question Check button and retries ---------- */
 function checkBar(q, i) {
   if (!state.retries || state.teacher) return el('span');
@@ -10966,7 +11013,7 @@ async function send(pts) {
     set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, subject: SUBJECTS[SETS[state.setKey].subject] || '', setTitle: SETS[state.setKey].title, period: state.period, name: state.name,
     score: sub.score, total: sub.total, percent: Math.round((100 * sub.score) / sub.total),
     detail: state.qs.map((q, i) => { const a = state.answers[i];
-      const tr = state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '';
+      const tr = (state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '') + (state.hintUsed && state.hintUsed[i] ? '(hint)' : '');
       if (pts[i] === 1) return `${i + 1}✓${tr}` + (q.proofQ && state.ai[i] && state.ai[i].ai ? '(AI)' : '');
       if (!isAnswered(q, a)) return `${i + 1}✗${tr}–`;
       if (q.proofQ) return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}(proof${state.ai[i] && state.ai[i].ai ? ', AI' : ''})`;
@@ -11113,6 +11160,8 @@ function builder() {
   lockIn.checked = saved.lockdown !== false;
   const sameIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   sameIn.checked = !!saved.same;
+  const hintsIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
+  hintsIn.checked = !!saved.hints;
   app.append(el('div', { class: 'card' },
     el('label', {}, 'Assignment title'), titleIn,
     el('label', {}, 'Subject (which gradebook tab scores go to)'), subjSel,
@@ -11124,7 +11173,9 @@ function builder() {
     el('label', {}, 'Lockdown mode'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, lockIn,
       el('span', { class: 'small' }, 'Full screen required; right-click, copy, and printing blocked; leaving the page hides the questions and is recorded.')),
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
-      el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Unchecked = a different version for each student.'))));
+      el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Unchecked = a different version for each student.')),
+    el('label', {}, 'Hints'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
+      el('span', { class: 'small' }, 'Adds a Hint button to every question (the first step of the solution, with the answer hidden). Hints do not change the score; the gradebook detail marks each question where a hint was used.'))));
 
   const list = el('div', { class: 'card' });
   const totalEl = el('strong', {}, '0');
@@ -11228,6 +11279,7 @@ function builder() {
   [titleIn, subjSel, orderSel, retriesIn, attemptsIn].forEach((x) => x.addEventListener('input', update));
   lockIn.addEventListener('change', update);
   sameIn.addEventListener('change', update);
+  hintsIn.addEventListener('change', update);
 
   function update() {
     const items = [];
@@ -11242,7 +11294,7 @@ function builder() {
     const total = items.reduce((a, [, n]) => a + n, 0);
     totalEl.textContent = String(total);
     const title = titleIn.value.trim() || 'Custom Practice';
-    store.set('builder:last', { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked, same: sameIn.checked });
+    store.set('builder:last', { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked });
     if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
@@ -11254,10 +11306,11 @@ function builder() {
     if (at > 1) q.set('attempts', String(at));
     if (!lockIn.checked) q.set('lock', '0');
     if (sameIn.checked) q.set('same', '1');
+    if (hintsIn.checked) q.set('hints', '1');
     const url = location.origin + location.pathname + '?' + q.toString();
     linkIn.value = url; tryLink.href = url; keyLink.href = url + '&teacher=1';
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''} },`;
   }
   update();
 }
