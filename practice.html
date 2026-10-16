@@ -59,6 +59,13 @@
   .anskeys button { min-width: 34px; padding: 3px 7px; font-size: 15px; }
   math-field.mans { display: inline-block; min-width: 96px; min-height: 40px; padding: 2px 8px; font-size: 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; vertical-align: middle; }
   math-field.mans.wide { min-width: 260px; }
+  .proof .pline { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+  .proof .plabel { width: 40px; text-align: right; font: 600 15px Georgia, serif; color: var(--muted, #666); }
+  .proof .pfield { flex: 1; min-width: 220px; max-width: 560px; }
+  .proof .pmark { width: 18px; font-weight: 700; } .proof .pmark.ok { color: #2e7d32; } .proof .pmark.bad { color: #c0392b; }
+  .proof .pmsg { flex-basis: 100%; margin-left: 48px; font: 13px system-ui, sans-serif; color: #c0392b; }
+  .proof .pnote { margin-top: 6px; }
+  .aifb { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #eef4fb; border: 1px solid #c9daf0; font: 15px/1.45 system-ui, sans-serif; }
   input.expr { min-width: 240px; font: 18px Georgia, serif; }
   math-field.mans:focus-within { border-color: var(--accent); }
   math-field.mans[read-only] { background: #f3f1ec; }
@@ -86,7 +93,7 @@
   .status.ok { background: var(--good-soft); color: var(--good); }
   .status.fail { background: var(--bad-soft); color: var(--bad); }
   .status.wait { background: var(--accent-soft); color: var(--accent); }
-  .sol { margin-top: 10px; font-size: 15px; background: #faf9f6; border-left: 3px solid var(--accent); padding: 8px 12px; }
+  .sol { white-space: pre-line; margin-top: 10px; font-size: 15px; background: #faf9f6; border-left: 3px solid var(--accent); padding: 8px 12px; }
   .tag { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
   .tag.good { background: var(--good-soft); color: var(--good); }
   .tag.bad { background: var(--bad-soft); color: var(--bad); }
@@ -154,6 +161,9 @@ const CONFIG = {
   // SAME_FOR_EVERYONE = true gives every student the identical questions (same numbers, same order).
   // Usually set per assignment instead: same: true in SETS, or the builder's "Same questions for everyone" box.
   SAME_FOR_EVERYONE: false,
+  // AI_GRADING = true lets "Prove the identity" questions be graded by Claude through your Apps Script
+  // (needs an Anthropic API key saved in the script — see PracticeResults.gs). false = step checker only.
+  AI_GRADING: true,
   // WATERMARK = faint student name, period, and date repeated across every question, so a shared screenshot shows whose it is.
   WATERMARK: true,
   ATTEMPTS: 1,
@@ -175,6 +185,7 @@ const CONFIG = {
 //   5.3–5.6: triCongruence (marked figures), triCongruenceGiven ("Given:" text, unmarked figure)
 //   Pre-Calc 2.1: trigIdentityFill (#1–4), trigEvaluate (#5–10), trigSimplify (#11–20, 31–38), trigFactor (#21–30), trigAddSub (#39–44)
 //   Pre-Calc 2.2: trigIsIdentity, trigVerifyReason (#5–14), trigVerifyStep (#5–32), trigSinCos (#27–32)
+//   Pre-Calc 2.2 proofs: trigProve (students write the proof; AI graded — set up the key in PracticeResults.gs)
 //   Pre-Calc 2.3: trigCheckSolution (#7–12), trigSolveBasic (#13–20), trigSolveFactor (#21–30), trigSolveInterval (#31–40), trigSolveMultiple (#41–48)
 //   other: dilation, composite, trigGraph
 const SUBJECTS = {
@@ -192,6 +203,7 @@ const SETS = {
   'precalc-trig':  { subject: 'precalc',  title: 'Graphs of Sine and Cosine', items: [['trigGraph', 6]] },
   'precalc-2-1':   { subject: 'precalc',  title: '2.1 Using Fundamental Identities', items: [['trigIdentityFill', 3], ['trigEvaluate', 3], ['trigSimplify', 4], ['trigFactor', 2], ['trigAddSub', 2]] },
   'precalc-2-2':   { subject: 'precalc',  title: '2.2 Verifying Trigonometric Identities', items: [['trigIsIdentity', 2], ['trigVerifyReason', 3], ['trigVerifyStep', 4], ['trigSinCos', 3]] },
+  'precalc-2-2-prove': { subject: 'precalc', title: '2.2 Proving Identities (AI graded)', items: [['trigProve', 4]] },
   'precalc-2-3':   { subject: 'precalc',  title: '2.3 Solving Trigonometric Equations', items: [['trigCheckSolution', 2], ['trigSolveBasic', 3], ['trigSolveFactor', 3], ['trigSolveInterval', 3], ['trigSolveMultiple', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
@@ -1091,6 +1103,192 @@ TEMPLATES.trigSinCos = (r) => {
     };
   }
 };
+
+/* ---------- Proving identities (student writes the proof; step checker + AI grading) ---------- */
+// The student writes one expression per line, starting with one side and ending with the other.
+// 1) The page checks every line mathematically (free, instant).
+// 2) On Submit (or Check), the proof is sent to the teacher's Apps Script, which asks Claude to grade the reasoning.
+//    Only the math lines are sent — no names — and they are rebuilt from the parsed math, so typed text can't reach the AI.
+// If AI grading isn't set up or doesn't answer, the step checker's score is used and the teacher can review the work Doc.
+TEMPLATES.trigProve = (r) => {
+  const [lhs, rhs, steps] = pick(r, TRIG_VERIFY), v = pick(r, TRIG_VARS);
+  const model = [lhs, ...steps.map(([e]) => e)];
+  const q = {
+    topic: 'Proving identities', proofQ: { lhs, rhs, v },
+    stem: `Prove the identity:   ${prettyTrig(lhs, v)} = ${prettyTrig(rhs, v)}\n` +
+      'Start with one side exactly as written. On each new line, write the next expression, changing one thing at a time, until you reach the other side. Press Enter for a new line.',
+    choices: [], answer: -1,
+    solution: 'One possible proof:\n' + chainLines(lhs, rhs, steps, v, { note: steps.map(([, w]) => `(${STEP_NOTE[w]})`) }).split('\n').slice(2).join('\n'),
+  };
+  q.fr = { fields: [{ kind: 'proof' }], key: [model.map((e) => latexTrig(e, v)).join('\n')], display: 'See the sample proof below.',
+    answered: (vals) => proofLines(vals[0]).length > 0, check: (vals) => proofScore(q, vals[0]) === 1, score: (vals) => proofScore(q, vals[0]) };
+  return q;
+};
+const proofLines = (s) => String(s || '').split('\n').filter((x) => x.replace(/\\[,;: ]|\s/g, '') !== '');
+// a line's "shape": its symbols in order, ignoring × signs and grouping, to tell whether it is one side as written
+const formKey = (s) => { const t = tokTrig(/[\\{}]/.test(s) ? latexToPlain(s) : s); return t ? t.filter((k) => !['*', '(', ')'].includes(k.t)).map((k) => k.t + (k.v != null ? ':' + (typeof k.v === 'number' ? k.v.toFixed(6) : k.v) : '')) : null; };
+const sameShape = (a, b) => { const x = formKey(a), y = formKey(b); return !!(x && y && x.join() === y.join()); };
+const sameSymbols = (a, b) => { const x = formKey(a), y = formKey(b); return !!(x && y && x.slice().sort().join() === y.slice().sort().join()); };
+function proofCheck(q, raw) {
+  const { lhs, rhs, v } = q.proofQ;
+  const L = parseTrig(trigVar(lhs, v)), lines = proofLines(raw);
+  const rows = lines.map((s) => {
+    const a = parseTrig(s);
+    if (!a) return { ok: false, msg: 'I can’t read this line as math.' };
+    const eq = trigEquiv(a, L) && trigEquiv(L, a);
+    return { ok: eq, ast: a, msg: eq ? '' : 'This isn’t equal to the line above it. Check this step.' };
+  });
+  const sides = { left: trigVar(lhs, v), right: trigVar(rhs, v) };
+  const first = lines[0] || '', last = lines[lines.length - 1] || '';
+  const start = sameShape(first, sides.left) ? 'left' : sameShape(first, sides.right) ? 'right' : null;
+  const goal = start === 'right' ? sides.left : sides.right;
+  const reached = lines.length > 1 && (sameShape(last, goal) || sameSymbols(last, goal));
+  const allOk = rows.length > 0 && rows.every((x) => x.ok);
+  const notes = [];
+  if (!lines.length) notes.push('No proof written yet.');
+  else {
+    if (!start) notes.push('Your first line should be one side of the identity, written exactly as given.');
+    if (rows.some((x) => !x.ok)) notes.push(`Check line ${rows.findIndex((x) => !x.ok) + 1}.`);
+    if (start && !reached) notes.push(`Keep going until your last line is the ${start === 'left' ? 'right' : 'left'} side.`);
+    if (start && reached && lines.length < 3) notes.push('Show the steps in between, one change per line.');
+    if (!notes.length) notes.push(`Every line checks out, and you went from the ${start} side to the ${start === 'left' ? 'right' : 'left'} side.`);
+  }
+  const score = allOk && start && reached && lines.length >= 3 ? 1 : allOk && start && lines.length >= 2 ? 0.5 : 0;
+  return { rows, start, reached, allOk, notes, score, lines };
+}
+const proofHash = (raw) => cyrb53(proofLines(raw).join('\n')).toString(36);
+function proofScore(q, raw) {
+  const i = state.qs.indexOf(q), g = state.ai && state.ai[i];
+  if (g && g.key === proofHash(raw)) return g.score;
+  return proofCheck(q, raw).score;
+}
+function astText(n, v) {
+  const T = (m) => astText(m, v);
+  switch (n.t) {
+    case 'n': return Math.abs(n.v - Math.PI) < 1e-12 ? 'π' : String(n.v);
+    case 'v': return v;
+    case 'p': return '(' + T(n.a) + ')';
+    case 'neg': return '−' + T(n.a);
+    case '+': return T(n.a) + ' + ' + T(n.b);
+    case '-': return T(n.a) + ' − ' + T(n.b);
+    case '*': return T(n.a) + '·' + T(n.b);
+    case '/': return T(n.a) + '/' + T(n.b);
+    case '^': return T(n.a) + '^' + T(n.b);
+    case 'sqrt': return '√(' + T(n.a) + ')';
+    case 'f': return `${n.f}(${T(n.a)})`;
+  }
+  return '?';
+}
+async function gradeProof(i) {
+  const q = state.qs[i], raw = (state.answers[i] || [])[0] || '';
+  const chk = proofCheck(q, raw), key = proofHash(raw), { lhs, rhs, v } = q.proofQ;
+  const fallback = (why) => ({ key, score: chk.score, fallback: true,
+    feedback: `${why} The step checker scored this proof: ${chk.notes.join(' ')} ${CONFIG.TEACHER_NAME} may review it.` });
+  let result;
+  if (!CONFIG.SCRIPT_URL || CONFIG.AI_GRADING === false) result = fallback('AI grading is not turned on.');
+  else if (!chk.lines.length) result = { key, score: 0, feedback: 'No proof was written.' };
+  else {
+    const body = {
+      action: 'gradeProof',
+      identity: `${prettyTrig(lhs, v)} = ${prettyTrig(rhs, v)}`,
+      sample: [lhs, ...TRIG_VERIFY.find((t) => t[0] === lhs && t[1] === rhs)[2].map(([e]) => e)].map((e) => prettyTrig(e, v)),
+      lines: chk.rows.map((row) => (row.ast ? astText(row.ast, v) : '[unreadable line]')),
+      check: chk.rows.map((row, k) => `line ${k + 1}: ${row.ast ? (row.ok ? 'equal to the starting side' : 'NOT equal to the starting side') : 'unreadable'}`)
+        .concat([`starts from: ${chk.start ? chk.start + ' side' : 'neither side as written'}`, `ends at the other side: ${chk.reached ? 'yes' : 'no'}`]),
+    };
+    try {
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 45000);
+      const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), signal: ctl.signal });
+      clearTimeout(timer);
+      const g = await res.json();
+      if (g && [0, 0.5, 1].includes(g.score)) {
+        // the AI can't give full credit when the step checker found a line that isn't equal
+        let s = g.score;
+        if (!chk.allOk) s = Math.min(s, 0.5);
+        result = { key, score: s, feedback: String(g.feedback || '').slice(0, 700), ai: true };
+      } else result = fallback(g && g.error ? `AI grading: ${g.error}.` : 'AI grading didn’t answer.');
+    } catch (e) { result = fallback('AI grading couldn’t be reached.'); }
+  }
+  state.ai[i] = result; saveState();
+  return result;
+}
+async function gradeAllProofs(only = null) {
+  const todo = state.qs.map((q, i) => i).filter((i) => {
+    if (only !== null && i !== only) return false;
+    const q = state.qs[i]; if (!q.proofQ || !isAnswered(q, state.answers[i])) return false;
+    const g = state.ai[i]; return !(g && g.key === proofHash(state.answers[i][0]));
+  });
+  if (!todo.length) return;
+  const ov = el('div', { id: 'grading', style: 'position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:50;display:flex;align-items:center;justify-content:center;font:600 20px system-ui,sans-serif' },
+    `Grading your proof${todo.length > 1 ? 's' : ''}… this can take up to a minute.`);
+  document.body.append(ov);
+  try { await Promise.all(todo.map(gradeProof)); } finally { ov.remove(); }
+}
+function proofEditor(q, i, vals, reveal, save) {
+  const box = el('div', { class: 'proof' });
+  let lines = String(vals[0] || '').split('\n'); if (!lines.length) lines = [''];
+  let focusAt = null, lastFocus = null;
+  const commit = () => { vals[0] = lines.join('\n'); save(); };
+  const draw = () => {
+    box.innerHTML = '';
+    const showMarks = reveal || state.proofShown[i];
+    const chk = showMarks ? proofCheck(q, lines.join('\n')) : null;
+    let n = 0;
+    const list = el('div', { class: 'plines' });
+    lines.forEach((text, k) => {
+      const filled = text.replace(/\\[,;: ]|\s/g, '') !== '';
+      const row = chk && filled ? chk.rows[n] : null; if (filled) n++;
+      const mark = row ? el('span', { class: 'pmark ' + (row.ok ? 'ok' : 'bad'), title: row.msg }, row.ok ? '✓' : '✗') : el('span', { class: 'pmark' }, '');
+      let input;
+      if (mathReady) {
+        input = new MathfieldElement();
+        input.smartMode = false; input.mathVirtualKeyboardPolicy = 'manual'; input.menuItems = [];
+        input.className = 'mans wide pfield'; input.value = text; input.setAttribute('aria-label', `Proof line ${k + 1}`);
+        if (reveal) input.readOnly = true;
+      } else {
+        input = el('input', { type: 'text', class: 'expr pfield', autocomplete: 'off', spellcheck: 'false', placeholder: k ? 'next step' : 'one side of the identity' });
+        input.value = text; if (reveal) input.disabled = true;
+      }
+      if (!reveal) {
+        input.addEventListener('input', () => { lines[k] = input.value; mark.textContent = ''; commit(); });
+        input.addEventListener('focus', () => { lastFocus = input; });
+        input.addEventListener('keydown', (e) => {
+          if (e.key === ' ' && mathReady) { e.preventDefault(); e.stopPropagation(); }
+          if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); lines.splice(k + 1, 0, ''); focusAt = k + 1; commit(); draw(); }
+          if (e.key === 'Backspace' && !String(input.value).trim() && lines.length > 1) { e.preventDefault(); e.stopPropagation(); lines.splice(k, 1); focusAt = Math.max(0, k - 1); commit(); draw(); }
+        }, true);
+      }
+      list.append(el('div', { class: 'pline' }, el('span', { class: 'plabel' }, k ? '=' : 'Start'), input, mark,
+        row && !row.ok ? el('span', { class: 'pmsg' }, row.msg) : ''));
+    });
+    box.append(list);
+    if (!reveal) {
+      const keys = [['sin', '\\sin '], ['cos', '\\cos '], ['tan', '\\tan '], ['csc', '\\csc '], ['sec', '\\sec '], ['cot', '\\cot '], ['θ', '\\theta '], ['x²', '^{2}'], ['a⁄b', '\\frac{#@}{#?}'], ['π', '\\pi']];
+      const tools = el('div', { class: 'mkeys anskeys' });
+      if (mathReady) keys.forEach(([label, latex]) => {
+        const b = el('button', { type: 'button' }, label);
+        b.addEventListener('mousedown', (e) => e.preventDefault());
+        b.addEventListener('click', () => { const mf = lastFocus && lastFocus.isConnected ? lastFocus : box.querySelector('math-field'); mf.focus(); mf.insert(latex, { format: 'latex', selectionMode: 'placeholder' }); mf.dispatchEvent(new Event('input')); });
+        tools.append(b);
+      });
+      const add = el('button', { type: 'button', class: 'mtext' }, '+ New line');
+      add.addEventListener('click', () => { lines.push(''); focusAt = lines.length - 1; commit(); draw(); });
+      const chkBtn = el('button', { type: 'button', class: 'mtext' }, 'Check my steps');
+      chkBtn.addEventListener('click', () => { state.proofShown[i] = true; draw(); });
+      tools.append(add, chkBtn);
+      box.append(tools);
+      if (chk) box.append(el('div', { class: 'small pnote' }, chk.notes.join(' ')));
+    }
+    const g = state.ai[i];
+    if (reveal && g && g.key === proofHash(lines.join('\n'))) {
+      box.append(el('div', { class: 'aifb' }, el('strong', {}, g.ai ? `AI grade: ${g.score === 1 ? 'full credit' : g.score > 0 ? 'half credit' : 'no credit'}` : 'Step checker grade'),
+        el('div', {}, g.feedback)));
+    }
+    if (focusAt !== null) { const t = box.querySelectorAll('.pfield')[focusAt]; focusAt = null; if (t) { t.focus(); requestAnimationFrame(() => t.focus()); } }
+  };
+  draw();
+  return box;
+}
 
 /* ---------- 2.3 Solving Trigonometric Equations ---------- */
 // Every equation is built so its solutions are special angles (multiples of π/12 for the inside angle u = mx).
@@ -2205,6 +2403,7 @@ const QUESTION_TYPES = [
   { id: 'trigVerifyReason',   subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Name the identity used', desc: 'A worked verification: which identity justifies the marked step (#5–14)' },
   { id: 'trigVerifyStep',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Fill in the missing step', desc: 'A worked verification with one step blank (#5–32)' },
   { id: 'trigSinCos',         subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Convert to sines and cosines', desc: 'Rewrite with only sin and cos (#27–32)' },
+  { id: 'trigProve',          subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Prove the identity (AI graded)', desc: 'Students write the whole proof line by line; each line is checked, then Claude grades it' },
   { id: 'trigCheckSolution', subject: 'precalc',  section: '2.3 Solving Trigonometric Equations', label: 'Is it a solution?', desc: 'Check whether an x-value solves the equation (#7–12)' },
   { id: 'trigSolveBasic', subject: 'precalc',  section: '2.3 Solving Trigonometric Equations', label: 'Solve (isolate the function)', desc: 'General solution, like x = π/6 + 2nπ (#13–20)' },
   { id: 'trigSolveFactor', subject: 'precalc',  section: '2.3 Solving Trigonometric Equations', label: 'Solve by factoring', desc: 'Factored, cubic, and quadratic-type equations (#21–30)' },
@@ -2234,6 +2433,7 @@ let CUSTOM_KEY = null;
 /* ---------- question generation ---------- */
 function applyMode(q, mode) {
   if (q.twoPart) { q.mode = 'fr'; q.fr = mode === 'fr' ? q.twoPart.fr : q.twoPart.mc; return q; } // Part A + Part B
+  if (q.proofQ) { q.mode = 'fr'; return q; } // proofs are always written out
   if (mode === 'fr' && q.fr) { q.mode = 'fr'; if (q.frStem) q.stem = q.frStem; }
   else q.mode = 'mc';
   return q;
@@ -2355,7 +2555,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1) {
     answers: saved.answers || Array(qs.length).fill(null),
     submitted: !teacher && saved.submitted ? saved.submitted : null,
     started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
-    tries, status: saved.status || {}, history: saved.history || {}, flash: {},
+    tries, status: saved.status || {}, history: saved.history || {}, flash: {}, ai: (!teacher && saved.ai) || {}, proofShown: {},
     drawings: (!teacher && store.get(key + ':draw')) || {}, drawOn: {}, work: (!teacher && store.get(key + ':work')) || {} };
   if (!teacher) { saveState(); store.set(base + ':meta', meta); }
   render();
@@ -2365,7 +2565,7 @@ function saveState() {
   if (state.teacher) return;
   const saved = store.get(state.key) || {};
   store.set(state.key, { ...saved, answers: state.answers, started: state.started, tabAways: state.tabAways,
-    tries: state.tries, status: state.status, history: state.history, submitted: state.submitted });
+    tries: state.tries, status: state.status, history: state.history, submitted: state.submitted, ai: state.ai });
 }
 
 function watermarkCss() {
@@ -2400,7 +2600,7 @@ function render() {
       q.draw(cv); box.append(drawable(cv, String(i), { readOnly: !!submitted || !!teacher || locked }));
     }
     const showSol = ((submitted || locked) && CONFIG.SHOW_SOLUTIONS) || teacher;
-    if (q.mode === 'fr') { box.append(frArea(q, i)); box.append(checkBar(q, i)); if (!teacher) box.append(workArea(q, i)); if (showSol) box.append(el('div', { class: 'sol' }, q.solution)); app.append(box); return; }
+    if (q.mode === 'fr') { box.append(frArea(q, i)); box.append(checkBar(q, i)); if (!teacher && !q.proofQ) box.append(workArea(q, i)); if (showSol) box.append(el('div', { class: 'sol' }, q.solution)); app.append(box); return; }
     const ch = el('div', { class: 'choices' });
     q.choices.forEach((c, j) => {
       let cls = 'choice';
@@ -2647,7 +2847,7 @@ function latexToText(latex) {
       .replace(/_([0-9a-z])/gi, (m, g) => map(g, SUB) || m)
       .replace(/sqrt\(/g, '√(').replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/\+-/g, '±')
       .replace(/(\d)xx(\d)/g, '$1×$2').replace(/ xx /g, ' × ').replace(/-:/g, '÷')
-      .replace(/\btheta\b/g, 'θ').replace(/pi(?![a-z])/g, 'π');
+      .replace(/\btheta\b/g, 'θ').replace(/alpha/g, 'α ').replace(/beta/g, 'β ').replace(/theta/g, 'θ ').replace(/pi(?![a-z])/g, 'π');
   }).join('').replace(/\s+/g, ' ').trim();
 }
 
@@ -2672,6 +2872,7 @@ function frArea(q, i) {
     applyLocks();
   };
   q.fr.fields.forEach((f, k) => {
+    if (f.kind === 'proof') { wrap.append(proofEditor(q, i, vals, reveal, save)); controls[k] = { set disabled(_) {}, set placeholder(_) {} }; return; }
     if (!row || f.part) {
       if (f.part) wrap.append(el('div', { class: 'frpart' }, f.part));
       row = el('div', { class: 'frrow' }); wrap.append(row);
@@ -2770,9 +2971,10 @@ function checkBar(q, i) {
   }
   return bar;
 }
-function checkQ(i) {
+async function checkQ(i) {
   const q = state.qs[i], a = state.answers[i];
   if (!isAnswered(q, a)) { state.flash[i] = 'Answer the question first, then press Check.'; return rerenderAt(i); }
+  if (q.proofQ) await gradeAllProofs(i);
   const pts = scoreOf(q, a);
   state.flash[i] = '';
   if (pts === 1) state.status[i] = 'correct';
@@ -2800,13 +3002,17 @@ function choose(i, j) {
 }
 
 let confirmArmed = false;
-function submit() {
+let submitting = false;
+async function submit() {
+  if (submitting) return;
   const blanks = state.qs.filter((q, i) => !isAnswered(q, state.answers[i])).length;
   if (blanks && !confirmArmed) {
     confirmArmed = true;
     document.getElementById('submitErr').textContent = `${blanks} unanswered. Tap Submit again to turn it in anyway.`;
     return;
   }
+  submitting = true;
+  try { await gradeAllProofs(); } finally { submitting = false; }
   const pts = state.qs.map((q, i) => scoreOf(q, state.answers[i]));
   const score = pts.reduce((a, b) => a + b, 0);
   state.submitted = { score, total: state.qs.length, at: Date.now(), saveStatus: 'wait' };
@@ -2832,6 +3038,7 @@ function answerText(q, a) {
   if (q.mode !== 'fr') return a === null || a === undefined || Array.isArray(a) ? '(no answer)' : `${LETTERS[a]}. ${q.choices[a]}`;
   if (!Array.isArray(a) || !isAnswered(q, a)) return '(no answer)';
   if (q.twoPart) return a[0] + (a[0] !== 'Not possible' ? `;  △${normLetters(a[1])} ≅ △${normLetters(a[2])}` : '');
+  if (q.proofQ) return '\n' + proofLines(a[0]).map((s, k) => (k ? '   = ' : '   ') + (/[\\{}]/.test(s) ? latexToText(s) : s)).join('\n');
   return q.fr.fields.map((f, k) => `${f.label ? f.label + ' ' : ''}${f.prefix || ''}${((f.kind === 'number' || f.kind === 'expr') && /[\\{}]/.test(a[k] || '') ? latexToText(a[k]) : a[k]) || '—'}${f.suffix || ''}`).join(',  ');
 }
 function exportWork(pts) {
@@ -2849,8 +3056,10 @@ function exportWork(pts) {
       const PL = state.drawings['Lw' + i] || PAD;
       if (ws.length) { const c = offCanvas(PL[0], PL[1]); paintGrid(c); paintStrokes(c._ctx, ws, PL[0], PL[1]); pad = toPng(c); }
     } catch (e) { /* never block a submission over a picture */ }
-    const correct = q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`;
-    return { n: i + 1, topic: q.topic, stem: q.stem, answer: answerText(q, state.answers[i]), correct, pts: pts[i], typed: workLines(i).map(latexToText).filter(Boolean).join('\n'), fig, pad,
+    const correct = q.proofQ ? '\n' + q.solution : q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`;
+    const g = q.proofQ && state.ai[i];
+    return { n: i + 1, topic: q.topic, stem: q.stem, answer: answerText(q, state.answers[i]), correct, pts: pts[i],
+      feedback: g ? (g.ai ? 'AI grader: ' : 'Step checker (AI not used): ') + g.feedback : '', typed: workLines(i).map(latexToText).filter(Boolean).join('\n'), fig, pad,
       tries: (state.tries[i] || 0) + 1, history: state.history[i] || [] };
   });
 }
@@ -2863,8 +3072,9 @@ async function send(pts) {
     score: sub.score, total: sub.total, percent: Math.round((100 * sub.score) / sub.total),
     detail: state.qs.map((q, i) => { const a = state.answers[i];
       const tr = state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '';
-      if (pts[i] === 1) return `${i + 1}✓${tr}`;
+      if (pts[i] === 1) return `${i + 1}✓${tr}` + (q.proofQ && state.ai[i] && state.ai[i].ai ? '(AI)' : '');
       if (!isAnswered(q, a)) return `${i + 1}✗${tr}–`;
+      if (q.proofQ) return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}(proof${state.ai[i] && state.ai[i].ai ? ', AI' : ''})`;
       return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}` + (q.mode === 'fr' ? '(' + a.filter((x) => x !== '').join(',').slice(0, 24) + ')' : LETTERS[a]); }).join(' '),
     minutes: Math.round((Date.now() - state.started) / 6000) / 10, tabAways: state.tabAways,
     version: state.version + (state.attempts > 1 ? ` · attempt ${state.attempt} of ${state.attempts}` : ''),
@@ -3105,7 +3315,7 @@ function previewQuestion(q) {
       f.part ? el('span', { class: 'frpart', style: 'margin:6px 8px 0 0' }, f.part) : '',
       f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '',
       f.kind === 'choice' ? el('span', { class: 'small' }, f.options.map((o, j) => `${LETTERS[j]}. ${o}`).join('   ')) :
-      f.kind === 'select' ? el('select', { disabled: 'disabled' }, el('option', {}, 'Choose…')) : el('input', { disabled: 'disabled', class: f.kind === 'number' ? 'num' : 'let' }),
+      f.kind === 'select' ? el('select', { disabled: 'disabled' }, el('option', {}, 'Choose…')) : f.kind === 'proof' ? el('span', { class: 'small' }, 'Students type the proof one line at a time; each line is checked, then the AI grades it.') : el('input', { disabled: 'disabled', class: f.kind === 'number' ? 'num' : 'let' }),
       f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''))),
       el('div', { class: 'small', style: 'margin-top:6px' }, 'Correct answer: ', el('strong', {}, q.fr.display.replace(/(.)\u0305/g, '$1')))), el('div', { class: 'sol' }, q.solution));
     return box;
