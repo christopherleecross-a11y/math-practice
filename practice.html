@@ -3266,6 +3266,7 @@ function builder() {
   const saved = store.get('builder:last') || {};
   const counts = Object.assign({}, saved.counts || {});
   const formats = Object.assign({}, saved.formats || {});
+  const frCounts = Object.assign({}, saved.frCounts || {}); // "Some of each": how many of a type are free response
   const titleIn = el('input', { type: 'text', value: saved.title || '', placeholder: 'e.g. 5.6 Quiz Review' });
   const subjSel = el('select', {}, ...Object.entries(SUBJECTS).map(([k, v]) => el('option', { value: k }, v)));
   subjSel.value = saved.subject || 'geometry';
@@ -3300,17 +3301,31 @@ function builder() {
     let seed = 1;
     const prevBtn = el('button', { class: 'btn secondary', style: 'margin:0;padding:7px 12px;font-size:14px', type: 'button', onclick: () => {
       prevBox.classList.remove('hidden'); prevBox.innerHTML = '';
-      prevBox.append(previewQuestion(applyMode(TEMPLATES[t.id](mulberry32(Date.now() % 100000 + seed++)), prevBtn._fmt ? prevBtn._fmt.value : 'mc')));
+      const f = prevBtn._fmt ? prevBtn._fmt.value : 'mc';
+      prevBox.append(previewQuestion(applyMode(TEMPLATES[t.id](mulberry32(Date.now() % 100000 + seed++)), f === 'both' ? (seed % 2 ? 'mc' : 'fr') : f)));
       prevBtn.textContent = 'Another example';
     } }, 'Preview');
     num.addEventListener('input', () => { counts[t.id] = Math.max(0, Math.min(20, Math.floor(+num.value || 0))); update(); });
     const fmtSel = el('select', { 'aria-label': `Format for ${t.label}`, style: 'width:auto;padding:7px 8px;font-size:14px' },
-      el('option', { value: 'mc' }, 'Multiple choice'), el('option', { value: 'fr' }, 'Free response'));
+      el('option', { value: 'mc' }, 'Multiple choice'), el('option', { value: 'fr' }, 'Free response'), el('option', { value: 'both' }, 'Some of each'));
     fmtSel.value = formats[t.id] || 'mc';
-    fmtSel.addEventListener('input', () => { formats[t.id] = fmtSel.value; update(); });
+    const frIn = el('input', { type: 'number', min: '0', max: '20', value: String(frCounts[t.id] ?? 0), 'aria-label': `How many ${t.label} are free response`,
+      style: 'width:62px;padding:6px;font-size:15px;border:1px solid var(--line);border-radius:8px' });
+    const splitNote = el('span', { class: 'small' });
+    const split = el('div', { style: 'flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-left:82px' },
+      el('span', { class: 'small' }, 'Free response:'), frIn, splitNote);
+    const showSplit = () => {
+      split.classList.toggle('hidden', fmtSel.value !== 'both');
+      const n = counts[t.id] || 0, fr = Math.min(n, frCounts[t.id] || 0);
+      splitNote.textContent = `→ ${n - fr} multiple choice + ${fr} free response`;
+    };
+    fmtSel.addEventListener('input', () => { formats[t.id] = fmtSel.value; showSplit(); update(); });
+    frIn.addEventListener('input', () => { frCounts[t.id] = Math.max(0, Math.min(20, Math.floor(+frIn.value || 0))); showSplit(); update(); });
+    num.addEventListener('input', showSplit);
+    showSplit();
     list.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' },
       num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc)),
-      t.writtenOnly ? el('span', { class: 'small', style: 'padding:7px 8px' }, 'Written proof') : fmtSel, prevBtn), prevBox);
+      t.writtenOnly ? el('span', { class: 'small', style: 'padding:7px 8px' }, 'Written proof') : fmtSel, prevBtn, t.writtenOnly ? '' : split), prevBox);
     prevBtn._fmt = fmtSel;
   });
   app.append(list);
@@ -3338,11 +3353,19 @@ function builder() {
   sameIn.addEventListener('change', update);
 
   function update() {
-    const items = QUESTION_TYPES.filter((t) => counts[t.id] > 0).map((t) => [t.id, counts[t.id], formats[t.id] === 'fr' ? 'fr' : 'mc']);
+    const items = [];
+    QUESTION_TYPES.filter((t) => counts[t.id] > 0).forEach((t) => {
+      const n = counts[t.id], f = t.writtenOnly ? 'mc' : formats[t.id];
+      if (f === 'both') { // multiple-choice ones first, then free response
+        const fr = Math.min(n, frCounts[t.id] || 0);
+        if (n - fr > 0) items.push([t.id, n - fr, 'mc']);
+        if (fr > 0) items.push([t.id, fr, 'fr']);
+      } else items.push([t.id, n, f === 'fr' ? 'fr' : 'mc']);
+    });
     const total = items.reduce((a, [, n]) => a + n, 0);
     totalEl.textContent = String(total);
     const title = titleIn.value.trim() || 'Custom Practice';
-    store.set('builder:last', { counts, formats, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked, same: sameIn.checked });
+    store.set('builder:last', { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked, same: sameIn.checked });
     if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
