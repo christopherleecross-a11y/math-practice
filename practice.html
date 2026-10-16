@@ -170,6 +170,7 @@ const CONFIG = {
 //   5.2: congStatement (#1-2), correspondingParts (#3-6), findXY (#7-8), congReason (#9-10), thirdAngle (#13-14)
 //   5.3–5.6: triCongruence (marked figures), triCongruenceGiven ("Given:" text, unmarked figure)
 //   Pre-Calc 2.1: trigIdentityFill (#1–4), trigEvaluate (#5–10), trigSimplify (#11–20, 31–38), trigFactor (#21–30), trigAddSub (#39–44)
+//   Pre-Calc 2.2: trigIsIdentity, trigVerifyReason (#5–14), trigVerifyStep (#5–32), trigSinCos (#27–32)
 //   other: dilation, composite, trigGraph
 const SUBJECTS = {
   geometry: 'Geometry',
@@ -185,6 +186,7 @@ const SETS = {
   // ----- Pre-Calculus -----
   'precalc-trig':  { subject: 'precalc',  title: 'Graphs of Sine and Cosine', items: [['trigGraph', 6]] },
   'precalc-2-1':   { subject: 'precalc',  title: '2.1 Using Fundamental Identities', items: [['trigIdentityFill', 3], ['trigEvaluate', 3], ['trigSimplify', 4], ['trigFactor', 2], ['trigAddSub', 2]] },
+  'precalc-2-2':   { subject: 'precalc',  title: '2.2 Verifying Trigonometric Identities', items: [['trigIsIdentity', 2], ['trigVerifyReason', 3], ['trigVerifyStep', 4], ['trigSinCos', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -887,6 +889,201 @@ TEMPLATES.trigFactor = (r) => {
   }
 };
 
+/* ---------- 2.2 Verifying Trigonometric Identities ---------- */
+// Each verification: [left side, right side, steps]. Each step is [expression, identity used].
+// The last step is the right side. Kinds: Reciprocal, Quotient, Pythagorean, Cofunction, Even/Odd, Algebra, Mixed.
+const ID_KINDS = ['Reciprocal', 'Quotient', 'Pythagorean', 'Cofunction', 'Even/Odd'];
+const STEP_NOTE = { Reciprocal: 'reciprocal identity', Quotient: 'quotient identity', Pythagorean: 'Pythagorean identity', Cofunction: 'cofunction identity',
+  'Even/Odd': 'even/odd identity', Algebra: 'algebra', Mixed: 'reciprocal and quotient identities' };
+const TRIG_VERIFY = [
+  ['tan X cot X', '1', [['tan X * (1/tan X)', 'Reciprocal'], ['1', 'Algebra']]],
+  ['(tan X cot X)/cos X', 'sec X', [['(tan X * (1/tan X))/cos X', 'Reciprocal'], ['1/cos X', 'Algebra'], ['sec X', 'Reciprocal']]],
+  ['1 + sin^2 X', '2 - cos^2 X', [['1 + (1 - cos^2 X)', 'Pythagorean'], ['2 - cos^2 X', 'Algebra']]],
+  ['cos^2 X - sin^2 X', '2 cos^2 X - 1', [['cos^2 X - (1 - cos^2 X)', 'Pythagorean'], ['2 cos^2 X - 1', 'Algebra']]],
+  ['cos^2 X - sin^2 X', '1 - 2 sin^2 X', [['(1 - sin^2 X) - sin^2 X', 'Pythagorean'], ['1 - 2 sin^2 X', 'Algebra']]],
+  ['sin^2 X - sin^4 X', 'cos^2 X - cos^4 X', [['sin^2 X (1 - sin^2 X)', 'Algebra'], ['sin^2 X cos^2 X', 'Pythagorean'], ['(1 - cos^2 X) cos^2 X', 'Pythagorean'], ['cos^2 X - cos^4 X', 'Algebra']]],
+  ['tan(pi/2 - X) sin X', 'cos X', [['cot X sin X', 'Cofunction'], ['(cos X/sin X) sin X', 'Quotient'], ['cos X', 'Algebra']]],
+  ['sin X csc(pi/2 - X)', 'tan X', [['sin X sec X', 'Cofunction'], ['sin X (1/cos X)', 'Reciprocal'], ['sin X/cos X', 'Algebra'], ['tan X', 'Quotient']]],
+  ['sec^2 X - cot^2(pi/2 - X)', '1', [['sec^2 X - tan^2 X', 'Cofunction'], ['1', 'Pythagorean']]],
+  ['1/tan X + 1/cot X', 'tan X + cot X', [['cot X + 1/cot X', 'Reciprocal'], ['cot X + tan X', 'Reciprocal'], ['tan X + cot X', 'Algebra']]],
+  ['1/sin X - 1/csc X', 'csc X - sin X', [['csc X - 1/csc X', 'Reciprocal'], ['csc X - sin X', 'Reciprocal']]],
+  ['(1 + sin X)/cos X + cos X/(1 + sin X)', '2 sec X', [['((1 + sin X)^2 + cos^2 X)/(cos X (1 + sin X))', 'Algebra'], ['(1 + 2 sin X + sin^2 X + cos^2 X)/(cos X (1 + sin X))', 'Algebra'],
+    ['(2 + 2 sin X)/(cos X (1 + sin X))', 'Pythagorean'], ['2/cos X', 'Algebra'], ['2 sec X', 'Reciprocal']]],
+  ['1/(cos X + 1) + 1/(cos X - 1)', '-2 csc X cot X', [['(cos X - 1 + cos X + 1)/(cos^2 X - 1)', 'Algebra'], ['2 cos X/(cos^2 X - 1)', 'Algebra'], ['2 cos X/(-sin^2 X)', 'Pythagorean'],
+    ['-2 (1/sin X)(cos X/sin X)', 'Algebra'], ['-2 csc X cot X', 'Mixed']]],
+  ['sec^3 X cos X', 'sec^2 X', [['sec^3 X (1/sec X)', 'Reciprocal'], ['sec^2 X', 'Algebra']]],
+  ['cot^2 X (sec^2 X - 1)', '1', [['cot^2 X tan^2 X', 'Pythagorean'], ['cot^2 X (1/cot^2 X)', 'Reciprocal'], ['1', 'Algebra']]],
+  ['tan^2 X/sec X', 'sin X tan X', [['(sin^2 X/cos^2 X)/sec X', 'Quotient'], ['(sin^2 X/cos^2 X) cos X', 'Reciprocal'], ['sin^2 X/cos X', 'Algebra'], ['sin X (sin X/cos X)', 'Algebra'], ['sin X tan X', 'Quotient']]],
+  ['(sec X - 1)/(1 - cos X)', 'sec X', [['(1/cos X - 1)/(1 - cos X)', 'Reciprocal'], ['((1 - cos X)/cos X)/(1 - cos X)', 'Algebra'], ['1/cos X', 'Algebra'], ['sec X', 'Reciprocal']]],
+  ['1/tan X + tan X', 'sec^2 X/tan X', [['(1 + tan^2 X)/tan X', 'Algebra'], ['sec^2 X/tan X', 'Pythagorean']]],
+  ['sec X - cos X', 'sin X tan X', [['1/cos X - cos X', 'Reciprocal'], ['(1 - cos^2 X)/cos X', 'Algebra'], ['sin^2 X/cos X', 'Pythagorean'], ['sin X (sin X/cos X)', 'Algebra'], ['sin X tan X', 'Quotient']]],
+  ['cot X - tan X', 'sec X (csc X - 2 sin X)', [['cos X/sin X - sin X/cos X', 'Quotient'], ['(cos^2 X - sin^2 X)/(sin X cos X)', 'Algebra'], ['(1 - 2 sin^2 X)/(sin X cos X)', 'Pythagorean'],
+    ['(1/cos X)(1/sin X - 2 sin X)', 'Algebra'], ['sec X (csc X - 2 sin X)', 'Reciprocal']]],
+  ['(1 + sin X)(1 + sin(-X))', 'cos^2 X', [['(1 + sin X)(1 - sin X)', 'Even/Odd'], ['1 - sin^2 X', 'Algebra'], ['cos^2 X', 'Pythagorean']]],
+  ['cos X + sin X tan X', 'sec X', [['cos X + sin X (sin X/cos X)', 'Quotient'], ['(cos^2 X + sin^2 X)/cos X', 'Algebra'], ['1/cos X', 'Pythagorean'], ['sec X', 'Reciprocal']]],
+  ['(cos X cot X)/(1 - sin X) - 1', 'csc X', [['(cos^2 X/sin X)/(1 - sin X) - 1', 'Quotient'], ['(1 - sin^2 X)/(sin X (1 - sin X)) - 1', 'Pythagorean'],
+    ['(1 + sin X)/sin X - 1', 'Algebra'], ['1/sin X', 'Algebra'], ['csc X', 'Reciprocal']]],
+  ['cos(-X) sec X', '1', [['cos X sec X', 'Even/Odd'], ['cos X (1/cos X)', 'Reciprocal'], ['1', 'Algebra']]],
+  ['tan(-X) cos X', '-sin X', [['-tan X cos X', 'Even/Odd'], ['-(sin X/cos X) cos X', 'Quotient'], ['-sin X', 'Algebra']]],
+  ['sin(pi/2 - X) tan X', 'sin X', [['cos X tan X', 'Cofunction'], ['cos X (sin X/cos X)', 'Quotient'], ['sin X', 'Algebra']]],
+  ['(1 - cos^2 X)(1 + cot^2 X)', '1', [['sin^2 X (1 + cot^2 X)', 'Pythagorean'], ['sin^2 X csc^2 X', 'Pythagorean'], ['sin^2 X (1/sin^2 X)', 'Reciprocal'], ['1', 'Algebra']]],
+  ['csc X tan X', 'sec X', [['(1/sin X)(sin X/cos X)', 'Mixed'], ['1/cos X', 'Algebra'], ['sec X', 'Reciprocal']]],
+];
+const chainLines = (lhs, rhs, steps, v, mark) => {
+  const lines = [`Verify the identity:   ${prettyTrig(lhs, v)} = ${prettyTrig(rhs, v)}`, '', `${prettyTrig(lhs, v)}`];
+  const gap = '\u00a0'.repeat(6);
+  steps.forEach(([e, why], k) => lines.push(`${gap}= ${mark && mark[k] != null ? mark[k] : prettyTrig(e, v)}` + (mark && mark.note && mark.note[k] ? `${gap}${mark.note[k]}` : '')));
+  return lines.join('\n');
+};
+// small edits that turn a correct step into a believable wrong one
+function trigMutations(s, { single = true } = {}) {
+  const out = [swapFns(s, RECIP), swapFns(s, COFN), flipSign(s)];
+  const ops = [...s.matchAll(/ ([+-]) /g)];
+  ops.forEach((m) => out.push(s.slice(0, m.index) + (m[1] === '+' ? ' - ' : ' + ') + s.slice(m.index + 3)));
+  const fns = [...s.matchAll(/sin|cos|tan|csc|sec|cot/g)];
+  if (single) fns.forEach((m) => { out.push(s.slice(0, m.index) + RECIP[m[0]] + s.slice(m.index + 3)); out.push(s.slice(0, m.index) + COFN[m[0]] + s.slice(m.index + 3)); });
+  [...s.matchAll(/\^2/g)].forEach((m) => out.push(s.slice(0, m.index) + s.slice(m.index + 2)));
+  return out;
+}
+function mutChoices(r, ans, v, { only = null } = {}) {
+  const seen = [parseTrig(trigVar(ans, v))];
+  const cands = [];
+  for (const s of shuffle(r, trigMutations(ans))) {
+    if (cands.length >= 3) break;
+    const p = parseTrig(trigVar(s, v));
+    if (!p || seen.some((q) => trigEquiv(p, q) && trigEquiv(q, p))) continue;
+    if (only && [...trigInfo(p).names].some((f) => !only.includes(f))) continue;
+    seen.push(p); cands.push(prettyTrig(s, v));
+  }
+  return cands;
+}
+
+// #5–32: one step of a verification is missing
+TEMPLATES.trigVerifyStep = (r) => {
+  for (let t = 0; t < 500; t++) {
+    const [lhs, rhs, steps] = pick(r, TRIG_VERIFY), v = pick(r, TRIG_VARS);
+    const ks = steps.map((s, k) => k).filter((k) => k < steps.length - 1 && steps[k][1] !== 'Algebra');
+    if (!ks.length) continue;
+    const k = pick(r, ks), ans = steps[k][0];
+    const cands = mutChoices(r, ans, v);
+    if (cands.length < 3) continue;
+    const mark = []; mark[k] = '______';
+    mark.note = steps.map(([, why], j) => (j === k ? '' : `(${STEP_NOTE[why]})`));
+    const ansAst = parseTrig(trigVar(ans, v)), info = trigInfo(ansAst);
+    const fill = (show) => chainLines(lhs, rhs, steps, v, mark) + `\n\nWhich expression ${show}`;
+    return {
+      topic: 'Verifying identities',
+      stem: fill('belongs in the blank?'),
+      ...buildChoices(r, prettyTrig(ans, v), cands, (i) => String(i)),
+      frStem: fill(`belongs in the blank? (Hint: the ${STEP_NOTE[steps[k][1]]} is used.)`),
+      fr: { fields: [{ kind: 'expr', label: 'Missing step:' }], key: [latexTrig(ans, v)], display: prettyTrig(ans, v),
+        check: (vals) => {
+          const p = parseTrig(vals[0]);
+          if (!p || !trigEquiv(p, ansAst)) return false;
+          const pi = trigInfo(p);
+          return pi.fns <= info.fns && [...pi.names].every((f) => info.names.has(f)) && (pi.simpleArgs || !info.simpleArgs);
+        } },
+      solution: `Use the ${STEP_NOTE[steps[k][1]]}: ${prettyTrig(k ? steps[k - 1][0] : lhs, v)} = ${prettyTrig(ans, v)}.\n` + chainLines(lhs, rhs, steps, v, { note: steps.map(([, why]) => `(${STEP_NOTE[why]})`) }),
+    };
+  }
+};
+
+// #5–14: which identity justifies a step
+TEMPLATES.trigVerifyReason = (r) => {
+  for (let t = 0; t < 500; t++) {
+    const [lhs, rhs, steps] = pick(r, TRIG_VERIFY), v = pick(r, TRIG_VARS);
+    const ks = steps.map((s, k) => k).filter((k) => ID_KINDS.includes(steps[k][1]));
+    if (!ks.length) continue;
+    const k = pick(r, ks), why = steps[k][1];
+    const mark = [];
+    mark.note = steps.map(([, w], j) => (j === k ? '←  ?' : `(${STEP_NOTE[w]})`));
+    const prev = k ? steps[k - 1][0] : lhs;
+    const stem = chainLines(lhs, rhs, steps, v, mark) + `\n\nWhich kind of identity is used in the step marked ←?`;
+    return {
+      topic: 'Verifying identities',
+      stem,
+      ...buildChoices(r, why, ID_KINDS.filter((x) => x !== why), (i) => ID_KINDS[i]),
+      fr: FR.select('Identity used', ID_KINDS, why),
+      solution: `${prettyTrig(prev, v)} = ${prettyTrig(steps[k][0], v)} uses a ${STEP_NOTE[why]}.` + (['Reciprocal', 'Quotient'].includes(why)
+        ? (why === 'Reciprocal' ? ' Reciprocal identities: csc u = 1/sin u, sec u = 1/cos u, cot u = 1/tan u.' : ' Quotient identities: tan u = sin u/cos u, cot u = cos u/sin u.')
+        : ' ' + ID_WHY[why]),
+    };
+  }
+};
+
+// #1–3 idea: an identity is true for every value in the domain
+function identityPool() {
+  const pool = [];
+  TRIG_VERIFY.forEach(([l, rr]) => pool.push([l, rr]));
+  TRIG_SIMPLIFY.forEach(([e, a]) => pool.push([e, a]));
+  TRIG_IDS.forEach(([e, a]) => pool.push([e, a]));
+  return pool.filter(([l, rr]) => (l + rr).length <= 44);
+}
+const ANGLES = [['π/6', Math.PI / 6], ['π/4', Math.PI / 4], ['π/3', Math.PI / 3], ['π/6', Math.PI / 6]];
+function counterexample(l, rr, v) {
+  const a = parseTrig(trigVar(l, v)), b = parseTrig(trigVar(rr, v));
+  for (const [name, x] of [['π/3', Math.PI / 3], ['π/6', Math.PI / 6], ['π/4', Math.PI / 4], ['2π/3', 2 * Math.PI / 3], ['1', 1]]) {
+    const p = evalTrig(a, x), q = evalTrig(b, x);
+    if (isFinite(p) && isFinite(q) && Math.abs(p) < 1e5 && Math.abs(q) < 1e5 && Math.abs(p - q) > 1e-6)
+      return `Try ${v} = ${name}: the left side is about ${fmt(p)} but the right side is about ${fmt(q)}, so it is not true for every value.`;
+  }
+  return 'The two sides are not equal for every value of the variable.';
+}
+function falseIdentity(r, v, avoid) {
+  const pool = identityPool();
+  for (let t = 0; t < 200; t++) {
+    const [l, rr] = pick(r, pool);
+    if (avoid.includes(l)) continue;
+    const opts = trigMutations(rr, { single: false }).filter((s) => { const p = parseTrig(trigVar(s, v)); return p && !trigEquiv(p, parseTrig(trigVar(l, v))); });
+    if (!opts.length) continue;
+    return [l, pick(r, opts)];
+  }
+}
+TEMPLATES.trigIsIdentity = (r) => {
+  const pool = identityPool(), v = pick(r, TRIG_VARS);
+  const truth = pick(r, pool);
+  const eq = ([l, rr]) => `${prettyTrig(l, v)} = ${prettyTrig(rr, v)}`;
+  const wrongs = [];
+  for (let t = 0; t < 50 && wrongs.length < 3; t++) { const w = falseIdentity(r, v, [truth[0], ...wrongs.map((x) => x[0])]); if (w) wrongs.push(w); }
+  const isTrue = r() < 0.5, one = isTrue ? truth : wrongs[0];
+  const why = (pair) => {
+    const ver = TRIG_VERIFY.find(([l, rr]) => l === pair[0] && rr === pair[1]);
+    return ver ? chainLines(pair[0], pair[1], ver[2], v, { note: ver[2].map(([, w]) => `(${STEP_NOTE[w]})`) }).split('\n').slice(2).join('\n') : `Using the fundamental identities, ${eq(pair)} for every value where both sides are defined.`;
+  };
+  return {
+    topic: 'Identities',
+    stem: 'Which equation is an identity (true for every value of the variable where both sides are defined)?',
+    ...buildChoices(r, eq(truth), wrongs.map(eq), (i) => String(i)),
+    frStem: `Is this equation an identity (true for every value of the variable where both sides are defined)?\n\n${eq(one)}`,
+    fr: FR.select('This equation is', ['an identity', 'not an identity'], isTrue ? 'an identity' : 'not an identity'),
+    solution: `${eq(truth)} is an identity:\n${why(truth)}` + `\n\n${eq(wrongs[0])} is not: ${counterexample(wrongs[0][0], wrongs[0][1], v)}`,
+  };
+};
+
+// #27–32: convert to sines and cosines
+const TRIG_SINCOS = [
+  ['cot^2 X/csc X', 'cos^2 X/sin X'], ['cos X + sin X tan X', '1/cos X'], ['sec X - cos X', 'sin^2 X/cos X'],
+  ['csc(-X)/sec(-X)', '-cos X/sin X'], ['tan X csc X', '1/cos X'], ['sec X csc X', '1/(sin X cos X)'], ['tan X + cot X', '1/(sin X cos X)'],
+  ['csc X - sin X', 'cos^2 X/sin X'], ['sec^2 X - 1', 'sin^2 X/cos^2 X'], ['tan^2 X/sec X', 'sin^2 X/cos X'], ['cot X sec X', '1/sin X'],
+  ['1 + cot^2 X', '1/sin^2 X'], ['1 + tan^2 X', '1/cos^2 X'], ['cot X/csc X', 'cos X'], ['sec X/tan X', '1/sin X'], ['tan X sec X', 'sin X/cos^2 X'],
+  ['csc X cot X', 'cos X/sin^2 X'], ['sec X - tan X', '(1 - sin X)/cos X'], ['csc X + cot X', '(1 + cos X)/sin X'], ['cot X - csc X', '(cos X - 1)/sin X'],
+];
+TEMPLATES.trigSinCos = (r) => {
+  for (let t = 0; t < 500; t++) {
+    const [e, ans] = pick(r, TRIG_SINCOS), v = pick(r, TRIG_VARS);
+    const cands = mutChoices(r, ans, v, { only: ['sin', 'cos'] });
+    if (cands.length < 3) continue;
+    return {
+      topic: 'Converting to sines and cosines',
+      stem: `Rewrite the expression using only sines and cosines, and simplify:   ${prettyTrig(e, v)}`,
+      ...buildChoices(r, prettyTrig(ans, v), cands, (i) => String(i)),
+      frStem: `Rewrite the expression using only sines and cosines, and simplify:   ${prettyTrig(e, v)}   (Use only sin and cos.)`,
+      fr: FR.trig('', ans, v, { ban: ['tan', 'cot', 'sec', 'csc'] }),
+      solution: `Use tan = sin/cos, cot = cos/sin, sec = 1/cos, csc = 1/sin (and sin(−u) = −sin u, cos(−u) = cos u), then simplify: ${prettyTrig(e, v)} = ${prettyTrig(ans, v)}.`,
+    };
+  }
+};
+
 function piFrac(num, den) {
   if (num === 0) return '0';
   const g = gcd(num, den); num /= g; den /= g;
@@ -908,6 +1105,7 @@ function makeCanvas(w, h) {
 
 const TEXT_FONT = '17px Georgia, "Times New Roman", serif';
 function wrapLines(ctx, text, maxW) {
+  if (text.includes('\n')) return text.split('\n').flatMap((part) => (part ? wrapLines(ctx, part, maxW) : ['']));
   text = text.replace(/\([^()]*\)/g, (m) => m.replace(/ /g, ' ')); // keep (x + 30) on one line
   const words = text.split(' '); const lines = []; let line = '';
   for (const w of words) {
@@ -1676,6 +1874,10 @@ const QUESTION_TYPES = [
   { id: 'trigSimplify',       subject: 'precalc',  section: '2.1 Using Fundamental Identities', label: 'Simplify', desc: 'Use the identities to simplify (#11–20, 31–38)' },
   { id: 'trigFactor',         subject: 'precalc',  section: '2.1 Using Fundamental Identities', label: 'Factor', desc: 'Factor a trig quadratic, or factor and simplify (#21–30)' },
   { id: 'trigAddSub',         subject: 'precalc',  section: '2.1 Using Fundamental Identities', label: 'Add or subtract fractions', desc: 'Combine and simplify (#39–44)' },
+  { id: 'trigIsIdentity',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Identity or not?', desc: 'Pick the true identity; or decide if one equation is an identity' },
+  { id: 'trigVerifyReason',   subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Name the identity used', desc: 'A worked verification: which identity justifies the marked step (#5–14)' },
+  { id: 'trigVerifyStep',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Fill in the missing step', desc: 'A worked verification with one step blank (#5–32)' },
+  { id: 'trigSinCos',         subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Convert to sines and cosines', desc: 'Rewrite with only sin and cos (#27–32)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
