@@ -257,6 +257,8 @@ const SETS = {
   'precalc-5-5':   { subject: 'precalc',  title: '5.5 Exponential and Logarithmic Models', items: [['e5Solve', 1], ['e5Continuous', 3], ['e5Double', 2], ['e5Fit', 2], ['e5Model', 2]] },
   'precalc-6-1':   { subject: 'precalc',  title: '6.1 Lines', items: [['a1Slope', 2], ['a1InclSlope', 2], ['a1InclPoints', 2], ['a1InclEq', 2], ['a1AngleLines', 3], ['a1DistPt', 2], ['a1DistPar', 1]] },
   'precalc-6-2':   { subject: 'precalc',  title: '6.2 Introduction to Conics: Parabolas', items: [['a2Match', 2], ['a2Origin', 3], ['a2Std', 3], ['a2VFD', 3], ['a2Tangent', 2], ['a2Apply', 1]] },
+  'precalc-6-3':   { subject: 'precalc',  title: '6.3 Ellipses', items: [['c3Match', 2], ['c3Origin', 3], ['c3Std', 3], ['c3Props', 3], ['c3Ecc', 2], ['c3Apply', 1]] },
+  'precalc-6-4':   { subject: 'precalc',  title: '6.4 Hyperbolas', items: [['c4Match', 2], ['c4Std', 3], ['c4Props', 3], ['c4Asym', 3], ['c4Classify', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -4532,6 +4534,361 @@ TEMPLATES.a2Apply = (r) => {
     topic: 'Parabola applications', stem: `Each cable of a suspension bridge is suspended (in the shape of a parabola) between two towers that are ${L} feet apart. The top of each tower is ${H} feet above the roadway, and the cables touch the roadway midway between the towers. Using the point where the cable touches the road as the origin, find an equation for the parabolic shape of each cable.`,
     ...parChoices(r, P, [{ ...P, p: L * L / (4 * H) / 4 }, { ...P, p: (L / 2) ** 2 / H / 4 / 2 }]), fr: parFR(P),
     solution: `The vertex is the origin and the parabola opens upward: x² = 4py. The top of a tower is the point (${L / 2}, ${H}): ${(L / 2) ** 2} = 4p(${H}), so 4p = ${fracT(4 * P.p)}.\n${parT(P)}`,
+  };
+};
+
+/* ---------- 6.3 / 6.4 shared: ellipses and hyperbolas ---------- */
+// conic { t: 'e' | 'h', h, k, A, B, tr }: A = denominator under (x − h)², B = under (y − k)²; tr = transverse axis of a hyperbola ('x' or 'y')
+const cgcd = (a, b) => gcd(a, b) || 1;
+const clcm = (a, b) => (a * b) / cgcd(a, b);
+const sqT = (v, c) => (c === 0 ? `${v}²` : `(${v} ${c > 0 ? MINUS : '+'} ${fracT(Math.abs(c))})²`);
+const sqL2 = (v, c) => (c === 0 ? `${v}^2` : `\\left(${v}${c > 0 ? '-' : '+'}${fracL(Math.abs(c))}\\right)^2`);
+const overT = (t, D) => (D === 1 ? t : fracParts(D)[1] === 1 ? `${t}/${fmt(D)}` : `${t}/(${fracT(D)})`);
+const overL = (t, D) => (D === 1 ? t : `\\frac{${t}}{${fracL(D)}}`);
+function conT(C) {
+  const X = overT(sqT('x', C.h), C.A), Y = overT(sqT('y', C.k), C.B);
+  return C.t === 'e' ? `${X} + ${Y} = 1` : C.tr === 'x' ? `${X} ${MINUS} ${Y} = 1` : `${Y} ${MINUS} ${X} = 1`;
+}
+function conL(C) {
+  const X = overL(sqL2('x', C.h), C.A), Y = overL(sqL2('y', C.k), C.B);
+  return C.t === 'e' ? `${X}+${Y}=1` : C.tr === 'x' ? `${X}-${Y}=1` : `${Y}-${X}=1`;
+}
+const conFn = (C) => (x, y) => { const X = (x - C.h) ** 2 / C.A, Y = (y - C.k) ** 2 / C.B; return C.t === 'e' ? X + Y : C.tr === 'x' ? X - Y : Y - X; };
+// typed equation is the conic in standard form: "… = 1" where the other side equals the standard left side
+function conOk(raw, C) {
+  const s = String(raw || '').replace(/\\left|\\right/g, ''); const parts = s.split('='); if (parts.length !== 2) return false;
+  const [L, R] = parts.map((q) => pxParse(q, ['x', 'y'], '')); if (!L || !R) return false;
+  const G = conFn(C), pts = [[1.3, 2.7], [-2.1, 0.6], [3.7, -1.9], [0.45, 4.2], [-3.3, -2.8], [5.1, 1.1], [2.2, -4.4]];
+  const same = (F, T) => pts.every(([x, y]) => { const a = F({ x, y }), b = T(x, y); return isFinite(a) && Math.abs(a - b) <= 1e-7 * Math.max(1, Math.abs(b)); });
+  const once = (t) => (t.match(/x/g) || []).length === 1 && (t.match(/y/g) || []).length === 1;
+  return (same(R, () => 1) && same(L, G) && once(parts[0])) || (same(L, () => 1) && same(R, G) && once(parts[1]));
+}
+const conFR = (C) => ({ fields: [{ kind: 'expr', keys: 'func', label: 'Standard form:' }], key: [conL(C)], display: conT(C), check: (v) => conOk(v[0], C) });
+// h + d where d may be a surd: "4 − √7", "−2√5"
+function offT(h, d) {
+  if (fracParts(h + d) && fracParts(d)) return fracT(h + d);
+  const s = exactT(Math.abs(d));
+  return h === 0 ? (d < 0 ? MINUS : '') + s : `${fracT(h)} ${d < 0 ? MINUS : '+'} ${s}`;
+}
+function offL(h, d) {
+  if (fracParts(h + d) && fracParts(d)) return fracL(h + d);
+  const s = exactL(Math.abs(d));
+  return h === 0 ? (d < 0 ? '-' : '') + s : `${fracL(h)}${d < 0 ? '-' : '+'}${s}`;
+}
+// a pair of points symmetric about the center along an axis: [{ v, t, l }]
+const pairPts = (C, d, axis) => [-1, 1].map((s) => axis === 'x'
+  ? { v: [C.h + s * d, C.k], t: `(${offT(C.h, s * d)}, ${fracT(C.k)})`, l: `\\left(${offL(C.h, s * d)},${fracL(C.k)}\\right)` }
+  : { v: [C.h, C.k + s * d], t: `(${fracT(C.h)}, ${offT(C.k, s * d)})`, l: `\\left(${fracL(C.h)},${offL(C.k, s * d)}\\right)` });
+const pairT = (P) => P.map((p) => p.t).join(', ');
+const pairL = (P) => P.map((p) => p.l).join(',');
+// any order, exact (or within 0.0006 for decimals typed for surds)
+function ptsOk(raw, want, tol = 0.0006) {
+  const got = parsePoints(raw); if (!got || got.length !== want.length) return false;
+  const used = new Set();
+  return got.every((g) => { const i = want.findIndex((w, j) => !used.has(j) && Math.abs(g[0] - w[0]) <= tol && Math.abs(g[1] - w[1]) <= tol); if (i < 0) return false; used.add(i); return true; });
+}
+// "(±7, 0)" style when centered at the origin
+const pmT = (d, axis) => (axis === 'x' ? `(±${exactT(d)}, 0)` : `(0, ±${exactT(d)})`);
+// ellipse facts
+function ellFacts(C) {
+  const ax = C.A > C.B ? 'x' : 'y', a2 = Math.max(C.A, C.B), b2 = Math.min(C.A, C.B), c2 = a2 - b2;
+  const a = Math.sqrt(a2), b = Math.sqrt(b2), c = Math.sqrt(c2);
+  return { ax, a2, b2, c2, a, b, c, V: pairPts(C, a, ax), Co: pairPts(C, b, ax === 'x' ? 'y' : 'x'), F: pairPts(C, c, ax), e: exactRatio(1, ...ratioParts(c2, a2)) };
+}
+const ratioParts = (n, d) => { const p = fracParts(n / d); return [p[0], p[1]]; }; // c²/a² as integers
+const ellCurve = (C) => ({ param: [(t) => [C.h + Math.sqrt(C.A) * Math.cos(t), C.k + Math.sqrt(C.B) * Math.sin(t)], 0, 2 * Math.PI] });
+function conicGeneralT(C) { // integer general form
+  const den = (v) => fracParts(v)[1], num = (v) => fracParts(v)[0];
+  // multiply 1/A and 1/B to integers: P = L/A, Q = ±L/B
+  const L = clcm(clcm(num(C.A), num(C.B)), 1) * clcm(den(C.A), den(C.B));
+  let P = L / C.A, Q = L / C.B, R = L;
+  if (C.t === 'h') { if (C.tr === 'x') Q = -Q; else { P = -P; } }
+  const g = [P, Q, R].map((v) => Math.round(v)).reduce((a, b) => cgcd(a, b));
+  P /= g; Q /= g; R /= g;
+  const terms = [[P, 'x²'], [Q, 'y²'], [-2 * P * C.h, 'x'], [-2 * Q * C.k, 'y'], [P * C.h ** 2 + Q * C.k ** 2 - R, '']];
+  const ord = P < 0 && Q > 0 ? [1, 0, 2, 3, 4] : [0, 1, 2, 3, 4];
+  return `${lnSumT(ord.map((i) => [terms[i][0], null, terms[i][1]]))} = 0`;
+}
+// standard-form distractors
+function conWrongs(C) {
+  const out = [{ ...C, A: C.B, B: C.A }, { ...C, h: -C.h, k: -C.k }, { ...C, A: Math.sqrt(C.A), B: Math.sqrt(C.B) }];
+  if (C.t === 'h') out.push({ ...C, tr: C.tr === 'x' ? 'y' : 'x' }, { ...C, t: 'e' }); else out.push({ ...C, t: 'h', tr: C.A > C.B ? 'x' : 'y' });
+  return out.filter((W) => W.A > 0 && W.B > 0 && fracParts(W.A) && fracParts(W.B));
+}
+function conChoices(r, C, extra = []) {
+  const correct = conT(C), c = [...new Set([...extra.filter((W) => W.A > 0 && W.B > 0 && fracParts(W.A) && fracParts(W.B)), ...conWrongs(C)].map(conT))].filter((t) => t !== correct);
+  return buildChoices(r, correct, c, (i) => conT({ ...C, A: C.A + i + 1 }));
+}
+// a random ellipse: integer semi-axes (sometimes halves); major axis on x or y
+function randEll(r, origin, small = false) {
+  for (;;) {
+    let a = ri(r, 2, small ? 5 : 8), b = ri(r, 1, a - 1);
+    if (r() < 0.12) { a = pick(r, [3 / 2, 5 / 2]); b = a === 3 / 2 ? 1 : pick(r, [1, 2]); }
+    if (b >= a) continue;
+    const major = pick(r, ['x', 'y']);
+    const h = origin ? 0 : ri(r, -6, 6), k = origin ? 0 : ri(r, -6, 6);
+    return { t: 'e', h, k, A: major === 'x' ? a * a : b * b, B: major === 'x' ? b * b : a * a };
+  }
+}
+
+/* ---------- 6.3 Ellipses ---------- */
+const ELL_MATCH_POOL = (r) => { const a = pick(r, [3, 4]), b = 2, h = pick(r, [2, -2, 3, -3]), k = pick(r, [1, -1, 2, -2]); return [
+  { t: 'e', h: 0, k: 0, A: b * b, B: a * a }, { t: 'e', h: 0, k: 0, A: a * a, B: b * b }, { t: 'e', h, k, A: a * a, B: b * b === 4 ? 1 : b * b }, { t: 'e', h: -h, k: -k, A: 9, B: 4 }, { t: 'e', h, k: -k, A: 4, B: 9 }]; };
+TEMPLATES.c3Match = (r) => {
+  for (;;) {
+    const pool = shuffle(r, ELL_MATCH_POOL(r)).slice(0, 4), opts = pool.map(conT);
+    if (new Set(opts).size < 4) continue;
+    const C = pool[0];
+    return {
+      topic: 'Matching ellipses', stem: 'Which equation matches the graph?',
+      ...buildChoices(r, opts[0], opts.slice(1), () => null), fr: FR.select('The graph is', shuffle(r, opts), opts[0]),
+      draw: plotQ({ xr: [-8, 8], yr: [-8, 8], curves: [ellCurve(C)], pts: [{ p: [C.h, C.k] }] }), size: [380, 380],
+      solution: `The center is ${ptT([C.h, C.k])}. The ellipse reaches ${fmt(Math.sqrt(C.A))} unit${C.A === 1 ? '' : 's'} left and right of the center and ${fmt(Math.sqrt(C.B))} up and down, so the denominators are ${fmt(C.A)} under the x-term and ${fmt(C.B)} under the y-term: ${opts[0]}`,
+    };
+  }
+};
+function ellGraphTags(C, E) { // label a vertex and a co-vertex (or both)
+  const lab = (p) => ({ p: p.v, text: ptT(p.v), dx: p.v[0] > C.h + 1e-9 ? 10 : p.v[0] < C.h - 1e-9 ? -10 : 8, dy: p.v[1] > C.k + 1e-9 ? -14 : p.v[1] < C.k - 1e-9 ? 14 : -12, align: p.v[0] < C.h - 1e-9 ? 'right' : 'left' });
+  return [...E.V, ...E.Co].map(lab);
+}
+TEMPLATES.c3Origin = (r) => {
+  for (;;) {
+    const kind = ri(r, 0, 4);
+    const C = randEll(r, true), E = ellFacts(C);
+    let given, why;
+    if (kind === 0) { if (!fracParts(E.c)) continue; given = `Vertices: ${pmT(E.a, E.ax)}; foci: ${pmT(E.c, E.ax)}`; why = `a = ${exactT(E.a)}, c = ${exactT(E.c)}, so b² = a² − c² = ${fracT(E.a2)} − ${fracT(E.c2)} = ${fracT(E.b2)}.`; }
+    else if (kind === 1) { if (!fracParts(E.c)) continue; given = `Foci: ${pmT(E.c, E.ax)}; major axis of length ${fracT(2 * E.a)}`; why = `2a = ${fracT(2 * E.a)}, so a = ${fracT(E.a)}; c = ${exactT(E.c)}, so b² = a² − c² = ${fracT(E.a2)} − ${fracT(E.c2)} = ${fracT(E.b2)}.`; }
+    else if (kind === 2) { const p1 = E.ax === 'x' ? [E.a, 0] : [0, E.a], p2 = E.ax === 'x' ? [0, E.b] : [E.b, 0]; given = `${E.ax === 'x' ? 'Horizontal' : 'Vertical'} major axis; passes through the points ${ptT(p1)} and ${ptT(p2)}`; why = `The points are a vertex and a co-vertex: a = ${fracT(E.a)}, b = ${fracT(E.b)}.`; }
+    else if (kind === 3) { // vertices and a point
+      const x0 = ri(r, 1, Math.floor(E.a) - (Number.isInteger(E.a) ? 1 : 0)); if (x0 < 1 || !Number.isInteger(E.a)) continue;
+      const y0 = pick(r, [1, 2, 3, 4]); const b2 = (y0 * y0) / (1 - (x0 * x0) / E.a2); if (!(b2 > 0 && b2 < E.a2) || !fracParts(b2) || fracParts(b2)[1] > 20) continue;
+      const P = E.ax === 'x' ? [x0, y0] : [y0, x0]; if (E.ax === 'x') C.B = b2; else C.A = b2;
+      given = `Vertices: ${pmT(E.a, E.ax)}; passes through the point ${ptT(P)}`;
+      why = `a² = ${fracT(E.a2)}. Substitute ${ptT(P)}: ${E.ax === 'x' ? `${x0 * x0}/${E.a2} + ${y0 * y0}/b² = 1` : `${y0 * y0}/b² + ${x0 * x0}/${E.a2} = 1`}, so b² = ${fracT(b2)}.`;
+    } else { // graph
+      if (!Number.isInteger(E.a) || !Number.isInteger(E.b) || E.a > 7) continue;
+      return {
+        topic: 'Ellipse centered at the origin', stem: 'Find the standard form of the equation of the ellipse shown. Its center is at the origin.',
+        ...conChoices(r, C), fr: conFR(C), draw: tagPlot({ xr: [-8, 8], yr: [-8, 8], curves: [ellCurve(C)], pts: [...E.V, ...E.Co].map((p) => ({ p: p.v })) }, ellGraphTags(C, E)), size: [380, 380],
+        solution: `From the graph, a = ${E.a} (${E.ax === 'x' ? 'horizontal' : 'vertical'} major axis) and b = ${E.b}.\n${conT(C)}`,
+      };
+    }
+    return {
+      topic: 'Ellipse centered at the origin', stem: `Find the standard form of the equation of the ellipse with the given characteristics and center at the origin.   ${given}`,
+      ...conChoices(r, C, [{ ...C, A: C.A === E.a2 ? E.a2 : E.a2 + E.c2, B: C.B === E.a2 ? E.a2 : E.a2 + E.c2 }]), fr: conFR(C),
+      solution: `${why}\nThe major axis is ${E.ax === 'x' ? 'horizontal, so a² goes under x²' : 'vertical, so a² goes under y²'}: ${conT(C)}`,
+    };
+  }
+};
+TEMPLATES.c3Std = (r) => {
+  for (;;) {
+    const kind = ri(r, 0, 6), C = randEll(r, false), E = ellFacts(C), Cn = ptT([C.h, C.k]);
+    let given, why;
+    const ptsList = (P) => P.map((p) => p.t).join(', ');
+    if (kind === 0) { given = `Vertices: ${ptsList(E.V)}; minor axis of length ${fracT(2 * E.b)}`; why = `The center is the midpoint of the vertices, ${Cn}; a = ${fracT(E.a)}, b = ${fracT(E.b)}.`; }
+    else if (kind === 1) { if (!fracParts(E.c) || E.c === 0) continue; given = `Foci: ${ptsList(E.F)}; major axis of length ${fracT(2 * E.a)}`; why = `The center is the midpoint of the foci, ${Cn}; c = ${fracT(E.c)}, a = ${fracT(E.a)}, so b² = ${fracT(E.a2)} − ${fracT(E.c2)} = ${fracT(E.b2)}.`; }
+    else if (kind === 2) { given = `Center: ${Cn}; vertex: ${E.V[pick(r, [0, 1])].t}; minor axis of length ${fracT(2 * E.b)}`; why = `a = distance from the center to the vertex = ${fracT(E.a)}; b = ${fracT(E.b)}.`; }
+    else if (kind === 3 || kind === 4) { // a = 2c with vertices, or a = 3c with foci
+      const m = kind === 3 ? 2 : 3, c = pick(r, kind === 3 ? [1, 2, 3] : [1, 2]), a = m * c, ax = pick(r, ['x', 'y']);
+      const b2 = a * a - c * c; C.A = ax === 'x' ? a * a : b2; C.B = ax === 'x' ? b2 : a * a;
+      const E2 = ellFacts(C);
+      given = kind === 3 ? `Center: ${Cn}; a = 2c; vertices: ${ptsList(E2.V)}` : `Center: ${Cn}; a = 3c; foci: ${ptsList(E2.F)}`;
+      why = kind === 3 ? `a = ${a}, so c = a/2 = ${c} and b² = a² − c² = ${a * a} − ${c * c} = ${b2}.` : `c = ${c}, so a = 3c = ${a} and b² = a² − c² = ${a * a} − ${c * c} = ${b2}.`;
+    } else if (kind === 5) { given = `Vertices: ${ptsList(E.V)}; endpoints of the minor axis: ${ptsList(E.Co)}`; why = `Center ${Cn}; a = ${fracT(E.a)}, b = ${fracT(E.b)}.`; }
+    else {
+      if (!Number.isInteger(E.a) || !Number.isInteger(E.b) || E.a > 6 || Math.abs(C.h) > 4 || Math.abs(C.k) > 4) continue;
+      return {
+        topic: 'Standard equation of an ellipse', stem: 'Find the standard form of the equation of the ellipse shown.',
+        ...conChoices(r, C), fr: conFR(C), draw: tagPlot({ xr: [C.h - 8, C.h + 8], yr: [C.k - 8, C.k + 8], curves: [ellCurve(C)], pts: [...E.V, ...E.Co].map((p) => ({ p: p.v })) }, ellGraphTags(C, E)), size: [380, 380],
+        solution: `The center is the midpoint of the vertices, ${Cn}; a = ${E.a}, b = ${E.b}, and the major axis is ${E.ax === 'x' ? 'horizontal' : 'vertical'}.\n${conT(C)}`,
+      };
+    }
+    const F2 = ellFacts(C);
+    return {
+      topic: 'Standard equation of an ellipse', stem: `Find the standard form of the equation of the ellipse with the given characteristics.   ${given}`,
+      ...conChoices(r, C), fr: conFR(C),
+      solution: `${why}\nThe major axis is ${F2.ax === 'x' ? 'horizontal, so a² goes under (x − h)²' : 'vertical, so a² goes under (y − k)²'}: ${conT(C)}`,
+    };
+  }
+};
+// center, vertices, foci, eccentricity
+TEMPLATES.c3Props = (r) => {
+  for (;;) {
+    const form = ri(r, 0, 2), C = randEll(r, form === 1, true);
+    if (form === 2 && (!Number.isInteger(C.A) || !Number.isInteger(C.B))) continue;
+    const E = ellFacts(C), Cn = [C.h, C.k];
+    const eq = form === 2 ? conicGeneralT(C) : form === 1 && r() < 0.5 && Number.isInteger(C.A) && Number.isInteger(C.B) ? (() => { const m = pick(r, [1, 2, 3]), L = clcm(C.A, C.B) * m; return `${lnSumT([[L / C.A, null, 'x²'], [L / C.B, null, 'y²']])} = ${L}`; })() : conT(C);
+    const T = (X) => `Center ${ptT([X.h, X.k])};  vertices ${pairT(X.V)};  foci ${pairT(X.F)};  e = ${X.e.text}`;
+    const mk = (h, k, ax, a, c) => { const D = { h, k }; return { h, k, V: pairPts(D, a, ax), F: pairPts(D, c, ax), e: exactRatio(1, ...ratioParts(c * c, a * a)) }; };
+    const correct = T({ h: C.h, k: C.k, V: E.V, F: E.F, e: E.e });
+    const other = E.ax === 'x' ? 'y' : 'x', cBad = Math.sqrt(E.a2 + E.b2);
+    const wrongs = [mk(C.h, C.k, other, E.a, E.c), mk(C.h, C.k, E.ax, E.a, cBad), mk(-C.h, -C.k, E.ax, E.a, E.c), mk(C.h, C.k, E.ax, E.b, E.c)].filter((X) => isFinite(X.e.val)).map(T);
+    const ok = (v) => [onePointOk(v[0], Cn), ptsOk(v[1], E.V.map((p) => p.v)), ptsOk(v[2], E.F.map((p) => p.v)), exact3Ok(v[3], E.e.val)];
+    return {
+      topic: 'Center, vertices, foci, eccentricity', stem: `Find the center, vertices, foci, and eccentricity of the ellipse.   ${eq}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => T(mk(C.h, C.k, E.ax, E.a + i + 1, E.c))),
+      fr: { fields: [{ kind: 'expr', keys: 'point', label: 'Center:' }, { kind: 'expr', keys: 'point', label: 'Vertices:' }, { kind: 'expr', keys: 'point', label: 'Foci:' }, { kind: 'expr', keys: 'num', label: 'Eccentricity e =' }],
+        key: [`\\left(${fracL(C.h)},${fracL(C.k)}\\right)`, pairL(E.V), pairL(E.F), E.e.latex], display: correct,
+        check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 4 },
+      solution: `${form === 2 ? 'Complete the square in x and y: ' : form === 1 && !/\//.test(eq) ? 'Divide both sides so the right side is 1: ' : ''}${conT(C)}\nCenter ${ptT(Cn)}; a² = ${fracT(E.a2)} (under ${E.ax}), b² = ${fracT(E.b2)}, so a = ${exactT(E.a)}, b = ${exactT(E.b)}.\nc² = a² − b² = ${fracT(E.c2)}, so c = ${exactT(E.c)}.\nVertices ${pairT(E.V)} (a units from the center along the ${E.ax === 'x' ? 'horizontal' : 'vertical'} major axis); foci ${pairT(E.F)}; e = c/a = ${E.e.text}.`,
+    };
+  }
+};
+TEMPLATES.c3Ecc = (r) => {
+  for (;;) {
+    const a = ri(r, 3, 10), c = ri(r, 1, a - 1), ax = pick(r, ['x', 'y']), orig = r() < 0.6;
+    const g = gcd(c, a), eT = `${c / g}/${a / g}`, h = orig ? 0 : ri(r, -5, 5), k = orig ? 0 : ri(r, -5, 5);
+    const b2 = a * a - c * c, C = { t: 'e', h, k, A: ax === 'x' ? a * a : b2, B: ax === 'x' ? b2 : a * a }, E = ellFacts(C);
+    const given = orig ? `Vertices: ${pmT(a, ax)}; eccentricity: ${eT}` : `Vertices: ${pairT(E.V)}; eccentricity: ${eT}`;
+    return {
+      topic: 'Ellipse from eccentricity', stem: `Find an equation of the ellipse with the given characteristics.   ${given}`,
+      ...conChoices(r, C, [{ ...C, A: ax === 'x' ? a * a : c * c, B: ax === 'x' ? c * c : a * a }, { ...C, A: ax === 'x' ? a * a : a * a + c * c, B: ax === 'x' ? a * a + c * c : a * a }]), fr: conFR(C),
+      solution: `${orig ? '' : `Center ${ptT([h, k])} (midpoint of the vertices). `}a = ${a}. e = c/a = ${eT}, so c = ${c}. b² = a² − c² = ${a * a} − ${c * c} = ${b2}.\n${conT(C)}`,
+    };
+  }
+};
+TEMPLATES.c3Apply = (r) => {
+  const W = pick(r, [40, 50, 60, 80, 100]), H = pick(r, [10, 12, 15, 20, 25, 30]), d = pick(r, [5, 10, 15, 20].filter((x) => x < W / 2));
+  const [what, unit] = pick(r, [['A semielliptical arch over a tunnel for a one-way road', 'feet'], ['A bridge has a semielliptical arch', 'feet'], ['A fireplace arch is semielliptical', 'inches']]);
+  const y = H * Math.sqrt(1 - (d * d) / ((W / 2) ** 2)), exact = exactRatio(1, H * H * ((W / 2) ** 2 - d * d), (W / 2) ** 2);
+  const isExact = fracParts(y), val = isExact ? fracT(y) : rT(y, 3);
+  const T = (v) => `${fracParts(v) ? fracT(v) : '≈ ' + rT(v, 3)} ${unit}`;
+  const wrongs = [H * (1 - d / (W / 2)), H * Math.sqrt(1 - d / (W / 2)), H * (1 - (d * d) / ((W / 2) ** 2)), H * Math.sqrt(1 - (d * d) / (W * W))].map(T);
+  return {
+    topic: 'Ellipse applications', stem: `${what}. It is ${W} ${unit} wide at the base and ${H} ${unit} high at the center. How high is the arch ${d} ${unit} from the center of the base? (Exact, or round to three decimal places.)`,
+    ...buildChoices(r, T(y), [...new Set(wrongs)].filter((w) => w !== T(y)), (i) => T(y + i + 1)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Height:' }], key: [exact.latex], display: T(y), check: (v) => exact3Ok(String(v[0]).replace(/\\text\{[^}]*\}|feet|inches|ft|in/g, ''), y) },
+    solution: `Put the center of the base at the origin: x²/${(W / 2) ** 2} + y²/${H * H} = 1 (a = ${W / 2} along the base, b = ${H}).\nAt x = ${d}: y² = ${H * H}(1 − ${d * d}/${(W / 2) ** 2}), so y = ${exact.text}${isExact ? '' : ` ≈ ${val}`} ${unit}.`,
+  };
+};
+
+/* ---------- 6.4 Hyperbolas ---------- */
+function hypFacts(C) {
+  const a2 = C.tr === 'x' ? C.A : C.B, b2 = C.tr === 'x' ? C.B : C.A, c2 = a2 + b2;
+  const a = Math.sqrt(a2), b = Math.sqrt(b2), c = Math.sqrt(c2), m = Math.sqrt(C.B / C.A);
+  const L1 = [m, -1, C.k - m * C.h], L2 = [-m, -1, C.k + m * C.h];
+  return { a2, b2, c2, a, b, c, m, V: pairPts(C, a, C.tr), F: pairPts(C, c, C.tr), L: [L1, L2],
+    asT: [lineText(m, C.k - m * C.h), lineText(-m, C.k + m * C.h)], asL: [lineLatex(m, C.k - m * C.h), lineLatex(-m, C.k + m * C.h)] };
+}
+const hypCurves = (C) => {
+  const a = Math.sqrt(C.tr === 'x' ? C.A : C.B), b = Math.sqrt(C.tr === 'x' ? C.B : C.A);
+  return [1, -1].map((s) => ({ param: [(t) => (C.tr === 'x' ? [C.h + s * a * Math.cosh(t), C.k + b * Math.sinh(t)] : [C.h + b * Math.sinh(t), C.k + s * a * Math.cosh(t)]), -3.2, 3.2] }));
+};
+function randHyp(r, origin) {
+  for (;;) {
+    let a = ri(r, 1, 7), b = ri(r, 1, 7);
+    if (r() < 0.1) { a = pick(r, [1 / 2, 3 / 2]); b = pick(r, [1, 2, 3]); }
+    const tr = pick(r, ['x', 'y']), h = origin ? 0 : ri(r, -6, 6), k = origin ? 0 : ri(r, -6, 6);
+    const C = { t: 'h', h, k, tr, A: tr === 'x' ? a * a : b * b, B: tr === 'x' ? b * b : a * a };
+    if (!fracParts(Math.sqrt(C.B / C.A))) continue;
+    return C;
+  }
+}
+// "y = ±(3/4)x"
+const pmLineT = (m) => `y = ±${m === 1 ? '' : fracParts(m)[1] === 1 ? fmt(m) : `(${fracT(m)})`}x`;
+TEMPLATES.c4Match = (r) => {
+  for (;;) {
+    const p = pick(r, [[9, 25], [25, 9], [4, 9], [9, 4], [16, 9]]), h = pick(r, [2, -2, 3]), k = pick(r, [2, -2, -4, 4]);
+    const pool = shuffle(r, [{ t: 'h', h: 0, k: 0, tr: 'y', A: p[1], B: p[0] }, { t: 'h', h: 0, k: 0, tr: 'x', A: p[0], B: p[1] }, { t: 'h', h: 0, k, tr: 'x', A: p[1], B: p[0] }, { t: 'h', h, k, tr: 'y', A: p[0], B: p[1] }, { t: 'h', h: -h, k: 0, tr: 'y', A: p[1], B: p[0] }]).slice(0, 4);
+    const opts = pool.map(conT); if (new Set(opts).size < 4) continue;
+    const C = pool[0], E = hypFacts(C);
+    return {
+      topic: 'Matching hyperbolas', stem: 'Which equation matches the graph?',
+      ...buildChoices(r, opts[0], opts.slice(1), () => null), fr: FR.select('The graph is', shuffle(r, opts), opts[0]),
+      draw: plotQ({ xr: [-10, 10], yr: [-10, 10], curves: hypCurves(C), pts: E.V.map((q) => ({ p: q.v })) }), size: [380, 380],
+      solution: `The branches open ${C.tr === 'x' ? 'left and right, so the x-term is positive' : 'up and down, so the y-term is positive'}. The center is ${ptT([C.h, C.k])} and the vertices are ${pairT(E.V)}, so a = ${exactT(E.a)}: ${opts[0]}`,
+    };
+  }
+};
+TEMPLATES.c4Std = (r) => {
+  for (;;) {
+    const kind = ri(r, 0, 2), C = randHyp(r, kind === 0), E = hypFacts(C), Cn = ptT([C.h, C.k]);
+    let given, why;
+    if (kind === 0) { if (!fracParts(E.c)) continue; given = `Vertices: ${pmT(E.a, C.tr)}; foci: ${pmT(E.c, C.tr)}`; why = `a = ${exactT(E.a)}, c = ${exactT(E.c)}, so b² = c² − a² = ${fracT(E.c2)} − ${fracT(E.a2)} = ${fracT(E.b2)}.`; }
+    else if (kind === 1) { if (!fracParts(E.c)) continue; given = `Vertices: ${pairT(E.V)}; foci: ${pairT(E.F)}`; why = `The center is the midpoint of the vertices, ${Cn}. a = ${exactT(E.a)}, c = ${exactT(E.c)}, so b² = c² − a² = ${fracT(E.c2)} − ${fracT(E.a2)} = ${fracT(E.b2)}.`; }
+    else { // vertices and a point
+      if (!Number.isInteger(E.a)) continue;
+      const du = (E.a + ri(r, 1, 4)) * pick(r, [1, -1]), dv = ri(r, 1, 6) * pick(r, [1, -1]);
+      if (Math.abs(du) <= E.a) continue;
+      const b2 = (dv * dv) / ((du * du) / E.a2 - 1); if (!fracParts(b2) || fracParts(b2)[1] > 16 || b2 > 200) continue;
+      if (C.tr === 'x') C.B = b2; else C.A = b2;
+      const P = C.tr === 'x' ? [C.h + du, C.k + dv] : [C.h + dv, C.k + du];
+      const E2 = hypFacts(C);
+      given = `Vertices: ${pairT(E2.V)}; passes through the point ${ptT(P)}`;
+      why = `The center is ${Cn} and a = ${E.a}. Substitute ${ptT(P)} into the equation: ${du * du}/${E.a2} − ${dv * dv}/b² = 1, so b² = ${fracT(b2)}.`;
+    }
+    return {
+      topic: 'Standard equation of a hyperbola', stem: `Find the standard form of the equation of the hyperbola with the given characteristics.   ${given}`,
+      ...conChoices(r, C, [C.tr === 'x' ? { ...C, B: E.c2 + E.a2 } : { ...C, A: E.c2 + E.a2 }]), fr: conFR(C),
+      solution: `${why}\nThe transverse axis is ${C.tr === 'x' ? 'horizontal, so the x-term is positive' : 'vertical, so the y-term is positive'}: ${conT(C)}`,
+    };
+  }
+};
+TEMPLATES.c4Props = (r) => {
+  for (;;) {
+    const form = ri(r, 0, 2), C = randHyp(r, form === 1);
+    if (form !== 0 && (!Number.isInteger(C.A) || !Number.isInteger(C.B))) continue;
+    const E = hypFacts(C), Cn = [C.h, C.k];
+    const eq = form === 2 ? conicGeneralT(C) : form === 1 ? (() => { const m = pick(r, [1, 1, 2]), L = clcm(C.A, C.B) * m, P = L / C.A, Q = L / C.B; return C.tr === 'x' ? `${lnSumT([[P, null, 'x²'], [-Q, null, 'y²']])} = ${L}` : `${lnSumT([[Q, null, 'y²'], [-P, null, 'x²']])} = ${L}`; })() : conT(C);
+    const T = (X) => `Center ${ptT([X.h, X.k])};  vertices ${pairT(X.V)};  foci ${pairT(X.F)};  asymptotes ${X.asT.join(' and ')}`;
+    const mk = (h, k, tr, a, c, m) => { const D = { h, k }; return { h, k, V: pairPts(D, a, tr), F: pairPts(D, c, tr), asT: [lineText(m, k - m * h), lineText(-m, k + m * h)] }; };
+    const correct = T({ h: C.h, k: C.k, V: E.V, F: E.F, asT: E.asT }), other = C.tr === 'x' ? 'y' : 'x';
+    const wrongs = [mk(C.h, C.k, other, E.a, E.c, E.m), mk(C.h, C.k, C.tr, E.a, E.c, 1 / E.m), E.a2 > E.b2 ? mk(C.h, C.k, C.tr, E.a, Math.sqrt(E.a2 - E.b2), E.m) : mk(C.h, C.k, C.tr, E.a, E.a + E.b, E.m), mk(-C.h, -C.k, C.tr, E.a, E.c, E.m), mk(C.h, C.k, C.tr, E.b, E.c, E.m)]
+      .filter((X) => X.asT.every((t) => t)).map(T);
+    const asOk = (v) => { const a = [0, 1].map((i) => E.L.map((L) => lineOk(v[3 + i], L))); return (a[0][0] && a[1][1]) || (a[0][1] && a[1][0]) ? [true, true] : [a[0][0] || a[0][1], (a[1][0] || a[1][1]) && !(a[0][0] || a[0][1])]; };
+    const ok = (v) => [onePointOk(v[0], Cn), ptsOk(v[1], E.V.map((p) => p.v)), ptsOk(v[2], E.F.map((p) => p.v)), ...asOk(v)];
+    return {
+      topic: 'Center, vertices, foci, asymptotes', stem: `Find the center, vertices, foci, and the equations of the asymptotes of the hyperbola.   ${eq}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => T(mk(C.h, C.k, C.tr, E.a + i + 1, E.c + i + 1, E.m))),
+      fr: { fields: [{ kind: 'expr', keys: 'point', label: 'Center:' }, { kind: 'expr', keys: 'point', label: 'Vertices:' }, { kind: 'expr', keys: 'point', label: 'Foci:' }, { kind: 'expr', keys: 'func', label: 'Asymptote:' }, { kind: 'expr', keys: 'func', label: 'Asymptote:' }],
+        key: [`\\left(${fracL(C.h)},${fracL(C.k)}\\right)`, pairL(E.V), pairL(E.F), E.asL[0], E.asL[1]], display: correct,
+        check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 5 },
+      solution: `${form === 2 ? 'Complete the square in x and y: ' : form === 1 ? 'Divide both sides so the right side is 1: ' : ''}${conT(C)}\nCenter ${ptT(Cn)}; a² = ${fracT(E.a2)} (under the positive ${C.tr}-term), b² = ${fracT(E.b2)}, so a = ${exactT(E.a)}, b = ${exactT(E.b)}.\nc² = a² + b² = ${fracT(E.c2)}, so c = ${exactT(E.c)}.\nVertices ${pairT(E.V)}; foci ${pairT(E.F)}.\nAsymptotes: y − k = ±${C.tr === 'x' ? '(b/a)' : '(a/b)'}(x − h), slope ±${fracT(E.m)}: ${E.asT.join(' and ')}.`,
+    };
+  }
+};
+TEMPLATES.c4Asym = (r) => {
+  for (;;) {
+    const kind = ri(r, 0, 3), C = randHyp(r, kind <= 1), E = hypFacts(C);
+    if (!Number.isInteger(E.a) && kind !== 1) continue;
+    const asym = kind <= 1 ? pmLineT(E.m) : `${E.asT[0]}, ${E.asT[1]}`;
+    let given, why;
+    const slopeWhy = C.tr === 'x' ? `The slopes are ±b/a = ±${fracT(E.m)}` : `The slopes are ±a/b = ±${fracT(E.m)}`;
+    if (kind === 0 || kind === 2) {
+      given = `Vertices: ${kind === 0 ? pmT(E.a, C.tr) : pairT(E.V)}; asymptotes: ${asym}`;
+      why = `${kind === 2 ? `The center is the midpoint of the vertices, ${ptT([C.h, C.k])}. ` : ''}a = ${exactT(E.a)}. ${slopeWhy}, so b = ${exactT(E.b)}.`;
+    } else {
+      given = `Foci: ${kind === 1 ? pmT(E.c, C.tr) : pairT(E.F)}; asymptotes: ${asym}`;
+      why = `${kind === 3 ? `The center is the midpoint of the foci, ${ptT([C.h, C.k])}. ` : ''}c = ${exactT(E.c)}. ${slopeWhy}, so ${C.tr === 'x' ? `b = ${fracT(E.m)}a` : `a = ${fracT(E.m)}b`}. Then c² = a² + b² gives a² = ${fracT(E.a2)} and b² = ${fracT(E.b2)}.`;
+    }
+    const inv = C.tr === 'x' ? { ...C, B: C.A * C.A / C.B } : { ...C, A: C.B * C.B / C.A };
+    return {
+      topic: 'Hyperbola from asymptotes', stem: `Find the standard form of the equation of the hyperbola with the given characteristics.   ${given}`,
+      ...conChoices(r, C, [inv]), fr: conFR(C),
+      solution: `${why}\n${conT(C)}`,
+    };
+  }
+};
+const CONIC_NAMES = ['Circle', 'Parabola', 'Ellipse', 'Hyperbola'];
+TEMPLATES.c4Classify = (r) => {
+  const kind = pick(r, CONIC_NAMES);
+  let eq, why;
+  if (kind === 'Circle') {
+    const h = ri(r, -6, 6), k = ri(r, -6, 6), rr = ri(r, 1, 7), m = pick(r, [1, 1, 2, 4, 100]);
+    eq = `${lnSumT([[m, null, 'x²'], [m, null, 'y²'], [-2 * m * h, null, 'x'], [-2 * m * k, null, 'y'], [m * (h * h + k * k - rr * rr), null, '']])} = 0`; why = `A = C = ${m} (same coefficient on x² and y²): a circle.`;
+  } else if (kind === 'Parabola') {
+    const P = { ax: pick(r, ['v', 'h']), h: ri(r, -5, 5), k: ri(r, -5, 5), p: pick(r, [1, 2, 3, -1, -2, 1 / 2, -3 / 2]) };
+    const m = pick(r, [1, 1, 2, 4]);
+    const c = 4 * P.p * m, [u, w, cu, cw] = P.ax === 'v' ? ['x', 'y', P.h, P.k] : ['y', 'x', P.k, P.h];
+    eq = `${lnSumT([[m, null, `${u}²`], [-2 * m * cu, null, u], [-c, null, w], [m * cu * cu + c * cw, null, '']])} = 0`; why = `Only ${u}² appears (A·C = 0): a parabola.`;
+  } else {
+    let C; do C = kind === 'Ellipse' ? randEll(r, false) : randHyp(r, false); while (!Number.isInteger(C.A) || !Number.isInteger(C.B) || C.A === C.B);
+    eq = conicGeneralT(C); why = kind === 'Ellipse' ? 'x² and y² have different coefficients with the same sign (A·C > 0, A ≠ C): an ellipse.' : 'x² and y² have coefficients with opposite signs (A·C < 0): a hyperbola.';
+  }
+  return {
+    topic: 'Classifying conics', stem: `Classify the graph of the equation as a circle, a parabola, an ellipse, or a hyperbola.   ${eq}`,
+    ...buildChoices(r, kind, CONIC_NAMES.filter((x) => x !== kind), () => null), fr: FR.select('The graph is a', CONIC_NAMES, kind),
+    solution: `Compare the coefficients A of x² and C of y². ${why}`,
   };
 };
 
@@ -8973,6 +9330,17 @@ const QUESTION_TYPES = [
   { id: 'a2VFD', subject: 'precalc',  section: '6.2 Introduction to Conics: Parabolas', label: 'Vertex, focus, and directrix', desc: 'From standard or general form' },
   { id: 'a2Tangent', subject: 'precalc',  section: '6.2 Introduction to Conics: Parabolas', label: 'Tangent line to a parabola', desc: 'And its x-intercept' },
   { id: 'a2Apply', subject: 'precalc',  section: '6.2 Introduction to Conics: Parabolas', label: 'Parabola applications', desc: 'Satellite dish, reflector, suspension bridge' },
+  { id: 'c3Match', subject: 'precalc',  section: '6.3 Ellipses', label: 'Matching ellipses', desc: '(#5–8)' },
+  { id: 'c3Origin', subject: 'precalc',  section: '6.3 Ellipses', label: 'Center at the origin', desc: 'Vertices, foci, axis lengths, points, graph (#9–18)' },
+  { id: 'c3Std', subject: 'precalc',  section: '6.3 Ellipses', label: 'Standard equation of an ellipse', desc: 'Any center (#19–30)' },
+  { id: 'c3Props', subject: 'precalc',  section: '6.3 Ellipses', label: 'Center, vertices, foci, eccentricity', desc: 'Standard or general form (#31–46)' },
+  { id: 'c3Ecc', subject: 'precalc',  section: '6.3 Ellipses', label: 'Using eccentricity', desc: '(#51–54)' },
+  { id: 'c3Apply', subject: 'precalc',  section: '6.3 Ellipses', label: 'Semielliptical arches', desc: 'Height at a point' },
+  { id: 'c4Match', subject: 'precalc',  section: '6.4 Hyperbolas', label: 'Matching hyperbolas', desc: '(#7–10)' },
+  { id: 'c4Std', subject: 'precalc',  section: '6.4 Hyperbolas', label: 'Standard equation of a hyperbola', desc: 'Vertices, foci, a point (#11–18)' },
+  { id: 'c4Props', subject: 'precalc',  section: '6.4 Hyperbolas', label: 'Center, vertices, foci, asymptotes', desc: 'Standard or general form (#19–30)' },
+  { id: 'c4Asym', subject: 'precalc',  section: '6.4 Hyperbolas', label: 'Hyperbola from asymptotes', desc: '(#37–46)' },
+  { id: 'c4Classify', subject: 'precalc',  section: '6.4 Hyperbolas', label: 'Classifying conics', desc: 'Circle, parabola, ellipse, or hyperbola (#47–56)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
