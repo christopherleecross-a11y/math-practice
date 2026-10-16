@@ -151,6 +151,9 @@ const CONFIG = {
   // LOCKDOWN = questions only show in full screen; right-click/copy/print are blocked; leaving the page
   //            (other tab, other app, Google Lens panel, exiting full screen) hides the questions and is counted.
   LOCKDOWN: true,
+  // SAME_FOR_EVERYONE = true gives every student the identical questions (same numbers, same order).
+  // Usually set per assignment instead: same: true in SETS, or the builder's "Same questions for everyone" box.
+  SAME_FOR_EVERYONE: false,
   // WATERMARK = faint student name, period, and date repeated across every question, so a shared screenshot shows whose it is.
   WATERMARK: true,
   ATTEMPTS: 1,
@@ -164,7 +167,8 @@ const CONFIG = {
 //   One assignment:          practice.html?set=KEY
 //   A subject's list only:   practice.html?subject=geometry   (or precalc, act)
 // Each item is [question type, how many] or [question type, how many, 'fr'] for free response.
-// Optional per assignment: retries: 2 (Check button + new versions), attempts: 3 (whole-assignment tries).
+// Optional per assignment: retries: 2 (Check button + new versions), attempts: 3 (whole-assignment tries),
+//   same: true (every student gets identical questions).
 // Types:
 //   5.1: angleSum, extAngleAlgebra, extAngleRatio, classifyTriangle
 //   5.2: congStatement (#1-2), correspondingParts (#3-6), findXY (#7-8), congReason (#9-10), thirdAngle (#13-14)
@@ -1893,9 +1897,10 @@ let CUSTOM_KEY = null;
   const shuffleQs = q.get('order') === 'mixed';
   const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
-  CUSTOM_KEY = 'custom-' + cyrb53(`${mix}|${title}|${shuffleQs}`).toString(36).slice(-8);
+  const same = q.get('same') === '1';
+  CUSTOM_KEY = 'custom-' + cyrb53(`${mix}|${title}|${shuffleQs}` + (same ? '|same' : '')).toString(36).slice(-8);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same };
 })();
 
 /* ---------- question generation ---------- */
@@ -1914,7 +1919,9 @@ const scoreOf = (q, a) => (q.mode === 'fr'
 const isCorrect = (q, a) => scoreOf(q, a) === 1;
 const norm = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
 function generate(setKey, period, name, attempt = 1) {
-  const seedStr = `${CONFIG.SALT}|${setKey}|${period}|${norm(name)}` + (attempt > 1 ? `|a${attempt}` : '');
+  // same: true → one version for the whole class (retries and new attempts are also the same for everyone)
+  const who = setting(setKey, 'same') ? 'everyone' : `${period}|${norm(name)}`;
+  const seedStr = `${CONFIG.SALT}|${setKey}|${who}` + (attempt > 1 ? `|a${attempt}` : '');
   const r = mulberry32(cyrb53(seedStr));
   let qs = [];
   for (const [tpl, count, mode] of SETS[setKey].items) for (let i = 0; i < count; i++) {
@@ -1934,6 +1941,7 @@ const setting = (setKey, name) => {
   if (v !== undefined) return v;
   if (name === 'attempts') return CONFIG.ALLOW_RETAKE ? 99 : CONFIG.ATTEMPTS || 1;
   if (name === 'lockdown') return CONFIG.LOCKDOWN !== false;
+  if (name === 'same') return !!CONFIG.SAME_FOR_EVERYONE;
   return CONFIG.RETRIES || 0;
 };
 
@@ -1989,7 +1997,8 @@ function startScreen(teacher = false) {
   const attSel = el('select', { id: 'attempt' }, ...Array.from({ length: 10 }, (_, n) => el('option', { value: String(n + 1) }, `Attempt ${n + 1}`)));
   if (teacher) card.append(el('label', { for: 'attempt' }, 'Which attempt'), attSel,
     el('p', { class: 'small' }, 'Shows the first version of each question. If retries are on, later versions are listed in the student’s work Doc.'));
-  if (!teacher) card.append(el('p', { class: 'small' }, 'Type your full name exactly the same way every time. Your questions are made just for you, so your answers won’t match anyone else’s.'));
+  if (!teacher) card.append(el('p', { class: 'small' }, setKey && setting(setKey, 'same') ? 'Type your full name exactly the same way every time.'
+    : 'Type your full name exactly the same way every time. Your questions are made just for you, so your answers won’t match anyone else’s.'));
   card.append(el('button', { class: 'btn', onclick: () => {
     const sk = setSel ? setSel.value : setKey;
     const name = nm.value.trim().replace(/\s+/g, ' ');
@@ -2661,6 +2670,8 @@ function builder() {
   const retriesIn = numIn(saved.retries ?? 0, 0, 5), attemptsIn = numIn(saved.attempts ?? 1, 1, 10);
   const lockIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   lockIn.checked = saved.lockdown !== false;
+  const sameIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
+  sameIn.checked = !!saved.same;
   app.append(el('div', { class: 'card' },
     el('label', {}, 'Assignment title'), titleIn,
     el('label', {}, 'Subject (which gradebook tab scores go to)'), subjSel,
@@ -2670,7 +2681,9 @@ function builder() {
     el('label', {}, 'Attempts at the whole assignment'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, attemptsIn,
       el('span', { class: 'small' }, '1 = one try. Each new attempt has all new numbers; every attempt is recorded.')),
     el('label', {}, 'Lockdown mode'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, lockIn,
-      el('span', { class: 'small' }, 'Full screen required; right-click, copy, and printing blocked; leaving the page hides the questions and is recorded.'))));
+      el('span', { class: 'small' }, 'Full screen required; right-click, copy, and printing blocked; leaving the page hides the questions and is recorded.')),
+    el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
+      el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Unchecked = a different version for each student.'))));
 
   const list = el('div', { class: 'card' });
   const totalEl = el('strong', {}, '0');
@@ -2716,13 +2729,14 @@ function builder() {
   app.append(out);
   [titleIn, subjSel, orderSel, retriesIn, attemptsIn].forEach((x) => x.addEventListener('input', update));
   lockIn.addEventListener('change', update);
+  sameIn.addEventListener('change', update);
 
   function update() {
     const items = QUESTION_TYPES.filter((t) => counts[t.id] > 0).map((t) => [t.id, counts[t.id], formats[t.id] === 'fr' ? 'fr' : 'mc']);
     const total = items.reduce((a, [, n]) => a + n, 0);
     totalEl.textContent = String(total);
     const title = titleIn.value.trim() || 'Custom Practice';
-    store.set('builder:last', { counts, formats, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked });
+    store.set('builder:last', { counts, formats, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked, same: sameIn.checked });
     if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
@@ -2733,10 +2747,11 @@ function builder() {
     if (rt) q.set('retries', String(rt));
     if (at > 1) q.set('attempts', String(at));
     if (!lockIn.checked) q.set('lock', '0');
+    if (sameIn.checked) q.set('same', '1');
     const url = location.origin + location.pathname + '?' + q.toString();
     linkIn.value = url; tryLink.href = url; keyLink.href = url + '&teacher=1';
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''} },`;
   }
   update();
 }
