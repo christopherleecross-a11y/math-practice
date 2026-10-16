@@ -214,6 +214,7 @@ const SETS = {
   'geo-5-1':       { subject: 'geometry', title: '5.1 Angles of Triangles',   items: [['classifyTriangle', 3], ['angleSum', 3], ['extAngleAlgebra', 2], ['extAngleRatio', 2]] },
   'geo-5-2':       { subject: 'geometry', title: '5.2 Congruent Polygons',    items: [['congStatement', 3], ['correspondingParts', 3], ['findXY', 2], ['congReason', 2], ['thirdAngle', 2]] },
   'geo-5-3-6':     { subject: 'geometry', title: '5.3–5.6 Triangle Congruence (SSS, SAS, ASA, AAS, HL)', items: [['triCongruence', 9], ['triCongruenceGiven', 3]] },
+  'geo-5-4':       { subject: 'geometry', title: '5.4 Equilateral and Isosceles Triangles', items: [['g54Complete', 2], ['g54FindX', 3], ['g54FindXY', 2], ['g54Perimeter', 2], ['g54Angles', 2], ['g54IsoT', 1], ['g54BaseFacts', 1], ['g54Lighthouse', 1]] },
   // ----- Pre-Calculus -----
   'precalc-p-1':   { subject: 'precalc',  title: 'P.1 Review of Real Numbers', items: [['p1Classify', 2], ['p1Order', 2], ['p1Interval', 4], ['p1AbsVal', 3], ['p1Compare', 2], ['p1Distance', 2]] },
   'precalc-p-2':   { subject: 'precalc',  title: 'P.2 Solving Equations', items: [['p2Linear', 3], ['p2Rational', 3], ['p2Factor', 2], ['p2SqRoots', 2], ['p2CompleteSq', 2], ['p2Quadratic', 3]] },
@@ -9831,6 +9832,177 @@ function triCong(r, givenText) {
 TEMPLATES.triCongruence = (r) => triCong(r, false);
 TEMPLATES.triCongruenceGiven = (r) => triCong(r, true);
 
+/* ==== GEOMETRY 5.4 BEGIN ==== */
+/* ---------- Geometry 5.4 Equilateral and Isosceles Triangles ---------- */
+const g4Lin = (a, b, v = 'x') => lnSumT([[a, null, v], [b, null, '']]);
+const ISO_PTS = (w = 6, h = 5) => [[0, 0], [w, 0], [w / 2, h]]; // base left, base right, apex
+const g4Names = (r) => pick(r, [['B', 'C', 'A'], ['L', 'N', 'M'], ['R', 'T', 'S'], ['Y', 'Z', 'X'], ['Q', 'R', 'P'], ['E', 'F', 'D']]);
+// complete the statement from a figure with a base line and an apex (#1–4)
+TEMPLATES.g54Complete = (r) => {
+  const L = pick(r, [['A', 'B', 'C', 'D', 'E'], ['P', 'Q', 'S', 'V', 'R'], ['J', 'K', 'L', 'M', 'N'], ['F', 'G', 'H', 'I', 'T']]);
+  const [A, B, C, D, E] = L, base = [A, B, C, D];
+  const tris = [[A, B, E], [A, C, E], [A, D, E], [B, C, E], [B, D, E], [C, D, E]];
+  const T = pick(r, tris), conv = r() < 0.45;
+  const [i, j] = shuffle(r, [0, 1, 2]).slice(0, 2), k = 3 - i - j; // vertices i, j; the third vertex k
+  const ang = (v) => { const [p, q] = T.filter((x) => x !== v); return `∠${p}${v}${q}`; }; // angle at v inside T
+  const side = (v) => SEG(T.filter((x) => x !== v).join('')); // side opposite v
+  let stem, correct, wrongs, thm, why;
+  if (!conv) { // two sides ≅ → angles opposite them
+    const s1 = side(T[i]), s2 = side(T[j]);
+    stem = `If ${s1} ≅ ${s2}, then ∠___ ≅ ∠___.`; correct = `${ang(T[i])} ≅ ${ang(T[j])}`; thm = 'Base Angles Theorem';
+    wrongs = [`${ang(T[i])} ≅ ${ang(T[k])}`, `${ang(T[j])} ≅ ${ang(T[k])}`];
+    why = `${s1} is opposite ${ang(T[i])} and ${s2} is opposite ${ang(T[j])} in △${T.join('')}. If two sides of a triangle are congruent, the angles opposite them are congruent.`;
+  } else {
+    stem = `If ${ang(T[i])} ≅ ${ang(T[j])}, then ___ ≅ ___.`; correct = `${side(T[i])} ≅ ${side(T[j])}`; thm = 'Converse of the Base Angles Theorem';
+    wrongs = [`${side(T[i])} ≅ ${side(T[k])}`, `${side(T[j])} ≅ ${side(T[k])}`];
+    why = `In △${T.join('')}, ${ang(T[i])} is opposite ${side(T[i])} and ${ang(T[j])} is opposite ${side(T[j])}. If two angles of a triangle are congruent, the sides opposite them are congruent.`;
+  }
+  const other = conv ? 'Base Angles Theorem' : 'Converse of the Base Angles Theorem';
+  const opt = (s, t) => `${s}  (${t})`, ans = opt(correct, thm);
+  const opts = [ans, opt(correct, other), opt(wrongs[0], thm), opt(wrongs[1], thm)];
+  const stmts = shuffle(r, [correct, ...wrongs]);
+  const xs = { [A]: 0, [B]: 3, [C]: 7, [D]: 10 };
+  const ok = (v) => [v[0] === correct, v[1] === thm];
+  return {
+    topic: 'Base Angles Theorem and its converse', stem: `Complete the statement. State which theorem you used.   ${stem}`,
+    ...buildChoices(r, ans, opts.slice(1), () => null),
+    fr: { fields: [{ kind: 'select', label: 'Statement:', options: stmts }, { kind: 'select', label: 'Theorem:', options: ['Base Angles Theorem', 'Converse of the Base Angles Theorem'] }], key: [correct, thm], display: ans,
+      check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+    draw: (cv) => drawFigure(cv, { polys: [[A, B, E], [B, C, E], [C, D, E]].map((t) => ({ group: 'g', pts: t.map((n) => (n === E ? [5, 4] : [xs[n], 0])), names: t })) }), size: [400, 260],
+    solution: `${why}\n${correct}  (${thm})`,
+  };
+};
+// find x (#5–8)
+TEMPLATES.g54FindX = (r) => {
+  const k = ri(r, 0, 3), N = g4Names(r);
+  let poly, x, why, lab;
+  if (k === 0) { // base angles marked; legs: expression and number
+    x = ri(r, 2, 12); const a = pick(r, [1, 1, 2, 3]), b = a === 1 ? 0 : ri(r, -6, 8), n = a * x + b; if (n <= 0) return TEMPLATES.g54FindX(r);
+    lab = g4Lin(a, b); poly = { pts: ISO_PTS(6, 5), names: N, slab: ['', String(n), lab], arcs: [1, 1, 0] };
+    why = `∠${N[0]} ≅ ∠${N[1]}, so by the Converse of the Base Angles Theorem the sides opposite them are congruent: ${lab} = ${n}, so x = ${x}.`;
+  } else if (k === 1) { // two 60° angles → equiangular → equilateral
+    x = ri(r, 3, 12); const a = pick(r, [1, 2, 3]), b = a === 1 ? 0 : ri(r, -5, 6), n = ri(r, 8, 30); const xv = (n - b) / a; if (!Number.isInteger(xv) || xv <= 0) return TEMPLATES.g54FindX(r); x = xv;
+    lab = g4Lin(a, b); poly = { pts: ISO_PTS(6, 3 * Math.sqrt(3)), names: N, slab: [String(n), '', lab], alab: ['60°', '60°', ''], arcs: [1, 1, 0] };
+    why = `The two marked angles are 60°, so the third is 180° − 120° = 60°. The triangle is equiangular, so it is equilateral: ${lab} = ${n}, so x = ${x}.`;
+  } else if (k === 2) { // equilateral (all sides marked) and an angle
+    const a = pick(r, [1, 2, 3, 4, 5, 6]), b = a === 1 ? ri(r, -20, 40) : 60 - a * ri(r, 5, Math.floor(70 / a)); x = (60 - b) / a; if (!Number.isInteger(x) || x <= 0 || b === 0 && a === 1) return TEMPLATES.g54FindX(r);
+    lab = b === 0 ? `${a === 1 ? '' : a}x°` : `(${g4Lin(a, b)})°`; poly = { pts: ISO_PTS(6, 3 * Math.sqrt(3)), names: N, ticks: [1, 1, 1], alab: [pick(r, [lab, '']), '', ''], arcs: [1, 0, 0] };
+    if (!poly.alab[0]) { poly.alab = ['', '', lab]; poly.arcs = [0, 0, 1]; }
+    why = `All three sides are congruent, so the triangle is equilateral and therefore equiangular: each angle is 60°. ${lab.replace(/[()°]/g, '')} = 60, so x = ${x}.`;
+  } else { // isosceles (legs marked), vertex angle given, base angle in x
+    const V = pick(r, [30, 40, 50, 70, 80, 100, 110, 120]), B = (180 - V) / 2, a = pick(r, [1, 2, 3, 5]), b = B - a * ri(r, 2, Math.floor(B / a)); x = (B - b) / a; if (!Number.isInteger(x) || x <= 0) return TEMPLATES.g54FindX(r);
+    lab = b === 0 ? `${a === 1 ? '' : a}x°` : `(${g4Lin(a, b)})°`; poly = { pts: ISO_PTS(6, V < 90 ? 6 : 2.5), names: N, ticks: [0, 1, 1], alab: [lab, '', `${V}°`], arcs: [1, 0, 1] };
+    why = `The legs are congruent, so the base angles are congruent (Base Angles Theorem): each is (180° − ${V}°)/2 = ${B}°. ${lab.replace(/[()°]/g, '')} = ${B}, so x = ${x}.`;
+  }
+  const wrongs = [x + 1, x - 2, 2 * x, Math.round(x / 2) || x + 3, x + 5].filter((w) => w > 0 && w !== x).map(String);
+  return {
+    topic: 'Isosceles and equilateral triangles: find x', stem: `Find the value of x.`,
+    ...buildChoices(r, `x = ${x}`, [...new Set(wrongs)].map((w) => `x = ${w}`), (i) => `x = ${x + i + 3}`),
+    fr: FR.num('x =', x), draw: (cv) => drawFigure(cv, { polys: [poly] }), size: [400, 300], solution: why,
+  };
+};
+// find x and y (#11–14)
+TEMPLATES.g54FindXY = (r) => {
+  const k = ri(r, 0, 2), N = g4Names(r);
+  let poly, x, y, why;
+  if (k === 0) { // equilateral (equiangular marks), sides in x and y
+    for (;;) { y = ri(r, 2, 9); const c = ri(r, 2, 6), e = ri(r, 1, 4); if (c === e) continue; const s = ri(r, 10, 40), d = s - c * y, f = s - e * y; const a = ri(r, 2, 5), b = s % a ? null : 0; x = (s - (b ?? 0)) / a;
+      const bb = pick(r, [-5, -3, 1, 2, 4, 7]); x = (s - bb) / a; if (!Number.isInteger(x) || x <= 0 || !d || !f) continue;
+      poly = { pts: ISO_PTS(6, 3 * Math.sqrt(3)), names: N, slab: [g4Lin(a, bb), g4Lin(c, d, 'y'), g4Lin(e, f, 'y')], arcs: [1, 1, 1] };
+      why = `All three angles are congruent, so the triangle is equilateral (Corollary to the Converse of the Base Angles Theorem). ${g4Lin(c, d, 'y')} = ${g4Lin(e, f, 'y')} gives y = ${y}, so each side is ${s}. Then ${g4Lin(a, bb)} = ${s}, so x = ${x}.`; break; }
+  } else if (k === 1) { // isosceles: vertex angle given; base angles (expr in x) and y°
+    for (;;) { const V = pick(r, [36, 40, 50, 64, 70, 80, 100, 110, 116]), B = (180 - V) / 2, a = pick(r, [2, 3, 4]), b = B - a * ri(r, 3, Math.floor(B / a)); x = (B - b) / a; if (!Number.isInteger(x) || x <= 0 || !b) continue; y = B;
+      poly = { pts: ISO_PTS(6, V < 90 ? 6 : 2.5), names: N, ticks: [0, 1, 1], alab: [`(${g4Lin(a, b)})°`, 'y°', `${V}°`], arcs: [1, 1, 1] };
+      why = `The legs are congruent, so the base angles are congruent: each is (180° − ${V}°)/2 = ${B}°. So y = ${B}, and ${g4Lin(a, b)} = ${B} gives x = ${x}.`; break; }
+  } else { // equilateral triangle split by a median: x is the 60° split, y a side
+    for (;;) { const s = ri(r, 6, 24), a = ri(r, 2, 4), b = ri(r, -6, 6); y = (s - b) / a; if (!Number.isInteger(y) || y <= 0 || !b) continue; x = 60;
+      poly = { pts: ISO_PTS(6, 3 * Math.sqrt(3)), names: N, ticks: [1, 1, 1], slab: [String(s), g4Lin(a, b, 'y'), ''], alab: ['', 'x°', ''], arcs: [0, 1, 0] };
+      why = `All sides are congruent, so the triangle is equilateral and equiangular: x = 60. Also ${g4Lin(a, b, 'y')} = ${s}, so y = ${y}.`; break; }
+  }
+  const T = (a, b) => `x = ${a}, y = ${b}`, correct = T(x, y);
+  return {
+    topic: 'Isosceles and equilateral triangles: find x and y', stem: 'Find the values of x and y.',
+    ...buildChoices(r, correct, [T(y, x), T(x + 2, y), T(x, y + 4), T(x - 3, y - 1)].filter((w) => w !== correct), (i) => T(x + i + 5, y)),
+    fr: FR.nums(['x =', 'y ='], [x, y], correct), draw: (cv) => drawFigure(cv, { polys: [poly] }), size: [400, 300], solution: why,
+  };
+};
+// perimeter (#21–22, chapter review #23)
+TEMPLATES.g54Perimeter = (r) => {
+  for (;;) {
+    const x = ri(r, 2, 12), a = ri(r, 1, 6), c = ri(r, 1, 6); if (a === c) continue;
+    const b = ri(r, -6, 9), L = a * x + b, d = L - c * x; if (L <= 0) continue;
+    const e = pick(r, [1, 2, 3, 4, -1]), f = ri(r, -5, 20), Bs = e * x + f; if (Bs < L / 3 || Bs >= 2 * L) continue;
+    const N = g4Names(r), marks = r() < 0.5;
+    const poly = { pts: ISO_PTS(6, 5), names: N, slab: [g4Lin(e, f), g4Lin(c, d), g4Lin(a, b)], ticks: marks ? [0, 1, 1] : [0, 0, 0], arcs: marks ? [0, 0, 0] : [1, 1, 0] };
+    const P = 2 * L + Bs, correct = String(P);
+    const wrongs = [L + Bs, 2 * Bs + L, 3 * L, P + x, x].filter((w) => w > 0 && w !== P).map(String);
+    return {
+      topic: 'Perimeter of an isosceles triangle', stem: `Find the perimeter of the triangle.`,
+      ...buildChoices(r, `Perimeter = ${correct}`, [...new Set(wrongs)].map((w) => `Perimeter = ${w}`), (i) => `Perimeter = ${P + i + 2}`),
+      fr: FR.num('Perimeter =', P), draw: (cv) => drawFigure(cv, { polys: [poly] }), size: [400, 300],
+      solution: `${marks ? 'The two marked sides are congruent' : `∠${N[0]} ≅ ∠${N[1]}, so the sides opposite them are congruent (Converse of the Base Angles Theorem)`}: ${g4Lin(a, b)} = ${g4Lin(c, d)}, so x = ${x}.\nThe sides are ${L}, ${L}, and ${Bs}, so the perimeter is ${L} + ${L} + ${Bs} = ${P}.`,
+    };
+  }
+};
+// which values of t make the triangle isosceles (#23)
+TEMPLATES.g54IsoT = (r) => {
+  for (;;) {
+    const S = [0, 1, 2].map(() => [ri(r, 1, 6), ri(r, -15, 25)]);
+    if (new Set(S.map((s) => s[0])).size < 3) continue;
+    const sols = [];
+    for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) { const t = (S[j][1] - S[i][1]) / (S[i][0] - S[j][0]); const L = S.map(([a, b]) => a * t + b); const [p, q, s] = [...L].sort((u, v) => u - v);
+      if (Number.isInteger(t) && L.every((v) => v > 0) && p + q > s && !sols.includes(t)) sols.push(t); }
+    if (sols.length < 2) continue; sols.sort((u, v) => u - v);
+    const txt = S.map(([a, b]) => g4Lin(a, b, 't'));
+    const T = (L) => `t = ${L.join(', ')}`, correct = T(sols);
+    const allT = [[0, 1], [0, 2], [1, 2]].map(([i, j]) => (S[j][1] - S[i][1]) / (S[i][0] - S[j][0])).filter((t) => isFinite(t)).map((t) => +t.toFixed(4));
+    const wrongs = [T(sols.slice(0, 1)), T(sols.slice(1)), T([...new Set(allT)].sort((u, v) => u - v)), T(sols.map((t) => t + 1))].filter((w) => w !== correct && !/\./.test(w));
+    return {
+      topic: 'Making a triangle isosceles', stem: `The lengths of the sides of a triangle are ${txt.join(', ')}. Find all values of t that make the triangle isosceles.`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T([sols[0] + i + 2])),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 't =' }], key: [sols.join(',')], display: correct, check: (v) => realListOk(v[0], sols) },
+      solution: `Set each pair of sides equal, then check that every side is positive and the Triangle Inequality holds.\n${[[0, 1], [0, 2], [1, 2]].map(([i, j]) => { const t = (S[j][1] - S[i][1]) / (S[i][0] - S[j][0]); const L = S.map(([a, b]) => a * t + b); return `${txt[i]} = ${txt[j]}: t = ${fracT(t)} → sides ${L.map(fracT).join(', ')}${sols.includes(t) ? ' ✓' : ' ✗ (not a triangle)'}`; }).join('\n')}\n${correct}`,
+    };
+  }
+};
+// vertex and base angles, exterior angles (#20b, #24)
+TEMPLATES.g54Angles = (r) => {
+  const k = ri(r, 0, 2);
+  let stem, ans, why, wrongs;
+  if (k === 0) { const V = pick(r, [30, 36, 40, 44, 50, 70, 84, 100, 110, 120, 136]), B = (180 - V) / 2; stem = `The vertex angle of an isosceles triangle measures ${V}°. Find the measure of each base angle.`; ans = B; wrongs = [180 - V, V, 90 - V / 4, 180 - 2 * V]; why = `The base angles are congruent: 2x + ${V} = 180, so x = ${B}°.`; }
+  else if (k === 1) { const B = pick(r, [35, 40, 48, 55, 62, 70, 75, 81]), V = 180 - 2 * B; stem = `Each base angle of an isosceles triangle measures ${B}°. Find the measure of the vertex angle.`; ans = V; wrongs = [B, 180 - B, 90 - B, 2 * B]; why = `The base angles are congruent, so the vertex angle is 180° − 2(${B}°) = ${V}°.`; }
+  else { const B = pick(r, [40, 50, 55, 65, 70, 72]), V = 180 - 2 * B; stem = `In an isosceles triangle, the exterior angle at the vertex measures ${180 - V}°. Find the measure of each base angle.`; ans = B; wrongs = [V, 180 - B, (180 - V) / 3, 2 * B]; why = `The vertex angle is 180° − ${180 - V}° = ${V}°. Each base angle is (180° − ${V}°)/2 = ${B}°. (Also: the exterior angle equals the sum of the two base angles.)`; }
+  return {
+    topic: 'Angles of isosceles triangles', stem,
+    ...buildChoices(r, deg(ans), [...new Set(wrongs.filter((w) => w > 0 && w !== ans))].map(deg), (i) => deg(ans + 5 * (i + 1))),
+    fr: FR.num('Measure =', ans, { suffix: '°' }), solution: why,
+  };
+};
+// lighthouse (#28)
+TEMPLATES.g54Lighthouse = (r) => {
+  const a = pick(r, [25, 30, 32, 35, 38, 40]), d = pick(r, [1.5, 2.1, 2.4, 3, 3.6, 1.8]);
+  const [who, what, unit] = pick(r, [['A boat', 'lighthouse', 'miles'], ['A hiker walking along a straight trail', 'radio tower', 'kilometers'], ['A plane flying level', 'mountain peak', 'miles']]);
+  const correct = `${fmt(d)} ${unit}`;
+  return {
+    topic: 'Isosceles triangles in real life', stem: `${who} travels along a straight line from point R toward point T. At R, the angle between the path and the line of sight to the ${what} L is ${a}°. After traveling ${fmt(d)} ${unit} to point S, the angle between the path and the line of sight to L is ${2 * a}°. How far is the ${what} from point S (find SL)?`,
+    ...buildChoices(r, correct, [`${fmt(2 * d)} ${unit}`, `${fmt(d / 2)} ${unit}`, `${fmt(Math.round(d * Math.sqrt(3) * 100) / 100)} ${unit}`].filter((w) => w !== correct), (i) => `${fmt(d + i + 1)} ${unit}`),
+    fr: FR.num('SL =', d, { suffix: ` ${unit}` }),
+    solution: `∠LST = ${2 * a}° is an exterior angle of △RSL, so ${2 * a}° = ${a}° + m∠L, and m∠L = ${a}°. Then ∠R ≅ ∠L, so SL = RS = ${fmt(d)} ${unit} (Converse of the Base Angles Theorem).`,
+  };
+};
+// "the base of isosceles △XYZ is YZ" (#18)
+TEMPLATES.g54BaseFacts = (r) => {
+  const [X, Y, Z] = shuffle(r, pick(r, [['X', 'Y', 'Z'], ['A', 'B', 'C'], ['P', 'Q', 'R'], ['J', 'K', 'L']]));
+  const legs = `${SEG(X + Y)} ≅ ${SEG(X + Z)}`, bases = `∠${Y} ≅ ∠${Z}`, correct = `${legs} and ${bases}`;
+  const opts = [correct, `${SEG(X + Y)} ≅ ${SEG(Y + Z)} and ∠${X} ≅ ∠${Y}`, `${SEG(Y + Z)} ≅ ${SEG(Z + X)} and ∠${Y} ≅ ∠${Z}`, `${legs} and ∠${X} ≅ ∠${Y}`];
+  return {
+    topic: 'Parts of an isosceles triangle', stem: `The base of isosceles △${X}${Y}${Z} is ${SEG(Y + Z)}. What can you prove?`,
+    ...buildChoices(r, correct, opts.slice(1), () => null), fr: FR.select('You can prove', shuffle(r, opts), correct),
+    solution: `The legs are the two sides that are not the base: ${legs}. The base angles are the angles at the ends of the base: ${bases} (Base Angles Theorem).`,
+  };
+};
+/* ==== GEOMETRY 5.4 END ==== */
+
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -9844,6 +10016,14 @@ const QUESTION_TYPES = [
   { id: 'thirdAngle',         subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Third Angles Theorem', desc: 'Find m∠1 (#13–14)' },
   { id: 'triCongruence',      subject: 'geometry', section: '5.3–5.6 Triangle Congruence', label: 'Prove congruent (marked figure)', desc: 'Part A: SSS, SAS, ASA, AAS, HL, or not possible. Part B: write the congruence statement' },
   { id: 'triCongruenceGiven', subject: 'geometry', section: '5.3–5.6 Triangle Congruence', label: 'Prove congruent (“Given:” text)', desc: 'Same two parts, with the facts given in words instead of marks' },
+  { id: 'g54Complete', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Complete the statement', desc: 'Base Angles Theorem or its converse (#1–4)' },
+  { id: 'g54FindX', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Find x', desc: 'Isosceles and equilateral figures (#5–8)' },
+  { id: 'g54FindXY', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Find x and y', desc: '(#11–14)' },
+  { id: 'g54Perimeter', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Perimeter', desc: 'Congruent sides as expressions (#21–22)' },
+  { id: 'g54Angles', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Vertex and base angles', desc: 'Including an exterior angle (#20, 24)' },
+  { id: 'g54IsoT', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Values that make it isosceles', desc: 'Sides like 3t, 5t − 12, t + 20 (#23)' },
+  { id: 'g54BaseFacts', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'What can you prove?', desc: 'Legs and base angles (#18)' },
+  { id: 'g54Lighthouse', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Lighthouse problem', desc: 'Exterior angle → isosceles (#28)' },
   { id: 'p1Classify', subject: 'precalc',  section: 'P.1 Review of Real Numbers', label: 'Classifying real numbers', desc: 'Natural, whole, integer, rational, irrational (#7–10)' },
   { id: 'p1Order', subject: 'precalc',  section: 'P.1 Review of Real Numbers', label: 'Ordering real numbers', desc: '< or > (#11–16)' },
   { id: 'p1Interval', subject: 'precalc',  section: 'P.1 Review of Real Numbers', label: 'Intervals and inequalities', desc: 'Interval ↔ inequality ↔ words (#17–28)' },
@@ -10995,7 +11175,11 @@ function builder() {
       const f = prevBtn._fmt ? prevBtn._fmt.value : 'mc';
       prevBox.append(previewQuestion(applyMode(TEMPLATES[t.id](mulberry32(Date.now() % 100000 + seed++)), f === 'both' ? (seed % 2 ? 'mc' : 'fr') : f)));
       prevBtn.textContent = 'Another example';
+      hideBtn.style.display = '';
     } }, 'Preview');
+    const hideBtn = el('button', { class: 'btn secondary', style: 'margin:0;padding:7px 12px;font-size:14px;display:none', type: 'button', onclick: () => {
+      prevBox.classList.add('hidden'); prevBox.innerHTML = ''; prevBtn.textContent = 'Preview'; hideBtn.style.display = 'none';
+    } }, 'Hide preview');
     num.addEventListener('input', () => { counts[t.id] = Math.max(0, Math.min(20, Math.floor(+num.value || 0))); refreshBadges(); update(); });
     const fmtSel = el('select', { 'aria-label': `Format for ${t.label}`, style: 'width:auto;padding:7px 8px;font-size:14px' },
       el('option', { value: 'mc' }, 'Multiple choice'), el('option', { value: 'fr' }, 'Free response'), el('option', { value: 'both' }, 'Some of each'));
@@ -11016,7 +11200,7 @@ function builder() {
     showSplit();
     secBody.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' },
       num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc)),
-      t.writtenOnly ? el('span', { class: 'small', style: 'padding:7px 8px' }, 'Written proof') : fmtSel, prevBtn, t.writtenOnly ? '' : split), prevBox);
+      t.writtenOnly ? el('span', { class: 'small', style: 'padding:7px 8px' }, 'Written proof') : fmtSel, prevBtn, hideBtn, t.writtenOnly ? '' : split), prevBox);
     prevBtn._fmt = fmtSel;
   });
   Object.entries(secs).forEach(([sec, S]) => { S.box.open = openSaved[sec] ?? S.ids.some((id) => counts[id] > 0); });
