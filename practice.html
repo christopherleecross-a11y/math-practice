@@ -87,6 +87,11 @@
   .tag.part { background: #fdf3dc; color: var(--warn); }
   .small { font-size: 13px; color: var(--muted); }
   .hidden { display: none; }
+  #shield { position: fixed; inset: 0; z-index: 9999; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; }
+  .shieldcard { max-width: 460px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 28px; text-align: center; }
+  .shieldcard h2 { margin: 8px 0; font-size: 22px; }
+  body.shielded .wrap { visibility: hidden; }
+  @media print { body { display: none !important; } }
   .fr { margin-top: 12px; }
   .frpart { font-weight: 700; font-size: 14px; color: var(--muted); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .5px; }
   .frrow { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; }
@@ -135,6 +140,9 @@ const CONFIG = {
   //            Each retry is a NEW version of that question, so answers can't be copied.
   // ATTEMPTS = how many times a student may take the whole assignment (each attempt has new numbers).
   RETRIES: 0,
+  // LOCKDOWN = questions only show in full screen; right-click/copy/print are blocked; leaving the page
+  //            (other tab, other app, Google Lens panel, exiting full screen) hides the questions and is counted.
+  LOCKDOWN: true,
   ATTEMPTS: 1,
 
   // Teacher answer-key PIN, stored as a hash. Default PIN is 1234.
@@ -1261,7 +1269,8 @@ let CUSTOM_KEY = null;
   const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
   CUSTOM_KEY = 'custom-' + cyrb53(`${mix}|${title}|${shuffleQs}`).toString(36).slice(-8);
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts };
+  const lockdown = q.get('lock') !== '0';
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown };
 })();
 
 /* ---------- question generation ---------- */
@@ -1299,6 +1308,7 @@ const setting = (setKey, name) => {
   const v = SETS[setKey][name];
   if (v !== undefined) return v;
   if (name === 'attempts') return CONFIG.ALLOW_RETAKE ? 99 : CONFIG.ATTEMPTS || 1;
+  if (name === 'lockdown') return CONFIG.LOCKDOWN !== false;
   return CONFIG.RETRIES || 0;
 };
 
@@ -1387,6 +1397,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1) {
     drawings: (!teacher && store.get(key + ':draw')) || {}, drawOn: {}, work: (!teacher && store.get(key + ':work')) || {} };
   if (!teacher) { saveState(); store.set(base + ':meta', meta); }
   render();
+  startLockdown();
 }
 function saveState() {
   if (state.teacher) return;
@@ -1800,6 +1811,8 @@ function submit() {
   state.meta.scores[state.attempt - 1] = score;
   store.set(state.base + ':meta', state.meta);
   render(); window.scrollTo(0, 0);
+  hideShield();
+  if (inFullscreen()) { const ex = document.exitFullscreen || document.webkitExitFullscreen; try { const p = ex && ex.call(document); if (p && p.catch) p.catch(() => {}); } catch {} }
   send(pts);
 }
 
@@ -1892,13 +1905,70 @@ function resultsCard() {
   return card;
 }
 
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && state && !state.submitted && !state.teacher) {
-    state.tabAways++;
-    const saved = store.get(state.key) || {};
-    store.set(state.key, { ...saved, tabAways: state.tabAways });
-  }
-});
+/* ---------- leaving the page + lockdown mode ---------- */
+const fsSupported = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+const inFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const active = () => state && !state.submitted && !state.teacher;
+const locked = () => active() && setting(state.setKey, 'lockdown');
+let away = false;
+function recordLeave() {
+  if (!active() || away) return; // count each departure once
+  away = true;
+  state.tabAways++;
+  const saved = store.get(state.key) || {};
+  store.set(state.key, { ...saved, tabAways: state.tabAways });
+  if (locked()) showShield('left');
+}
+function cameBack() {
+  away = false;
+  if (locked() && !(fsSupported() && !inFullscreen())) hideShield();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) recordLeave(); else cameBack(); });
+window.addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) recordLeave(); }, 150));
+window.addEventListener('focus', cameBack);
+['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => document.addEventListener(ev, () => {
+  if (!locked()) return;
+  if (inFullscreen()) { if (!away) hideShield(); }
+  else { recordLeave(); showShield('fullscreen'); away = false; }
+}));
+// no right-click (Search with Google Lens, copy), no copying or dragging question content, no printing
+document.addEventListener('contextmenu', (e) => { if (locked()) e.preventDefault(); });
+['copy', 'cut', 'dragstart', 'selectstart'].forEach((ev) => document.addEventListener(ev, (e) => {
+  if (!locked()) return;
+  const t = e.target;
+  if (t && t.closest && t.closest('input, textarea, math-field')) return; // students can still edit their own answers
+  e.preventDefault();
+}));
+function goFullscreen() {
+  const el2 = document.documentElement;
+  const req = el2.requestFullscreen || el2.webkitRequestFullscreen;
+  if (req) try { const p = req.call(el2); if (p && p.catch) p.catch(() => {}); } catch {}
+}
+function showShield(why) {
+  let sh = document.getElementById('shield');
+  if (!sh) { sh = el('div', { id: 'shield' }); document.body.append(sh); }
+  sh.innerHTML = '';
+  const needFs = fsSupported() && !inFullscreen();
+  const first = why === 'start';
+  sh.append(el('div', { class: 'shieldcard' },
+    el('div', { style: 'font-size:40px' }, first ? '🔒' : '⚠️'),
+    el('h2', {}, first ? 'This assignment runs in full screen' : 'Your questions are hidden'),
+    el('p', {}, first
+      ? 'Your questions will appear when you go full screen. Leaving full screen, switching tabs, or opening other apps (like Google Lens) will hide them and is recorded for ' + CONFIG.TEACHER_NAME + '.'
+      : `You left the assignment. This was recorded for ${CONFIG.TEACHER_NAME} (${state.tabAways} ${state.tabAways === 1 ? 'time' : 'times'} so far).`),
+    el('button', { class: 'btn', type: 'button', onclick: () => { if (needFs) goFullscreen(); else hideShield(); } }, needFs ? (first ? 'Start in full screen' : 'Return to full screen') : 'Continue')));
+  sh.style.display = 'flex';
+  document.body.classList.add('shielded');
+}
+function hideShield() {
+  const sh = document.getElementById('shield');
+  if (sh) sh.style.display = 'none';
+  document.body.classList.remove('shielded');
+}
+function startLockdown() {
+  if (!locked()) { hideShield(); return; }
+  if (fsSupported() && !inFullscreen()) showShield('start'); else hideShield();
+}
 let lastW = 0;
 window.addEventListener('resize', () => {
   clearTimeout(window._rt);
@@ -1930,6 +2000,8 @@ function builder() {
   orderSel.value = saved.order || 'grouped';
   const numIn = (val, min, max) => el('input', { type: 'number', min: String(min), max: String(max), value: String(val), style: 'width:80px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
   const retriesIn = numIn(saved.retries ?? 0, 0, 5), attemptsIn = numIn(saved.attempts ?? 1, 1, 10);
+  const lockIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
+  lockIn.checked = saved.lockdown !== false;
   app.append(el('div', { class: 'card' },
     el('label', {}, 'Assignment title'), titleIn,
     el('label', {}, 'Subject (which gradebook tab scores go to)'), subjSel,
@@ -1937,7 +2009,9 @@ function builder() {
     el('label', {}, 'Retries on a missed question'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, retriesIn,
       el('span', { class: 'small' }, '0 = graded only at Submit. 1 or more adds a Check button; each retry is a new version of the question.')),
     el('label', {}, 'Attempts at the whole assignment'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, attemptsIn,
-      el('span', { class: 'small' }, '1 = one try. Each new attempt has all new numbers; every attempt is recorded.'))));
+      el('span', { class: 'small' }, '1 = one try. Each new attempt has all new numbers; every attempt is recorded.')),
+    el('label', {}, 'Lockdown mode'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, lockIn,
+      el('span', { class: 'small' }, 'Full screen required; right-click, copy, and printing blocked; leaving the page hides the questions and is recorded.'))));
 
   const list = el('div', { class: 'card' });
   const totalEl = el('strong', {}, '0');
@@ -1982,13 +2056,14 @@ function builder() {
       el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut));
   app.append(out);
   [titleIn, subjSel, orderSel, retriesIn, attemptsIn].forEach((x) => x.addEventListener('input', update));
+  lockIn.addEventListener('change', update);
 
   function update() {
     const items = QUESTION_TYPES.filter((t) => counts[t.id] > 0).map((t) => [t.id, counts[t.id], formats[t.id] === 'fr' ? 'fr' : 'mc']);
     const total = items.reduce((a, [, n]) => a + n, 0);
     totalEl.textContent = String(total);
     const title = titleIn.value.trim() || 'Custom Practice';
-    store.set('builder:last', { counts, formats, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1 });
+    store.set('builder:last', { counts, formats, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked });
     if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
@@ -1998,10 +2073,11 @@ function builder() {
     const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), at = Math.max(1, Math.min(10, Math.floor(+attemptsIn.value || 1)));
     if (rt) q.set('retries', String(rt));
     if (at > 1) q.set('attempts', String(at));
+    if (!lockIn.checked) q.set('lock', '0');
     const url = location.origin + location.pathname + '?' + q.toString();
     linkIn.value = url; tryLink.href = url; keyLink.href = url + '&teacher=1';
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'} },`;
   }
   update();
 }
