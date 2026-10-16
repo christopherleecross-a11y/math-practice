@@ -193,6 +193,8 @@ const CONFIG = {
 //                 trigHalfExact (#33–38), trigHalfValues (#39–42), trigProdToSum (#47–50), trigSumToProd (#51–54)
 //   Pre-Calc 3.1: triSinesAAS (#5–22), triSinesSSA (#23–32), triAmbiguousB (#33–36), triAreaSAS (#37–44), triSinesWord (word problems, #45+)
 //   Pre-Calc 3.2: triCosSSS / triCosSAS (#5–24), triParallelogram (#25–30), triWhichLaw (#31–36), triHeron (#37–44), triCosWord (word problems, like #45)
+//   Pre-Calc 4.1: cxEqual (#7–8), cxAddSub (#9–16), cxMultiply (#17–24), cxConjugate (#25–32), cxDivide (#33–40), cxSqrtNeg (#41–48), cxQuadratic (#49–58)
+//   Pre-Calc 4.2: cxNumSolutions (#5–8), cxDiscriminant (#9–14), cxSolveQuad (#15–24), cxQuartic (#25–28), cxLinearFactors (#33–48), cxGivenZero (#49–58)
 //   Pre-Calc 3.4: vecDot (#5–10), vecDotProps (#11–22), vecMagnitude (#23–28), vecAngle (#29–42), vecTriangle (#43–46), vecDotFromAngle (#47–50)
 //   other: dilation, composite, trigGraph
 const SUBJECTS = {
@@ -219,6 +221,8 @@ const SETS = {
   'precalc-3-1':   { subject: 'precalc',  title: '3.1 Law of Sines', items: [['triSinesAAS', 4], ['triSinesSSA', 4], ['triAmbiguousB', 2], ['triAreaSAS', 3], ['triSinesWord', 2]] },
   'precalc-3-2':   { subject: 'precalc',  title: '3.2 Law of Cosines', items: [['triCosSSS', 3], ['triCosSAS', 3], ['triParallelogram', 2], ['triWhichLaw', 2], ['triHeron', 3], ['triCosWord', 2]] },
   'precalc-3-4':   { subject: 'precalc',  title: '3.4 Vectors and Dot Products', items: [['vecDot', 2], ['vecDotProps', 3], ['vecMagnitude', 2], ['vecAngle', 3], ['vecTriangle', 1], ['vecDotFromAngle', 2]] },
+  'precalc-4-1':   { subject: 'precalc',  title: '4.1 Complex Numbers', items: [['cxEqual', 1], ['cxAddSub', 2], ['cxMultiply', 2], ['cxConjugate', 2], ['cxDivide', 3], ['cxSqrtNeg', 2], ['cxQuadratic', 3]] },
+  'precalc-4-2':   { subject: 'precalc',  title: '4.2 Complex Solutions of Equations', items: [['cxNumSolutions', 1], ['cxDiscriminant', 2], ['cxSolveQuad', 3], ['cxQuartic', 2], ['cxLinearFactors', 4], ['cxGivenZero', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -1553,7 +1557,7 @@ function fixAngleFracs(s) {
     depth = 0; let m = numEnd;
     for (; m < s.length; m++) { if (s[m] === '{') depth++; else if (s[m] === '}' && --depth === 0) break; }
     const den = s.slice(numEnd + 1, m), mm = /^\s*(\d+)\s*([\s\S]+)$/.exec(den);
-    if (mm && /^[+\-,;]/.test(mm[2].trim())) { s = s.slice(0, numEnd) + '{' + mm[1] + '}' + mm[2] + s.slice(m + 1); }
+    if (mm && /^([+\-,;]|\\pm|i(?![a-z]))/.test(mm[2].trim())) { s = s.slice(0, numEnd) + '{' + mm[1] + '}' + mm[2] + s.slice(m + 1); }
     i = numEnd;
   }
   return s;
@@ -2933,6 +2937,482 @@ TEMPLATES.triCosWord = (r) => {
   }
 }
 
+/* ---------- 4.1 Complex Numbers and 4.2 Complex Solutions of Equations ---------- */
+// exact numbers of the form (n/d)·√m
+const Sd = (n, d = 1, m = 1) => {
+  if (m === 0 || n === 0) return { n: 0, d: 1, m: 1 };
+  const [k, mm] = sqrtParts(m); n *= k; if (d < 0) { n = -n; d = -d; }
+  const g = gcd(Math.abs(n), d); return { n: n / g, d: d / g, m: mm };
+};
+const sVal = (s) => (s.n / s.d) * Math.sqrt(s.m);
+const sZero = (s) => s.n === 0;
+const sNeg = (s) => ({ ...s, n: -s.n });
+const sAbsText = (s, latex) => { // |s| as text
+  const n = Math.abs(s.n), top = s.m === 1 ? String(n) : (n === 1 ? '' : n) + (latex ? `\\sqrt{${s.m}}` : `√${s.m}`);
+  if (s.d === 1) return top;
+  return latex ? `\\frac{${top}}{${s.d}}` : `${top}/${s.d}`;
+};
+const sText = (s, latex) => (s.n < 0 ? (latex ? '-' : MINUS) : '') + sAbsText(s, latex);
+// i-part core: i, 3i, (2/5)i, √3 i, (√11/8)i
+const imCore = (s, latex) => {
+  const n = Math.abs(s.n);
+  if (latex) return (s.m === 1 && n === 1 && s.d === 1 ? '' : sAbsText(s, true)) + 'i';
+  if (s.m === 1 && s.d === 1) return (n === 1 ? '' : n) + 'i';
+  if (s.d === 1) return `${n === 1 ? '' : n}√${s.m} i`;
+  return `(${sAbsText(s)})i`;
+};
+const cx = (re, im) => ({ re, im, v: [sVal(re), sVal(im)] });
+const cxR = (n, d = 1) => cx(Sd(n, d), Sd(0));
+function cxText(z, latex = false) {
+  const { re, im } = z, M = latex ? '-' : MINUS;
+  if (sZero(im)) return sText(re, latex);
+  const core = imCore(im, latex);
+  if (sZero(re)) return (im.n < 0 ? M : '') + core;
+  return sText(re, latex) + (latex ? (im.n < 0 ? '-' : '+') : im.n < 0 ? ` ${MINUS} ` : ' + ') + core;
+}
+const cxPM = (re, im, latex = false) => { // re ± im·i  (im > 0)
+  const core = imCore(im, latex), pm = latex ? '\\pm ' : '± ';
+  return sZero(re) ? (latex ? '\\pm ' : '±') + core : `${sText(re, latex)}${latex ? '\\pm ' : ' ± '}${core}`;
+};
+const realPM = (re, s, latex = false) => (sZero(re) ? (latex ? '\\pm ' : '±') + sAbsText(s, latex) : `${sText(re, latex)}${latex ? '\\pm ' : ' ± '}${sAbsText(s, latex)}`);
+// complex from integers a + bi, written for a problem: (5 + i), −8i, 12
+const cxIn = (a, b) => cxText(cx(Sd(a), Sd(b)));
+const cxInP = (a, b) => `(${cxIn(a, b)})`;
+// √(−n) as text
+const sqrtNeg = (n) => `√(${MINUS}${n})`;
+// read a complex answer: "3 − 2i", "\frac{2}{41}+\frac{10}{41}i", "3\sqrt{2}i"
+function parseCx(raw) {
+  let s = fixAngleFracs(String(raw || '').replace(/\\left|\\right/g, ''));
+  if (/[\\{}]/.test(s)) s = latexToPlain(s);
+  s = s.replace(/[−–]/g, '-').replace(/√/g, 'sqrt').replace(/\s+/g, '');
+  if (!s) return null;
+  const val = (e) => { const n = parseTrig(e); if (!n) return NaN; const I = trigInfo(n); if (I.hasVar || I.fns) return NaN; return evalTrig(n, 0); };
+  const noPi = s.replace(/pi/g, 'Π');
+  if (!/i/.test(noPi)) { const v = val(s); return isFinite(v) ? [v, 0] : null; }
+  const sub = (t) => val(noPi.replace(/i/g, `(${t})`).replace(/Π/g, 'pi'));
+  const a = sub(0), b = sub(1) - a;
+  if (![a, b].every(isFinite)) return null;
+  if (Math.abs(sub(2) - (a + 2 * b)) > 1e-7 * (1 + Math.abs(b)) || Math.abs(sub(-3) - (a - 3 * b)) > 1e-7 * (1 + Math.abs(b))) return null; // not a + bi (like i²)
+  return [a, b];
+}
+const cxClose = (p, v, tol = 1e-6) => !!p && Math.abs(p[0] - v[0]) <= tol * (1 + Math.abs(v[0])) && Math.abs(p[1] - v[1]) <= tol * (1 + Math.abs(v[1]));
+const cxCheck = (raw, z) => cxClose(parseCx(String(raw || '').replace(/^\s*[a-z]\s*=/i, '')), z.v);
+// a list of complex answers (commas, ±, "none")
+function cxList(raw) {
+  let s = String(raw || '').replace(/\\left|\\right/g, '');
+  const parts = splitAnswers(s);
+  if (parts === 'none') return 'none';
+  const out = [];
+  for (const p of parts) {
+    if (/\\pm|±|\+-|\+\\?-/.test(p)) { const a = p.replace(/\\pm|±|\+-/, '+').replace(/^\s*\+/, ''), b = p.replace(/\\pm|±|\+-/, '-'); out.push(parseCx(a), parseCx(b)); }
+    else out.push(parseCx(p));
+  }
+  return out;
+}
+function cxListCheck(raw, zeros) {
+  const got = cxList(raw);
+  if (got === 'none') return !zeros.length;
+  if (!got.length || got.some((g) => !g)) return false;
+  return got.every((g) => zeros.some((z) => cxClose(g, z.v))) && zeros.every((z) => got.some((g) => cxClose(g, z.v)));
+}
+const cxListText = (zeros) => zeros.map((z) => cxText(z)).join(', ');
+const cxListLatex = (zeros) => zeros.map((z) => cxText(z, true)).join(',');
+// exact rational complex arithmetic (parts are fractions [n, d])
+const Qr = (n, d = 1) => { if (d < 0) { n = -n; d = -d; } const g = gcd(Math.abs(n), d) || 1; return [n / g, d / g]; };
+const qAdd = (a, b) => Qr(a[0] * b[1] + b[0] * a[1], a[1] * b[1]), qSub = (a, b) => qAdd(a, [-b[0], b[1]]), qMul = (a, b) => Qr(a[0] * b[0], a[1] * b[1]), qDiv = (a, b) => Qr(a[0] * b[1], a[1] * b[0]);
+const C2 = (re, im) => ({ re: Qr(...[].concat(re)), im: Qr(...[].concat(im)) });
+const cMul = (z, w) => ({ re: qSub(qMul(z.re, w.re), qMul(z.im, w.im)), im: qAdd(qMul(z.re, w.im), qMul(z.im, w.re)) });
+const cAdd = (z, w) => ({ re: qAdd(z.re, w.re), im: qAdd(z.im, w.im) }), cSub = (z, w) => ({ re: qSub(z.re, w.re), im: qSub(z.im, w.im) });
+const cDiv = (z, w) => { const den = qAdd(qMul(w.re, w.re), qMul(w.im, w.im)), num = cMul(z, { re: w.re, im: [-w.im[0], w.im[1]] }); return { re: qDiv(num.re, den), im: qDiv(num.im, den) }; };
+const cOf = (z) => cx(Sd(z.re[0], z.re[1]), Sd(z.im[0], z.im[1]));
+const cxMC = (r, z, wrongs, fb) => {
+  const correct = cxText(z);
+  const cands = wrongs.map((w) => (w.v ? w : cOf(w))).filter((w) => !cxClose(w.v, z.v, 1e-9)).map((w) => cxText(w));
+  return buildChoices(r, correct, [...new Set(cands)].filter((c) => c !== correct), fb || ((i) => cxText(cx(Sd(z.re.n + i + 1, z.re.d, z.re.m), z.im))));
+};
+const cxFR = (label, z) => ({ fields: [{ kind: 'expr', keys: 'complex', label }], key: [cxText(z, true)], display: cxText(z), check: (v) => cxCheck(v[0], z) });
+const nz = (r, lo, hi) => { let v = 0; while (!v) v = ri(r, lo, hi); return v; };
+
+// 4.1 #7–8: equal complex numbers
+TEMPLATES.cxEqual = (r) => {
+  const a = nz(r, -9, 9), b = nz(r, -9, 9), kind = ri(r, 0, 2), sg = (c) => (c < 0 ? ` ${MINUS} ${-c}` : ` + ${c}`);
+  let eq, why;
+  if (kind === 0) { const p = nz(r, -8, 8), q = nz(r, -8, 8); eq = `(a${sg(p)}) + (b${sg(q)})i = ${cxIn(a + p, b + q)}`; why = `Real parts: a${sg(p)} = ${fmt(a + p)}, so a = ${fmt(a)}.\nImaginary parts: b${sg(q)} = ${fmt(b + q)}, so b = ${fmt(b)}.`; }
+  else if (kind === 1) { const k = pick(r, [2, 3, 4]), j = pick(r, [2, 3]), q = nz(r, -6, 6); eq = `${k}a + (${j}b${sg(q)})i = ${cxIn(k * a, j * b + q)}`; why = `Real parts: ${k}a = ${fmt(k * a)}, so a = ${fmt(a)}.\nImaginary parts: ${j}b${sg(q)} = ${fmt(j * b + q)}, so b = ${fmt(b)}.`; }
+  else { const k = pick(r, [2, 3]), p = a - b, q = k * a - b; eq = `a + bi = ${p ? `(b${sg(p)})` : 'b'} + (${k}a${q ? sg(-q) : ''})i`; why = `Real parts: a = b${p ? sg(p) : ''}. Imaginary parts: b = ${k}a${q ? sg(-q) : ''}.\nSubstitute: a = ${k}a${q ? sg(-q) : ''}${p ? sg(p) : ''}, so a = ${fmt(a)} and b = ${fmt(b)}.`; }
+  const T = (x, y) => `a = ${fmt(x)}, b = ${fmt(y)}`, correct = T(a, b);
+  return {
+    topic: 'Equal complex numbers', stem: `Find real numbers a and b such that the equation is true.   ${eq}`,
+    ...buildChoices(r, correct, [T(b, a), T(-a, b), T(a, -b), T(-a, -b)].filter((c) => c !== correct), (i) => T(a + i + 1, b)),
+    fr: FR.nums(['a =', 'b ='], [a, b], correct), solution: why,
+  };
+};
+
+// 4.1 #9–16: add or subtract
+TEMPLATES.cxAddSub = (r) => {
+  for (let t = 0; t < 100; t++) {
+    if (r() < 0.65) {
+      const n = r() < 0.25 ? 3 : 2, zs = [], ops = [];
+      for (let k = 0; k < n; k++) { zs.push([ri(r, -15, 25), ri(r, -15, 15)]); if (k) ops.push(r() < 0.5 ? 1 : -1); }
+      if (zs.some(([x, y]) => !y)) continue;
+      let re = zs[0][0], im = zs[0][1], bad = [zs[0][0], zs[0][1]];
+      ops.forEach((o, k) => { re += o * zs[k + 1][0]; im += o * zs[k + 1][1]; bad[0] += o * zs[k + 1][0]; bad[1] += zs[k + 1][1]; });
+      const z = cx(Sd(re), Sd(im));
+      const expr = zs.map(([x, y], k) => (k ? (ops[k - 1] > 0 ? ' + ' : ` ${MINUS} `) : '') + (x === 0 && !k ? cxIn(x, y) : cxInP(x, y))).join('');
+      return {
+        topic: 'Adding and subtracting', stem: `Perform the operation and write the result in standard form.   ${expr}`,
+        ...cxMC(r, z, [cx(Sd(bad[0]), Sd(bad[1])), cx(Sd(re), Sd(-im)), cx(Sd(-re), Sd(im)), cx(Sd(re + 2 * (zs[1][0] * ops[0] < 0 ? zs[1][0] : 0)), Sd(im))]),
+        fr: cxFR('=', z),
+        solution: `Combine the real parts and the imaginary parts separately${ops.includes(-1) ? ' (subtracting changes the sign of both parts)' : ''}.\nReal: ${fmt(re)}.  Imaginary: ${fmt(im)}.\nResult: ${cxText(z)}`,
+      };
+    }
+    // with square roots of negatives: (p + √−A) ± (q − √−B), A = k1²m, B = k2²m
+    const m = pick(r, [2, 3, 5, 6, 7]), k1 = ri(r, 1, 5), k2 = ri(r, 1, 5), p = ri(r, -10, 15), q = ri(r, -10, 15);
+    const s1 = r() < 0.5 ? 1 : -1, s2 = r() < 0.5 ? 1 : -1, op = r() < 0.5 ? 1 : -1, A = k1 * k1 * m, B = k2 * k2 * m;
+    const asI = r() < 0.3; // second written as (q + k√m i) like #14
+    if (k1 === 1 && k2 === 1) continue;
+    const re = p + op * q, imK = s1 * k1 + op * s2 * k2;
+    const z = cx(Sd(re), Sd(imK, 1, m));
+    const t1 = `(${fmt(p)} ${s1 > 0 ? '+' : MINUS} ${sqrtNeg(A)})`;
+    const t2 = asI ? `(${fmt(q)} ${s2 > 0 ? '+' : MINUS} ${k2 === 1 ? '' : k2}√${m} i)` : `(${fmt(q)} ${s2 > 0 ? '+' : MINUS} ${sqrtNeg(B)})`;
+    const expr = `${t1} ${op > 0 ? '+' : MINUS} ${t2}`;
+    const wrongReal = cx(Sd(re), Sd(s1 * k1 + s2 * k2, 1, m)), noRad = cx(Sd(re), Sd(imK)), sgn = cx(Sd(re), Sd(-imK, 1, m)), neg = cx(Sd(p - op * q), Sd(imK, 1, m));
+    return {
+      topic: 'Adding and subtracting', stem: `Perform the operation and write the result in standard form.   ${expr}`,
+      ...cxMC(r, z, [wrongReal, noRad, sgn, neg]),
+      fr: cxFR('=', z),
+      solution: `Write each square root of a negative number in i-form first: ${sqrtNeg(A)} = ${k1 === 1 ? '' : k1}√${m} i${asI ? '' : `, ${sqrtNeg(B)} = ${k2 === 1 ? '' : k2}√${m} i`}.\nReal parts: ${fmt(p)} ${op > 0 ? '+' : MINUS} ${q < 0 ? `(${fmt(q)})` : fmt(q)} = ${fmt(re)}.  Imaginary parts: ${fmt(imK)}√${m} i.\nResult: ${cxText(z)}`,
+    };
+  }
+};
+
+// 4.1 #17–24: multiply
+TEMPLATES.cxMultiply = (r) => {
+  const kind = pick(r, ['two', 'two', 'mono', 'square', 'radconj']);
+  if (kind === 'radconj') { // (√m + ki)(√m − ki) or (a + √m i)(a − √m i)
+    const m = pick(r, [2, 3, 5, 6, 7, 10]), k = ri(r, 1, 6), first = r() < 0.5;
+    const expr = first ? `(√${m} + ${k === 1 ? '' : k}i)(√${m} ${MINUS} ${k === 1 ? '' : k}i)` : `(${k} + √${m} i)(${k} ${MINUS} √${m} i)`;
+    const val = m + k * k, z = cxR(val);
+    return { topic: 'Multiplying', stem: `Perform the operation and write the result in standard form.   ${expr}`,
+      ...cxMC(r, z, [cxR(first ? m - k * k : k * k - m), cxR(m * m + k * k), cx(Sd(val), Sd(2 * k, 1, m))]), fr: cxFR('=', z),
+      solution: `This is (a + b)(a − b) = a² − b² with an i: ${first ? `(√${m})² − (${k === 1 ? '' : k}i)² = ${m} − (${k * k})(−1)` : `${k}² − (√${m} i)² = ${k * k} − (${m})(−1)`} = ${val}` };
+  }
+  let z1, z2, expr;
+  if (kind === 'mono') { const k = nz(r, -12, 12); z1 = C2(0, k); z2 = C2(nz(r, -9, 9), nz(r, -9, 9)); expr = `${cxIn(0, k)}${cxInP(z2.re[0], z2.im[0])}`; }
+  else if (kind === 'square') { z1 = C2(nz(r, -9, 9), nz(r, -9, 9)); z2 = z1; expr = `${cxInP(z1.re[0], z1.im[0])}²`; }
+  else { z1 = C2(nz(r, -9, 9), nz(r, -9, 9)); z2 = C2(nz(r, -9, 9), nz(r, -9, 9)); expr = `${cxInP(z1.re[0], z1.im[0])}${cxInP(z2.re[0], z2.im[0])}`; }
+  const P = cMul(z1, z2), z = cOf(P);
+  const [a, b, c, d] = [z1.re[0], z1.im[0], z2.re[0], z2.im[0]];
+  const plusOne = C2(a * c + b * d, a * d + b * c), noCross = C2(a * c, b * d), signIm = C2(P.re[0], -P.im[0]);
+  return {
+    topic: 'Multiplying', stem: `Perform the operation and write the result in standard form.   ${expr}`,
+    ...cxMC(r, z, [plusOne, noCross, signIm, C2(a * c - b * d, a * d - b * c)]), fr: cxFR('=', z),
+    solution: !a ? `Distribute, then replace i² with −1.\n${cxIn(0, b)}${cxInP(c, d)} = ${cxText(cx(Sd(0), Sd(b * c)))} ${b * d < 0 ? MINUS : '+'} ${Math.abs(b * d) === 1 ? '' : Math.abs(b * d)}i² = ${cxText(z)}` : `Multiply like binomials (FOIL), then replace i² with −1.\n(${fmt(a)})(${fmt(c)}) + (${fmt(a)})(${fmt(d)})i + (${fmt(b)})(${fmt(c)})i + (${fmt(b)})(${fmt(d)})i²\n= ${cxText(cx(Sd(a * c), Sd(a * d + b * c)))}${b * d ? ` ${b * d > 0 ? MINUS : '+'} ${Math.abs(b * d)}` : ''}   (because i² = −1)\n= ${cxText(z)}`,
+  };
+};
+
+// 4.1 #25–32: multiply by the conjugate
+TEMPLATES.cxConjugate = (r) => {
+  const kind = pick(r, ['int', 'int', 'rad', 'pureNeg', 'oneNeg']);
+  let z, shown, why = '';
+  if (kind === 'int') { const a = nz(r, -12, 12), b = nz(r, -12, 12); z = cx(Sd(a), Sd(b)); shown = cxIn(a, b); }
+  else if (kind === 'rad') { const a = nz(r, -9, 9), m = pick(r, [2, 3, 5, 7]), s = r() < 0.5 ? 1 : -1; z = cx(Sd(a), Sd(s, 1, m)); shown = cxText(z); }
+  else if (kind === 'pureNeg') { const n = pick(r, [4, 8, 9, 12, 15, 18, 20, 25, 27, 32, 45, 50]); z = cx(Sd(0), Sd(1, 1, n)); shown = sqrtNeg(n); why = `${sqrtNeg(n)} = ${cxText(z)}.\n`; }
+  else { const a = nz(r, -6, 9), n = pick(r, [2, 3, 6, 8, 12, 18]), s = r() < 0.5 ? 1 : -1; z = cx(Sd(a), Sd(s, 1, n)); shown = `${fmt(a)} ${s > 0 ? '+' : MINUS} ${sqrtNeg(n)}`; why = `${shown} = ${cxText(z)}.\n`; }
+  const conj = cx(z.re, sNeg(z.im)), prod = (z.re.n / z.re.d) ** 2 + (z.im.n / z.im.d) ** 2 * z.im.m;
+  const conjT = cxText(conj), T = (c, p) => `Conjugate: ${c};  product: ${fmt(p)}`;
+  const correct = T(conjT, prod), a2v = (z.re.n / z.re.d) ** 2, b2v = (z.im.n / z.im.d) ** 2 * z.im.m;
+  const negC = cxText(cx(sNeg(z.re), z.im));
+  return {
+    topic: 'Complex conjugates', stem: `Multiply the complex number by its complex conjugate.   ${shown}`,
+    ...buildChoices(r, correct, [T(conjT, a2v - b2v), T(negC, a2v - b2v), T(negC, prod), T(conjT, -prod)].filter((c) => c !== correct), (i) => T(conjT, prod + i + 1)),
+    frStem: `Find the complex conjugate of the number, then multiply the number by its conjugate.   ${shown}`,
+    fr: { fields: [{ kind: 'expr', keys: 'complex', label: 'Conjugate:' }, { kind: 'number', label: 'Product:' }], key: [cxText(conj, true), String(prod)], display: `${conjT};  ${fmt(prod)}`,
+      check: (v) => cxCheck(v[0], conj) && numEq(v[1], prod), score: (v) => (cxCheck(v[0], conj) ? 0.5 : 0) + (numEq(v[1], prod) ? 0.5 : 0) },
+    solution: `${why}The conjugate of a + bi is a − bi, so the conjugate is ${conjT}.\n(a + bi)(a − bi) = a² + b² = ${fmt(a2v)} + ${fmt(b2v)} = ${fmt(prod)}`,
+  };
+};
+
+// 4.1 #33–40: quotients
+TEMPLATES.cxDivide = (r) => {
+  for (let t = 0; t < 100; t++) {
+    const kind = pick(r, ['gen', 'gen', 'gen', 'real', 'byI', 'sq']);
+    let N, D, shownD, Dsq = null;
+    if (kind === 'gen') { N = C2(ri(r, -9, 12), ri(r, -9, 16)); D = C2(nz(r, -6, 6), nz(r, -6, 6)); }
+    else if (kind === 'real') { N = C2(nz(r, 1, 30), 0); D = C2(nz(r, -6, 6), nz(r, -6, 6)); }
+    else if (kind === 'byI') { N = C2(nz(r, -12, 16), nz(r, -12, 16)); D = C2(0, pick(r, [1, 1, 2, 3, -1])); }
+    else { N = C2(0, nz(r, -6, 6)); Dsq = C2(nz(r, -5, 5), nz(r, -5, 5)); D = cMul(Dsq, Dsq); }
+    if (!N.re[0] && !N.im[0]) continue;
+    const Q = cDiv(N, D), z = cOf(Q);
+    shownD = Dsq ? `${cxInP(Dsq.re[0], Dsq.im[0])}²` : (D.re[0] && D.im[0]) || Math.abs(D.im[0]) > 1 || D.im[0] < 0 ? cxInP(D.re[0], D.im[0]) : cxIn(D.re[0], D.im[0]);
+    const shownN = cxIn(N.re[0], N.im[0]);
+    const den = D.re[0] ** 2 + D.im[0] ** 2, conjD = C2(D.re[0], -D.im[0]), NC = cMul(N, conjD);
+    const wrongDen = D.re[0] ** 2 - D.im[0] ** 2;
+    const w = [C2(NC.re, NC.im), C2(Qr(NC.re[0], den), Qr(-NC.im[0], den)), cMul(N, D), wrongDen ? C2(Qr(NC.re[0], wrongDen), Qr(NC.im[0], wrongDen)) : C2(Qr(NC.im[0], den), Qr(NC.re[0], den))].map((x) => ({ re: Qr(...x.re), im: Qr(...x.im) }));
+    return {
+      topic: 'Dividing', stem: `Write the quotient in standard form.   (${shownN}) / ${shownD}`.replace(/^(.*)\(([^()]*)\) \/ /, (m, pre, num) => `${pre}${/[+−]/.test(num.slice(1)) ? '(' + num + ')' : num} / `),
+      ...cxMC(r, z, w), fr: cxFR('=', z),
+      solution: `${Dsq ? `First square the denominator: ${shownD} = ${cxIn(D.re[0], D.im[0])}.\n` : ''}Multiply the top and bottom by the conjugate of the denominator, ${cxIn(conjD.re[0], conjD.im[0])}.\nBottom: ${D.re[0] < 0 ? `(${fmt(D.re[0])})` : fmt(D.re[0])}² + ${D.im[0] < 0 ? `(${fmt(D.im[0])})` : fmt(D.im[0])}² = ${den}.  Top: ${cxIn(NC.re[0], NC.im[0])}.\nResult: ${cxText(z)}`,
+    };
+  }
+};
+
+// 4.1 #41–48: square roots of negative numbers — write them with i first
+TEMPLATES.cxSqrtNeg = (r) => {
+  for (let t = 0; t < 100; t++) {
+    const kind = pick(r, ['prod', 'prod', 'square', 'sum', 'binsq']);
+    let expr, z, wrongs, why;
+    if (kind === 'prod') {
+      const a = ri(r, 2, 20), b = ri(r, 2, 20); if (a === b) continue;
+      expr = `${sqrtNeg(a)} · ${sqrtNeg(b)}`; z = cx(Sd(-1, 1, a * b), Sd(0));
+      wrongs = [cx(Sd(1, 1, a * b), Sd(0)), cx(Sd(0), Sd(1, 1, a * b)), cx(Sd(0), Sd(-1, 1, a * b))];
+      why = `${sqrtNeg(a)} · ${sqrtNeg(b)} = (√${a} i)(√${b} i) = √${a * b} · i² = ${MINUS}${sAbsText(Sd(1, 1, a * b))}\n(Careful: √(${MINUS}${a}) · √(${MINUS}${b}) is not √${a * b}. Write each one with i first.)`;
+    } else if (kind === 'square') {
+      const n = ri(r, 2, 90); expr = `(${sqrtNeg(n)})²`; z = cxR(-n);
+      wrongs = [cxR(n), cx(Sd(0), Sd(n)), cx(Sd(0), Sd(-n))];
+      why = `(${sqrtNeg(n)})² = (√${n} i)² = ${n} · i² = ${MINUS}${n}`;
+    } else if (kind === 'sum') {
+      const m = pick(r, [2, 3, 5, 6, 7]), k1 = ri(r, 1, 6), k2 = ri(r, 1, 6), op = r() < 0.5 ? 1 : -1; if (k1 === k2 && op < 0) continue;
+      const A = k1 * k1 * m, B = k2 * k2 * m; expr = `${sqrtNeg(A)} ${op > 0 ? '+' : MINUS} ${sqrtNeg(B)}`;
+      z = cx(Sd(0), Sd(k1 + op * k2, 1, m));
+      wrongs = [cx(Sd(k1 + op * k2, 1, m), Sd(0)), cx(Sd(0), Sd(1, 1, A + op * B > 0 ? A + op * B : -(A + op * B))), cx(Sd(0), Sd(-(k1 + op * k2), 1, m))];
+      why = `${sqrtNeg(A)} = ${k1 === 1 ? '' : k1}√${m} i and ${sqrtNeg(B)} = ${k2 === 1 ? '' : k2}√${m} i, so the result is ${cxText(z)}.`;
+    } else {
+      const p = nz(r, -6, 6), n = pick(r, [2, 3, 5, 6, 7, 8, 10, 12]), s = r() < 0.5 ? 1 : -1;
+      expr = `(${fmt(p)} ${s > 0 ? '+' : MINUS} ${sqrtNeg(n)})²`;
+      z = cx(Sd(p * p - n), Sd(2 * p * s, 1, n));
+      wrongs = [cx(Sd(p * p + n), Sd(2 * p * s, 1, n)), cx(Sd(p * p - n), Sd(0)), cx(Sd(p * p - n), Sd(-2 * p * s, 1, n))];
+      why = `${sqrtNeg(n)} = √${n} i.  (${fmt(p)} ${s > 0 ? '+' : MINUS} √${n} i)² = ${p * p} ${s * p > 0 ? '+' : MINUS} ${2 * Math.abs(p)}√${n} i + ${n}i² = ${cxText(z)}`;
+    }
+    return { topic: 'Square roots of negatives', stem: `Write the complex number in standard form.   ${expr}`, ...cxMC(r, z, wrongs), fr: cxFR('=', z), solution: why };
+  }
+};
+
+// quadratic with integer coefficients: solutions as exact strings and values
+function cxQuadRoots(a, b, c) {
+  const D = b * b - 4 * a * c, re = Sd(-b, 2 * a);
+  if (D < 0) { const im = Sd(1, 2 * a, -D); return { D, kind: 'cx', re, im, zeros: [cx(re, im), cx(re, sNeg(im))], text: cxPM(re, im), latex: cxPM(re, im, true) }; }
+  if (D === 0) return { D, kind: 'one', zeros: [cx(re, Sd(0))], text: sText(re), latex: sText(re, true) };
+  const s = Sd(1, 2 * a, D);
+  if (s.m === 1) { const rt = Math.round(Math.sqrt(D)), zs = [cxR(-b + rt, 2 * a), cxR(-b - rt, 2 * a)]; return { D, kind: 'rat', zeros: zs, text: zs.map((z) => cxText(z)).join(', '), latex: zs.map((z) => cxText(z, true)).join(',') }; }
+  const zs = [1, -1].map((k) => ({ re, im: Sd(0), v: [sVal(re) + k * sVal(s), 0] }));
+  return { D, kind: 'irr', re, s, zeros: zs, text: realPM(re, s), latex: realPM(re, s, true) };
+}
+const polyT = (coeffs, v = 'x') => { // highest power first
+  const n = coeffs.length - 1, parts = [];
+  coeffs.forEach((c, k) => {
+    if (!c) return; const p = n - k, ac = Math.abs(c);
+    const body = (p === 0 || ac !== 1 ? ac : '') + (p ? v + (p > 1 ? SUP[p] : '') : '');
+    parts.push(parts.length ? (c < 0 ? ` ${MINUS} ` : ' + ') + body : (c < 0 ? MINUS : '') + body);
+  });
+  return parts.join('') || '0';
+};
+const pMul = (p, q) => { const out = Array(p.length + q.length - 1).fill(0); p.forEach((a, i) => q.forEach((b, j) => { out[i + j] += a * b; })); return out; };
+
+// 4.1 #49–58: quadratic formula, complex solutions
+TEMPLATES.cxQuadratic = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const a = pick(r, [1, 1, 1, 2, 3, 4, 4, 9, 16]), b = ri(r, -16, 16), c = ri(r, 1, 40);
+    const D = b * b - 4 * a * c; if (D >= 0 || D < -400) continue;
+    const Q = cxQuadRoots(a, b, c);
+    const eq = `${polyT([a, b, c])} = 0`;
+    const re = Q.re, im = Q.im;
+    const w1 = cxPM(Sd(-b), Sd(1, 1, -D)), w2 = cxPM(Sd(b, 2 * a), im), w3 = realPM(re, Sd(1, 2 * a, -D)), w4 = cxPM(Sd(-b, a), Sd(1, a, -D));
+    const correct = `x = ${Q.text}`;
+    return {
+      topic: 'Quadratic Formula (complex)', stem: `Use the Quadratic Formula to solve the equation.   ${eq}`,
+      ...buildChoices(r, correct, [...new Set([w1, w2, w3, w4].map((x) => `x = ${x}`))].filter((x) => x !== correct), (i) => `x = ${cxPM(Sd(-b + i + 1, 2 * a), im)}`),
+      frStem: `Use the Quadratic Formula to solve the equation. Write the solutions in standard form, separated by a comma (or use ±).   ${eq}`,
+      fr: { fields: [{ kind: 'expr', keys: 'complex', label: 'x =' }], key: [Q.latex], display: Q.text, check: (v) => cxListCheck(v[0], Q.zeros) },
+      solution: `a = ${a}, b = ${fmt(b)}, c = ${c}.  b² − 4ac = ${fmt(b * b)} − ${4 * a * c} = ${fmt(D)}\nx = (−b ± √(b² − 4ac)) / (2a) = (${fmt(-b)} ± √(${MINUS}${-D})) / ${2 * a} = (${fmt(-b)} ± ${imCore(Sd(1, 1, -D))}) / ${2 * a}\nx = ${Q.text}`,
+    };
+  }
+};
+
+/* 4.2 */
+// #5–8: number of solutions
+TEMPLATES.cxNumSolutions = (r) => {
+  const n = ri(r, 2, 8), terms = [[nz(r, -9, 9), n]];
+  for (let k = n - 1; k >= 0; k--) if (r() < 0.5) terms.push([nz(r, -20, 20), k]);
+  const ord = shuffle(r, terms), tx = (c, p) => (p === 0 ? String(Math.abs(c)) : (Math.abs(c) === 1 ? '' : Math.abs(c)) + 'x' + (p > 1 ? SUP[p] : ''));
+  const eq = ord.map(([c, p], k) => (k ? (c < 0 ? ` ${MINUS} ` : ' + ') : c < 0 ? MINUS : '') + tx(c, p)).join('') + ' = 0';
+  return {
+    topic: 'Number of solutions', stem: `Determine the number of solutions of the equation in the complex number system.   ${eq}`,
+    ...buildChoices(r, String(n), [String(terms.length), String(n - 1), String(Math.abs(terms[0][0])), String(n + 1), String(Math.ceil(n / 2))].filter((x) => x !== String(n)), (i) => String(n + 2 + i)),
+    fr: FR.num('Number of solutions:', n), solution: `The highest power of x is ${n}, so the polynomial has degree ${n}.\nBy the Fundamental Theorem of Algebra, it has exactly ${n} solutions in the complex numbers (counting repeated ones).`,
+  };
+};
+// #9–14: discriminant
+TEMPLATES.cxDiscriminant = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const want = pick(r, ['pos', 'zero', 'neg']);
+    let a, b, c;
+    if (want === 'zero') { const p = pick(r, [1, 1, 2, 3, 4]), q = nz(r, -7, 7); [a, b, c] = [p * p, 2 * p * q, q * q]; if (r() < 0.4) [a, b, c] = [-a, -b, -c]; }
+    else { a = nz(r, -5, 6); b = ri(r, -14, 14); c = nz(r, -30, 60); }
+    const D = b * b - 4 * a * c, got = D > 0 ? 'pos' : D === 0 ? 'zero' : 'neg'; if (got !== want) continue;
+    const ans = { pos: 'Two real solutions', zero: 'One real solution (repeated)', neg: 'Two imaginary solutions' }[want];
+    return {
+      topic: 'The discriminant', stem: `Use the discriminant to find the number of real and imaginary solutions of the equation.   ${polyT([a, b, c])} = 0`,
+      ...buildChoices(r, `${ans} (b² − 4ac = ${fmt(D)})`, [...['Two real solutions', 'One real solution (repeated)', 'Two imaginary solutions'].filter((x) => x !== ans).map((x) => `${x} (b² − 4ac = ${fmt(D)})`), `${ans} (b² − 4ac = ${fmt(b * b + 4 * a * c)})`, `${{ pos: 'Two imaginary solutions', zero: 'Two real solutions', neg: 'Two real solutions' }[want]} (b² − 4ac = ${fmt(b * b + 4 * a * c)})`], (i) => `${ans} (b² − 4ac = ${fmt(D + i + 1)})`),
+      frStem: `Find the discriminant, then decide the number of real and imaginary solutions.   ${polyT([a, b, c])} = 0`,
+      fr: { fields: [{ kind: 'number', label: 'b² − 4ac =' }, { kind: 'select', label: 'The equation has', options: ['Two real solutions', 'One real solution (repeated)', 'Two imaginary solutions'] }],
+        key: [String(D), ans], display: `${fmt(D)}; ${ans}`, check: (v) => numEq(v[0], D) && v[1] === ans, score: (v) => (numEq(v[0], D) ? 0.5 : 0) + (v[1] === ans ? 0.5 : 0) },
+      solution: `a = ${fmt(a)}, b = ${fmt(b)}, c = ${fmt(c)}\nb² − 4ac = (${fmt(b)})² − 4(${fmt(a)})(${fmt(c)}) = ${fmt(D)}\n${D > 0 ? 'Positive: two real solutions.' : D === 0 ? 'Zero: one repeated real solution.' : 'Negative: two imaginary solutions (a conjugate pair).'}`,
+    };
+  }
+};
+// #15–24: solve a quadratic (real or complex)
+TEMPLATES.cxSolveQuad = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const kind = pick(r, ['cx', 'cx', 'irr', 'rat', 'sq']);
+    let a, b, c;
+    if (kind === 'rat') { const p = pick(r, [1, 1, 2, 4]), q = nz(r, -8, 8), s = pick(r, [1, 1, 2]), u = nz(r, -8, 8); [a, b, c] = pMul([p, -q], [s, -u]); if (gcd(gcd(a, Math.abs(b)), Math.abs(c)) > 1 && r() < 0.7) continue; }
+    else if (kind === 'sq') { a = pick(r, [1, 1, 3, 2]); b = 0; c = -ri(r, 2, 20); }
+    else { a = pick(r, [1, 1, 1, 4, 2]); b = ri(r, -16, 16); c = ri(r, -30, 70); }
+    const D = b * b - 4 * a * c;
+    if (kind === 'cx' && D >= 0) continue;
+    if (kind === 'irr' && (D <= 0 || Number.isInteger(Math.sqrt(D)))) continue;
+    if (kind === 'sq' && Number.isInteger(Math.sqrt(-4 * a * c))) continue;
+    const Q = cxQuadRoots(a, b, c);
+    // write the equation in the book's mixed order sometimes, like 2 − 2x − x² = 0 or x² + 10 + 8x = 0
+    const tm = [[a, 2], [b, 1], [c, 0]].filter(([k]) => k), ord = r() < 0.3 ? shuffle(r, tm) : tm, sg = r() < 0.15 ? -1 : 1;
+    const tx = ([k, p], i) => { k *= sg; const body = (p === 0 || Math.abs(k) !== 1 ? Math.abs(k) : '') + (p ? 'x' + (p > 1 ? '²' : '') : ''); return (i ? (k < 0 ? ` ${MINUS} ` : ' + ') : k < 0 ? MINUS : '') + body; };
+    const eq = ord.map(tx).join('') + ' = 0';
+    const correct = `x = ${Q.text}`;
+    const alt = [];
+    if (Q.kind === 'cx') alt.push(realPM(Q.re, Q.im), cxPM(sNeg(Q.re), Q.im), cxPM(Q.re, Sd(1, a, -D)));
+    else if (Q.kind === 'irr') alt.push(cxPM(Q.re, Q.s), realPM(sNeg(Q.re), Q.s), realPM(Q.re, Sd(1, a, D)));
+    else if (Q.kind === 'rat') alt.push(Q.zeros.map((z) => cxText(cx(sNeg(z.re), Sd(0)))).join(', '), Q.zeros.map((z) => cxText(cx(Sd(0), z.re))).join(', '));
+    else alt.push(realPM(Sd(0), Sd(1, 1, 2 * a * D)));
+    return {
+      topic: 'Solving quadratics', stem: `Solve the equation. Write complex solutions in standard form.   ${eq}`,
+      ...buildChoices(r, correct, [...new Set(alt.map((x) => `x = ${x}`))].filter((x) => x !== correct && !cxListCheck(x.replace(/^x = /, ''), Q.zeros)), (i) => `x = ${cxPM(Sd(i + 2), Sd(i + 1))}`),
+      frStem: `Solve the equation. Write complex solutions in standard form. Separate solutions with commas (or use ±).   ${eq}`,
+      fr: { fields: [{ kind: 'expr', keys: 'complex', label: 'x =' }], key: [Q.latex], display: Q.text, check: (v) => cxListCheck(v[0], Q.zeros) },
+      solution: `Standard form: ${polyT([a, b, c])} = 0, so a = ${a}, b = ${fmt(b)}, c = ${fmt(c)}.\nb² − 4ac = ${fmt(D)}\nx = (−b ± √(b² − 4ac)) / (2a) ⇒ x = ${Q.text}`,
+    };
+  }
+};
+// #25–28: x⁴ + bx² + c = (x² − p)(x² + q)
+TEMPLATES.cxQuartic = (r) => {
+  for (let t = 0; t < 100; t++) {
+    const p = ri(r, 1, 12), q = ri(r, 1, 12), sp = r() < 0.8 ? 1 : -1, sq = r() < 0.8 ? 1 : -1; // factors (x² − sp·p)(x² + sq·q)
+    const A = -sp * p, B = sq * q; // (x² + A)(x² + B)
+    if (A === B) continue;
+    const coeffs = pMul([1, 0, A], [1, 0, B]);
+    if (!coeffs[2] && r() < 0.8) continue;
+    const zerosOf = (k) => (k < 0 ? [cx(Sd(1, 1, -k), Sd(0)), cx(Sd(-1, 1, -k), Sd(0))] : [cx(Sd(0), Sd(1, 1, k)), cx(Sd(0), Sd(-1, 1, k))]);
+    const zeros = [...zerosOf(A), ...zerosOf(B)];
+    const pmT = (k) => (k < 0 ? realPM(Sd(0), Sd(1, 1, -k)) : cxPM(Sd(0), Sd(1, 1, k)));
+    const pmL = (k) => (k < 0 ? realPM(Sd(0), Sd(1, 1, -k), true) : cxPM(Sd(0), Sd(1, 1, k), true));
+    const correct = `x = ${pmT(A)}, ${pmT(B)}`;
+    const fac = (k) => `(x² ${k < 0 ? MINUS : '+'} ${Math.abs(k)})`;
+    return {
+      topic: 'Solving polynomial equations', stem: `Solve the equation. Write complex solutions in standard form.   ${polyT(coeffs)} = 0`,
+      ...buildChoices(r, correct, [`x = ${pmT(-A)}, ${pmT(-B)}`, `x = ${pmT(A)}`, `x = ${pmT(B)}`, `x = ${pmT(-A)}, ${pmT(B)}`, `x = ${pmT(A)}, ${pmT(-B)}`].filter((x) => x !== correct && !cxListCheck(x.replace(/^x = /, ''), zeros)), (i) => `x = ${pmT(A)}, ${pmT(B + i + 1)}`),
+      frStem: `Solve the equation. Write complex solutions in standard form. List all four solutions separated by commas (± is fine).   ${polyT(coeffs)} = 0`,
+      fr: { fields: [{ kind: 'expr', keys: 'complex', label: 'x =' }], key: [`${pmL(A)},${pmL(B)}`], display: `${pmT(A)}, ${pmT(B)}`, check: (v) => cxListCheck(v[0], zeros) },
+      solution: `Factor like a quadratic in x²: ${fac(A)}${fac(B)} = 0\n${['x² = ' + fmt(-A), 'x² = ' + fmt(-B)].join(' or ')}\nx = ${pmT(A)} or x = ${pmT(B)}`,
+    };
+  }
+};
+
+// factors for 4.2 #33–58: each piece is an integer polynomial with known exact zeros
+const linFac = (z) => (z === 0 ? 'x' : `(x ${z > 0 ? MINUS : '+'} ${Math.abs(z)})`);
+function mkPiece(kind, o) {
+  if (kind === 'imag') { const im = Sd(1, 1, o.m); return { kind, o, p: [1, 0, o.m], zeros: [cx(Sd(0), im), cx(Sd(0), sNeg(im))], fac: [`(x ${MINUS} ${imCore(im)})`, `(x + ${imCore(im)})`] }; }
+  if (kind === 'pair') {
+    const { p, im } = o, re = Sd(p), m2 = (im.n / im.d) ** 2 * im.m;
+    const fac = [im, sNeg(im)].map((w) => `(x ${p > 0 ? MINUS : '+'} ${Math.abs(p)} ${w.n > 0 ? MINUS : '+'} ${imCore(w)})`);
+    return { kind, o, p: [1, -2 * p, p * p + m2], zeros: [cx(re, im), cx(re, sNeg(im))], fac };
+  }
+  if (kind === 'lin') { const { a, c } = o; return { kind, o, p: [a, -c], zeros: [cxR(c, a)], fac: [a === 1 ? linFac(c) : `(${a}x ${c > 0 ? MINUS : '+'} ${Math.abs(c)})`] }; }
+  if (kind === 'x') return { kind, o, p: [1, 0], zeros: [cxR(0)], fac: ['x'] };
+  // realpm: zeros p ± √m
+  const { p, m } = o, s = Sd(1, 1, m);
+  if (s.m === 1) { const k = s.n; return { kind, o, p: [1, -2 * p, p * p - m], zeros: [cxR(p + k), cxR(p - k)], fac: [linFac(p + k), linFac(p - k)] }; }
+  const pre = p ? `${p > 0 ? MINUS : '+'} ${Math.abs(p)} ` : '';
+  return { kind, o, p: [1, -2 * p, p * p - m], zeros: [1, -1].map((k) => ({ re: Sd(p), im: Sd(0), v: [p + k * Math.sqrt(m), 0] })), fac: [`(x ${pre}${MINUS} √${m})`, `(x ${pre}+ √${m})`], irr: [p, m] };
+}
+function piece(r, kind) {
+  if (kind === 'imag') return mkPiece('imag', { m: pick(r, [1, 4, 9, 16, 25, 36, 2, 3, 5, 8, 18]) });
+  if (kind === 'pair') { const p = nz(r, -5, 5), q = r() < 0.75 ? ri(r, 1, 5) : null; return mkPiece('pair', { p, im: q ? Sd(q) : Sd(1, 1, pick(r, [2, 3, 5])) }); }
+  if (kind === 'lin') { for (;;) { const a = pick(r, [1, 1, 1, 2, 3, 4]), c = nz(r, -6, 6); if (gcd(a, Math.abs(c)) === 1) return mkPiece('lin', { a, c }); } }
+  if (kind === 'x') return mkPiece('x', {});
+  return mkPiece('realpm', { m: pick(r, [2, 3, 5, 6, 7, 10]), p: r() < 0.5 ? 0 : nz(r, -4, 4) });
+}
+// common mistakes, as changed pieces
+const MUT = {
+  forgotI: (P) => (P.kind === 'imag' ? mkPiece('realpm', { p: 0, m: P.o.m }) : null),
+  negate: (P) => (P.kind === 'lin' ? mkPiece('lin', { a: P.o.a, c: -P.o.c }) : P.kind === 'pair' ? mkPiece('pair', { p: -P.o.p, im: P.o.im }) : P.kind === 'realpm' && P.o.p ? mkPiece('realpm', { p: -P.o.p, m: P.o.m }) : null),
+  noRoot: (P) => (P.kind === 'imag' && P.o.m > 1 ? mkPiece('imag', { m: P.o.m * P.o.m }) : null),
+};
+function mutate(pieces, name) { let hit = false; const out = pieces.map((P) => { const Q = MUT[name](P); if (Q) { hit = true; return Q; } return P; }); return hit ? out : null; }
+const zeroKey = (pieces) => pieces.flatMap((P) => P.zeros.map((z) => z.v.map((x) => x.toFixed(6)).join(';'))).sort().join('|');
+const factText = (pieces) => pieces.flatMap((P) => P.fac).join('');
+function zerosText(pieces, latex = false) { // conjugate and ± pairs written with ±
+  const out = [];
+  for (const P of pieces) {
+    if (P.irr) out.push(realPM(Sd(P.irr[0]), Sd(1, 1, P.irr[1]), latex));
+    else if (P.kind === 'imag' || P.kind === 'pair') out.push(cxPM(P.zeros[0].re, P.zeros[0].im, latex));
+    else P.zeros.forEach((z) => out.push(cxText(z, latex)));
+  }
+  return out.join(latex ? ',' : ', ');
+}
+const zerosLatex = (pieces) => zerosText(pieces, true);
+// #33–48: linear factors and zeros
+TEMPLATES.cxLinearFactors = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const plan = pick(r, [['imag'], ['pair'], ['real'], ['imag', 'imag'], ['lin', 'imag'], ['x', 'lin', 'imag'], ['four'], ['lin', 'pair'], ['real', 'imag']]);
+    let pieces;
+    if (plan[0] === 'four') { const k = ri(r, 1, 5); pieces = [mkPiece('realpm', { p: 0, m: k * k }), mkPiece('imag', { m: k * k })]; }
+    else pieces = plan.map((k) => piece(r, k));
+    if (plan.join() === 'imag,imag' && pieces[0].p[2] === pieces[1].p[2]) continue;
+    const coeffs = pieces.reduce((acc, P) => pMul(acc, P.p), [1]);
+    if (coeffs.some((c) => Math.abs(c) > 999)) continue;
+    const zeros = pieces.flatMap((P) => P.zeros);
+    const fact = pieces.flatMap((P) => P.fac).join('');
+    const v = pick(r, ['x', 'x', 'x', 't', 'z']), f = pick(r, ['f', 'g', 'h']);
+    const fx = `${f}(${v}) = ${polyT(coeffs, v)}`;
+    const key0 = zeroKey(pieces), wrongFacs = [];
+    for (const name of ['forgotI', 'negate', 'noRoot']) { const M = mutate(pieces, name); if (M && zeroKey(M) !== key0) wrongFacs.push(factText(M).replace(/x/g, v)); }
+    { const lp = pieces.findIndex((P) => P.kind !== 'x'); const M = pieces.map((P, k) => (k === lp && MUT.negate(P) ? MUT.negate(P) : P)); if (zeroKey(M) !== key0) wrongFacs.push(factText(M).replace(/x/g, v)); }
+    const correct = fact.replace(/x/g, v);
+    const zt = zerosText(pieces);
+    return {
+      topic: 'Linear factors and zeros', stem: `Write the polynomial as a product of linear factors.   ${fx}`,
+      ...buildChoices(r, correct, [...new Set(wrongFacs)].filter((x) => x !== correct), (i) => factText(pieces.map((P) => (P.kind === 'imag' ? mkPiece('imag', { m: P.o.m + i + 1 }) : P.kind === 'lin' ? mkPiece('lin', { a: P.o.a, c: P.o.c + i + 1 }) : P.kind === 'pair' ? mkPiece('pair', { p: P.o.p + i + 1, im: P.o.im }) : P.kind === 'realpm' ? mkPiece('realpm', { p: P.o.p + i + 1, m: P.o.m }) : P))).replace(/x/g, v)),
+      frStem: `List all the zeros of the function, separated by commas (± is fine).   ${fx}`,
+      fr: { fields: [{ kind: 'expr', keys: 'complex', label: 'Zeros:' }], key: [zerosLatex(pieces)], display: zt, check: (vv) => cxListCheck(vv[0], zeros) },
+      solution: `${pieces.length > 1 ? `Factor: ${f}(${v}) = ${pieces.map((P) => (P.kind === 'x' ? v : `(${polyT(P.p, v)})`)).join('')}\n` : ''}Set each factor equal to 0. For ${v}² = −k, ${v} = ±√k i; use the Quadratic Formula for the others.\n${f}(${v}) = ${correct}\nZeros: ${zt}`,
+    };
+  }
+};
+// #49–58: use a given complex zero to find all zeros
+TEMPLATES.cxGivenZero = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const P = piece(r, r() < 0.4 ? 'imag' : 'pair');
+    const other = pick(r, [['lin'], ['lin'], ['lin', 'lin'], ['real'], ['pair']]).map((k) => piece(r, k));
+    const pieces = [P, ...other];
+    const coeffs = pieces.reduce((acc, Q) => pMul(acc, Q.p), [1]);
+    if (coeffs.some((c) => Math.abs(c) > 999) || new Set(pieces.flatMap((Q) => Q.zeros.map((z) => z.v.map((x) => x.toFixed(6)).join()))).size !== pieces.flatMap((Q) => Q.zeros).length) continue;
+    const given = P.zeros[r() < 0.6 ? 0 : 1];
+    const zeros = pieces.flatMap((Q) => Q.zeros);
+    const f = pick(r, ['f', 'g', 'h']);
+    const zt = zerosText(pieces), correct = zt;
+    const noConj = [cxText(given), ...other.map((Q) => zerosText([Q]))].join(', ');
+    const negO = mutate(other, 'negate'), negReal = negO ? zerosText([P, ...negO]) : null;
+    const wrongPair = P.kind === 'pair' ? zerosText([MUT.negate(P), ...other]) : zerosText([MUT.forgotI(P), ...other]);
+    return {
+      topic: 'Using a given zero', stem: `Use the given zero to find all the zeros of the function.   ${f}(x) = ${polyT(coeffs)};   zero: ${cxText(given)}`,
+      ...buildChoices(r, correct, [...new Set([noConj, negReal, wrongPair])].filter((x) => x && x !== correct && !cxListCheck(x, zeros)), (i) => zerosText([P, ...other.map((Q) => (Q.kind === 'lin' ? mkPiece('lin', { a: Q.o.a, c: Q.o.c + i + 1 }) : Q))]) + (other.every((Q) => Q.kind !== 'lin') ? `, ${i + 7}` : '')),
+      frStem: `Use the given zero to find all the zeros of the function. List them separated by commas (± is fine).   ${f}(x) = ${polyT(coeffs)};   zero: ${cxText(given)}`,
+      fr: { fields: [{ kind: 'expr', keys: 'complex', label: 'Zeros:' }], key: [zerosLatex(pieces)], display: zt, check: (vv) => cxListCheck(vv[0], zeros) },
+      solution: `Complex zeros of a polynomial with real coefficients come in conjugate pairs, so ${cxText(P.zeros[given === P.zeros[0] ? 1 : 0])} is also a zero.\n(x − (${cxText(P.zeros[0])}))(x − (${cxText(P.zeros[1])})) = ${polyT(P.p)}\nDivide: ${f}(x) ÷ (${polyT(P.p)}) = ${polyT(other.reduce((acc, Q) => pMul(acc, Q.p), [1]))}\nZeros of that factor: ${other.map((Q) => zerosText([Q])).join(', ')}\nAll zeros: ${zt}`,
+    };
+  }
+};
+
 /* ---------- 3.4 Vectors and Dot Products ---------- */
 const vecA = ([x, y]) => `⟨${fmt(x)}, ${fmt(y)}⟩`;
 const vecIJ = ([x, y]) => {
@@ -3950,6 +4430,19 @@ const QUESTION_TYPES = [
   { id: 'vecAngle', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Angle between vectors', desc: 'In radians or degrees (#29–42)' },
   { id: 'vecTriangle', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Angles in a triangle', desc: 'Use vectors to find the interior angles (#43–46)' },
   { id: 'vecDotFromAngle', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Dot product from the angle', desc: 'Given ‖u‖, ‖v‖, and θ (#47–50)' },
+  { id: 'cxEqual', subject: 'precalc',  section: '4.1 Complex Numbers', label: 'Equal complex numbers', desc: 'Find a and b (#7–8)' },
+  { id: 'cxAddSub', subject: 'precalc',  section: '4.1 Complex Numbers', label: 'Adding and subtracting', desc: 'Including √(−n) terms (#9–16)' },
+  { id: 'cxMultiply', subject: 'precalc',  section: '4.1 Complex Numbers', label: 'Multiplying', desc: 'FOIL, squares, i² = −1 (#17–24)' },
+  { id: 'cxConjugate', subject: 'precalc',  section: '4.1 Complex Numbers', label: 'Complex conjugates', desc: 'Multiply by the conjugate (#25–32)' },
+  { id: 'cxDivide', subject: 'precalc',  section: '4.1 Complex Numbers', label: 'Dividing', desc: 'Quotients in standard form (#33–40)' },
+  { id: 'cxSqrtNeg', subject: 'precalc',  section: '4.1 Complex Numbers', label: 'Square roots of negatives', desc: 'Like √(−6)·√(−2) (#41–48)' },
+  { id: 'cxQuadratic', subject: 'precalc',  section: '4.1 Complex Numbers', label: 'Quadratic Formula (complex)', desc: 'Complex solutions (#49–58)' },
+  { id: 'cxNumSolutions', subject: 'precalc',  section: '4.2 Complex Solutions of Equations', label: 'Number of solutions', desc: 'Fundamental Theorem of Algebra (#5–8)' },
+  { id: 'cxDiscriminant', subject: 'precalc',  section: '4.2 Complex Solutions of Equations', label: 'The discriminant', desc: 'Real or imaginary solutions (#9–14)' },
+  { id: 'cxSolveQuad', subject: 'precalc',  section: '4.2 Complex Solutions of Equations', label: 'Solving quadratics', desc: 'Real or complex solutions (#15–24)' },
+  { id: 'cxQuartic', subject: 'precalc',  section: '4.2 Complex Solutions of Equations', label: 'Quartics like x⁴ − 6x² − 7', desc: 'Factor as a quadratic in x² (#25–28)' },
+  { id: 'cxLinearFactors', subject: 'precalc',  section: '4.2 Complex Solutions of Equations', label: 'Linear factors and zeros', desc: 'Factor completely; list the zeros (#33–48)' },
+  { id: 'cxGivenZero', subject: 'precalc',  section: '4.2 Complex Solutions of Equations', label: 'Using a given zero', desc: 'Conjugate pairs (#49–58)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
@@ -4397,7 +4890,7 @@ function frArea(q, i) {
   const vals = state.teacher ? q.fr.key.slice() : Array.isArray(state.answers[i]) ? state.answers[i].slice() : q.fr.fields.map(() => '');
   const wrap = el('div', { class: 'fr' });
   const controls = [];
-  let row = null, lastAns = null, hasMath = false, hasExpr = false, hasAngles = false, hasInverse = false, hasDegrees = false, hasVector = false;
+  let row = null, lastAns = null, hasMath = false, hasExpr = false, hasAngles = false, hasInverse = false, hasDegrees = false, hasVector = false, hasComplex = false;
   const applyLocks = () => q.fr.fields.forEach((f, k) => {
     if (!f.lockWhen || reveal) return;
     const locked = f.lockWhen(vals);
@@ -4456,7 +4949,7 @@ function frArea(q, i) {
       if (f.kind === 'expr') input.addEventListener('keydown', (e) => { if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); } }, true);
       input.addEventListener('focus', () => { lastAns = input; });
       row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
-      hasMath = true; if (f.kind === 'expr') { if (f.keys === 'angles') hasAngles = true; else if (f.keys === 'inverse') hasInverse = true; else if (f.keys === 'degrees') hasDegrees = true; else if (f.keys === 'vector') hasVector = true; else hasExpr = true; }
+      hasMath = true; if (f.kind === 'expr') { if (f.keys === 'angles') hasAngles = true; else if (f.keys === 'inverse') hasInverse = true; else if (f.keys === 'degrees') hasDegrees = true; else if (f.keys === 'vector') hasVector = true; else if (f.keys === 'complex') hasComplex = true; else hasExpr = true; }
       return;
     }
     if (f.kind === 'select') {
@@ -4476,7 +4969,8 @@ function frArea(q, i) {
   applyLocks();
   if (hasMath && !reveal) { // small symbol row for the answer boxes
     const firstAns = () => lastAns || wrap.querySelector('math-field.mans');
-    const keys = hasVector ? [['⟨ ⟩', '\\left\\langle #?\\right\\rangle'], [',', ','], ['i', 'i'], ['j', 'j'], ['√', '\\sqrt{#?}'], ['a⁄b', '\\frac{#@}{#?}']]
+    const keys = hasComplex ? [['i', 'i'], ['√', '\\sqrt{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['±', '\\pm '], [',', ',']]
+      : hasVector ? [['⟨ ⟩', '\\left\\langle #?\\right\\rangle'], [',', ','], ['i', 'i'], ['j', 'j'], ['√', '\\sqrt{#?}'], ['a⁄b', '\\frac{#@}{#?}']]
       : hasDegrees ? [['°', '^{\\circ}'], ['n', 'n'], [',', ','], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}']]
       : hasInverse ? [['arcsin', '\\arcsin\\left(#?\\right)'], ['arccos', '\\arccos\\left(#?\\right)'], ['arctan', '\\arctan\\left(#?\\right)'], ['π', '\\pi'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['n', 'n'], [',', ',']]
       : hasAngles ? [['π', '\\pi'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['n', 'n'], [',', ',']]
