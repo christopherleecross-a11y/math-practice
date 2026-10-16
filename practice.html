@@ -255,6 +255,8 @@ const SETS = {
   'precalc-5-3':   { subject: 'precalc',  title: '5.3 Properties of Logarithms', items: [['e3ChangeBase', 1], ['e3CalcCB', 1], ['e3Terms', 2], ['e3Exact', 2], ['e3Approx', 2], ['e3Expand', 3], ['e3Condense', 3]] },
   'precalc-5-4':   { subject: 'precalc',  title: '5.4 Exponential and Logarithmic Equations', items: [['e4Check', 2], ['e4Simple', 3], ['e4ExpEq', 4], ['e4LogEq', 4]] },
   'precalc-5-5':   { subject: 'precalc',  title: '5.5 Exponential and Logarithmic Models', items: [['e5Solve', 1], ['e5Continuous', 3], ['e5Double', 2], ['e5Fit', 2], ['e5Model', 2]] },
+  'precalc-6-1':   { subject: 'precalc',  title: '6.1 Lines', items: [['a1Slope', 2], ['a1InclSlope', 2], ['a1InclPoints', 2], ['a1InclEq', 2], ['a1AngleLines', 3], ['a1DistPt', 2], ['a1DistPar', 1]] },
+  'precalc-6-2':   { subject: 'precalc',  title: '6.2 Introduction to Conics: Parabolas', items: [['a2Match', 2], ['a2Origin', 3], ['a2Std', 3], ['a2VFD', 3], ['a2Tangent', 2], ['a2Apply', 1]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -4150,6 +4152,390 @@ TEMPLATES.e5Model = (r) => {
 };
 
 /* ==== CHAPTER 5 END ==== */
+/* ==== CHAPTER 6 BEGIN ==== */
+/* ---------- Chapter 6: shared helpers ---------- */
+// signed sum of terms: [[value, absText|null, variable], ...] → "3x − √3y + 2"
+function lnSumT(terms) {
+  let s = '';
+  for (const [v, abs0, x] of terms) {
+    if (Math.abs(v) < 1e-12) continue;
+    const abs = abs0 ?? fracT(Math.abs(v));
+    const body = x && abs === '1' ? x : /\//.test(abs) && x ? `(${abs})${x}` : abs + x;
+    s += s ? (v < 0 ? ` ${MINUS} ` : ' + ') + body : (v < 0 ? MINUS : '') + body;
+  }
+  return s || '0';
+}
+const sq3T = (k) => `${Math.abs(k) === 1 ? '' : Math.abs(k)}√3`; // |k|√3
+const SPECIAL_INC = [0, 30, 45, 60, 90, 120, 135, 150];
+const isSpecialDeg = (d) => SPECIAL_INC.some((s) => Math.abs(d - s) < 1e-7);
+const incDeg = (m) => { const d = Math.atan(m) / D2R; return d < -1e-12 ? d + 180 : Math.max(0, d); };
+// "θ = 3π/4 radian = 135°" or "θ ≈ 0.588 radian ≈ 33.690°"
+function incT(d) {
+  if (isSpecialDeg(d)) { const s = SPECIAL_INC.find((x) => Math.abs(d - x) < 1e-7); return `θ = ${radT(s)} radian${s === 0 ? 's' : ''} = ${s}°`; }
+  return `θ ≈ ${rT(d * D2R, 3)} radian ≈ ${rT(d, 3)}°`;
+}
+const incKey = (d) => (isSpecialDeg(d) ? [radL(Math.round(d)), `${Math.round(d)}^{\\circ}`] : [rT(d * D2R, 3), `${rT(d, 3)}^{\\circ}`]);
+const incOk = (v, d) => [angOk(v[0], d, 'rad', 0.00051 / D2R), angOk(v[1], d, 'deg', 0.00051)];
+const incFR = (d) => ({ fields: [{ kind: 'expr', keys: 'ang', label: 'θ in radians:' }, { kind: 'expr', keys: 'ang', label: 'θ in degrees:' }], key: incKey(d), display: incT(d),
+  check: (v) => incOk(v, d).every(Boolean), score: (v) => incOk(v, d).filter(Boolean).length / 2 });
+const snap3 = (v) => { const q = Math.round(v * v * 12); return Math.abs(v * v * 12 - q) < 1e-6 ? Math.sign(v) * Math.sqrt(q / 12) : v; }; // √(n/12) values exactly
+const slopeT = (m) => exactT(snap3(m)); // exact slope text (fractions and √3/3)
+// MC choices of inclinations (distinct, in (0°, 180°))
+function incChoices(r, d, wrongDegs) {
+  const correct = incT(d);
+  const c = [...new Set(wrongDegs.map((w) => ((w % 180) + 180) % 180).filter((w) => w > 1e-6 && Math.abs(w - d) > 0.01).map(incT))].filter((t) => t !== correct);
+  return buildChoices(r, correct, c, (i) => incT((d + 17 * (i + 1)) % 180 || 11));
+}
+// number answer: exact or rounded to three decimals
+const exact3Ok = (raw, v) => valOk(raw, v) || valOk(raw, v, 0.00051);
+// d = num / (den·√S) as exact text/latex
+const lnDistExact = (num, den, S) => exactRatio(1, num * num, den * den * S);
+
+/* ---------- 6.1 Lines ---------- */
+const SPEC_RAD = [[30, 'π/6'], [45, 'π/4'], [60, 'π/3'], [120, '2π/3'], [135, '3π/4'], [150, '5π/6']];
+TEMPLATES.a1Slope = (r) => {
+  if (r() < 0.45) {
+    const [d, t] = pick(r, SPEC_RAD), m = Math.tan(d * D2R), mm = snap3(m);
+    const correct = `m = ${slopeT(mm)}`;
+    const wrongs = [-mm, 1 / mm, Math.sin(d * D2R), Math.cos(d * D2R), -1 / mm].map((w) => `m = ${slopeT(w)}`);
+    return {
+      topic: 'Slope from inclination', stem: `Find the slope of the line with inclination θ.   θ = ${t} radian${/^π/.test(t) ? '' : 's'}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => `m = ${slopeT([1, -1, 0.5, 2][i % 4] * (i + 2))}`),
+      fr: { fields: [{ kind: 'expr', keys: 'slope', label: 'm =' }], key: [exactL(snap3(mm))], display: correct, check: (v) => exact3Ok(v[0], mm) },
+      solution: `m = tan θ = tan ${t} = ${slopeT(mm)}`,
+    };
+  }
+  let th; do th = ri(r, 20, 295) / 100; while (Math.abs(th - Math.PI / 2) < 0.12);
+  const m = Math.tan(th), correct = `m ≈ ${rT(m, 3)}`;
+  const wrongs = [Math.tan(th * D2R), -m, 1 / m, Math.sin(th), Math.cos(th)].map((w) => `m ≈ ${rT(w, 3)}`);
+  return {
+    topic: 'Slope from inclination', stem: `Find the slope of the line with inclination θ. Round to three decimal places.   θ = ${fmt(th)} radian${th === 1 ? '' : 's'}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => `m ≈ ${rT(m + 0.5 * (i + 1), 3)}`),
+    fr: { fields: [{ kind: 'expr', keys: 'slope', label: 'm ≈' }], key: [rT(m, 3).replace(MINUS, '-')], display: correct, check: (v) => valOk(v[0], m, 0.00051) },
+    solution: `m = tan θ = tan ${fmt(th)} ≈ ${rT(m, 3)}  (calculator in radian mode)`,
+  };
+};
+const INC_SLOPES = [[1, '1'], [Math.sqrt(3), '√3'], [-1, `${MINUS}1`], [-Math.sqrt(3), `${MINUS}√3`], [Math.sqrt(3) / 3, '√3/3'], [-Math.sqrt(3) / 3, `${MINUS}√3/3`]];
+TEMPLATES.a1InclSlope = (r) => {
+  let m, mT;
+  if (r() < 0.4) [m, mT] = pick(r, INC_SLOPES);
+  else { m = pick(r, [2 / 3, 1 / 4, -3 / 2, -5 / 9, 3, -2, 5 / 2, 4 / 3, -1 / 3, -4, 6, -7 / 5, 3 / 4, -3 / 4, 2, 1 / 2]); mT = fracT(m); }
+  const d = incDeg(m);
+  return {
+    topic: 'Inclination from slope', stem: `Find the inclination θ (in radians and degrees) of the line with slope m. Round to three decimal places if needed.   m = ${mT}`,
+    ...incChoices(r, d, [Math.atan(m) / D2R, 90 - d, 180 - d, Math.atan(1 / m) / D2R, d + 90]),
+    fr: incFR(d),
+    solution: `tan θ = m = ${mT}. ${m > 0 ? `θ = arctan(${mT})` : `Because m < 0, θ is in Quadrant II: θ = π + arctan(${mT})`}, so ${incT(d)}.`,
+  };
+};
+// a coordinate j√3 as text
+const r3T = (j) => (j === 0 ? '0' : `${j < 0 ? MINUS : ''}${Math.abs(j) === 1 ? '' : Math.abs(j)}√3`);
+TEMPLATES.a1InclPoints = (r) => {
+  const k = ri(r, 0, 3);
+  let P, Q, m, PT, QT;
+  if (k === 0) { // √3 coordinates → special angle
+    const a = ri(r, -4, 4), j = ri(r, -2, 2), s = pick(r, [1, 2, -1, -2]), sg = pick(r, [1, -1]);
+    if (r() < 0.5) { P = [a, j * Math.sqrt(3)]; Q = [a + s, (j + sg * s) * Math.sqrt(3)]; PT = `(${fmt(P[0])}, ${r3T(j)})`; QT = `(${fmt(Q[0])}, ${r3T(j + sg * s)})`; m = sg * Math.sqrt(3); }
+    else { P = [j * Math.sqrt(3), a]; Q = [(j + s) * Math.sqrt(3), a + sg * s]; PT = `(${r3T(j)}, ${fmt(P[1])})`; QT = `(${r3T(j + s)}, ${fmt(Q[1])})`; m = sg / Math.sqrt(3); }
+  } else if (k === 1) { // fractions
+    const F = [1 / 2, 3 / 2, 1 / 4, 3 / 4, 1 / 3, 2 / 3, -1 / 2, -3 / 4, -1 / 3, 2 / 5, -11 / 10, 5 / 4];
+    for (;;) { P = [pick(r, F), pick(r, F)]; Q = [pick(r, F), pick(r, F)]; if (P[0] !== Q[0] && P[1] !== Q[1]) break; }
+    PT = ptT(P); QT = ptT(Q); m = (Q[1] - P[1]) / (Q[0] - P[0]);
+  } else {
+    for (;;) { P = [ri(r, -6, 12), ri(r, -5, 20)]; Q = [ri(r, -6, 12), ri(r, -5, 20)]; if (P[0] !== Q[0] && P[1] !== Q[1]) break; }
+    if (r() < 0.25) { P = P.map((x) => x * 10); Q = Q.map((x) => x * 10); }
+    PT = ptT(P); QT = ptT(Q); m = (Q[1] - P[1]) / (Q[0] - P[0]);
+  }
+  m = Math.round(m * 1e12) / 1e12;
+  const d = incDeg(m), mT = fracParts(m) ? fracT(m) : slopeT(m);
+  return {
+    topic: 'Inclination of a line through two points', stem: `Find the inclination θ (in radians and degrees) of the line passing through the points. Round to three decimal places if needed.   ${PT}, ${QT}`,
+    ...incChoices(r, d, [Math.atan(m) / D2R, 90 - d, 180 - d, Math.atan(1 / m) / D2R]),
+    fr: incFR(d),
+    solution: `m = (y₂ − y₁)/(x₂ − x₁) = ${mT}. ${m > 0 ? `θ = arctan(${mT})` : `m < 0, so θ = π + arctan(${mT})`}: ${incT(d)}.`,
+  };
+};
+// a line A·x + B·y + C = 0 where A or B may be k√3; returns { A, B, C, t }
+function lineWithRoot3(r) {
+  const p = pick(r, [1, 2, 1, 3]), sg = pick(r, [1, -1]), C = pick(r, [0, 1, 2, -2, 5, -3, 4]), onX = r() < 0.5;
+  const A = onX ? p * Math.sqrt(3) : p, B = onX ? sg * p : sg * p * Math.sqrt(3);
+  const lead = pick(r, [1, -1]); // multiply through by −1 sometimes
+  const terms = onX ? [[lead * A, sq3T(p), 'x'], [lead * B, String(p), 'y']] : [[lead * A, String(p), 'x'], [lead * B, sq3T(p), 'y']];
+  return { A: lead * A, B: lead * B, C: lead * C, t: `${lnSumT([...terms, [lead * C, null, '']])} = 0` };
+}
+TEMPLATES.a1InclEq = (r) => {
+  let A, B, C, t;
+  if (r() < 0.4) ({ A, B, C, t } = lineWithRoot3(r));
+  else {
+    for (;;) { A = ri(r, -6, 6); B = ri(r, -6, 6); C = ri(r, -12, 12); if (A && B && gcd(gcd(A, B), C) === 1) break; }
+    t = r() < 0.6 ? `${lnSumT([[A, null, 'x'], [B, null, 'y'], [C, null, '']])} = 0` : `${lnSumT([[A, null, 'x'], [B, null, 'y']])} = ${fmt(-C)}`;
+  }
+  const m = Math.round((-A / B) * 1e12) / 1e12, d = incDeg(m), mT = fracParts(m) ? fracT(m) : slopeT(m);
+  return {
+    topic: 'Inclination of a line from its equation', stem: `Find the inclination θ (in radians and degrees) of the line. Round to three decimal places if needed.   ${t}`,
+    ...incChoices(r, d, [Math.atan(-m) / D2R + 180, 90 - d, Math.atan(1 / m) / D2R, Math.atan(-1 / m) / D2R]),
+    fr: incFR(d),
+    solution: `Solve for y to read the slope: m = ${mT}. ${m > 0 ? `θ = arctan(${mT})` : m < 0 ? `m < 0, so θ = π + arctan(${mT})` : 'm = 0, so θ = 0'}: ${incT(d)}.`,
+  };
+};
+// angle between two lines
+const acuteBetween = (m1, m2) => Math.atan(Math.abs((m2 - m1) / (1 + m1 * m2))) / D2R;
+TEMPLATES.a1AngleLines = (r) => {
+  const dec = r() < 0.2;
+  for (;;) {
+    const L = [0, 1].map(() => [ri(r, -6, 6), ri(r, -6, 6), ri(r, -12, 24)]);
+    if (L.some(([a, b]) => !a || !b || gcd(a, b) !== 1)) continue;
+    const [m1, m2] = L.map(([a, b]) => -a / b);
+    if (Math.abs(m1 - m2) < 1e-9 || Math.abs(1 + m1 * m2) < 1e-9) continue;
+    const det = L[0][0] * L[1][1] - L[1][0] * L[0][1], ix = (L[0][2] * L[1][1] - L[1][2] * L[0][1]) / det, iy = (L[0][0] * L[1][2] - L[1][0] * L[0][2]) / det;
+    if (Math.abs(ix) > 6 || Math.abs(iy) > 6) continue;
+    const d = acuteBetween(m1, m2); if (d < 5) continue;
+    const eqT = ([a, b, c]) => (dec ? `${lnSumT([[a, (Math.abs(a) / 100).toFixed(2), 'x'], [b, (Math.abs(b) / 100).toFixed(2), 'y']])} = ${(c / 100).toFixed(2).replace('-', MINUS)}` : `${lnSumT([[a, null, 'x'], [b, null, 'y']])} = ${fmt(c)}`);
+    const cx = Math.round(ix), cy = Math.round(iy);
+    const tanT = fracParts(Math.abs((m2 - m1) / (1 + m1 * m2))) ? fracT(Math.abs((m2 - m1) / (1 + m1 * m2))) : rT(Math.abs((m2 - m1) / (1 + m1 * m2)), 3);
+    return {
+      topic: 'Angle between two lines', stem: `Find the angle θ (in radians and degrees) between the lines. Round to three decimal places if needed.   ${eqT(L[0])}   and   ${eqT(L[1])}`,
+      ...incChoices(r, d, [180 - d, Math.atan(Math.abs(m2 - m1)) / D2R, Math.atan(Math.abs((m2 - m1) / (1 - m1 * m2))) / D2R, 90 - d]),
+      fr: incFR(d),
+      draw: dec ? undefined : plotQ({ xr: [cx - 6, cx + 6], yr: [cy - 6, cy + 6], curves: [{ f: (x) => m1 * x + L[0][2] / L[0][1] }, { f: (x) => m2 * x + L[1][2] / L[1][1], color: '#b5462f' }], pts: [{ p: [ix, iy] }] }), size: dec ? undefined : [380, 380],
+      solution: `Slopes: m₁ = ${fracT(m1)}, m₂ = ${fracT(m2)}.\ntan θ = |(m₂ − m₁)/(1 + m₁m₂)| = |(${fracT(m2)} − (${fracT(m1)}))/(1 + (${fracT(m1)})(${fracT(m2)}))| = ${tanT}\nθ = arctan(${tanT}): ${incT(d)}.`,
+    };
+  }
+};
+// distance from a point to a line
+function lineGiven(r, A, B, C) { // text for A·x + B·y + C = 0 in one of a few forms
+  const k = ri(r, 0, 3);
+  if (k <= 1) return `${lnSumT([[A, null, 'x'], [B, null, 'y'], [C, null, '']])} = 0`;
+  if (k === 2) return `${lnSumT([[A, null, 'x'], [B, null, 'y']])} = ${fmt(-C)}`;
+  if (B === -1 || B === 1) { const m = -A / B, b = -C / B; return `y = ${lnSumT([[m, null, 'x'], [b, null, '']])}`; }
+  return `${lnSumT([[A, null, 'x'], [B, null, 'y']])} = ${fmt(-C)}`;
+}
+TEMPLATES.a1DistPt = (r) => {
+  for (;;) {
+    const k = r();
+    let A, B, C;
+    if (k < 0.12) { A = 1; B = 0; C = -ri(r, -6, 6); } else if (k < 0.2) { A = 0; B = 1; C = -ri(r, -6, 6); }
+    else { A = ri(r, -6, 6); B = pick(r, [ri(r, -6, 6), 1, -1]); C = ri(r, -10, 10); if (!A || !B || gcd(gcd(A, B), C) !== 1) continue; }
+    const P = [ri(r, -6, 6), ri(r, -6, 6)], N = Math.abs(A * P[0] + B * P[1] + C), S = A * A + B * B;
+    if (!N) continue;
+    const t = A && B ? lineGiven(r, A, B, C) : A ? `x = ${fmt(-C)}` : `y = ${fmt(-C)}`;
+    const E = lnDistExact(N, 1, S), d = E.val, correct = `d = ${E.text}`;
+    const wrongs = [fracT(N / S), A * P[0] + B * P[1] ? lnDistExact(Math.abs(A * P[0] + B * P[1]), 1, S).text : null, Math.abs(A * P[0] + B * P[1] - C) ? lnDistExact(Math.abs(A * P[0] + B * P[1] - C), 1, S).text : null, String(N), fracT(N / (Math.abs(A) + Math.abs(B)))]
+      .filter((w) => w && w !== E.text).map((w) => `d = ${w}`);
+    return {
+      topic: 'Distance between a point and a line', stem: `Find the distance between the point and the line.   Point: ${ptT(P)}    Line: ${t}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => `d = ${lnDistExact(N * (i + 2), 1, S).text}`),
+      frStem: `Find the distance between the point and the line. Give an exact answer or round to three decimal places.   Point: ${ptT(P)}    Line: ${t}`,
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'd =' }], key: [E.latex], display: correct, check: (v) => exact3Ok(v[0], d) },
+      solution: A && B ? `Write the line as ${lnSumT([[A, null, 'x'], [B, null, 'y'], [C, null, '']])} = 0, so A = ${fmt(A)}, B = ${fmt(B)}, C = ${fmt(C)}.\nd = |Ax₁ + By₁ + C|/√(A² + B²) = |(${fmt(A)})(${fmt(P[0])}) + (${fmt(B)})(${fmt(P[1])})${C ? ` ${C < 0 ? MINUS : '+'} ${Math.abs(C)}` : ''}|/√${S} = ${N}/√${S} = ${E.text}${fracParts(d) ? '' : ` ≈ ${rT(d, 3)}`}`
+        : `The line ${t} is ${A ? 'vertical' : 'horizontal'}, so the distance is the difference in ${A ? 'x' : 'y'}-coordinates: d = |${fmt(A ? P[0] : P[1])}${C ? ` ${C > 0 ? '+' : MINUS} ${Math.abs(C)}` : ''}| = ${N}`,
+    };
+  }
+};
+TEMPLATES.a1DistPar = (r) => {
+  for (;;) {
+    const A = ri(r, -5, 5), B = ri(r, -5, 5), C1 = ri(r, -12, 12), C2 = ri(r, -12, 12), s = pick(r, [1, 1, 2, 3, -1, -2]);
+    if (!A || !B || C1 === C2 || gcd(gcd(A, B), C1) !== 1 || gcd(A, B) !== 1) continue;
+    const t1 = `${lnSumT([[A, null, 'x'], [B, null, 'y'], [C1, null, '']])} = 0`, t2 = `${lnSumT([[s * A, null, 'x'], [s * B, null, 'y'], [s * C2, null, '']])} = 0`;
+    const S = A * A + B * B, E = lnDistExact(Math.abs(C1 - C2), 1, S), correct = `d = ${E.text}`;
+    const wrongs = [Math.abs(C1 - s * C2) ? lnDistExact(Math.abs(C1 - s * C2), 1, S).text : null, lnDistExact(Math.abs(C1 + C2), 1, S).text, fracT(Math.abs(C1 - C2) / S), String(Math.abs(C1 - C2))].filter((w) => w && w !== E.text).map((w) => `d = ${w}`);
+    const P = Math.abs(B) === 1 ? [0, -C1 / B] : Math.abs(A) === 1 ? [-C1 / A, 0] : null;
+    return {
+      topic: 'Distance between parallel lines', stem: `The lines are parallel. Find the distance between them.   ${t1}   and   ${t2}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => `d = ${lnDistExact(Math.abs(C1 - C2) * (i + 2), 1, S).text}`),
+      frStem: `The lines are parallel. Find the distance between them. Give an exact answer or round to three decimal places.   ${t1}   and   ${t2}`,
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'd =' }], key: [E.latex], display: correct, check: (v) => exact3Ok(v[0], E.val) },
+      solution: `${s === 1 ? '' : `Divide the second equation by ${fmt(s)}: ${lnSumT([[A, null, 'x'], [B, null, 'y'], [C2, null, '']])} = 0.\n`}${P ? `Pick a point on the first line, such as ${ptT(P)}, and find its distance to the second line.\n` : ''}d = |C₁ − C₂|/√(A² + B²) = |${fmt(C1)}${C2 ? ` − ${C2 < 0 ? `(${fmt(C2)})` : fmt(C2)}` : ''}|/√${S} = ${E.text}${fracParts(E.val) ? '' : ` ≈ ${rT(E.val, 3)}`}`,
+    };
+  }
+};
+
+/* ---------- 6.2 Introduction to Conics: Parabolas ---------- */
+// parabola { ax: 'v' | 'h', h, k, p }: (x − h)² = 4p(y − k)  or  (y − k)² = 4p(x − h)
+const shT = (v, c) => (c === 0 ? v : `(${v} ${c > 0 ? MINUS : '+'} ${fracT(Math.abs(c))})`); // (x − 2)
+const shL = (v, c) => (c === 0 ? v : `\\left(${v}${c > 0 ? '-' : '+'}${fracL(Math.abs(c))}\\right)`);
+function parT(P) {
+  const [u, w, cu, cw] = P.ax === 'v' ? ['x', 'y', P.h, P.k] : ['y', 'x', P.k, P.h];
+  const c = 4 * P.p, sq = cu === 0 ? `${u}²` : `${shT(u, cu)}²`;
+  const coef = c === 1 ? '' : c === -1 ? MINUS : fracParts(c)[1] === 1 ? fmt(c) : `${c < 0 ? MINUS : ''}(${fracT(Math.abs(c))})`;
+  const rhs = cw === 0 ? `${coef}${w}` : c === 1 ? `${w} ${cw > 0 ? MINUS : '+'} ${fracT(Math.abs(cw))}` : `${coef}${shT(w, cw)}`;
+  return `${sq} = ${rhs}`;
+}
+function parL(P) {
+  const [u, w, cu, cw] = P.ax === 'v' ? ['x', 'y', P.h, P.k] : ['y', 'x', P.k, P.h];
+  const c = 4 * P.p, coef = c === 1 ? '' : c === -1 ? '-' : fracL(c);
+  return `${cu === 0 ? u : shL(u, cu)}^2=${coef}${cw === 0 ? w : shL(w, cw)}`;
+}
+const parFocus = (P) => (P.ax === 'v' ? [P.h, P.k + P.p] : [P.h + P.p, P.k]);
+const parDirT = (P) => (P.ax === 'v' ? `y = ${fracT(P.k - P.p)}` : `x = ${fracT(P.h - P.p)}`);
+const parDirL = (P) => (P.ax === 'v' ? `y=${fracL(P.k - P.p)}` : `x=${fracL(P.h - P.p)}`);
+const parDirLine = (P) => (P.ax === 'v' ? [0, 1, -(P.k - P.p)] : [1, 0, -(P.h - P.p)]);
+const parFn = (P) => (P.ax === 'v' ? (x, y) => (x - P.h) ** 2 - 4 * P.p * (y - P.k) : (x, y) => (y - P.k) ** 2 - 4 * P.p * (x - P.h));
+// typed equation equals the parabola AND is in standard form: one side is exactly (x − h)² (or (y − k)²)
+function parOk(raw, P) {
+  const s = String(raw || '').replace(/\\left|\\right/g, ''); const parts = s.split('='); if (parts.length !== 2) return false;
+  const [L, R] = parts.map((q) => pxParse(q, ['x', 'y'], '')); if (!L || !R) return false;
+  const G = parFn(P), sq = P.ax === 'v' ? (x) => (x - P.h) ** 2 : (x, y) => (y - P.k) ** 2;
+  const pts = [[1.3, 2.7], [-2.1, 0.6], [3.7, -1.9], [0.45, 4.2], [-3.3, -2.8], [5.1, 1.1], [2.2, -4.4]];
+  const same = (F, T) => pts.every(([x, y]) => { const a = F({ x, y }), b = T(x, y); return isFinite(a) && Math.abs(a - b) <= 1e-7 * Math.max(1, Math.abs(b)); });
+  const once = (t) => (t.match(P.ax === 'v' ? /x/g : /y/g) || []).length === 1; // (x − h)², not x² − 2hx + h²
+  if (same(L, sq) && once(parts[0])) return same(({ x, y }) => L({ x, y }) - R({ x, y }), G);
+  if (same(R, sq) && once(parts[1])) return same(({ x, y }) => R({ x, y }) - L({ x, y }), G);
+  return false;
+}
+const parFR = (P) => ({ fields: [{ kind: 'expr', keys: 'func', label: 'Standard form:' }], key: [parL(P)], display: parT(P), check: (v) => parOk(v[0], P) });
+const parCurve = (P) => (P.ax === 'v' ? { param: [(t) => [P.h + t, P.k + (t * t) / (4 * P.p)], -30, 30] } : { param: [(t) => [P.h + (t * t) / (4 * P.p), P.k + t], -30, 30] });
+// wrong standard forms: other axis, opposite opening, c = p instead of 4p, 2p
+const parWrongs = (P) => [{ ...P, ax: P.ax === 'v' ? 'h' : 'v', h: P.k, k: P.h }, { ...P, p: -P.p }, { ...P, p: P.p / 4 }, { ...P, p: P.p * 2 }, { ...P, ax: P.ax === 'v' ? 'h' : 'v' }, { ...P, h: -P.h, k: -P.k }];
+function parChoices(r, P, extra = []) {
+  const correct = parT(P), c = [...new Set([...extra, ...parWrongs(P)].map(parT))].filter((t) => t !== correct);
+  return buildChoices(r, correct, c, (i) => parT({ ...P, p: P.p * (i + 3) }));
+}
+// graph with point labels on white tags; tags: [{ p, text, dx, dy, align }] (offsets in px)
+const tagPlot = (o, tags) => (cv) => {
+  drawPlot(cv, o);
+  const ctx = cv._ctx, W = cv._w, H = cv._h, [x0, x1] = o.xr, [y0, y1] = o.yr, m = 26;
+  const sc = Math.min((W - 2 * m) / (x1 - x0), (H - 2 * m) / (y1 - y0)), ox = (W - sc * (x1 - x0)) / 2, oy = (H - sc * (y1 - y0)) / 2;
+  ctx.font = '13px Georgia, serif'; ctx.textBaseline = 'middle';
+  for (const { p, text, dx, dy, align } of tags) {
+    const w = ctx.measureText(text).width, X = ox + (p[0] - x0) * sc + dx, Y = oy + (y1 - p[1]) * sc + dy, L = align === 'right' ? X - w : align === 'center' ? X - w / 2 : X;
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillRect(L - 3, Y - 9, w + 6, 18);
+    ctx.fillStyle = '#1d1d1b'; ctx.textAlign = 'left'; ctx.fillText(text, L, Y);
+  }
+};
+const P_VALS = [1 / 2, 1, 3 / 2, 2, 3, 1 / 4, 3 / 4, 5 / 2, 9 / 2, 4, 1 / 8, 5 / 4];
+TEMPLATES.a2Match = (r) => {
+  const p = pick(r, [1 / 2, 1, 3 / 2, 2]) * pick(r, [1, -1]), ax = pick(r, ['v', 'h']);
+  const P = { ax, h: 0, k: 0, p }, opts = [P, { ...P, p: -p }, { ...P, ax: ax === 'v' ? 'h' : 'v' }, { ...P, p: p * 2 }].map(parT);
+  const pt = ax === 'v' ? [4 * Math.abs(p), 4 * p] : [4 * p, 4 * Math.abs(p)];
+  return {
+    topic: 'Matching parabolas', stem: 'Which equation matches the graph?',
+    ...buildChoices(r, opts[0], opts.slice(1), () => null),
+    fr: FR.select('The graph is', shuffle(r, opts), opts[0]),
+    draw: plotQ({ xr: [-9, 9], yr: [-9, 9], curves: [parCurve(P)], pts: [{ p: pt, label: ptT(pt) }] }), size: [380, 380],
+    solution: `The parabola has its vertex at the origin and opens ${ax === 'v' ? (p > 0 ? 'upward' : 'downward') : p > 0 ? 'to the right' : 'to the left'}, so the equation has the form ${ax === 'v' ? 'x² = 4py' : 'y² = 4px'} with ${p > 0 ? 'p > 0' : 'p < 0'}. The point ${ptT(pt)} satisfies ${opts[0]}.`,
+  };
+};
+TEMPLATES.a2Origin = (r) => {
+  const k = ri(r, 0, 4), ax = pick(r, ['v', 'h']);
+  let p = pick(r, P_VALS) * pick(r, [1, -1]), given, draw, why;
+  if (k === 3) { // passes through a point
+    let a, b; do { a = ri(r, -6, 6); b = ri(r, -6, 6); } while (!a || !b);
+    const pt = ax === 'v' ? [a, b] : [b, a]; p = (a * a) / (4 * b);
+    given = `${ax === 'v' ? 'Vertical' : 'Horizontal'} axis; passes through the point ${ptT(pt)}`;
+    why = ax === 'v' ? `Use x² = 4py with (x, y) = ${ptT(pt)}: ${a * a} = 4p(${fmt(b)}), so 4p = ${fracT(4 * p)}.` : `Use y² = 4px with (x, y) = ${ptT(pt)}: ${a * a} = 4p(${fmt(b)}), so 4p = ${fracT(4 * p)}.`;
+  }
+  const P = { ax, h: 0, k: 0, p }, F = parFocus(P);
+  if (k === 0 || k === 4) { given = `Focus: ${ptT(F)}`; why = `The focus ${ptT(F)} is on the ${ax === 'v' ? 'y' : 'x'}-axis, so the axis is ${ax === 'v' ? 'vertical' : 'horizontal'} and p = ${fracT(p)}. Then 4p = ${fracT(4 * p)}.`; }
+  if (k === 1 || k === 2) { given = `Directrix: ${parDirT(P)}`; why = `The directrix ${parDirT(P)} is ${ax === 'v' ? 'horizontal, so the axis is vertical' : 'vertical, so the axis is horizontal'}. The vertex is halfway between focus and directrix, so p = ${fracT(p)} and 4p = ${fracT(4 * p)}.`; }
+  if (k === 4) { if (!Number.isInteger(2 * p) || Math.abs(p) > 4) p = pick(r, [1, 2, 3, -1, -2, -3]); P.p = p; const F2 = parFocus(P); draw = tagPlot({ xr: [-8, 8], yr: [-8, 8], curves: [parCurve(P)], pts: [{ p: F2 }] }, [P.ax === 'h' ? { p: F2, text: `Focus ${ptT(F2)}`, dx: 0, dy: 18, align: 'center' } : { p: F2, text: `Focus ${ptT(F2)}`, dx: 10, dy: 0, align: 'left' }]); given = null; why = `The focus ${ptT(F2)} gives p = ${fracT(p)}, so 4p = ${fracT(4 * p)}.`; }
+  return {
+    topic: 'Parabola with vertex at the origin', stem: given ? `Find the standard form of the equation of the parabola with the given characteristic and vertex at the origin.   ${given}` : 'Find the standard form of the equation of the parabola shown. Its vertex is at the origin.',
+    ...parChoices(r, P), fr: parFR(P), draw, size: draw ? [380, 380] : undefined,
+    solution: `${why}\n${parT(P)}`,
+  };
+};
+TEMPLATES.a2Std = (r) => {
+  const k = ri(r, 0, 4), ax = pick(r, ['v', 'h']), h = ri(r, -6, 6), kk = ri(r, -6, 6);
+  let p = pick(r, [1, 2, 3, 1 / 2, 3 / 2, 4, 1 / 4]) * pick(r, [1, -1]), given, why, draw;
+  const P = { ax, h, k: kk, p };
+  const V = [h, kk];
+  if (k === 3) { // vertex, axis, point
+    let d; do d = ri(r, -4, 4); while (!d);
+    const e = pick(r, [1, 2, 3, 4, -1, -2, -3]); P.p = (d * d) / (4 * e); p = P.p;
+    const pt = ax === 'v' ? [h + d, kk + e] : [h + e, kk + d];
+    given = `Vertex: ${ptT(V)}; ${ax === 'v' ? 'vertical' : 'horizontal'} axis; passes through the point ${ptT(pt)}`;
+    why = ax === 'v' ? `Substitute ${ptT(pt)} into (x − h)² = 4p(y − k): ${d * d} = 4p(${fmt(e)}), so 4p = ${fracT(4 * p)}.` : `Substitute ${ptT(pt)} into (y − k)² = 4p(x − h): ${d * d} = 4p(${fmt(e)}), so 4p = ${fracT(4 * p)}.`;
+  }
+  const F = parFocus(P);
+  if (k === 0) { given = `Vertex: ${ptT(V)}; focus: ${ptT(F)}`; why = `The focus is ${ax === 'v' ? 'directly above or below' : 'directly left or right of'} the vertex, so the axis is ${ax === 'v' ? 'vertical' : 'horizontal'} and p = ${fracT(p)} (directed distance from vertex to focus). 4p = ${fracT(4 * p)}.`; }
+  if (k === 1) { given = `Vertex: ${ptT(V)}; directrix: ${parDirT(P)}`; why = `The directrix is ${ax === 'v' ? 'horizontal, so the axis is vertical' : 'vertical, so the axis is horizontal'}. The vertex is p units from the directrix toward the focus: p = ${fracT(p)}, 4p = ${fracT(4 * p)}.`; }
+  if (k === 2) { given = `Focus: ${ptT(F)}; directrix: ${parDirT(P)}`; why = `The vertex is the midpoint between the focus and the directrix: ${ptT(V)}. p = ${fracT(p)} (vertex to focus), 4p = ${fracT(4 * p)}.`; }
+  if (k === 4) {
+    P.p = p = pick(r, ax === 'v' ? [2, 3] : [3]) * pick(r, [1, -1]); P.h = ri(r, -3, 3); P.k = ri(r, -3, 3);
+    const V2 = [P.h, P.k], F2 = parFocus(P);
+    const s = Math.sign(P.p), tags = P.ax === 'h'
+      ? [{ p: V2, text: `V${ptT(V2)}`, dx: -10 * s, dy: 0, align: s > 0 ? 'right' : 'left' }, { p: F2, text: `F${ptT(F2)}`, dx: 0, dy: 18, align: 'center' }]
+      : [{ p: V2, text: `V${ptT(V2)}`, dx: 0, dy: 18 * s, align: 'center' }, { p: F2, text: `F${ptT(F2)}`, dx: 10, dy: 0, align: 'left' }];
+    draw = tagPlot({ xr: [P.h - 8, P.h + 8], yr: [P.k - 8, P.k + 8], curves: [parCurve(P)], pts: [{ p: V2 }, { p: F2 }] }, tags);
+    why = `From the graph, the vertex is ${ptT(V2)} and the focus is ${ptT(F2)}, so p = ${fracT(P.p)} and 4p = ${fracT(4 * P.p)}.`;
+  }
+  return {
+    topic: 'Standard equation of a parabola', stem: draw ? 'Find the standard form of the equation of the parabola shown. V is the vertex and F is the focus.' : `Find the standard form of the equation of the parabola with the given characteristics.   ${given}`,
+    ...parChoices(r, P), fr: parFR(P), draw, size: draw ? [380, 380] : undefined,
+    solution: `${why}\n${parT(P)}`,
+  };
+};
+// general form of a parabola with integer 4p
+function parGeneralT(P) {
+  const c = 4 * P.p;
+  if (P.ax === 'v') return `${lnSumT([[1, null, 'x²'], [-2 * P.h, null, 'x'], [-c, null, 'y'], [P.h * P.h + c * P.k, null, '']])} = 0`;
+  return `${lnSumT([[1, null, 'y²'], [-2 * P.k, null, 'y'], [-c, null, 'x'], [P.k * P.k + c * P.h, null, '']])} = 0`;
+}
+TEMPLATES.a2VFD = (r) => {
+  const gen = r() < 0.4, ax = pick(r, ['v', 'h']);
+  const P = gen ? { ax, h: ri(r, -5, 5), k: ri(r, -5, 5), p: pick(r, [1 / 4, 1 / 2, 1, 3 / 2, 2, 3]) * pick(r, [1, -1]) } : { ax, h: r() < 0.35 ? 0 : ri(r, -5, 5), k: r() < 0.35 ? 0 : ri(r, -5, 5), p: pick(r, P_VALS) * pick(r, [1, -1]) };
+  const eq = gen ? parGeneralT(P) : parT(P), V = [P.h, P.k], F = parFocus(P);
+  const T = (Q) => `Vertex ${ptT([Q.h, Q.k])};  focus ${ptT(parFocus(Q))};  directrix ${parDirT(Q)}`, correct = T(P);
+  const wrongs = [{ ...P, p: -P.p }, { ...P, p: 4 * P.p }, { ...P, ax: P.ax === 'v' ? 'h' : 'v' }, { ...P, h: -P.h, k: -P.k }, { ...P, h: -P.h, k: -P.k, p: -P.p }].map(T);
+  const ok = (v) => [onePointOk(v[0], V), onePointOk(v[1], F), lineOk(v[2], parDirLine(P))];
+  return {
+    topic: 'Vertex, focus, and directrix', stem: `Find the vertex, focus, and directrix of the parabola.   ${eq}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => T({ ...P, p: P.p * (i + 2) })),
+    fr: { fields: [{ kind: 'expr', keys: 'point', label: 'Vertex:' }, { kind: 'expr', keys: 'point', label: 'Focus:' }, { kind: 'expr', keys: 'func', label: 'Directrix:' }],
+      key: [`\\left(${fracL(V[0])},${fracL(V[1])}\\right)`, `\\left(${fracL(F[0])},${fracL(F[1])}\\right)`, parDirL(P)], display: correct,
+      check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 3 },
+    solution: `${gen ? `Complete the square on ${P.ax === 'v' ? 'x' : 'y'}: ${parT(P)}\n` : ''}Compare with ${P.ax === 'v' ? '(x − h)² = 4p(y − k)' : '(y − k)² = 4p(x − h)'}: vertex ${ptT(V)}, 4p = ${fracT(4 * P.p)}, so p = ${fracT(P.p)}.\nFocus ${ptT(F)} (${fracT(Math.abs(P.p))} unit${Math.abs(P.p) === 1 ? '' : 's'} ${P.ax === 'v' ? (P.p > 0 ? 'above' : 'below') : P.p > 0 ? 'right of' : 'left of'} the vertex); directrix ${parDirT(P)}.`,
+  };
+};
+TEMPLATES.a2Tangent = (r) => {
+  for (;;) {
+    const c = pick(r, [1, 2, 4, 8, 12, 16, -1, -2, -4, -8, -12, -16]), x1 = pick(r, [-6, -4, -2, 2, 4, 6, 8, -8]), y1 = (x1 * x1) / c;
+    if (!fracParts(y1) || fracParts(y1)[1] > 4 || Math.abs(y1) > 40) continue;
+    const ax = pick(r, ['v', 'h']), p = c / 4, P = { ax, h: 0, k: 0, p };
+    const m = x1 / (2 * p); // slope of the tangent for x² = 4py at (x1, y1); for y² = 4px at (y1, x1) the line is x = m·y − y1
+    const pt = ax === 'v' ? [x1, y1] : [y1, x1];
+    let line, lineTx, lineLx, xi, wrongLines;
+    if (ax === 'v') { line = [m, -1, -y1]; lineTx = lineText(m, -y1); lineLx = lineLatex(m, -y1); xi = y1 / m; wrongLines = [lineText(m, y1), lineText(x1 / p, -y1), lineText(2 * m, -y1)]; }
+    else { line = [1, -m, y1]; const s = 1 / m; lineTx = lineText(s, y1 * s); lineLx = lineLatex(s, y1 * s); xi = -y1; wrongLines = [lineText(s, -y1 * s), lineText(m, y1), lineText(s / 2, y1 * s / 2)]; }
+    const T = (L, X) => `${L};  x-intercept ${ptT([X, 0])}`, correct = T(lineTx, xi);
+    const wrongs = [T(wrongLines[0], -xi), T(wrongLines[1], ax === 'v' ? y1 * p / x1 : -y1), T(lineTx, -xi), T(wrongLines[2], xi)];
+    const ok = (v) => [lineOk(v[0], line), onePointOk(v[1], [xi, 0]) || numOk(v[1], xi)];
+    return {
+      topic: 'Tangent line to a parabola', stem: `Find an equation of the tangent line to the parabola at the given point, and find the x-intercept of the line.   ${parT(P)},   ${ptT(pt)}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => T(lineText(m + i + 1, -y1), xi + i + 1)),
+      fr: { fields: [{ kind: 'expr', keys: 'func', label: 'Tangent line:' }, { kind: 'expr', keys: 'point', label: 'x-intercept:' }], key: [lineLx, `\\left(${fracL(xi)},0\\right)`], display: correct,
+        check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+      solution: ax === 'v'
+        ? `For x² = 4py, 4p = ${fracT(c)}, so p = ${fracT(p)} and the focus is ${ptT([0, p])}. The tangent line meets the y-axis at (0, −y₁) = ${ptT([0, -y1])} (reflective property: the focus is equally far from (0, −y₁) and the point of tangency).\nSlope = (change in y)/(change in x) = (${fracT(2 * y1)})/(${fmt(x1)}) = ${fracT(m)}, so ${lineTx}.\nSet y = 0: x = ${fracT(xi)}, so the x-intercept is ${ptT([xi, 0])}.`
+        : `For y² = 4px, 4p = ${fracT(c)}, so p = ${fracT(p)} and the focus is ${ptT([p, 0])}. The tangent line meets the x-axis at (−x₁, 0) = ${ptT([-y1, 0])} (reflective property: the focus is equally far from (−x₁, 0) and the point of tangency).\nSlope = (change in y)/(change in x) = (${fmt(x1)})/(${fracT(2 * y1)}) = ${fracT(1 / m)}, so ${lineTx}.\nThe x-intercept is ${ptT([xi, 0])}.`,
+    };
+  }
+};
+TEMPLATES.a2Apply = (r) => {
+  if (r() < 0.5) {
+    const [what, unit, Ws, Ds] = pick(r, [['satellite dish', 'feet', [4, 6, 8, 10, 12], [1, 2, 3, 0.5]], ['flashlight reflector', 'inches', [3, 4, 5, 6], [1, 2, 1.5, 0.75]], ['headlight reflector', 'inches', [6, 8, 10, 12], [2, 3, 4, 1.5]]]);
+    const W = pick(r, Ws), D = pick(r, Ds), p = (W / 2) ** 2 / (4 * D);
+    const exact = fracParts(p) && fracParts(p)[1] <= 16, val = exact ? fracT(p) : rT(p, 3), correct = `${exact ? '' : '≈ '}${val} ${unit} from the vertex`;
+    const wrongs = [(W / 2) ** 2 / D, W ** 2 / (4 * D), (W / 2) / (4 * D), (W / 2) ** 2 / (2 * D)].map((w) => `${fracParts(w) && fracParts(w)[1] <= 16 ? fracT(w) : '≈ ' + rT(w, 3)} ${unit} from the vertex`);
+    return {
+      topic: 'Parabola applications', stem: `A ${what} has a parabolic cross section. It is ${fmt(W)} ${unit} across and ${fmt(D)} ${unit} deep. The ${what === 'satellite dish' ? 'receiver' : 'bulb'} should be placed at the focus. How far from the vertex is the focus?`,
+      ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => `${fracT(p + i + 1)} ${unit} from the vertex`),
+      frStem: `A ${what} has a parabolic cross section. It is ${fmt(W)} ${unit} across and ${fmt(D)} ${unit} deep. The ${what === 'satellite dish' ? 'receiver' : 'bulb'} should be placed at the focus. How far from the vertex is the focus? (Exact, or round to three decimal places.)`,
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Distance:', suffix: unit }], key: [fracL(p)], display: correct, check: (v) => exact3Ok(String(v[0]).replace(/\\text\{[^}]*\}|feet|inches|ft|in/g, ''), p) },
+      solution: `Put the vertex at the origin with the parabola opening upward: x² = 4py. The rim point (${fmt(W / 2)}, ${fmt(D)}) is on the parabola: ${fmt((W / 2) ** 2)} = 4p(${fmt(D)}), so p = ${fmt((W / 2) ** 2)}/${fmt(4 * D)} = ${val}. The focus is ${val} ${unit} from the vertex.`,
+    };
+  }
+  const L = pick(r, [400, 600, 800, 1000, 1200, 500]), H = pick(r, [40, 50, 60, 80, 100, 125]);
+  const P = { ax: 'v', h: 0, k: 0, p: (L / 2) ** 2 / (4 * H) };
+  return {
+    topic: 'Parabola applications', stem: `Each cable of a suspension bridge is suspended (in the shape of a parabola) between two towers that are ${L} feet apart. The top of each tower is ${H} feet above the roadway, and the cables touch the roadway midway between the towers. Using the point where the cable touches the road as the origin, find an equation for the parabolic shape of each cable.`,
+    ...parChoices(r, P, [{ ...P, p: L * L / (4 * H) / 4 }, { ...P, p: (L / 2) ** 2 / H / 4 / 2 }]), fr: parFR(P),
+    solution: `The vertex is the origin and the parabola opens upward: x² = 4py. The top of a tower is the point (${L / 2}, ${H}): ${(L / 2) ** 2} = 4p(${H}), so 4p = ${fracT(4 * P.p)}.\n${parT(P)}`,
+  };
+};
+
+/* ==== CHAPTER 6 END ==== */
 /* ---------- 2.1 Using Fundamental Identities ---------- */
 // Expressions are written in a small plain notation with X for the variable, e.g. 'sin^2 X/(1 + cos X)'.
 // The same parser reads a student's answer (LaTeX from the math editor, or plain text) so answers are graded
@@ -8574,6 +8960,19 @@ const QUESTION_TYPES = [
   { id: 'e5Double', subject: 'precalc',  section: '5.5 Exponential and Logarithmic Models', label: 'Time to double or triple', desc: 'Annually, monthly, daily, continuously (#13–15)' },
   { id: 'e5Fit', subject: 'precalc',  section: '5.5 Exponential and Logarithmic Models', label: 'Finding an exponential model', desc: 'Through two points (#19–22)' },
   { id: 'e5Model', subject: 'precalc',  section: '5.5 Exponential and Logarithmic Models', label: 'Growth model word problems', desc: '(#17–18)' },
+  { id: 'a1Slope', subject: 'precalc',  section: '6.1 Lines', label: 'Slope from inclination', desc: '(#5–16)' },
+  { id: 'a1InclSlope', subject: 'precalc',  section: '6.1 Lines', label: 'Inclination from slope', desc: 'Radians and degrees (#17–24)' },
+  { id: 'a1InclPoints', subject: 'precalc',  section: '6.1 Lines', label: 'Inclination through two points', desc: '(#25–34)' },
+  { id: 'a1InclEq', subject: 'precalc',  section: '6.1 Lines', label: 'Inclination from an equation', desc: '(#35–44)' },
+  { id: 'a1AngleLines', subject: 'precalc',  section: '6.1 Lines', label: 'Angle between two lines', desc: '(#45–54)' },
+  { id: 'a1DistPt', subject: 'precalc',  section: '6.1 Lines', label: 'Distance from a point to a line', desc: '|Ax₁ + By₁ + C|/√(A² + B²)' },
+  { id: 'a1DistPar', subject: 'precalc',  section: '6.1 Lines', label: 'Distance between parallel lines', desc: '' },
+  { id: 'a2Match', subject: 'precalc',  section: '6.2 Introduction to Conics: Parabolas', label: 'Matching parabolas', desc: '(#9–12)' },
+  { id: 'a2Origin', subject: 'precalc',  section: '6.2 Introduction to Conics: Parabolas', label: 'Vertex at the origin', desc: 'Focus, directrix, or a point (#13–26)' },
+  { id: 'a2Std', subject: 'precalc',  section: '6.2 Introduction to Conics: Parabolas', label: 'Standard equation of a parabola', desc: 'Vertex, focus, directrix, point (#27–36)' },
+  { id: 'a2VFD', subject: 'precalc',  section: '6.2 Introduction to Conics: Parabolas', label: 'Vertex, focus, and directrix', desc: 'From standard or general form' },
+  { id: 'a2Tangent', subject: 'precalc',  section: '6.2 Introduction to Conics: Parabolas', label: 'Tangent line to a parabola', desc: 'And its x-intercept' },
+  { id: 'a2Apply', subject: 'precalc',  section: '6.2 Introduction to Conics: Parabolas', label: 'Parabola applications', desc: 'Satellite dish, reflector, suspension bridge' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
@@ -9414,32 +9813,44 @@ function builder() {
   const list = el('div', { class: 'card' });
   const totalEl = el('strong', {}, '0');
   // each section folds up; sections with questions chosen start open
+  // chapters fold up too: each chapter holds its sections
   const openSaved = store.get('builder:open') || {}, secs = {};
+  const CH_TITLES = { precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set('builder:open', openSaved); };
+  const foldBox = (key, label, big) => {
+    const badge = el('span', { class: 'small', style: 'margin-left:auto;font-weight:600;color:var(--accent, #1f5fa8)' });
+    const arrow = el('span', { style: 'display:inline-block;width:14px;transition:transform .15s' }, '▸');
+    const sum = el('summary', { style: `display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 4px;font-size:${big ? 17 : 16}px;font-weight:${big ? 700 : 600};list-style:none` }, arrow, el('span', {}, label), badge);
+    const body = el('div', big ? { style: 'padding-left:22px' } : {});
+    const box = el('details', { style: `border-top:${big ? '2px solid var(--line)' : '1px solid var(--line)'}` }, sum, body);
+    box.addEventListener('toggle', () => { arrow.style.transform = box.open ? 'rotate(90deg)' : ''; openSaved[key] = box.open; store.set('builder:open', openSaved); });
+    secs[key] = { ids: [], badge, box };
+    return { box, body };
+  };
   list.append(el('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-bottom:6px' },
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px;font-size:14px', onclick: () => setAll(true) }, 'Expand all'),
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px;font-size:14px', onclick: () => setAll(false) }, 'Collapse all')));
-  let section = null, secBody = null, subject = null;
+  let section = null, secBody = null, subject = null, chapter = null, chKey = null, chBody = null;
   QUESTION_TYPES.forEach((t) => {
+    const ch = t.section.split(/[. ]/)[0];
     if (t.subject !== subject) {
-      subject = t.subject;
+      subject = t.subject; chapter = null;
       list.append(el('h2', { style: `margin:${list.querySelector('details') ? '26px' : '6px'} 0 4px;font-size:20px;padding-bottom:6px;border-bottom:2px solid var(--ink, #1d1d1b)` }, SUBJECTS[subject] || subject));
+    }
+    if (ch !== chapter) {
+      chapter = ch; chKey = `chapter:${subject}:${ch}`;
+      const name = (CH_TITLES[subject] || {})[ch];
+      const F = foldBox(chKey, `Chapter ${ch}${name ? `: ${name}` : ''}`, true);
+      chBody = F.body; list.append(F.box);
     }
     if (t.section !== section) {
       section = t.section;
-      const sec = section, badge = el('span', { class: 'small', style: 'margin-left:auto;font-weight:600;color:var(--accent, #1f5fa8)' });
-      const sum = el('summary', { style: 'display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 4px;font-size:16px;font-weight:600;list-style:none' },
-        el('span', { class: 'secarrow', style: 'display:inline-block;width:14px;transition:transform .15s' }, '▸'), el('span', {}, sec), badge);
-      secBody = el('div', {});
-      const box = el('details', { style: 'border-top:1px solid var(--line)' }, sum, secBody);
-      secs[sec] = { ids: [], badge, box };
-      const arrow = sum.querySelector('.secarrow');
-      box.addEventListener('toggle', () => { arrow.style.transform = box.open ? 'rotate(90deg)' : ''; openSaved[sec] = box.open; store.set('builder:open', openSaved); });
-      list.append(box);
+      const F = foldBox(section, section, false);
+      secBody = F.body; chBody.append(F.box);
     }
-    secs[section].ids.push(t.id);
+    secs[section].ids.push(t.id); secs[chKey].ids.push(t.id);
     const num = el('input', { type: 'number', min: '0', max: '20', value: String(counts[t.id] || 0), style: 'width:70px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px', 'aria-label': `How many ${t.label}` });
     const prevBox = el('div', { class: 'hidden' });
     let seed = 1;
