@@ -203,7 +203,7 @@ const SETS = {
   'precalc-trig':  { subject: 'precalc',  title: 'Graphs of Sine and Cosine', items: [['trigGraph', 6]] },
   'precalc-2-1':   { subject: 'precalc',  title: '2.1 Using Fundamental Identities', items: [['trigIdentityFill', 3], ['trigEvaluate', 3], ['trigSimplify', 4], ['trigFactor', 2], ['trigAddSub', 2]] },
   'precalc-2-2':   { subject: 'precalc',  title: '2.2 Verifying Trigonometric Identities', items: [['trigIsIdentity', 2], ['trigVerifyReason', 3], ['trigVerifyStep', 4], ['trigSinCos', 3]] },
-  'precalc-2-2-prove': { subject: 'precalc', title: '2.2 Proving Identities (AI graded)', items: [['trigProve', 4]] },
+  'precalc-2-2-prove': { subject: 'precalc', title: '2.2 Proving Identities (AI graded)', items: [['trigWhichProof', 2], ['trigProve', 4]] },
   'precalc-2-3':   { subject: 'precalc',  title: '2.3 Solving Trigonometric Equations', items: [['trigCheckSolution', 2], ['trigSolveBasic', 3], ['trigSolveFactor', 3], ['trigSolveInterval', 3], ['trigSolveMultiple', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
@@ -1110,6 +1110,65 @@ TEMPLATES.trigSinCos = (r) => {
 // 2) On Submit (or Check), the proof is sent to the teacher's Apps Script, which asks Claude to grade the reasoning.
 //    Only the math lines are sent — no names — and they are rebuilt from the parsed math, so typed text can't reach the AI.
 // If AI grading isn't set up or doesn't answer, the step checker's score is used and the teacher can review the work Doc.
+// "Which proof is correct?" — one valid proof and three with a single realistic mistake each
+function proofMistakes(s) { // [wrong expression, what went wrong]
+  const out = [];
+  [...s.matchAll(/ ([+-]) /g)].forEach((m) => out.push([s.slice(0, m.index) + (m[1] === '+' ? ' - ' : ' + ') + s.slice(m.index + 3), 'a sign error']));
+  if (/^-/.test(s)) out.push([s.slice(1), 'a dropped negative sign']);
+  [...s.matchAll(/sin|cos|tan|csc|sec|cot/g)].forEach((m) => {
+    out.push([s.slice(0, m.index) + RECIP[m[0]] + s.slice(m.index + 3), `mixing up ${m[0]} with its reciprocal ${RECIP[m[0]]}`]);
+    out.push([s.slice(0, m.index) + COFN[m[0]] + s.slice(m.index + 3), `writing ${COFN[m[0]]} where ${m[0]} belongs`]);
+  });
+  [...s.matchAll(/\^2/g)].forEach((m) => out.push([s.slice(0, m.index) + s.slice(m.index + 2), 'a dropped square']));
+  [...s.matchAll(/(sin|cos|tan|csc|sec|cot) X(?!\^)/g)].forEach((m) => out.push([s.slice(0, m.index) + m[1] + '^2 X' + s.slice(m.index + m[0].length), 'an extra square']));
+  return out;
+}
+TEMPLATES.trigWhichProof = (r) => {
+  for (let t = 0; t < 500; t++) {
+    const [lhs, rhs, steps] = pick(r, TRIG_VERIFY.filter((x) => x[2].length >= 2)), v = pick(r, TRIG_VARS);
+    const L = parseTrig(trigVar(lhs, v));
+    const lines = [lhs, ...steps.map(([e]) => e)];
+    const fmtProof = (ls) => ls.map((e, k) => (k ? '= ' : '') + prettyTrig(e, v)).join('\n');
+    // a wrong version changes one middle line and keeps the rest
+    const wrongs = [];
+    for (const k of shuffle(r, lines.map((_, k) => k).filter((k) => k > 0 && k < lines.length - 1))) {
+      for (const [bad, why] of shuffle(r, proofMistakes(lines[k]))) {
+        const p = parseTrig(trigVar(bad, v));
+        if (!p || (trigEquiv(p, L) && trigEquiv(L, p))) continue;
+        const ls = lines.slice(); ls[k] = bad;
+        const text = fmtProof(ls);
+        if (wrongs.some((w) => w.text === text)) continue;
+        wrongs.push({ text, k, why, bad });
+        break;
+      }
+      if (wrongs.length >= 3) break;
+    }
+    // proofs with only one middle line: allow a second mistake in the same line
+    for (let tries = 0; wrongs.length < 3 && tries < 40; tries++) {
+      const k = ri(r, 1, lines.length - 2), [bad, why] = pick(r, proofMistakes(lines[k]).concat([['', '']])); if (!bad) continue;
+      const p = parseTrig(trigVar(bad, v)); if (!p || (trigEquiv(p, L) && trigEquiv(L, p))) continue;
+      const ls = lines.slice(); ls[k] = bad; const text = fmtProof(ls);
+      if (!wrongs.some((w) => w.text === text)) wrongs.push({ text, k, why, bad });
+    }
+    if (wrongs.length < 3) continue;
+    const correct = fmtProof(lines), ident = `${prettyTrig(lhs, v)} = ${prettyTrig(rhs, v)}`;
+    const mc = buildChoices(r, correct, wrongs.map((w) => w.text), (i) => String(i));
+    const one = pick(r, wrongs), lineOpts = lines.map((_, k) => `Line ${k + 1}`).slice(1, -1);
+    const shown = one.text.split('\n').map((l, k) => `Line ${k + 1}:   ${l.replace(/^= /, '')}`).join('\n');
+    const explain = (w) => `Line ${w.k + 1} (${prettyTrig(w.bad, v)}) is wrong: ${w.why}. It should be ${prettyTrig(lines[w.k], v)}.`;
+    const letterOf = (w) => LETTERS[mc.choices.indexOf(w.text)];
+    return {
+      topic: 'Verifying identities',
+      stem: `Which of the following is a correct proof of the identity   ${ident} ?`,
+      ...mc,
+      frStem: `This proof of   ${ident}   has exactly one mistake.\n\n${shown}\n\nWhich line is wrong?`,
+      fr: FR.select('The mistake is in', lineOpts, `Line ${one.k + 1}`),
+      solution: `Proof ${LETTERS[mc.answer]} is correct:\n${chainLines(lhs, rhs, steps, v, { note: steps.map(([, w]) => `(${STEP_NOTE[w]})`) }).split('\n').slice(2).join('\n')}\n\n` +
+        wrongs.slice().sort((a, b) => letterOf(a).localeCompare(letterOf(b))).map((w) => `Proof ${letterOf(w)}: ${explain(w)}`).join('\n'),
+      _frSolution: `${explain(one)}\n\nThe correct proof:\n${chainLines(lhs, rhs, steps, v, { note: steps.map(([, w]) => `(${STEP_NOTE[w]})`) }).split('\n').slice(2).join('\n')}`,
+    };
+  }
+};
 TEMPLATES.trigProve = (r) => {
   const [lhs, rhs, steps] = pick(r, TRIG_VERIFY), v = pick(r, TRIG_VARS);
   const model = [lhs, ...steps.map(([e]) => e)];
@@ -2403,7 +2462,8 @@ const QUESTION_TYPES = [
   { id: 'trigVerifyReason',   subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Name the identity used', desc: 'A worked verification: which identity justifies the marked step (#5–14)' },
   { id: 'trigVerifyStep',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Fill in the missing step', desc: 'A worked verification with one step blank (#5–32)' },
   { id: 'trigSinCos',         subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Convert to sines and cosines', desc: 'Rewrite with only sin and cos (#27–32)' },
-  { id: 'trigProve',          subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Prove the identity (AI graded)', desc: 'Students write the whole proof line by line; each line is checked, then Claude grades it' },
+  { id: 'trigWhichProof',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Which proof is correct?', desc: 'MC: pick the valid proof of four. Free response: find the line with the mistake' },
+  { id: 'trigProve',          subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', writtenOnly: true, label: 'Prove the identity (AI graded)', desc: 'Students write the whole proof line by line; each line is checked, then Claude grades it' },
   { id: 'trigCheckSolution', subject: 'precalc',  section: '2.3 Solving Trigonometric Equations', label: 'Is it a solution?', desc: 'Check whether an x-value solves the equation (#7–12)' },
   { id: 'trigSolveBasic', subject: 'precalc',  section: '2.3 Solving Trigonometric Equations', label: 'Solve (isolate the function)', desc: 'General solution, like x = π/6 + 2nπ (#13–20)' },
   { id: 'trigSolveFactor', subject: 'precalc',  section: '2.3 Solving Trigonometric Equations', label: 'Solve by factoring', desc: 'Factored, cubic, and quadratic-type equations (#21–30)' },
@@ -2434,7 +2494,7 @@ let CUSTOM_KEY = null;
 function applyMode(q, mode) {
   if (q.twoPart) { q.mode = 'fr'; q.fr = mode === 'fr' ? q.twoPart.fr : q.twoPart.mc; return q; } // Part A + Part B
   if (q.proofQ) { q.mode = 'fr'; return q; } // proofs are always written out
-  if (mode === 'fr' && q.fr) { q.mode = 'fr'; if (q.frStem) q.stem = q.frStem; }
+  if (mode === 'fr' && q.fr) { q.mode = 'fr'; if (q.frStem) q.stem = q.frStem; if (q._frSolution) q.solution = q._frSolution; }
   else q.mode = 'mc';
   return q;
 }
@@ -3249,7 +3309,8 @@ function builder() {
     fmtSel.value = formats[t.id] || 'mc';
     fmtSel.addEventListener('input', () => { formats[t.id] = fmtSel.value; update(); });
     list.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' },
-      num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc)), fmtSel, prevBtn), prevBox);
+      num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc)),
+      t.writtenOnly ? el('span', { class: 'small', style: 'padding:7px 8px' }, 'Written proof') : fmtSel, prevBtn), prevBox);
     prevBtn._fmt = fmtSel;
   });
   app.append(list);
