@@ -191,6 +191,9 @@ const CONFIG = {
 //   Pre-Calc 2.4: trigSumDiffExact (#9–28), trigSumDiffFormula (#29–42), trigSumDiffGiven (#43–54)
 //   Pre-Calc 2.5: trigMultiAngleSolve (#5–12, 43–46), trigDoubleRewrite (#13–18), trigDoubleValues (#19–22), trigPowerReduce (#25–32),
 //                 trigHalfExact (#33–38), trigHalfValues (#39–42), trigProdToSum (#47–50), trigSumToProd (#51–54)
+//   Pre-Calc 3.1: triSinesAAS (#5–22), triSinesSSA (#23–32), triAmbiguousB (#33–36), triAreaSAS (#37–44), triSinesWord (word problems, #45+)
+//   Pre-Calc 3.2: triCosSSS / triCosSAS (#5–24), triParallelogram (#25–30), triWhichLaw (#31–36), triHeron (#37–44), triCosWord (word problems, like #45)
+//   Pre-Calc 3.4: vecDot (#5–10), vecDotProps (#11–22), vecMagnitude (#23–28), vecAngle (#29–42), vecTriangle (#43–46), vecDotFromAngle (#47–50)
 //   other: dilation, composite, trigGraph
 const SUBJECTS = {
   geometry: 'Geometry',
@@ -213,6 +216,9 @@ const SETS = {
   'precalc-2-3-deg': { subject: 'precalc', title: '2.3 Solving Trig Equations (Degrees)', items: [['trigSolveDegInterval', 4], ['trigSolveDegGeneral', 4], ['trigSolveDegApprox', 3]] },
   'precalc-2-4':   { subject: 'precalc',  title: '2.4 Sum and Difference Formulas', items: [['trigSumDiffExact', 4], ['trigSumDiffFormula', 4], ['trigSumDiffGiven', 4]] },
   'precalc-2-5':   { subject: 'precalc',  title: '2.5 Multiple-Angle and Product-to-Sum Formulas', items: [['trigMultiAngleSolve', 3], ['trigDoubleRewrite', 2], ['trigDoubleValues', 2], ['trigPowerReduce', 2], ['trigHalfExact', 2], ['trigHalfValues', 2], ['trigProdToSum', 2], ['trigSumToProd', 2]] },
+  'precalc-3-1':   { subject: 'precalc',  title: '3.1 Law of Sines', items: [['triSinesAAS', 4], ['triSinesSSA', 4], ['triAmbiguousB', 2], ['triAreaSAS', 3], ['triSinesWord', 2]] },
+  'precalc-3-2':   { subject: 'precalc',  title: '3.2 Law of Cosines', items: [['triCosSSS', 3], ['triCosSAS', 3], ['triParallelogram', 2], ['triWhichLaw', 2], ['triHeron', 3], ['triCosWord', 2]] },
+  'precalc-3-4':   { subject: 'precalc',  title: '3.4 Vectors and Dot Products', items: [['vecDot', 2], ['vecDotProps', 3], ['vecMagnitude', 2], ['vecAngle', 3], ['vecTriangle', 1], ['vecDotFromAngle', 2]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -2438,6 +2444,678 @@ TEMPLATES.trigSumToProd = (r) => {
   }
 };
 
+/* ---------- 3.1 Law of Sines and 3.2 Law of Cosines ---------- */
+const D2R = Math.PI / 180;
+const sinD = (x) => Math.sin(x * D2R), cosD = (x) => Math.cos(x * D2R);
+const asinD = (x) => Math.asin(Math.max(-1, Math.min(1, x))) / D2R, acosD = (x) => Math.acos(Math.max(-1, Math.min(1, x))) / D2R;
+const f2 = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('-', MINUS);
+const f1 = (x) => (Math.round(x * 10) / 10).toFixed(1).replace('-', MINUS);
+const a2 = (x) => f2(x) + '°';
+const ANG_TOL = 0.06;
+const sideTol = (t) => Math.max(0.021, 0.002 * Math.abs(t));
+const nearV = (raw, t, tol) => { const n = parseNum(stripDeg(raw)); return isFinite(n) && Math.abs(n - t) <= tol; };
+// a given angle: whole degrees, tenths, or degrees and minutes (like the book)
+function angleGiv(r, lo, hi) {
+  const k = r(), d = ri(r, lo, hi - 1);
+  if (k < 0.65) return { v: d, t: `${d}°` };
+  if (k < 0.8) { const v = d + ri(r, 1, 9) / 10; return { v, t: `${fmt(v)}°` }; }
+  const m = pick(r, [10, 15, 20, 30, 35, 40, 45, 50]);
+  return { v: d + m / 60, t: `${d}°${m}′` };
+}
+const sideGiv = (r, lo = 3, hi = 60) => (r() < 0.7 ? ri(r, lo, hi) : ri(r, lo * 10, hi * 10) / 10);
+const NM = ['a', 'b', 'c'], AN = ['A', 'B', 'C'];
+// one item per unknown: { name, val, ang }
+const itemTxt = (it) => `${it.name} ≈ ${it.ang ? a2(it.val) : f2(it.val)}`;
+const itemsTxt = (items) => items.map(itemTxt).join(',  ');
+function triFR(items) {
+  const ok = (vv, i) => nearV(vv[i], items[i].val, items[i].ang ? ANG_TOL : sideTol(items[i].val));
+  return {
+    fields: items.map((it) => ({ kind: 'number', label: `${it.name} ≈`, suffix: it.ang ? '°' : '' })),
+    key: items.map((it) => f2(it.val).replace(MINUS, '-')),
+    display: itemsTxt(items),
+    check: (vv) => items.every((_, i) => ok(vv, i)),
+    score: (vv) => items.filter((_, i) => ok(vv, i)).length / items.length,
+  };
+}
+// MC from a correct list of items and a few wrong lists of the same shape
+function triMC(r, items, wrongLists) {
+  const correct = itemsTxt(items);
+  const close = (L) => L.every((it, k) => Math.abs(it.val - items[k].val) <= 3 * (items[k].ang ? ANG_TOL : sideTol(items[k].val)));
+  const cands = wrongLists.filter((L) => L.every((it) => isFinite(it.val) && it.val > 0.005 && (!it.ang || it.val < 179.5)) && !close(L)).map(itemsTxt);
+  const fb = (i) => itemsTxt(items.map((it, k) => ({ ...it, val: it.val * (k === i % items.length ? 1.15 + 0.1 * i : 1) })));
+  return buildChoices(r, correct, [...new Set(cands)].filter((c) => c !== correct), fb);
+}
+// triangle with A at the left, B at the right, C on top (like the book)
+function triDraw(T, lab) {
+  const P = [[0, 0], [T.c, 0], [T.b * cosD(T.A), T.b * sinD(T.A)]];
+  return (cv) => drawFigure(cv, { polys: [{ pts: P, names: ['A', 'B', 'C'], slab: [lab.c || 'c', lab.a || 'a', lab.b || 'b'], alab: [lab.A || '', lab.B || '', lab.C || ''], arcs: [lab.A ? 1 : 0, lab.B ? 1 : 0, lab.C ? 1 : 0] }] });
+}
+const okTri = (T) => [T.a, T.b, T.c].every((s) => isFinite(s) && s > 0.05 && s < 5000) && [T.A, T.B, T.C].every((x) => x > 0.9 && x < 179);
+const ROUND2 = 'Round your answers to two decimal places.';
+
+// 3.1 #5–22: two angles and a side
+TEMPLATES.triSinesAAS = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const gi = pick(r, [[0, 1], [0, 2], [1, 2]]), g1 = angleGiv(r, 4, 140), g2 = angleGiv(r, 4, 140);
+    const third = 180 - g1.v - g2.v; if (third < 8) continue;
+    const ang = [0, 0, 0], gt = ['', '', '']; ang[gi[0]] = g1.v; ang[gi[1]] = g2.v; gt[gi[0]] = g1.t; gt[gi[1]] = g2.t;
+    const ui = [0, 1, 2].find((i) => !gi.includes(i)); ang[ui] = third;
+    const si = ri(r, 0, 2), sv = sideGiv(r, 2, 60), k = sv / sinD(ang[si]);
+    const T = { A: ang[0], B: ang[1], C: ang[2], a: k * sinD(ang[0]), b: k * sinD(ang[1]), c: k * sinD(ang[2]) };
+    if (!okTri(T) || Math.min(T.a, T.b, T.c) < 1.5) continue;
+    const sides = [0, 1, 2].filter((i) => i !== si);
+    const items = [{ name: AN[ui], val: ang[ui], ang: true }, ...sides.map((i) => ({ name: NM[i], val: k * sinD(ang[i]) }))];
+    const given = `${AN[gi[0]]} = ${gt[gi[0]]},   ${AN[gi[1]]} = ${gt[gi[1]]},   ${NM[si]} = ${fmt(sv)}`;
+    const swapped = [items[0], { ...items[1], val: items[2].val }, { ...items[2], val: items[1].val }];
+    const inverted = [items[0], ...sides.map((i) => ({ name: NM[i], val: (sv * sinD(ang[si])) / sinD(ang[i]) }))];
+    const otherK = sv / sinD(ang[(si + 1) % 3]);
+    const wrongPair = [items[0], ...sides.map((i) => ({ name: NM[i], val: otherK * sinD(ang[i]) }))];
+    const cosWay = [items[0], ...sides.map((i) => ({ name: NM[i], val: Math.abs((sv * cosD(ang[i])) / cosD(ang[si])) }))];
+    const lab = { [AN[gi[0]]]: gt[gi[0]].replace(' ', ''), [AN[gi[1]]]: gt[gi[1]].replace(' ', ''), [NM[si]]: `${NM[si]} = ${fmt(sv)}` };
+    const intro = `Use the Law of Sines to solve the triangle. ${ROUND2}   ${given}`;
+    return {
+      topic: 'Law of Sines', stem: intro, ...triMC(r, items, [swapped, inverted, wrongPair, cosWay]),
+      frStem: intro, fr: triFR(items),
+      draw: r() < 0.45 ? triDraw(T, lab) : undefined,
+      solution: [`${AN[ui]} = 180° − ${g1.t} − ${g2.t} ≈ ${a2(ang[ui])}`,
+        `Law of Sines: ${NM[si]}/sin ${AN[si]} = ${fmt(sv)}/sin ${a2(ang[si])} ≈ ${f2(k)}`,
+        ...sides.map((i) => `${NM[i]} = ${fmt(sv)} · sin ${AN[i]} / sin ${AN[si]} ≈ ${f2(k * sinD(ang[i]))}`)].join('\n'),
+    };
+  }
+};
+
+// solutions of the SSA case: angle A, side a opposite it, side b
+function ssaSolve(A, a, b) {
+  const s = (b * sinD(A)) / a, out = [];
+  if (s > 1 + 1e-9) return out;
+  if (Math.abs(s - 1) < 1e-9) return [{ B: 90, C: 90 - A, c: a * sinD(90 - A) / sinD(A) }].filter((x) => x.C > 0);
+  const B1 = asinD(s);
+  for (const B of [B1, 180 - B1]) { const C = 180 - A - B; if (C > 1e-6 && !out.some((o) => Math.abs(o.B - B) < 1e-9)) out.push({ B, C, c: (a * sinD(C)) / sinD(A) }); }
+  return out;
+}
+// 3.1 #23–32: two sides and an angle across from one of them (0, 1, or 2 triangles)
+TEMPLATES.triSinesSSA = (r) => {
+  for (let t = 0; t < 400; t++) {
+    const obtuse = r() < 0.3, want = obtuse ? (r() < 0.65 ? 1 : 0) : pick(r, [2, 2, 2, 2, 1, 1, 1, 0, 0, 'right']);
+    let Ag = obtuse ? angleGiv(r, 95, 140) : angleGiv(r, 20, 80), b, a;
+    if (want === 'right') { Ag = { v: 30, t: '30°' }; a = ri(r, 3, 30); b = 2 * a; }
+    else {
+      b = sideGiv(r, 4, 60); const h = b * sinD(Ag.v), round = (x) => (r() < 0.5 ? Math.round(x) : Math.round(x * 10) / 10);
+      if (obtuse) a = want === 1 ? round(b * (1.1 + 0.8 * r())) : (r() < 0.25 ? b : round(b * (0.4 + 0.5 * r())));
+      else if (want === 2) a = round(h + (b - h) * (0.15 + 0.7 * r()));
+      else if (want === 1) a = r() < 0.2 ? b : round(b * (1.1 + 0.8 * r()));
+      else a = round(h * (0.4 + 0.5 * r()));
+    }
+    if (!(a > 0)) continue;
+    const A = Ag.v, s = (b * sinD(A)) / a;
+    if (want !== 'right' && Math.abs(s - 1) < 0.02) continue;
+    const sols = ssaSolve(A, a, b), n = sols.length;
+    if (n === 2 && 180 - A - sols[1].B < 1) continue;
+    if (sols.some((o) => o.c < 0.05)) continue;
+    const given = `A = ${Ag.t},   a = ${fmt(a)},   b = ${fmt(b)}`;
+    const bText = (L) => (L.length === 0 ? 'No triangle' : L.length === 1 ? `One triangle: B ≈ ${a2(L[0])}` : `Two triangles: B ≈ ${a2(L[0])} or B ≈ ${a2(L[1])}`);
+    const correct = bText(sols.map((o) => o.B));
+    const B1 = s <= 1 ? asinD(s) : asinD(Math.min(1, (a * sinD(A)) / b));
+    const cands = [bText([]), bText([B1]), bText([180 - B1]), bText([B1, 180 - B1]), bText([asinD(Math.min(1, (a * sinD(A)) / b))])];
+    const intro = `Use the Law of Sines to solve the triangle, if possible. If two triangles are possible, find both. ${ROUND2}   ${given}`;
+    const lists = ['B', 'C', 'c'].map((key) => sols.map((o) => o[key]));
+    const listOk = (raw, L, ang) => {
+      const parts = splitAnswers(raw);
+      if (!L.length) return parts === 'none' || !parts.length;
+      if (parts === 'none' || parts.length !== L.length) return false;
+      return parts.every((p, i) => nearV(p, L[i], ang ? ANG_TOL : sideTol(L[i])));
+    };
+    const ok = (vv) => [vv[0] === String(n), listOk(vv[1], lists[0], true), listOk(vv[2], lists[1], true), listOk(vv[3], lists[2], false)];
+    const tri = (o) => `B ≈ ${a2(o.B)}, C ≈ ${a2(o.C)}, c ≈ ${f2(o.c)}`;
+    const why = [`sin B = b sin A / a = ${fmt(b)} sin ${Ag.t} / ${fmt(a)} ≈ ${s.toFixed(4)}`];
+    if (s > 1 + 1e-9) why.push('sin B cannot be more than 1, so there is no triangle.');
+    else if (Math.abs(s - 1) < 1e-9) why.push('sin B = 1, so B = 90°. There is one (right) triangle.');
+    else {
+      why.push(`B ≈ ${a2(B1)} or B ≈ 180° − ${a2(B1)} = ${a2(180 - B1)}`);
+      if (180 - A - B1 <= 1e-6) why.push('Neither angle works, because A + B would be at least 180°, so there is no triangle.');
+      else if (180 - A - (180 - B1) <= 1e-6) why.push(`B ≈ ${a2(180 - B1)} does not work, because A + B would be at least 180°. So there is only one triangle.`);
+      else why.push('Both angles work, so there are two triangles.');
+    }
+    sols.forEach((o, i) => why.push(`${n === 2 ? `Triangle ${i + 1}: ` : ''}${tri(o)}  (C = 180° − A − B, c = a sin C / sin A)`));
+    return {
+      topic: 'Law of Sines: the ambiguous case', stem: `${intro}\nHow many triangles are possible, and what is B?`,
+      ...buildChoices(r, correct, [...new Set(cands)].filter((c) => c !== correct), (i) => bText([30 + 7 * i])),
+      frStem: `${intro}\n(Choose how many triangles. For two triangles, list both values in each box separated by a comma, smaller B first. For no triangle, leave the boxes blank.)`,
+      fr: { fields: [{ kind: 'select', label: 'Number of triangles:', options: ['0', '1', '2'] }, { kind: 'number', label: 'B ≈' }, { kind: 'number', label: 'C ≈' }, { kind: 'number', label: 'c ≈' }],
+        key: [String(n), ...lists.map((L, k) => L.map((x) => f2(x)).join(', ') || '')],
+        display: n ? `${n} triangle${n > 1 ? 's' : ''}: ${sols.map(tri).join(';  ')}` : 'No triangle',
+        check: (vv) => ok(vv).every(Boolean), score: (vv) => ok(vv).filter(Boolean).length / 4 },
+      solution: why.join('\n'),
+    };
+  }
+};
+
+// 3.1 #33–36: values of b that give two, one, or no triangles
+TEMPLATES.triAmbiguousB = (r) => {
+  for (let t = 0; t < 100; t++) {
+    const obtuse = r() < 0.3, Ag = obtuse ? { v: pick(r, [100, 105, 110, 120, 125, 132, 135, 140]) } : { v: pick(r, [20, 25, 30, 36, 40, 45, 50, 55, 60, 65, 70]) };
+    Ag.t = `${Ag.v}°`;
+    const a = ri(r, 4, 40), A = Ag.v, L = a / sinD(A), Lt = f2(L);
+    const part = obtuse ? pick(r, ['one', 'none', 'two']) : pick(r, ['two', 'one', 'none']);
+    const ans = obtuse ? { one: `b < ${a}`, two: 'Not possible', none: `b ≥ ${a}` } : { one: `b ≤ ${a} or b ≈ ${Lt}`, two: `${a} < b < ${Lt}`, none: `b > ${Lt}` };
+    const wrongL = f2(a * sinD(A));
+    const extra = obtuse ? [`b > ${Lt}`, `b ≤ ${a}`, `${a} < b < ${Lt}`] : [`${wrongL} < b < ${a}`, `b > ${wrongL}`, `b < ${a}`, `${a} < b < ${f2(a / cosD(A))}`];
+    const correct = ans[part];
+    const phr = { one: 'one solution', two: 'two solutions', none: 'no solution' }[part];
+    const intro = `Find the values of b such that the triangle has ${phr}.   A = ${Ag.t},   a = ${a}`;
+    let fr;
+    if (obtuse && part === 'two') fr = FR.select('Two triangles are', ['possible', 'not possible'], 'not possible');
+    else {
+      const flds = obtuse ? (part === 'one' ? [{ pre: 'b <', v: a }] : [{ pre: 'b ≥', v: a }])
+        : part === 'two' ? [{ v: a, suf: '< b <' }, { v: L }] : part === 'none' ? [{ pre: 'b >', v: L }] : [{ pre: 'b ≤', v: a, suf: 'or b =' }, { v: L }];
+      const ok = (vv, i) => nearV(vv[i], flds[i].v, 0.011);
+      fr = { fields: flds.map((f) => ({ kind: 'number', label: f.pre || '', suffix: f.suf ? ' ' + f.suf : '' })), key: flds.map((f) => f2(f.v)),
+        display: correct, check: (vv) => flds.every((_, i) => ok(vv, i)), score: (vv) => flds.filter((_, i) => ok(vv, i)).length / flds.length };
+    }
+    const why = obtuse
+      ? `A is obtuse, so side a must be the longest side. If b < ${a} there is one triangle; if b ≥ ${a} there is none. Two triangles are not possible.`
+      : `The height from C is h = b sin A. The triangle has two solutions when h < a < b, that is, ${a} < b < a/sin A = ${a}/sin ${A}° ≈ ${Lt}.\n` +
+        `One solution when b ≤ a = ${a} (one triangle) or when a = h exactly, b = a/sin A ≈ ${Lt} (a right triangle).\nNo solution when a < h, that is, b > ${Lt}.`;
+    return {
+      topic: 'Law of Sines: how many triangles', stem: intro,
+      ...buildChoices(r, correct, [...new Set([...Object.values(ans), ...extra])].filter((c) => c !== correct), (i) => `b > ${a + i + 1}`),
+      frStem: `${intro}\n(Round to two decimal places.)`, fr, solution: why,
+    };
+  }
+};
+
+// 3.1 #37–44: area from two sides and the included angle (or from AAS)
+TEMPLATES.triAreaSAS = (r) => {
+  for (let t = 0; t < 100; t++) {
+    let given, area, wrong, why;
+    if (r() < 0.75) {
+      const vi = ri(r, 0, 2), Ag = angleGiv(r, 15, 165), s1 = sideGiv(r, 3, 60), s2 = sideGiv(r, 3, 60);
+      const others = [0, 1, 2].filter((i) => i !== vi);
+      given = `${AN[vi]} = ${Ag.t},   ${NM[others[0]]} = ${fmt(s1)},   ${NM[others[1]]} = ${fmt(s2)}`;
+      area = 0.5 * s1 * s2 * sinD(Ag.v);
+      wrong = [s1 * s2 * sinD(Ag.v), Math.abs(0.5 * s1 * s2 * cosD(Ag.v)), 0.5 * s1 * s2, 0.5 * (s1 + s2) * sinD(Ag.v) * Math.max(s1, s2) / 2];
+      why = `Area = ½ ${NM[others[0]]}${NM[others[1]]} sin ${AN[vi]} = ½(${fmt(s1)})(${fmt(s2)}) sin ${Ag.t} ≈ ${f1(area)}`;
+    } else {
+      const A = angleGiv(r, 20, 100), B = angleGiv(r, 20, 100), C = 180 - A.v - B.v; if (C < 10) continue;
+      const a = sideGiv(r, 4, 60), b = (a * sinD(B.v)) / sinD(A.v);
+      given = `A = ${A.t},   B = ${B.t},   a = ${fmt(a)}`;
+      area = 0.5 * a * b * sinD(C);
+      wrong = [0.5 * a * a * sinD(C), 0.5 * a * b * sinD(A.v), a * b * sinD(C), 0.5 * a * b];
+      why = `C = 180° − A − B ≈ ${a2(C)}.  b = a sin B / sin A ≈ ${f2(b)}.\nArea = ½ ab sin C ≈ ½(${fmt(a)})(${f2(b)}) sin ${a2(C)} ≈ ${f1(area)}`;
+    }
+    if (area < 0.5 || area > 20000) continue;
+    const correct = f1(area);
+    const intro = `Find the area of the triangle. Round your answer to one decimal place.   ${given}`;
+    return {
+      topic: 'Area of a triangle', stem: intro,
+      ...buildChoices(r, correct, [...new Set(wrong.filter((w) => isFinite(w) && w > 0 && Math.abs(w - area) > 3 * Math.max(0.06, 0.0005 * area)).map(f1))], (i) => f1(area * (1.2 + 0.15 * i))),
+      fr: { fields: [{ kind: 'number', label: 'Area ≈', suffix: ' square units' }], key: [correct], display: `${correct} square units`,
+        check: (vv) => nearV(vv[0], area, Math.max(0.06, 0.0005 * area)) },
+      solution: why,
+    };
+  }
+};
+
+/* 3.2 Law of Cosines */
+const lcAngle = (opp, s1, s2) => acosD((s1 * s1 + s2 * s2 - opp * opp) / (2 * s1 * s2));
+const lcSide = (s1, s2, ang) => Math.sqrt(s1 * s1 + s2 * s2 - 2 * s1 * s2 * cosD(ang));
+function randSSS(r) {
+  for (;;) {
+    const s = [sideGiv(r, 3, 60), sideGiv(r, 3, 60), sideGiv(r, 3, 60)];
+    const T = { a: s[0], b: s[1], c: s[2] };
+    T.A = lcAngle(T.a, T.b, T.c); T.B = lcAngle(T.b, T.a, T.c); T.C = 180 - T.A - T.B;
+    if (okTri(T) && Math.min(T.A, T.B, T.C) > 6) return T;
+  }
+}
+// 3.2 #5–24: three sides
+TEMPLATES.triCosSSS = (r) => {
+  const T = randSSS(r), ang = [T.A, T.B, T.C];
+  const items = AN.map((n, i) => ({ name: n, val: ang[i], ang: true }));
+  const big = ang.indexOf(Math.max(...ang));
+  const rot = items.map((it, i) => ({ ...it, val: ang[(i + 1) % 3] }));
+  const swp = items.map((it, i) => ({ ...it, val: ang[[1, 0, 2][i]] }));
+  const sup = items.map((it, i) => ({ ...it, val: i === big ? 180 - ang[i] : ang[i] }));
+  const sgn = items.map((it, i) => { const s = [T.a, T.b, T.c], o = s[i], p = s[(i + 1) % 3], q = s[(i + 2) % 3]; return { ...it, val: acosD((p * p + q * q - o * o) / (p * q)) }; });
+  const intro = `Use the Law of Cosines to solve the triangle. ${ROUND2}   a = ${fmt(T.a)},   b = ${fmt(T.b)},   c = ${fmt(T.c)}`;
+  return {
+    topic: 'Law of Cosines', stem: intro, ...triMC(r, items, [rot, swp, sup, sgn]), frStem: intro, fr: triFR(items),
+    draw: r() < 0.45 ? triDraw(T, { a: `a = ${fmt(T.a)}`, b: `b = ${fmt(T.b)}`, c: `c = ${fmt(T.c)}` }) : undefined,
+    solution: [`Find the largest angle first (across from the longest side), so you know if it is obtuse.`,
+      ...[0, 1, 2].map((i) => { const s = [T.a, T.b, T.c], p = (i + 1) % 3, q = (i + 2) % 3;
+        return `cos ${AN[i]} = (${NM[p]}² + ${NM[q]}² − ${NM[i]}²)/(2${NM[p]}${NM[q]}) = (${fmt(s[p])}² + ${fmt(s[q])}² − ${fmt(s[i])}²)/(2 · ${fmt(s[p])} · ${fmt(s[q])}) ≈ ${(Math.cos(ang[i] * D2R)).toFixed(4).replace('-', MINUS)}, so ${AN[i]} ≈ ${a2(ang[i])}`; }),
+      `Check: the angles add to 180°.`].join('\n'),
+  };
+};
+// 3.2 #9–24: two sides and the angle between them
+TEMPLATES.triCosSAS = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const vi = ri(r, 0, 2), Ag = angleGiv(r, 15, 160), p = (vi + 1) % 3, q = (vi + 2) % 3;
+    const s = [0, 0, 0]; s[p] = sideGiv(r, 3, 60); s[q] = sideGiv(r, 3, 60); s[vi] = lcSide(s[p], s[q], Ag.v);
+    const ang = [0, 0, 0]; ang[vi] = Ag.v; ang[p] = lcAngle(s[p], s[vi], s[q]); ang[q] = 180 - Ag.v - ang[p];
+    const T = { a: s[0], b: s[1], c: s[2], A: ang[0], B: ang[1], C: ang[2] };
+    if (!okTri(T) || Math.min(...ang) < 3) continue;
+    const others = [p, q].sort();
+    const items = [{ name: NM[vi], val: s[vi] }, ...others.map((i) => ({ name: AN[i], val: ang[i], ang: true }))];
+    const plus = Math.sqrt(s[p] * s[p] + s[q] * s[q] + 2 * s[p] * s[q] * cosD(Ag.v)), pyth = Math.hypot(s[p], s[q]);
+    const withSide = (x) => { const a1 = lcAngle(s[others[0]], x, s[3 - vi - others[0]]); return [{ name: NM[vi], val: x }, { ...items[1], val: a1 }, { ...items[2], val: 180 - Ag.v - a1 }]; };
+    const swp = [items[0], { ...items[1], val: items[2].val }, { ...items[2], val: items[1].val }];
+    const lab = { [AN[vi]]: Ag.t.replace(' ', ''), [NM[p]]: `${NM[p]} = ${fmt(s[p])}`, [NM[q]]: `${NM[q]} = ${fmt(s[q])}` };
+    const given = `${AN[vi]} = ${Ag.t},   ${NM[others[0]]} = ${fmt(s[others[0]])},   ${NM[others[1]]} = ${fmt(s[others[1]])}`;
+    const intro = `Use the Law of Cosines to solve the triangle. ${ROUND2}   ${given}`;
+    const sm = others.find((i) => s[i] <= s[3 - vi - i]) ?? others[0];
+    return {
+      topic: 'Law of Cosines', stem: intro, ...triMC(r, items, [withSide(plus), withSide(pyth), swp]), frStem: intro, fr: triFR(items),
+      draw: r() < 0.45 ? triDraw(T, lab) : undefined,
+      solution: [`${NM[vi]}² = ${NM[p]}² + ${NM[q]}² − 2${NM[p]}${NM[q]} cos ${AN[vi]} = ${fmt(s[p])}² + ${fmt(s[q])}² − 2(${fmt(s[p])})(${fmt(s[q])}) cos ${Ag.t} ≈ ${f2(s[vi] * s[vi])}, so ${NM[vi]} ≈ ${f2(s[vi])}`,
+        `Find the angle across from the shorter given side next (it must be acute): ${AN[sm]} ≈ ${a2(ang[sm])}`,
+        `${AN[3 - vi - sm]} = 180° − ${AN[vi]} − ${AN[sm]} ≈ ${a2(ang[3 - vi - sm])}`].join('\n'),
+    };
+  }
+};
+
+// 3.2 #25–30: parallelogram — sides a, b, angle θ between them, φ = 180° − θ, diagonal c across from θ, diagonal d
+TEMPLATES.triParallelogram = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const v = ri(r, 0, 3);
+    let a = ri(r, 4, 60), b = ri(r, 4, 60), th = pick(r, [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 100, 110, 120, 135, 150]), c, d;
+    const C0 = lcSide(a, b, th), D0 = lcSide(a, b, 180 - th);
+    let given, items;
+    if (v === 0) { c = C0; d = D0; given = { a, b, θ: th }; items = [['c', c], ['d', d], ['φ', 180 - th, 1]]; }
+    else if (v === 1) { c = Math.round(C0); th = lcAngle(c, a, b); d = lcSide(a, b, 180 - th); given = { a, b, c }; items = [['d', d], ['θ', th, 1], ['φ', 180 - th, 1]]; }
+    else if (v === 2) { d = Math.round(D0); th = 180 - lcAngle(d, a, b); c = lcSide(a, b, th); given = { a, b, d }; items = [['c', c], ['θ', th, 1], ['φ', 180 - th, 1]]; }
+    else { c = Math.round(C0); d = Math.round(D0); const b2 = (c * c + d * d) / 2 - a * a; if (b2 <= 0) continue; b = Math.sqrt(b2); th = lcAngle(c, a, b); given = { a, c, d }; items = [['b', b], ['θ', th, 1], ['φ', 180 - th, 1]]; }
+    if (!(th > 5 && th < 175) || !(c > 0.5) || !(d > 0.5) || !isFinite(b) || Math.abs(th - 90) < 3) continue;
+    items = items.map(([name, val, ang]) => ({ name, val, ang: !!ang }));
+    const gtxt = Object.entries(given).map(([k, x]) => `${k} = ${fmt(x)}${k === 'θ' ? '°' : ''}`).join(',   ');
+    const intro = `Find the missing values for the parallelogram. θ is the angle between sides a and b, φ is the other angle, c is the diagonal across from θ, and d is the other diagonal. ${ROUND2}   ${gtxt}`;
+    const swapCD = items.map((it) => (it.name === 'c' ? { ...it, val: d } : it.name === 'd' ? { ...it, val: c } : it));
+    const swapTP = items.map((it) => (it.name === 'θ' ? { ...it, val: 180 - th } : it.name === 'φ' ? { ...it, val: th } : it.name === 'c' ? { ...it, val: d } : it.name === 'd' ? { ...it, val: c } : it));
+    const noHalf = items.map((it) => (it.name === 'b' ? { ...it, val: Math.sqrt(c * c + d * d - a * a) } : it.ang ? { ...it, val: 180 - it.val } : it));
+    const tw = 1.0, P0 = [0, 0], P1 = [b * tw, 0], P3 = [a * cosD(th), a * sinD(th)], P2 = [P1[0] + P3[0], P3[1]];
+    const M = [(P1[0] + P3[0]) / 2, (P1[1] + P3[1]) / 2];
+    const draw = (cv) => drawFigure(cv, { polys: [
+      { pts: [P0, P1, P2, P3], slab: ['b', '', '', 'a'], alab: ['θ', 'φ', '', ''], arcs: [1, 1, 0, 0] },
+      { pts: [P1, M], slab: ['c'] }, { pts: [M, P3] }, { pts: [P0, M], slab: [''] }, { pts: [M, P2], slab: ['d'] }] });
+    const steps = [];
+    if (v === 0) steps.push(`c² = a² + b² − 2ab cos θ ⇒ c ≈ ${f2(c)}`, `d² = a² + b² − 2ab cos φ (φ = 180° − θ = ${fmt(180 - th)}°) ⇒ d ≈ ${f2(d)}`);
+    if (v === 1) steps.push(`cos θ = (a² + b² − c²)/(2ab) ⇒ θ ≈ ${a2(th)}`, `φ = 180° − θ ≈ ${a2(180 - th)}`, `d² = a² + b² − 2ab cos φ ⇒ d ≈ ${f2(d)}`);
+    if (v === 2) steps.push(`d is across from φ: cos φ = (a² + b² − d²)/(2ab) ⇒ φ ≈ ${a2(180 - th)}`, `θ = 180° − φ ≈ ${a2(th)}`, `c² = a² + b² − 2ab cos θ ⇒ c ≈ ${f2(c)}`);
+    if (v === 3) steps.push(`c² + d² = (a² + b² − 2ab cos θ) + (a² + b² + 2ab cos θ) = 2a² + 2b², so b² = (c² + d²)/2 − a² ⇒ b ≈ ${f2(b)}`, `cos θ = (a² + b² − c²)/(2ab) ⇒ θ ≈ ${a2(th)}`, `φ = 180° − θ ≈ ${a2(180 - th)}`);
+    return {
+      topic: 'Parallelogram', stem: intro, ...triMC(r, items, [swapCD, swapTP, noHalf]), frStem: intro, fr: triFR(items), draw, size: [560, 300],
+      solution: steps.join('\n'),
+    };
+  }
+};
+
+// 3.2 #31–36: which law, then the first missing piece
+TEMPLATES.triWhichLaw = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const kind = pick(r, ['SSS', 'SAS', 'ASA', 'AAS', 'SSA']);
+    const T = randSSS(r), s = [T.a, T.b, T.c], ang = [T.A, T.B, T.C];
+    const i = ri(r, 0, 2), p = (i + 1) % 3, q = (i + 2) % 3;
+    const rs = (x) => Math.round(x * 10) / 10, ra = (x) => Math.round(x);
+    let given, find, val, law, wrongVal, how;
+    if (kind === 'SSS') { const S = s.map(rs); given = `a = ${fmt(S[0])},   b = ${fmt(S[1])},   c = ${fmt(S[2])}`; find = AN[i]; val = lcAngle(S[i], S[p], S[q]); law = 'Law of Cosines'; wrongVal = 180 - val; how = `Three sides are given (SSS), so use the Law of Cosines: cos ${AN[i]} = (${NM[p]}² + ${NM[q]}² − ${NM[i]}²)/(2${NM[p]}${NM[q]})`; }
+    else if (kind === 'SAS') { const A = ra(ang[i]), x = rs(s[p]), y = rs(s[q]); given = `${AN[i]} = ${A}°,   ${NM[Math.min(p, q)]} = ${fmt(p < q ? x : y)},   ${NM[Math.max(p, q)]} = ${fmt(p < q ? y : x)}`; find = NM[i]; val = lcSide(x, y, A); law = 'Law of Cosines'; wrongVal = Math.sqrt(x * x + y * y + 2 * x * y * cosD(A)); how = `Two sides and the angle between them (SAS), so use the Law of Cosines: ${NM[i]}² = ${NM[p]}² + ${NM[q]}² − 2${NM[p]}${NM[q]} cos ${AN[i]}`; }
+    else if (kind === 'ASA' || kind === 'AAS') {
+      const A1 = ra(ang[p]), A2 = ra(kind === 'ASA' ? ang[q] : ang[i]), side = rs(kind === 'ASA' ? s[i] : s[p]);
+      if (kind === 'ASA') { const Ai = 180 - A1 - A2; if (Ai < 5) continue; given = `${AN[p]} = ${A1}°,   ${AN[q]} = ${A2}°,   ${NM[i]} = ${fmt(side)}`; find = NM[p]; val = (side * sinD(A1)) / sinD(Ai); wrongVal = (side * sinD(Ai)) / sinD(A1); how = `Two angles and a side (ASA), so use the Law of Sines. ${AN[i]} = 180° − ${A1}° − ${A2}° = ${fmt(Ai)}°, then ${NM[p]} = ${NM[i]} sin ${AN[p]} / sin ${AN[i]}`; }
+      else { if (180 - A1 - A2 < 5) continue; given = `${AN[p]} = ${A1}°,   ${AN[i]} = ${A2}°,   ${NM[p]} = ${fmt(side)}`; find = NM[i]; val = (side * sinD(A2)) / sinD(A1); wrongVal = (side * sinD(A1)) / sinD(A2); how = `Two angles and a side not between them (AAS), so use the Law of Sines: ${NM[i]} = ${NM[p]} sin ${AN[i]} / sin ${AN[p]}`; }
+      law = 'Law of Sines';
+    } else { // SSA with exactly one triangle: the given angle is across from the longer side
+      const A = ra(ang[i]), x = rs(s[i]), y = rs(s[p]); if (!(x > y)) continue;
+      const sols = ssaSolve(A, x, y); if (sols.length !== 1) continue;
+      given = `${AN[i]} = ${A}°,   ${NM[i]} = ${fmt(x)},   ${NM[p]} = ${fmt(y)}`; find = AN[p]; val = sols[0].B; law = 'Law of Sines'; wrongVal = asinD(Math.min(1, (x * sinD(A)) / y));
+      how = `Two sides and an angle across from one of them (SSA), so use the Law of Sines: sin ${AN[p]} = ${NM[p]} sin ${AN[i]} / ${NM[i]}. Since ${NM[i]} > ${NM[p]}, there is only one triangle.`;
+    }
+    const isAng = /[ABC]/.test(find);
+    if (!isFinite(val) || val <= 0 || !isFinite(wrongVal) || wrongVal <= 0 || Math.abs(val - wrongVal) < 3 * (/[ABC]/.test(find) ? ANG_TOL : sideTol(val))) continue;
+    const vt = (x) => (isAng ? a2(x) : f2(x));
+    const other = law === 'Law of Sines' ? 'Law of Cosines' : 'Law of Sines';
+    const correct = `${law}; ${find} ≈ ${vt(val)}`;
+    const intro = `Decide whether you need the Law of Sines or the Law of Cosines to start solving the triangle. Then find ${find}. Round to two decimal places.   ${given}`;
+    const ok = (vv) => [vv[0] === law, nearV(vv[1], val, isAng ? ANG_TOL : sideTol(val))];
+    return {
+      topic: 'Sines or Cosines?', stem: intro,
+      ...buildChoices(r, correct, [`${other}; ${find} ≈ ${vt(val)}`, `${law}; ${find} ≈ ${vt(wrongVal)}`, `${other}; ${find} ≈ ${vt(wrongVal)}`].filter((c) => c !== correct), (i) => `${other}; ${find} ≈ ${vt(val + i + 1)}`),
+      fr: { fields: [{ kind: 'select', label: 'Use the', options: ['Law of Sines', 'Law of Cosines'] }, { kind: 'number', label: `${find} ≈`, suffix: isAng ? '°' : '' }],
+        key: [law, f2(val)], display: correct, check: (vv) => ok(vv).every(Boolean), score: (vv) => ok(vv).filter(Boolean).length / 2 },
+      solution: `${how}\n${find} ≈ ${vt(val)}`,
+    };
+  }
+};
+
+// 3.2 #37–44: Heron's Area Formula
+const fracGiv = (r) => { const d = pick(r, [2, 3, 4, 5, 8, 9]); let n = ri(r, 1, 3 * d); while (gcd(n, d) !== 1) n++; return { v: n / d, t: `${n}/${d}` }; };
+TEMPLATES.triHeron = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const k = r();
+    let S, given, pre = '';
+    if (k < 0.15) { const F = [fracGiv(r), fracGiv(r), fracGiv(r)]; S = F.map((f) => f.v); given = `a = ${F[0].t},   b = ${F[1].t},   c = ${F[2].t}`; }
+    else if (k < 0.82) { S = [sideGiv(r, 2, 60), sideGiv(r, 2, 60), sideGiv(r, 2, 60)]; given = `a = ${fmt(S[0])},   b = ${fmt(S[1])},   c = ${fmt(S[2])}`; }
+    else { // an angle and the two sides next to it: find the third side first
+      const vi = ri(r, 0, 2), Ag = ri(r, 20, 150), p = (vi + 1) % 3, q = (vi + 2) % 3; S = [0, 0, 0]; S[p] = ri(r, 3, 80); S[q] = ri(r, 3, 80); S[vi] = lcSide(S[p], S[q], Ag);
+      const o = [p, q].sort(); given = `${AN[vi]} = ${Ag}°,   ${NM[o[0]]} = ${S[o[0]]},   ${NM[o[1]]} = ${S[o[1]]}`;
+      pre = `First use the Law of Cosines: ${NM[vi]}² = ${NM[p]}² + ${NM[q]}² − 2${NM[p]}${NM[q]} cos ${AN[vi]}, so ${NM[vi]} ≈ ${f2(S[vi])}.\n`;
+    }
+    const [a, b, c] = S, s = (a + b + c) / 2, P = s * (s - a) * (s - b) * (s - c);
+    if (!(P > 0)) continue;
+    const area = Math.sqrt(P);
+    if (area < 0.05 || area > 50000 || Math.min(s - a, s - b, s - c) < 0.02 * s) continue;
+    const full = 2 * s, P2 = full * (full - a) * (full - b) * (full - c);
+    const wrong = [P2 > 0 ? Math.sqrt(P2) : NaN, P, area / 2, 0.5 * a * b].filter((w) => isFinite(w) && w > 0 && w < 1e7);
+    const correct = f2(area);
+    const intro = `Use Heron's Area Formula to find the area of the triangle. Round to two decimal places.   ${given}`;
+    return {
+      topic: "Heron's Area Formula", stem: intro,
+      ...buildChoices(r, correct, [...new Set(wrong.filter((w) => Math.abs(w - area) > 3 * Math.max(0.021, 0.0005 * area)).map(f2))], (i) => f2(area * (1.3 + 0.2 * i))),
+      fr: { fields: [{ kind: 'number', label: 'Area ≈', suffix: ' square units' }], key: [correct], display: `${correct} square units`, check: (vv) => nearV(vv[0], area, Math.max(0.021, 0.0005 * area)) },
+      solution: `${pre}s = (a + b + c)/2 = ${+s.toFixed(4)}\nArea = √(s(s − a)(s − b)(s − c)) = √(${+s.toFixed(4)} · ${+(s - a).toFixed(4)} · ${+(s - b).toFixed(4)} · ${+(s - c).toFixed(4)}) ≈ ${correct}`,
+    };
+  }
+};
+
+// word problems: one numeric answer with units
+function wordQ(r, { topic, text, val, unit, wrong, why, dp = 2, draw, tol }) {
+  const show = (x) => (dp === 0 ? Math.round(x).toLocaleString('en-US') : (Math.round(x * 10 ** dp) / 10 ** dp).toFixed(dp));
+  const T = tol ?? Math.max(dp === 0 ? 0.6 : dp === 1 ? 0.051 : 0.021, 0.002 * Math.abs(val));
+  const fmtU = (x) => (unit === 'dollars' ? '$' + show(x) : `${show(x)} ${unit}`);
+  const correct = fmtU(val);
+  const cands = wrong.filter((w) => isFinite(w) && w > 0 && Math.abs(w - val) > 3 * T).map(fmtU);
+  const round = dp === 0 ? (unit === 'dollars' ? 'Round to the nearest dollar.' : 'Round to the nearest whole number.') : dp === 1 ? 'Round to one decimal place.' : 'Round to two decimal places.';
+  return {
+    topic, stem: `${text} ${round}`, ...buildChoices(r, correct, [...new Set(cands)].filter((c) => c !== correct), (i) => fmtU(val * (1.25 + 0.2 * i))),
+    fr: { fields: [{ kind: 'number', label: '', prefix: unit === 'dollars' ? '$' : '', suffix: unit === 'dollars' ? '' : ' ' + unit }], key: [show(val).replace(/,/g, '')], display: correct,
+      check: (vv) => nearV(String(vv[0]).replace(/\$|\\\$/g, ''), val, T) },
+    solution: why, draw,
+  };
+}
+const triPts = (A, b, c) => [[0, 0], [c, 0], [b * cosD(A), b * sinD(A)]];
+// 3.1 word problems (Law of Sines)
+TEMPLATES.triSinesWord = (r) => {
+  for (let t = 0; t < 100; t++) {
+    const kind = pick(r, ['fire', 'balloon', 'river', 'pole']);
+    if (kind === 'fire') {
+      const d = ri(r, 8, 40), al = ri(r, 25, 80), be = ri(r, 25, 80), C = 180 - al - be; if (C < 15) continue;
+      const fromA = r() < 0.5, val = (d * sinD(fromA ? be : al)) / sinD(C);
+      const st = pick(r, [['ranger station', 'fire'], ['Coast Guard station', 'ship in distress'], ['cell tower', 'phone signal']]);
+      return wordQ(r, { topic: 'Law of Sines: applications', unit: 'miles', val,
+        text: `Two ${st[0]}s, A and B, are ${d} miles apart on a straight east–west line, with A to the west. From A, the ${st[1]} is seen ${al}° north of the line toward B. From B, it is seen ${be}° north of the line toward A. How far is the ${st[1]} from ${fromA ? 'A' : 'B'}?`,
+        wrong: [(d * sinD(fromA ? al : be)) / sinD(C), (d * sinD(fromA ? be : al)) / sinD(fromA ? al : be), d * sinD(fromA ? be : al), (d * sinD(C)) / sinD(fromA ? be : al)],
+        why: `The angle at the ${st[1]} is 180° − ${al}° − ${be}° = ${C}°.\nThe side from ${fromA ? 'A' : 'B'} is across from the angle at ${fromA ? 'B' : 'A'} (${fromA ? be : al}°), and the ${d}-mile side is across from ${C}°.\nDistance = ${d} sin ${fromA ? be : al}° / sin ${C}° ≈ ${f2(val)} miles`,
+        draw: (cv) => drawFigure(cv, { polys: [{ pts: triPts(al, (d * sinD(be)) / sinD(C), d), names: ['A', 'B', '★'], slab: [`${d} mi`, '', ''], alab: [`${al}°`, `${be}°`, ''], arcs: [1, 1, 0] }] }) });
+    }
+    if (kind === 'balloon') {
+      const d = ri(r, 3, 20) * 100, al = ri(r, 20, 70), be = ri(r, 20, 70), C = 180 - al - be; if (C < 20) continue;
+      const AC = (d * sinD(be)) / sinD(C), h = AC * sinD(al);
+      const thing = pick(r, ['hot-air balloon', 'drone', 'kite']);
+      return wordQ(r, { topic: 'Law of Sines: applications', unit: 'feet', val: h, dp: 1,
+        text: `Two people stand ${d} feet apart on level ground with a ${thing} between them, directly above the line joining them. The angles of elevation to the ${thing} are ${al}° and ${be}°. How high is the ${thing}?`,
+        wrong: [AC, (d * sinD(al)) / sinD(C) * sinD(al), AC * cosD(al), (d * sinD(be)) / sinD(C) * sinD(be)],
+        why: `The angle at the ${thing} is 180° − ${al}° − ${be}° = ${C}°.\nDistance from the first person: ${d} sin ${be}° / sin ${C}° ≈ ${f2(AC)} feet.\nHeight = ${f2(AC)} sin ${al}° ≈ ${f1(h)} feet`,
+        draw: (cv) => drawFigure(cv, { polys: [{ pts: triPts(al, AC, d), names: ['', '', ''], slab: [`${d} ft`, '', ''], alab: [`${al}°`, `${be}°`, ''], arcs: [1, 1, 0] }] }) });
+    }
+    if (kind === 'river') {
+      const d = ri(r, 40, 300), al = ri(r, 35, 85), be = ri(r, 35, 85), C = 180 - al - be; if (C < 15) continue;
+      const val = (d * sinD(be)) / sinD(C);
+      return wordQ(r, { topic: 'Law of Sines: applications', unit: 'meters', val,
+        text: `To find the distance from point A to a tree at point C across a river, a surveyor walks ${d} meters along the bank from A to point B. She measures angle CAB = ${al}° and angle CBA = ${be}°. Find the distance AC.`,
+        wrong: [(d * sinD(al)) / sinD(C), (d * sinD(be)) / sinD(al), d * sinD(be), d * Math.tan(be * D2R)],
+        why: `Angle C = 180° − ${al}° − ${be}° = ${C}°.\nAC is across from B: AC/sin ${be}° = ${d}/sin ${C}°, so AC ≈ ${f2(val)} meters`,
+        draw: (cv) => drawFigure(cv, { polys: [{ pts: triPts(al, val, d), names: ['A', 'B', 'C'], slab: [`${d} m`, '', ''], alab: [`${al}°`, `${be}°`, ''], arcs: [1, 1, 0] }] }) });
+    }
+    // a pole on a slope: the sun's angle of elevation and the shadow down the hill
+    const slope = ri(r, 6, 15), sun = ri(r, 35, 70), sh = ri(r, 15, 60);
+    // angle at the base of the pole (between the pole and the slope going downhill) = 90° + slope; angle at the shadow tip = sun − slope
+    const atBase = 90 + slope, atTip = sun - slope, atTop = 180 - atBase - atTip; if (atTop < 5) continue;
+    const val = (sh * sinD(atTip)) / sinD(atTop);
+    return wordQ(r, { topic: 'Law of Sines: applications', unit: 'feet', val,
+      text: `A vertical pole stands on a hill that slopes down at ${slope}° from the horizontal. The pole casts a shadow ${sh} feet long straight down the hill when the angle of elevation of the sun is ${sun}°. How tall is the pole? (The angle at the base of the pole, between the pole and the downhill slope, is ${atBase}°.)`,
+      wrong: [sh * Math.tan(sun * D2R), (sh * sinD(sun)) / sinD(180 - 90 - sun), (sh * sinD(atTip)) / sinD(atBase), sh * Math.tan(atTip * D2R)],
+      why: `In the triangle (pole, shadow, sun ray): the angle at the shadow's tip is ${sun}° − ${slope}° = ${atTip}°, the angle at the base is ${atBase}°, so the angle at the top is 180° − ${atBase}° − ${atTip}° = ${atTop}°.\nPole height = ${sh} sin ${atTip}° / sin ${atTop}° ≈ ${f2(val)} feet` });
+  }
+};
+// 3.2 word problems (Law of Cosines)
+TEMPLATES.triCosWord = (r) => {
+  for (let t = 0; t < 100; t++) {
+    const kind = pick(r, ['marsh', 'ships', 'diamond', 'lotAngle', 'lotCost']);
+    if (kind === 'marsh') {
+      const x = ri(r, 10, 60) * 10, y = ri(r, 10, 60) * 10, B = ri(r, 40, 140);
+      const val = lcSide(x, y, B), place = pick(r, ['marsh', 'lake', 'pond', 'swamp']);
+      return wordQ(r, { topic: 'Law of Cosines: applications', unit: 'meters', val,
+        text: `To approximate the length of a ${place}, a surveyor walks ${x} meters from point A to point B, then turns so that angle ABC is ${B}° and walks ${y} meters to point C. Find the length AC of the ${place}.`,
+        wrong: [Math.sqrt(x * x + y * y + 2 * x * y * cosD(B)), Math.hypot(x, y), Math.sqrt(Math.abs(x * x + y * y - x * y * cosD(B)))],
+        why: `AC² = AB² + BC² − 2(AB)(BC) cos B = ${x}² + ${y}² − 2(${x})(${y}) cos ${B}° ≈ ${f2(val * val)}\nAC ≈ ${f2(val)} meters`,
+        draw: (cv) => { const P = [[0, 0], [x, 0], [x - y * cosD(B), y * sinD(B)]]; drawFigure(cv, { polys: [{ pts: [P[2], P[1], P[0]], names: ['C', 'B', 'A'], slab: [`${y} m`, `${x} m`, ''], alab: ['', `${B}°`, ''], arcs: [0, 1, 0] }] }); } });
+    }
+    if (kind === 'ships') {
+      const v1 = ri(r, 8, 30), v2 = ri(r, 8, 30), th = ri(r, 20, 160), h = pick(r, [1.5, 2, 2.5, 3, 4]);
+      const d1 = v1 * h, d2 = v2 * h, val = lcSide(d1, d2, th);
+      const what = pick(r, [['ships', 'knots', 'nautical miles'], ['planes', 'miles per hour', 'miles']]);
+      const sp = what[0] === 'planes' ? [v1 * 20, v2 * 20] : [v1, v2], D = what[0] === 'planes' ? val * 20 : val;
+      return wordQ(r, { topic: 'Law of Cosines: applications', unit: what[2], val: D, dp: 1,
+        text: `Two ${what[0]} leave the same ${what[0] === 'planes' ? 'airport' : 'port'} at the same time. One travels at ${sp[0]} ${what[1]} and the other at ${sp[1]} ${what[1]}, and the angle between their straight-line courses is ${th}°. How far apart are they after ${h} hours?`,
+        wrong: [Math.sqrt((sp[0] * h) ** 2 + (sp[1] * h) ** 2 + 2 * sp[0] * sp[1] * h * h * cosD(th)), Math.hypot(sp[0] * h, sp[1] * h), lcSide(sp[0], sp[1], th)],
+        why: `After ${h} hours they have gone ${fmt(sp[0] * h)} and ${fmt(sp[1] * h)} ${what[2]}.\nd² = ${fmt(sp[0] * h)}² + ${fmt(sp[1] * h)}² − 2(${fmt(sp[0] * h)})(${fmt(sp[1] * h)}) cos ${th}°, so d ≈ ${f1(D)} ${what[2]}` });
+    }
+    if (kind === 'diamond') {
+      const [game, base, mound] = pick(r, [['A baseball diamond', 90, 60.5], ['A Little League diamond', 60, 46], ['A softball diamond', 60, 43]]);
+      const val = lcSide(base, mound, 45), bag = pick(r, ['first', 'third']);
+      return wordQ(r, { topic: 'Law of Cosines: applications', unit: 'feet', val,
+        text: `${game} is a square with ${base}-foot sides. The pitcher's mound is ${mound} feet from home plate on the line from home plate to second base. How far is it from the pitcher's mound to ${bag} base?`,
+        wrong: [Math.sqrt(base * base + mound * mound + 2 * base * mound * cosD(45)), Math.hypot(base, mound), base * Math.SQRT2 - mound],
+        why: `The line from home to second base makes a 45° angle with the line from home to ${bag} base.\nd² = ${base}² + ${mound}² − 2(${base})(${mound}) cos 45°, so d ≈ ${f2(val)} feet` });
+    }
+    const s = [ri(r, 40, 400), ri(r, 40, 400), ri(r, 40, 400)].sort((p, q) => p - q);
+    if (s[0] + s[1] <= s[2] * 1.15) continue;
+    const big = lcAngle(s[2], s[0], s[1]);
+    if (kind === 'lotAngle') {
+      return wordQ(r, { topic: 'Law of Cosines: applications', unit: 'degrees', val: big,
+        text: `A triangular parcel of land has sides of ${s[0]} feet, ${s[1]} feet, and ${s[2]} feet. Find the measure of the largest angle of the parcel (in degrees).`,
+        wrong: [lcAngle(s[0], s[1], s[2]), 180 - big, acosD((s[0] * s[0] + s[1] * s[1] - s[2] * s[2]) / (s[0] * s[1]))], tol: ANG_TOL,
+        why: `The largest angle is across from the longest side (${s[2]} ft).\ncos θ = (${s[0]}² + ${s[1]}² − ${s[2]}²)/(2 · ${s[0]} · ${s[1]}) ≈ ${cosD(big).toFixed(4).replace('-', MINUS)}, so θ ≈ ${a2(big)}` });
+    }
+    const half = (s[0] + s[1] + s[2]) / 2, area = Math.sqrt(half * (half - s[0]) * (half - s[1]) * (half - s[2])), price = pick(r, [1.5, 2, 2.25, 2.75, 3, 4.5, 5, 8]);
+    const val = area * price;
+    return wordQ(r, { topic: 'Law of Cosines: applications', unit: 'dollars', val, dp: 0, tol: Math.max(1, 0.002 * val),
+      text: `A triangular lot has sides of ${s[0]} feet, ${s[1]} feet, and ${s[2]} feet. Land costs $${price.toFixed(2)} per square foot. Use Heron's Area Formula to find the cost of the lot.`,
+      wrong: [area, 0.5 * s[0] * s[1] * price, area * price * 2, Math.sqrt(2 * half * (2 * half - s[0]) * (2 * half - s[1]) * (2 * half - s[2])) * price],
+      why: `s = (${s[0]} + ${s[1]} + ${s[2]})/2 = ${fmt(half)}\nArea = √(s(s − a)(s − b)(s − c)) ≈ ${f2(area)} square feet\nCost ≈ ${f2(area)} × $${price.toFixed(2)} ≈ $${Math.round(val).toLocaleString('en-US')}` });
+  }
+};
+// keep "A = 52°" together when the stem wraps
+{
+  const nb = (txt) => txt.split('\n').map((line) => { const k = line.lastIndexOf('   '); return k < 0 ? line : line.slice(0, k) + line.slice(k).replace(/ = /g, '\u00a0=\u00a0'); }).join('\n');
+  for (const name of ['triSinesAAS', 'triSinesSSA', 'triAmbiguousB', 'triAreaSAS', 'triCosSSS', 'triCosSAS', 'triParallelogram', 'triWhichLaw', 'triHeron', 'triSinesWord', 'triCosWord']) {
+    const make = TEMPLATES[name];
+    TEMPLATES[name] = (r) => { const q = make(r); if (q) { q.stem = nb(q.stem); if (q.frStem) q.frStem = nb(q.frStem); } return q; };
+  }
+}
+
+/* ---------- 3.4 Vectors and Dot Products ---------- */
+const vecA = ([x, y]) => `⟨${fmt(x)}, ${fmt(y)}⟩`;
+const vecIJ = ([x, y]) => {
+  const t = (c, u, first) => (c === 0 ? '' : (c < 0 ? (first ? MINUS : ` ${MINUS} `) : first ? '' : ' + ') + (Math.abs(c) === 1 ? '' : Math.abs(c)) + u);
+  const s = t(x, 'i', true) + t(y, 'j', x === 0);
+  return s || '0';
+};
+const vecL = ([x, y]) => `\\left\\langle ${x},${y}\\right\\rangle`;
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+const norm2 = (a) => a[0] * a[0] + a[1] * a[1];
+const randVec = (r, lo = -9, hi = 9) => { for (;;) { const v = [ri(r, lo, hi), ri(r, lo, hi)]; if (v[0] || v[1]) return v; } };
+// Reads "⟨3, −1⟩", "(3,-1)", "3i − j", or a plain number. Returns { vec: [x, y] } or { num }.
+function parseVecAns(raw) {
+  let s = String(raw || '').replace(/\\left|\\right|\\mleft|\\mright/g, '').replace(/\\langle|⟨|\\lt|</g, '(').replace(/\\rangle|⟩|\\gt|>/g, ')');
+  if (/[\\{}]/.test(s)) s = latexToPlain(s);
+  s = s.replace(/[−–]/g, '-').trim();
+  const val = (e) => { const n = parseTrig(e); if (!n) return NaN; const I = trigInfo(n); if (I.hasVar || I.fns) return NaN; return evalTrig(n, 0); };
+  const noPi = s.replace(/pi/g, 'Π');
+  if (/[ij]/.test(noPi)) { // i, j form: read the coefficients by setting i, j to 1 or 0
+    const sub = (iv, jv) => val(noPi.replace(/i/g, `(${iv})`).replace(/j/g, `(${jv})`).replace(/Π/g, 'pi'));
+    const x = sub(1, 0), y = sub(0, 1);
+    return isFinite(x) && isFinite(y) && Math.abs(sub(1, 1) - (x + y)) < 1e-9 ? { vec: [x, y] } : null;
+  }
+  let inner = s; while (/^\(.*\)$/.test(inner) && (() => { let d = 0; for (let k = 0; k < inner.length; k++) { if (inner[k] === '(') d++; else if (inner[k] === ')') d--; if (d === 0 && k < inner.length - 1) return false; } return true; })()) inner = inner.slice(1, -1);
+  let depth = 0, cut = -1;
+  for (let k = 0; k < inner.length; k++) { const c = inner[k]; if (c === '(') depth++; else if (c === ')') depth--; else if (c === ',' && depth === 0) { if (cut >= 0) return null; cut = k; } }
+  if (cut >= 0) { const x = val(inner.slice(0, cut)), y = val(inner.slice(cut + 1)); return isFinite(x) && isFinite(y) ? { vec: [x, y] } : null; }
+  const n = val(s); return isFinite(n) ? { num: n } : null;
+}
+const vecEq = (p, v, tol = 1e-7) => !!(p && p.vec && Math.abs(p.vec[0] - v[0]) < tol && Math.abs(p.vec[1] - v[1]) < tol);
+const numEqv = (p, n, tol = 1e-7) => !!(p && p.num != null && Math.abs(p.num - n) < tol);
+const sqrtE = (n2) => exactRatio(1, n2, 1); // √n2 simplified, e.g. 2√13
+const showV = (r, v) => (r() < 0.5 ? vecA(v) : vecIJ(v));
+
+// #5–10: dot product
+TEMPLATES.vecDot = (r) => {
+  const u = randVec(r), v = randVec(r), d = dot(u, v), useIJ = r() < 0.4;
+  const S = (x) => (useIJ ? vecIJ(x) : vecA(x));
+  const cands = [u[0] * v[0] - u[1] * v[1], u[0] * v[1] + u[1] * v[0], u[0] + v[0] + u[1] + v[1], -d].map(String).map((x) => x.replace('-', MINUS));
+  return {
+    topic: 'Dot product', stem: `Find u · v.   u = ${S(u)},   v = ${S(v)}`,
+    ...buildChoices(r, fmt(d), [...new Set(cands)].filter((c) => c !== fmt(d)), (i) => fmt(d + i + 1)),
+    fr: { fields: [{ kind: 'number', label: 'u · v =' }], key: [String(d)], display: fmt(d), check: (vv) => numEqv(parseVecAns(vv[0]), d) },
+    solution: `u · v = (${fmt(u[0])})(${fmt(v[0])}) + (${fmt(u[1])})(${fmt(v[1])}) = ${fmt(u[0] * v[0])} + ${u[1] * v[1] < 0 ? '(' + fmt(u[1] * v[1]) + ')' : fmt(u[1] * v[1])} = ${fmt(d)}`,
+  };
+};
+// #11–22: properties — the answer is a scalar or a vector
+TEMPLATES.vecDotProps = (r) => {
+  const u = randVec(r, -6, 6), v = randVec(r, -6, 6), w = randVec(r, -6, 6);
+  const nu = norm2(u), nv = norm2(v), nw = norm2(w);
+  const k = ri(r, 2, 4);
+  const sc = (val, text, latex) => ({ kind: 'scalar', val, text: text || fmt(val), latex: latex || String(val) });
+  const rad = (n2, sub, sign = 1) => { // √n2 − sub  or  sub − √n2
+    const e = sqrtE(n2), root = Math.sqrt(n2);
+    if (Number.isInteger(root)) return sc(sign > 0 ? root - sub : sub - root);
+    return sign > 0 ? sc(root - sub, `${e.text} ${MINUS} ${sub}`, `${e.latex}-${sub}`) : sc(sub - root, `${sub} ${MINUS} ${e.text}`, `${sub}-${e.latex}`);
+  };
+  const vc = (x, y) => ({ kind: 'vector', vec: [x, y], text: vecA([x, y]), latex: vecL([x, y]) });
+  const uv = dot(u, v);
+  const items = [
+    ['u · u', sc(nu), `u · u = ${fmt(u[0])}² + ${fmt(u[1])}²`],
+    [`${k}u · v`, sc(k * uv), `${k}u · v = ${k}(u · v) = ${k}(${fmt(uv)})`],
+    ['(u · v)v', vc(uv * v[0], uv * v[1]), `u · v = ${fmt(uv)}, so (u · v)v = ${fmt(uv)}${vecA(v)}`],
+    ['(u · 2v)w', vc(2 * uv * w[0], 2 * uv * w[1]), `u · 2v = 2(u · v) = ${fmt(2 * uv)}, so (u · 2v)w = ${fmt(2 * uv)}${vecA(w)}`],
+    ['(v · 0)w', vc(0, 0), 'v · 0 = 0 (a scalar), and 0w is the zero vector'],
+    ['(u + v) · 0', sc(0), 'Any vector dotted with the zero vector is the scalar 0'],
+    [`${k}‖v‖²`, sc(k * nv), `‖v‖² = v · v = ${nv}`],
+    [`${MINUS}${k}‖u‖²`, sc(-k * nu), `‖u‖² = u · u = ${nu}`],
+    ['‖w‖ − 1', rad(nw, 1, 1), `‖w‖ = √(w · w) = √${nw}`],
+    [`${k} − ‖u‖`, rad(nu, k, -1), `‖u‖ = √(u · u) = √${nu}`],
+    ['(u · v) − (u · w)', sc(uv - dot(u, w)), `u · v = ${fmt(uv)} and u · w = ${fmt(dot(u, w))}`],
+    ['(v · u) − (w · v)', sc(uv - dot(w, v)), `v · u = ${fmt(uv)} and w · v = ${fmt(dot(w, v))}`],
+  ];
+  const [q, ans, why] = pick(r, items);
+  const given = `u = ${vecA(u)}, v = ${vecA(v)}, and w = ${vecA(w)}`;
+  const other = ans.kind === 'vector' ? 'scalar' : 'vector';
+  const wrongs = ans.kind === 'vector'
+    ? [`${ans.text} (scalar)`, `${vecA([-ans.vec[0], -ans.vec[1]])} (vector)`, `${vecA([ans.vec[1], ans.vec[0]])} (vector)`, `${fmt(ans.vec[0] + ans.vec[1])} (scalar)`]
+    : [`${ans.text} (vector)`, `${/√/.test(ans.text) ? ans.text.replace(` ${MINUS} `, ' + ') : fmt(-ans.val)} (scalar)`, `${vecA([Math.round(ans.val) || 1, Math.round(ans.val) || 1])} (vector)`, `${/√/.test(ans.text) ? ans.text.replace(/\d+$/, (m) => String(+m + 1)) : fmt(2 * ans.val + 1)} (scalar)`];
+  return {
+    topic: 'Dot product properties', stem: `Use u = ${vecA(u)}, v = ${vecA(v)}, and w = ${vecA(w)} to find ${q}.`,
+    ...buildChoices(r, `${ans.text} (${ans.kind})`, [...new Set(wrongs)].filter((x) => x !== `${ans.text} (${ans.kind})`), (i) => `${fmt(i + 50)} (${other})`),
+    frStem: `Use ${given} to find ${q}. State whether the result is a vector or a scalar. (Type a vector like ⟨3, −1⟩ or 3i − j.)`,
+    fr: { fields: [{ kind: 'select', label: 'The result is a', options: ['scalar', 'vector'] }, { kind: 'expr', keys: 'vector', label: `${q} =` }],
+      key: [ans.kind, ans.latex], display: `${ans.text} (a ${ans.kind})`,
+      check: (vv) => { const p = parseVecAns(vv[1]); return vv[0] === ans.kind && (ans.kind === 'vector' ? vecEq(p, ans.vec) : numEqv(p, ans.val)); },
+      score: (vv) => { const p = parseVecAns(vv[1]); const okV = ans.kind === 'vector' ? vecEq(p, ans.vec) : numEqv(p, ans.val); return (vv[0] === ans.kind ? 0.5 : 0) + (okV ? 0.5 : 0); } },
+    solution: `${why}, so ${q} = ${ans.text}. It is a ${ans.kind}.`,
+  };
+};
+// #23–28: magnitude from the dot product
+TEMPLATES.vecMagnitude = (r) => {
+  const u = r() < 0.2 ? (r() < 0.5 ? [ri(r, -25, 25) || 6, 0] : [0, ri(r, -25, 25) || 6]) : randVec(r, -25, 25);
+  const n2 = norm2(u), e = sqrtE(n2);
+  const cands = [String(Math.abs(u[0]) + Math.abs(u[1])), String(n2), sqrtE(Math.abs(u[0] * u[0] - u[1] * u[1]) || 2).text, e.text.includes('√') ? fmt(Math.sqrt(n2)) : sqrtE(n2 + 1).text];
+  return {
+    topic: 'Magnitude', stem: `Use the dot product to find the magnitude of u.   u = ${showV(r, u)}`,
+    ...buildChoices(r, e.text, [...new Set(cands)].filter((c) => c !== e.text), (i) => String(i + 3)),
+    fr: { fields: [{ kind: 'number', label: '‖u‖ =' }], key: [e.latex], display: e.text, check: (vv) => !/\./.test(String(vv[0])) && numEqv(parseVecAns(vv[0]), Math.sqrt(n2)) },
+    solution: `‖u‖ = √(u · u) = √((${fmt(u[0])})² + (${fmt(u[1])})²) = √${n2} = ${e.text}`,
+  };
+};
+// #29–42: angle between two vectors (radians or degrees)
+function angleText(theta, inDeg) { // exact when the angle is a multiple of 15°, else rounded to hundredths
+  const d = (theta * 180) / Math.PI, k = Math.round(d / 15);
+  if (Math.abs(d - 15 * k) < 1e-9) return inDeg ? { text: `${15 * k}°`, latex: `${15 * k}^{\\circ}`, exact: true } : { text: piText(frc(k, 12)), latex: piLatex(frc(k, 12)), exact: true };
+  return inDeg ? { text: `${(Math.round(d * 100) / 100).toFixed(2)}°`, latex: `${(Math.round(d * 100) / 100).toFixed(2)}^{\\circ}`, exact: false }
+    : { text: (Math.round(theta * 100) / 100).toFixed(2), latex: (Math.round(theta * 100) / 100).toFixed(2), exact: false };
+}
+TEMPLATES.vecAngle = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const inDeg = r() < 0.4, unitForm = !inDeg && r() < 0.25;
+    let u, v, show, U, V, unitWhy = '';
+    if (unitForm) {
+      const a = ri(r, 0, 23), b = ri(r, 0, 23); if (a === b) continue;
+      U = [Math.cos((a * Math.PI) / 12), Math.sin((a * Math.PI) / 12)]; V = [Math.cos((b * Math.PI) / 12), Math.sin((b * Math.PI) / 12)];
+      const f = (k) => piText(frc(k, 12));
+      show = `u = cos(${f(a)})i + sin(${f(a)})j,   v = cos(${f(b)})i + sin(${f(b)})j`;
+      if (a === 0 || b === 0) show = show.replace(/cos\(0\)i \+ sin\(0\)j/, 'i');
+      const d = Math.abs(a - b), dd = d > 12 ? 24 - d : d;
+      unitWhy = `Both are unit vectors, pointing at angles ${f(a)} and ${f(b)}. The difference is ${f(d)}${d > 12 ? `, which is more than π, so θ = 2π − ${f(d)} = ${f(dd)}` : ', so θ = ' + f(dd)}.`;
+    } else {
+      u = randVec(r, -8, 8); v = randVec(r, -8, 8);
+      if (u[0] * v[1] - u[1] * v[0] === 0) continue; // not parallel
+      U = u; V = v; const S = r() < 0.5 ? vecA : vecIJ; show = `u = ${S(u)},   v = ${S(v)}`;
+    }
+    const c = Math.max(-1, Math.min(1, dot(U, V) / Math.sqrt(norm2(U) * norm2(V)))), theta = Math.acos(Math.max(-1, Math.min(1, c)));
+    const A = angleText(theta, inDeg), tol = inDeg ? 0.0051 : 0.0051;
+    const target = inDeg ? (theta * 180) / Math.PI : theta;
+    const alt = [Math.PI - theta, Math.acos(Math.abs(c)) === theta ? theta / 2 : Math.acos(Math.abs(c)), theta + 0.3, Math.asin(Math.min(1, Math.abs(c)))].map((x) => angleText(x, inDeg).text);
+    const cosT = unitForm ? fmt(c) : `${fmt(dot(U, V))}/(${sqrtE(norm2(U)).text} · ${sqrtE(norm2(V)).text})`;
+    return {
+      topic: 'Angle between vectors', stem: `Find the angle θ (in ${inDeg ? 'degrees' : 'radians'}) between the vectors.   ${show}`,
+      ...buildChoices(r, A.text, [...new Set(alt)].filter((x) => x !== A.text), (i) => angleText(0.2 * (i + 1), inDeg).text),
+      frStem: `Find the angle θ (in ${inDeg ? 'degrees' : 'radians'}) between the vectors.   ${show}\n(${A.exact ? 'Give the exact value' : 'Round to two decimal places'}.)`,
+      fr: { fields: [{ kind: 'expr', keys: inDeg ? 'degrees' : 'angles', label: 'θ =' }], key: [A.latex], display: A.text,
+        check: (vv) => numEqv(parseVecAns(inDeg ? stripDeg(vv[0]) : vv[0]), target, tol) },
+      solution: unitForm ? unitWhy : `cos θ = (u · v)/(‖u‖ ‖v‖) = ${cosT}${unitForm ? '' : ' ≈ ' + c.toFixed(4)}, so θ = arccos(${unitForm ? fmt(c) : c.toFixed(4)}) ${A.exact ? '=' : '≈'} ${A.text}.`,
+    };
+  }
+};
+// #43–46: interior angles of a triangle
+TEMPLATES.vecTriangle = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const P = [0, 1, 2].map(() => [ri(r, -5, 9), ri(r, -5, 9)]);
+    const cross = (P[1][0] - P[0][0]) * (P[2][1] - P[0][1]) - (P[1][1] - P[0][1]) * (P[2][0] - P[0][0]);
+    if (Math.abs(cross) < 4) continue;
+    const ang = P.map((p, i) => { const a = P[(i + 1) % 3], b = P[(i + 2) % 3]; const x = [a[0] - p[0], a[1] - p[1]], y = [b[0] - p[0], b[1] - p[1]]; return (Math.acos(dot(x, y) / Math.sqrt(norm2(x) * norm2(y))) * 180) / Math.PI; });
+    const tx = ang.map((x) => (Math.round(x * 10) / 10).toFixed(1) + '°');
+    const pt2 = (p) => `(${fmt(p[0])}, ${fmt(p[1])})`;
+    const correct = tx.join(', ');
+    const swapped = ang.map((x) => (Math.round((180 - x) * 10) / 10).toFixed(1) + '°').join(', ');
+    const off = [ang[0] + 5, ang[1] - 5, ang[2]].map((x) => (Math.round(x * 10) / 10).toFixed(1) + '°').join(', ');
+    const rot = [tx[1], tx[2], tx[0]].join(', ');
+    const fields = P.map((p) => ({ kind: 'expr', keys: 'degrees', label: `Angle at ${pt2(p)}:` }));
+    const ok = (vv, i) => numEqv(parseVecAns(stripDeg(vv[i])), ang[i], 0.051);
+    return {
+      topic: 'Angles in a triangle', stem: `Use vectors to find the interior angles of the triangle with vertices ${P.map(pt2).join(', ')}. (Angles listed in the same order as the vertices.)`,
+      ...buildChoices(r, correct, [swapped, off, rot].filter((x) => x !== correct), (i) => [60 + i, 60 - i, 60].map((x) => x.toFixed(1) + '°').join(', ')),
+      frStem: `Use vectors to find the interior angles of the triangle with vertices ${P.map(pt2).join(', ')}. Round to the nearest tenth of a degree.`,
+      fr: { fields, key: tx.map((x) => x.replace('°', '^{\\circ}')), display: P.map((p, i) => `${pt2(p)}: ${tx[i]}`).join(',  '),
+        check: (vv) => [0, 1, 2].every((i) => ok(vv, i)), score: (vv) => { const n = [0, 1, 2].filter((i) => ok(vv, i)).length; return n === 3 ? 1 : n === 2 ? 0.5 : 0; } },
+      solution: `At each vertex, make vectors to the other two vertices and use cos θ = (u · v)/(‖u‖ ‖v‖).\n` + P.map((p, i) => `At ${pt2(p)}: ${tx[i]}`).join('\n') + `\nCheck: the angles add to 180°.`,
+    };
+  }
+};
+// #47–50: u · v from the lengths and the angle
+TEMPLATES.vecDotFromAngle = (r) => {
+  const a = pick(r, [2, 3, 4, 5, 6, 8, 9, 10, 12, 20, 100]), b = pick(r, [3, 4, 5, 6, 10, 12, 36, 250]);
+  const k = pick(r, [2, 3, 4, 6, 8, 9, 10, 12]); // θ = kπ/12
+  const theta = (k * Math.PI) / 12, c = Math.cos(theta), P = a * b;
+  const p12 = Math.round(c * c * 12), g = gcd(p12, 12);
+  const e = p12 === 0 ? { text: '0', latex: '0', val: 0 } : exactRatio(c < 0 ? -1 : 1, P * P * (p12 / g), 12 / g);
+  const th = piText(frc(k, 12));
+  const cands = [exactRatio(c < 0 ? 1 : -1, P * P * (p12 / g) || 1, 12 / g).text, String(P), exactRatio(1, P * P * (12 - p12 || 1), 12).text, fmt(P / 2)];
+  return {
+    topic: 'Dot product from the angle', stem: `Find u · v, where θ is the angle between u and v.   ‖u‖ = ${a},  ‖v‖ = ${b},  θ = ${th}`,
+    ...buildChoices(r, e.text, [...new Set(cands)].filter((x) => { const a = parseTrig(x.replace(/−/g, '-')); return x !== e.text && !(a && Math.abs(evalTrig(a, 0) - e.val) < 1e-9); }), (i) => String(i + 7)),
+    fr: { fields: [{ kind: 'number', label: 'u · v =' }], key: [e.latex], display: e.text, check: (vv) => numEqv(parseVecAns(vv[0]), e.val, 1e-6) },
+    solution: `u · v = ‖u‖ ‖v‖ cos θ = (${a})(${b}) cos ${th} = ${P}(${specialExact(c) ? specialExact(c).text : fmt(c)}) = ${e.text}`,
+  };
+};
+
 function piFrac(num, den) {
   if (num === 0) return '0';
   const g = gcd(num, den); num /= g; den /= g;
@@ -3255,6 +3933,23 @@ const QUESTION_TYPES = [
   { id: 'trigHalfValues', subject: 'precalc',  section: '2.5 Multiple-Angle and Product-to-Sum Formulas', label: 'Half-angle values from conditions', desc: 'Quadrant of u/2, then sin, cos, tan of u/2 (#39–42)' },
   { id: 'trigProdToSum', subject: 'precalc',  section: '2.5 Multiple-Angle and Product-to-Sum Formulas', label: 'Product-to-sum', desc: 'Rewrite a product as a sum or difference (#47–50)' },
   { id: 'trigSumToProd', subject: 'precalc',  section: '2.5 Multiple-Angle and Product-to-Sum Formulas', label: 'Sum-to-product', desc: 'Rewrite a sum or difference as a product (#51–54)' },
+  { id: 'triSinesAAS', subject: 'precalc',  section: '3.1 Law of Sines', label: 'Two angles and a side', desc: 'Solve the triangle (#5–22)' },
+  { id: 'triSinesSSA', subject: 'precalc',  section: '3.1 Law of Sines', label: 'Ambiguous case (SSA)', desc: 'No triangle, one, or two (#23–32)' },
+  { id: 'triAmbiguousB', subject: 'precalc',  section: '3.1 Law of Sines', label: 'How many triangles?', desc: 'Values of b for two, one, or no solutions (#33–36)' },
+  { id: 'triAreaSAS', subject: 'precalc',  section: '3.1 Law of Sines', label: 'Area of a triangle', desc: '½ab sin C (#37–44)' },
+  { id: 'triSinesWord', subject: 'precalc',  section: '3.1 Law of Sines', label: 'Word problems', desc: 'Fire spotting, balloons, rivers, a pole on a hill' },
+  { id: 'triCosSSS', subject: 'precalc',  section: '3.2 Law of Cosines', label: 'Three sides (SSS)', desc: 'Find all three angles (#5–24)' },
+  { id: 'triCosSAS', subject: 'precalc',  section: '3.2 Law of Cosines', label: 'Two sides and the angle between (SAS)', desc: 'Solve the triangle (#5–24)' },
+  { id: 'triParallelogram', subject: 'precalc',  section: '3.2 Law of Cosines', label: 'Parallelogram', desc: 'Sides, angles, and diagonals (#25–30)' },
+  { id: 'triWhichLaw', subject: 'precalc',  section: '3.2 Law of Cosines', label: 'Sines or Cosines?', desc: 'Pick the law, then find the first missing part (#31–36)' },
+  { id: 'triHeron', subject: 'precalc',  section: '3.2 Law of Cosines', label: "Heron's Area Formula", desc: 'Area from three sides (#37–44)' },
+  { id: 'triCosWord', subject: 'precalc',  section: '3.2 Law of Cosines', label: 'Word problems', desc: 'Marsh/lake length, ships, baseball diamond, land parcels (#45 and like it)' },
+  { id: 'vecDot', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Dot product', desc: 'Find u · v (#5–10)' },
+  { id: 'vecDotProps', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Dot product properties', desc: 'Like (u · v)v or ‖w‖ − 1; scalar or vector? (#11–22)' },
+  { id: 'vecMagnitude', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Magnitude', desc: 'Use the dot product to find ‖u‖ (#23–28)' },
+  { id: 'vecAngle', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Angle between vectors', desc: 'In radians or degrees (#29–42)' },
+  { id: 'vecTriangle', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Angles in a triangle', desc: 'Use vectors to find the interior angles (#43–46)' },
+  { id: 'vecDotFromAngle', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Dot product from the angle', desc: 'Given ‖u‖, ‖v‖, and θ (#47–50)' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
@@ -3702,7 +4397,7 @@ function frArea(q, i) {
   const vals = state.teacher ? q.fr.key.slice() : Array.isArray(state.answers[i]) ? state.answers[i].slice() : q.fr.fields.map(() => '');
   const wrap = el('div', { class: 'fr' });
   const controls = [];
-  let row = null, lastAns = null, hasMath = false, hasExpr = false, hasAngles = false, hasInverse = false, hasDegrees = false;
+  let row = null, lastAns = null, hasMath = false, hasExpr = false, hasAngles = false, hasInverse = false, hasDegrees = false, hasVector = false;
   const applyLocks = () => q.fr.fields.forEach((f, k) => {
     if (!f.lockWhen || reveal) return;
     const locked = f.lockWhen(vals);
@@ -3761,7 +4456,7 @@ function frArea(q, i) {
       if (f.kind === 'expr') input.addEventListener('keydown', (e) => { if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); } }, true);
       input.addEventListener('focus', () => { lastAns = input; });
       row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
-      hasMath = true; if (f.kind === 'expr') { if (f.keys === 'angles') hasAngles = true; else if (f.keys === 'inverse') hasInverse = true; else if (f.keys === 'degrees') hasDegrees = true; else hasExpr = true; }
+      hasMath = true; if (f.kind === 'expr') { if (f.keys === 'angles') hasAngles = true; else if (f.keys === 'inverse') hasInverse = true; else if (f.keys === 'degrees') hasDegrees = true; else if (f.keys === 'vector') hasVector = true; else hasExpr = true; }
       return;
     }
     if (f.kind === 'select') {
@@ -3781,7 +4476,8 @@ function frArea(q, i) {
   applyLocks();
   if (hasMath && !reveal) { // small symbol row for the answer boxes
     const firstAns = () => lastAns || wrap.querySelector('math-field.mans');
-    const keys = hasDegrees ? [['°', '^{\\circ}'], ['n', 'n'], [',', ','], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}']]
+    const keys = hasVector ? [['⟨ ⟩', '\\left\\langle #?\\right\\rangle'], [',', ','], ['i', 'i'], ['j', 'j'], ['√', '\\sqrt{#?}'], ['a⁄b', '\\frac{#@}{#?}']]
+      : hasDegrees ? [['°', '^{\\circ}'], ['n', 'n'], [',', ','], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}']]
       : hasInverse ? [['arcsin', '\\arcsin\\left(#?\\right)'], ['arccos', '\\arccos\\left(#?\\right)'], ['arctan', '\\arctan\\left(#?\\right)'], ['π', '\\pi'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['n', 'n'], [',', ',']]
       : hasAngles ? [['π', '\\pi'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['n', 'n'], [',', ',']]
       : hasExpr
