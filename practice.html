@@ -262,6 +262,7 @@ const SETS = {
   'precalc-6-5':   { subject: 'precalc',  title: '6.5 Rotation of Conics', items: [['r5Point', 3], ['r5Angle', 3], ['r5Rotate', 4], ['r5Classify', 2], ['r5Match', 2]] },
   'precalc-6-6':   { subject: 'precalc',  title: '6.6 Parametric Equations', items: [['p6Table', 2], ['p6Orient', 2], ['p6Elim', 7], ['p6Find', 3]] },
   'precalc-6-7':   { subject: 'precalc',  title: '6.7 Polar Coordinates', items: [['q7Rep', 2], ['q7ToRect', 2], ['q7ToPolar', 2], ['q7RectToPolar', 3], ['q7PolarToRect', 3], ['q7Describe', 2]] },
+  'precalc-6-8':   { subject: 'precalc',  title: '6.8 Graphs of Polar Equations', items: [['s8Type', 3], ['s8Match', 2], ['s8Sym', 3], ['s8MaxZero', 3], ['s8Rose', 3]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -5405,6 +5406,124 @@ TEMPLATES.q7Describe = (r) => {
   };
 };
 
+/* ---------- 6.8 Graphs of Polar Equations ---------- */
+const PTYPES = ['Circle', 'Line', 'Cardioid', 'Limaçon with inner loop', 'Dimpled limaçon', 'Convex limaçon', 'Rose curve', 'Lemniscate'];
+// polar curves: { type, text, f(θ) → r  (or g(θ) → r² for lemniscates), petals, ... }
+function polCurve(r, want) {
+  const kind = want || pick(r, ['circle', 'lim', 'lim', 'rose', 'rose', 'lem', 'line']);
+  const fn = pick(r, ['cos', 'sin']), F = fn === 'cos' ? Math.cos : Math.sin, sg = pick(r, [1, -1]);
+  if (kind === 'circle') { const a = ri(r, 2, 8), k = ri(r, 0, 2);
+    if (k === 0) return { type: 'Circle', text: `r = ${a}`, f: () => a };
+    return { type: 'Circle', text: `r = ${sg < 0 ? MINUS : ''}${a} ${fn} θ`, f: (t) => sg * a * F(t) }; }
+  if (kind === 'line') { const a = ri(r, 2, 6); return r() < 0.5 ? { type: 'Line', text: `r = ${a} ${fn === 'cos' ? 'sec' : 'csc'} θ`, f: (t) => a / F(t) } : (() => { const d = pick(r, [30, 45, 60, 120, 135]); return { type: 'Line', text: `θ = ${radT(d)}`, theta: d * D2R }; })(); }
+  if (kind === 'lim') {
+    const cat = pick(r, ['card', 'loop', 'dimple', 'convex']);
+    let a, b; for (;;) { b = ri(r, 1, 6); a = cat === 'card' ? b : cat === 'loop' ? ri(r, 1, 3 * b) : cat === 'dimple' ? ri(r, b + 1, 2 * b - 1) : ri(r, 2 * b, 3 * b + 2); if (cat === 'loop' && a >= b) continue; if (cat === 'dimple' && !(a > b && a < 2 * b)) continue; break; }
+    const type = cat === 'card' ? 'Cardioid' : cat === 'loop' ? 'Limaçon with inner loop' : cat === 'dimple' ? 'Dimpled limaçon' : 'Convex limaçon';
+    const m = cat === 'card' && r() < 0.5 ? ri(r, 2, 5) : 1; // m(1 ± cos θ) form
+    const text = m > 1 ? `r = ${m}(1 ${sg > 0 ? '+' : MINUS} ${fn} θ)` : `r = ${a} ${sg > 0 ? '+' : MINUS} ${b === 1 ? '' : b + ' '}${fn} θ`;
+    const A = m > 1 ? m : a, B = m > 1 ? m : b;
+    return { type, text, f: (t) => A + sg * B * F(t), a: A, b: B, sg, fn };
+  }
+  if (kind === 'rose') { const n = ri(r, 2, 5), a = ri(r, 2, 8) * pick(r, [1, 1, -1]);
+    return { type: 'Rose curve', text: `r = ${a < 0 ? MINUS : ''}${Math.abs(a)} ${fn} ${n}θ`, f: (t) => a * F(n * t), n, a, fn, petals: n % 2 ? n : 2 * n }; }
+  const a2 = pick(r, [4, 9, 16, 25, 36, 64]) * (r() < 0.2 ? -1 : 1);
+  return { type: 'Lemniscate', text: `r² = ${a2 < 0 ? MINUS : ''}${Math.abs(a2)} ${fn} 2θ`, g: (t) => a2 * F(2 * t), a2, fn };
+}
+// draw a polar curve
+const polDrawCurves = (C) => {
+  if (C.theta !== undefined) return [{ param: [(t) => [t * Math.cos(C.theta), t * Math.sin(C.theta)], -20, 20] }];
+  if (C.g) return [1, -1].map((s) => ({ param: [(t) => { const v = Math.sqrt(Math.max(0, C.g(t))); return [s * v * Math.cos(t), s * v * Math.sin(t)]; }, 0, 2 * Math.PI] }));
+  return [{ param: [(t) => { const v = C.f(t); return Math.abs(v) > 60 ? [NaN, NaN] : [v * Math.cos(t), v * Math.sin(t)]; }, 0, 2 * Math.PI] }];
+};
+const polExtent = (C) => { let m = 1; for (let j = 0; j < 400; j++) { const t = (j * 2 * Math.PI) / 400; const v = C.g ? Math.sqrt(Math.max(0, C.g(t))) : C.f ? Math.abs(C.f(t)) : 6; if (isFinite(v) && v < 60) m = Math.max(m, v); } return Math.min(Math.ceil(m + 1), 20); };
+const polPlot = (C) => { const e = C.type === 'Line' ? 8 : polExtent(C); return plotQ({ xr: [-e, e], yr: [-e, e], curves: polDrawCurves(C), step: e > 12 ? 2 : 1 }); };
+// is the rectangular point on the curve?
+function polOn(C, x, y) {
+  const rho = Math.hypot(x, y), phi = Math.atan2(y, x), tol = 1e-6 * Math.max(1, rho);
+  if (C.g) return [0, Math.PI].some((s) => Math.abs(C.g(phi + s) - rho * rho) < tol * Math.max(1, rho));
+  return Math.abs(C.f(phi) - rho) < tol || Math.abs(C.f(phi + Math.PI) + rho) < tol;
+}
+function polSym(C) { // [polar axis, θ = π/2, pole]
+  const pts = []; for (let j = 0; j < 48; j++) { const t = 0.07 + (j * 2 * Math.PI) / 48; if (C.g) { const v = C.g(t); if (v > 1e-6) { const s = Math.sqrt(v); pts.push([s * Math.cos(t), s * Math.sin(t)]); } } else { const v = C.f(t); if (Math.abs(v) > 1e-6 && Math.abs(v) < 60) pts.push([v * Math.cos(t), v * Math.sin(t)]); } }
+  return [([x, y]) => [x, -y], ([x, y]) => [-x, y], ([x, y]) => [-x, -y]].map((R) => pts.every((p) => polOn(C, ...R(p))));
+}
+TEMPLATES.s8Type = (r) => {
+  const C = polCurve(r), ans = C.type;
+  const near = { Cardioid: ['Limaçon with inner loop', 'Dimpled limaçon', 'Rose curve'], 'Limaçon with inner loop': ['Cardioid', 'Dimpled limaçon', 'Convex limaçon'], 'Dimpled limaçon': ['Convex limaçon', 'Cardioid', 'Limaçon with inner loop'], 'Convex limaçon': ['Dimpled limaçon', 'Circle', 'Cardioid'],
+    'Rose curve': ['Lemniscate', 'Circle', 'Cardioid'], Lemniscate: ['Rose curve', 'Circle', 'Limaçon with inner loop'], Circle: ['Line', 'Cardioid', 'Rose curve'], Line: ['Circle', 'Rose curve', 'Lemniscate'] }[ans];
+  const why = C.b !== undefined ? `This is a limaçon r = a ± b ${C.fn} θ with a = ${C.a}, b = ${C.b}: a/b ${C.a === C.b ? '= 1, a cardioid' : C.a < C.b ? '< 1, a limaçon with an inner loop' : C.a < 2 * C.b ? 'is between 1 and 2, a dimpled limaçon' : '≥ 2, a convex limaçon'}.`
+    : ans === 'Rose curve' ? `r = a ${C.fn} nθ is a rose curve (n = ${C.n}, so ${C.petals} petals).` : ans === 'Lemniscate' ? `r² = a² ${C.fn} 2θ is a lemniscate.` : ans === 'Circle' ? `${C.text} is a circle (r = a, r = a cos θ, or r = a sin θ).` : `${C.text} is a line.`;
+  return {
+    topic: 'Identifying polar graphs', stem: `Identify the type of polar graph.   ${C.text}`,
+    ...buildChoices(r, ans, near, () => null), fr: FR.select('The graph is a', PTYPES, ans),
+    draw: r() < 0.5 ? polPlot(C) : undefined, size: [360, 360],
+    solution: why,
+  };
+};
+TEMPLATES.s8Sym = (r) => {
+  let C; do C = polCurve(r, pick(r, ['lim', 'lim', 'rose', 'lem', 'circle'])); while (C.type === 'Circle' && /^r = \d+$/.test(C.text) && r() < 0.6);
+  const S = polSym(C), names = ['the polar axis', 'the line θ = π/2', 'the pole'];
+  const T = (s) => { const L = names.filter((_, i) => s[i]); return L.length ? `Symmetric with respect to ${L.join(', ').replace(/, ([^,]*)$/, L.length > 2 ? ', and $1' : ' and $1')}` : 'No symmetry'; };
+  const all = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 1], [0, 0, 0]].map((s) => s.map(Boolean));
+  const correct = T(S), opts = all.map(T).filter((t) => t !== correct);
+  const ok = (v) => S.map((s, i) => v[i] === (s ? 'Yes' : 'No'));
+  return {
+    topic: 'Testing for symmetry', stem: `Test for symmetry with respect to the line θ = π/2, the polar axis, and the pole.   ${C.text}`,
+    ...buildChoices(r, correct, opts, () => null),
+    fr: { fields: names.map((n) => ({ kind: 'select', label: `Symmetric about ${n}?`, options: ['Yes', 'No'] })), key: S.map((s) => (s ? 'Yes' : 'No')), display: correct, check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 3 },
+    solution: `Polar axis: replace (r, θ) with (r, −θ). Line θ = π/2: replace (r, θ) with (r, π − θ). Pole: replace (r, θ) with (−r, θ) or (r, π + θ).\n${C.fn === 'cos' ? 'cos(−θ) = cos θ' : 'sin(π − θ) = sin θ'}${C.type === 'Lemniscate' ? '; r² is unchanged by r → −r' : ''}.\n${correct}.`,
+  };
+};
+TEMPLATES.s8MaxZero = (r) => {
+  let C, max, maxAt, zeros;
+  const fn = pick(r, ['cos', 'sin']), F = fn === 'cos' ? Math.cos : Math.sin, k = ri(r, 0, 2);
+  if (k === 0) { // limaçon a ± b fn θ with a/b ∈ {1, 1/2} or a > b (no zeros)
+    const b = ri(r, 2, 8), cat = pick(r, ['card', 'half', 'none']), a = cat === 'card' ? b : cat === 'half' ? b : b + ri(r, 1, 4), sg = pick(r, [1, -1]);
+    const B = cat === 'half' ? 2 * b : b;
+    C = { text: `r = ${a} ${sg > 0 ? '+' : MINUS} ${B} ${fn} θ`, f: (t) => a + sg * B * F(t) };
+    max = a + B;
+  } else { const n = ri(r, 2, 4), a = ri(r, 2, 9) * pick(r, [1, -1]); C = { text: `r = ${a < 0 ? MINUS : ''}${Math.abs(a)} ${fn} ${n}θ`, f: (t) => a * F(n * t) }; max = Math.abs(a); }
+  zeros = []; maxAt = [];
+  for (let j = 0; j < 48; j++) { const d = j * 7.5, v = C.f(d * D2R); if (Math.abs(v) < 1e-9) zeros.push(d); if (Math.abs(Math.abs(v) - max) < 1e-9) maxAt.push(d); }
+  const zT = zeros.length ? zeros.map((d) => (d === 0 ? '0' : radT(d))).join(', ') : 'none', correct = `Maximum |r| = ${max};  zeros: θ = ${zT}`.replace('θ = none', 'none');
+  const wrongs = [`Maximum |r| = ${max};  zeros: none`, `Maximum |r| = ${max + 1};  zeros: θ = ${zT}`.replace('θ = none', 'none'), `Maximum |r| = ${max};  zeros: θ = ${zeros.length ? zeros.filter((d) => d < 180).map((d) => (d === 0 ? '0' : radT(d))).join(', ') || 'π' : radT(fn === 'cos' ? 180 : 270)}`, `Maximum |r| = ${Math.max(1, max - 2)};  zeros: θ = ${zT}`.replace('θ = none', 'none')];
+  const ok = (v) => [numOk(v[0], max), angListOk(v[1], zeros, 'rad')];
+  return {
+    topic: 'Maximum |r| and zeros', stem: `Find the maximum value of |r| and any zeros of r for 0 ≤ θ < 2π.   ${C.text}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => `Maximum |r| = ${max + i + 2};  zeros: θ = ${zT}`),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Maximum |r| =' }, { kind: 'expr', keys: 'ang', label: 'Zeros (θ, separated by commas):' }], key: [String(max), zeros.length ? zeros.map((d) => (d === 0 ? '0' : radL(d))).join(',') : '\\text{none}'], display: correct,
+      check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+    solution: `|r| is largest when ${fn} ${k ? `nθ` : 'θ'} = ${k ? '±1' : '±1 (the sign that adds)'}: |r| = ${max} at θ = ${maxAt.map((d) => (d === 0 ? '0' : radT(d))).join(', ')}.\n${zeros.length ? `r = 0 when θ = ${zT}.` : 'r is never 0, so there are no zeros.'}`,
+  };
+};
+TEMPLATES.s8Rose = (r) => {
+  const C = polCurve(r, 'rose'), len = Math.abs(C.a);
+  const T = (p, l) => `${p} petals, each ${l} unit${l === 1 ? '' : 's'} long`, correct = T(C.petals, len);
+  const wrongs = [T(C.n, len), T(2 * C.n === C.petals ? C.n : 2 * C.n, len), T(C.petals, 2 * len), T(C.petals, C.n)].filter((w) => w !== correct);
+  const ok = (v) => [numOk(v[0], C.petals), numOk(v[1], len)];
+  return {
+    topic: 'Rose curves', stem: `Find the number of petals and the length of each petal of the rose curve.   ${C.text}`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(C.petals + i + 1, len)),
+    fr: { fields: [{ kind: 'number', label: 'Number of petals:' }, { kind: 'number', label: 'Length of each petal:' }], key: [String(C.petals), String(len)], display: correct, check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+    draw: r() < 0.4 ? polPlot(C) : undefined, size: [360, 360],
+    solution: `r = a ${C.fn} nθ with n = ${C.n} (${C.n % 2 ? 'odd: n petals' : 'even: 2n petals'}) and |a| = ${len}: ${correct}.`,
+  };
+};
+TEMPLATES.s8Match = (r) => {
+  for (;;) {
+    const kinds = shuffle(r, ['circle', 'lim', 'lim', 'rose', 'lem']).slice(0, 4);
+    const Cs = kinds.map((k) => polCurve(r, k)); const opts = Cs.map((c) => c.text); if (new Set(opts).size < 4) continue;
+    const C = Cs[0];
+    return {
+      topic: 'Matching polar graphs', stem: 'Which polar equation matches the graph?',
+      ...buildChoices(r, opts[0], opts.slice(1), () => null), fr: FR.select('The graph is', shuffle(r, opts), opts[0]),
+      draw: polPlot(C), size: [380, 380],
+      solution: `The graph is a ${C.type.toLowerCase()}. ${opts[0]} is the only ${C.type.toLowerCase()} among the choices with this size and position.`,
+    };
+  }
+};
+
 /* ==== CHAPTER 6 END ==== */
 /* ---------- 2.1 Using Fundamental Identities ---------- */
 // Expressions are written in a small plain notation with X for the variable, e.g. 'sin^2 X/(1 + cos X)'.
@@ -9869,6 +9988,11 @@ const QUESTION_TYPES = [
   { id: 'q7RectToPolar', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Rectangular equation to polar form', desc: '' },
   { id: 'q7PolarToRect', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Polar equation to rectangular form', desc: '(#79–92)' },
   { id: 'q7Describe', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Describing a polar graph', desc: '(#93–100)' },
+  { id: 's8Type', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Identifying polar graphs', desc: 'Circle, limaçon, cardioid, rose, lemniscate (#5–10)' },
+  { id: 's8Match', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Matching polar graphs', desc: '' },
+  { id: 's8Sym', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Testing for symmetry', desc: 'Polar axis, θ = π/2, pole (#11–16)' },
+  { id: 's8MaxZero', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Maximum |r| and zeros', desc: '(#17–20)' },
+  { id: 's8Rose', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Rose curves', desc: 'Number and length of petals' },
 ];
 
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
