@@ -219,6 +219,12 @@ const SETS = {
   'geo-5-2-name':  { subject: 'geometry', title: '5.2 Naming Corresponding Parts', items: [['g52Name', 6], ['g52AllPairs', 2], ['g52TrueFalse', 4], ['g52Rewrite', 2]] },
   'geo-5-3-6':     { subject: 'geometry', title: '5.3–5.6 Triangle Congruence (SSS, SAS, ASA, AAS, HL)', items: [['triCongruence', 9], ['triCongruenceGiven', 3]] },
   'geo-5-4':       { subject: 'geometry', title: '5.4 Equilateral and Isosceles Triangles', items: [['g54Complete', 2], ['g54FindX', 3], ['g54FindXY', 2], ['g54Perimeter', 2], ['g54Angles', 2], ['g54IsoT', 1], ['g54BaseFacts', 1], ['g54Lighthouse', 1]] },
+  'geo-6-1':       { subject: 'geometry', title: '6.1 Perpendicular and Angle Bisectors', items: [['g61PerpBis', 3], ['g61PerpConclude', 2], ['g61AngBis', 3], ['g61AngConclude', 2], ['g61PerpEq', 3]] },
+  'geo-6-2':       { subject: 'geometry', title: '6.2 Bisectors of Triangles', items: [['g62Centers', 6], ['g62CircumCoord', 4], ['g62WhichCenter', 2]] },
+  'geo-6-3':       { subject: 'geometry', title: '6.3 Medians and Altitudes of Triangles', items: [['g63Centroid', 4], ['g63CentroidFind', 4], ['g63CentroidCoord', 2], ['g63Ortho', 3]] },
+  'geo-6-4':       { subject: 'geometry', title: '6.4 The Triangle Midsegment Theorem', items: [['g64Coords', 2], ['g64FindX', 4], ['g64Complete', 4], ['g64Word', 2]] },
+  'geo-6-5':       { subject: 'geometry', title: '6.5 Indirect Proof and Inequalities in One Triangle', items: [['g65FirstStep', 2], ['g65OrderAngles', 3], ['g65OrderSides', 3], ['g65ThirdSide', 3], ['g65Possible', 3]] },
+  'geo-6-6':       { subject: 'geometry', title: '6.6 Inequalities in Two Triangles', items: [['g66Hinge', 6], ['g66Flights', 2], ['g66PossibleX', 3]] },
   // ----- Pre-Calculus -----
   'precalc-p-1':   { subject: 'precalc',  title: 'P.1 Review of Real Numbers', items: [['p1Classify', 2], ['p1Order', 2], ['p1Interval', 4], ['p1AbsVal', 3], ['p1Compare', 2], ['p1Distance', 2]] },
   'precalc-p-2':   { subject: 'precalc',  title: 'P.2 Solving Equations', items: [['p2Linear', 3], ['p2Rational', 3], ['p2Factor', 2], ['p2SqRoots', 2], ['p2CompleteSq', 2], ['p2Quadratic', 3]] },
@@ -231,6 +237,7 @@ const SETS = {
   'precalc-p-9':   { subject: 'precalc',  title: 'P.9 Combinations of Functions: Composite Functions', items: [['p9Arith', 3], ['p9Evaluate', 4], ['p9Compose', 3], ['p9CompDomain', 3]] },
   'precalc-p-10':  { subject: 'precalc',  title: 'P.10 Inverse Functions', items: [['p10FindInverse', 3], ['p10Verify', 2], ['p10Table', 2], ['p10HasInverse', 2], ['p10Determine', 3], ['p10CompInverse', 2]] },
   'precalc-trig':  { subject: 'precalc', hidden: true,  title: 'Graphs of Sine and Cosine', items: [['trigGraph', 6]] },
+  'precalc-1-0':   { subject: 'precalc',  title: '1 Review: Combining Like Terms with Trig Functions', items: [['t1Combine', 12]] },
   'precalc-1-1':   { subject: 'precalc',  title: '1.1 Radian and Degree Measure', items: [['t1Quadrant', 2], ['t1Coterminal', 2], ['t1CompSupp', 2], ['t1DegToRad', 2], ['t1RadToDeg', 2], ['t1DMS', 1], ['t1Arc', 1], ['t1CentralAngle', 1], ['t1Sector', 1], ['t1Speed', 1]] },
   'precalc-1-2':   { subject: 'precalc',  title: '1.2 Trigonometric Functions: The Unit Circle', items: [['t2SixFromPoint', 2], ['t2Point', 2], ['t2SinCosTan', 3], ['t2SixExact', 2], ['t2Period', 2], ['t2GivenValue', 2], ['t2Calc', 2]] },
   'precalc-1-3':   { subject: 'precalc',  title: '1.3 Right Triangle Trigonometry', items: [['t3SixTriangle', 2], ['t3OtherFive', 2], ['t3SpecialTable', 2], ['t3Calc', 2], ['t3Identities', 2], ['t3SpecialAngle', 2], ['t3SolveSides', 2]] },
@@ -10097,6 +10104,471 @@ TEMPLATES.g54BaseFacts = (r) => {
 };
 /* ==== GEOMETRY 5.4 END ==== */
 
+/* ==== GEOMETRY CH6 BEGIN ==== */
+/* ---------- Geometry Chapter 6: Relationships Within Triangles ---------- */
+const g6Num = (r, lo, hi) => ri(r, lo, hi);
+// solve a·x + b = c·x + d with a whole-number x; returns { x, L, R, val } or null
+function g6Eq(r, lo = 2, hi = 12, minVal = 3) {
+  for (let t = 0; t < 400; t++) {
+    const x = ri(r, lo, hi), a = ri(r, 1, 9), c = ri(r, 1, 9); if (a === c) continue;
+    const b = ri(r, -12, 20), val = a * x + b, d = val - c * x; if (val < minVal || Math.abs(d) > 40) continue;
+    return { x, L: g4Lin(a, b), R: g4Lin(c, d), val };
+  }
+  return null;
+}
+const g6Wrong = (v) => [v + 2, v - 3, 2 * v, Math.round(v / 2) || v + 5, v + 7].filter((w) => w > 0 && w !== v);
+const g6Choices = (r, v, f = (x) => String(x)) => buildChoices(r, f(v), [...new Set(g6Wrong(v))].map(f), (i) => f(v + i + 4));
+
+/* ---------- 6.1 Perpendicular and Angle Bisectors ---------- */
+// figure: P on the perpendicular bisector of LM (N = foot); marks optional
+function g61PerpFig(N, { right = true, ticks = true, lab1 = '', lab2 = '', labL = '', labR = '' } = {}) {
+  const [L, M, F, P] = N, h = 4;
+  return (cv) => drawFigure(cv, { polys: [
+    { group: 'g', pts: [[0, 0], [3, 0], [3, h]], names: [L, F, P], ticks: [ticks ? 1 : 0, 0, 0], right: [0, right ? 1 : 0, 0], slab: [labL, '', lab1] },
+    { group: 'g', pts: [[3, 0], [6, 0], [3, h]], names: [F, M, P], ticks: [ticks ? 1 : 0, 0, 0], right: [right ? 1 : 0, 0, 0], slab: [labR, lab2, ''] }] });
+}
+TEMPLATES.g61PerpBis = (r) => {
+  const N = pickLetters(r, 4), [L, M, F, P] = N, k = ri(r, 0, 2);
+  let stem, ans, draw, why;
+  if (k === 0) { // equidistant: P on ⊥ bisector, PL given → PM
+    const v = pick(r, [4.6, 4.7, 8, 12, 7.5, 15, 23]); ans = v; stem = `Find ${P}${M}.`;
+    draw = g61PerpFig(N, { lab1: String(v) });
+    why = `${P}${F} is the perpendicular bisector of ${SEG(L + M)}, so ${P} is equidistant from ${L} and ${M} (Perpendicular Bisector Theorem): ${P}${M} = ${P}${L} = ${v}.`;
+  } else if (k === 1) { // expressions on PL and PM → find LM? (book #8 UW) → find PL
+    const E = g6Eq(r, 2, 9, 5); ans = E.val; stem = `Find ${P}${L}.`;
+    draw = g61PerpFig(N, { lab1: E.L, lab2: E.R });
+    why = `${P} is on the perpendicular bisector of ${SEG(L + M)}, so ${P}${L} = ${P}${M}: ${E.L} = ${E.R}, so x = ${E.x}. ${P}${L} = ${E.val}.`;
+  } else { // segment pieces: LF = 5x, FM = 4x + 3 → find LM (book #7)
+    const E = g6Eq(r, 2, 9, 4); ans = 2 * E.val; stem = `Find ${L}${M}.`;
+    draw = (cv) => drawFigure(cv, { polys: [
+      { group: 'g', pts: [[0, 0], [3, 0], [3, 3]], names: [L, F, P], right: [0, 1, 0], slab: [E.L, '', ''] },
+      { group: 'g', pts: [[3, 0], [6, 0], [3, 3]], names: [F, M, P], right: [1, 0, 0], slab: [E.R, '', ''], ticks: [0, 1, 0] }, { group: 'g', pts: [[0, 0], [3, 3]], names: [L, P], ticks: [0, 1] }] });
+    why = `${P}${L} = ${P}${M} (marked), so ${P} is on the perpendicular bisector of ${SEG(L + M)} (Converse of the Perpendicular Bisector Theorem) and ${F} is the midpoint: ${E.L} = ${E.R}, so x = ${E.x}. Each half is ${E.val}, so ${L}${M} = ${2 * E.val}.`;
+  }
+  return { topic: 'Perpendicular Bisector Theorem', stem: `Find the indicated measure. ${stem}`, ...g6Choices(r, ans, (x) => fmt(x)), fr: FR.num(`${stem.slice(5, -1)} =`, ans), draw, size: [400, 280], solution: why };
+};
+TEMPLATES.g61PerpConclude = (r) => {
+  const N = pickLetters(r, 4), [L, M, F, P] = N, k = ri(r, 0, 3);
+  const opts = { right: k !== 2, ticks: k !== 1 };
+  let ans = 'Yes', why;
+  if (k === 0) why = `${SEG(P + F)} is perpendicular to ${SEG(L + M)} and bisects it, so it is the perpendicular bisector; ${P} lies on it.`;
+  else if (k === 1) { ans = 'No'; why = `${SEG(P + F)} is perpendicular to ${SEG(L + M)}, but you do not know that ${F} is the midpoint of ${SEG(L + M)}.`; }
+  else if (k === 2) { ans = 'No'; why = `${F} is the midpoint of ${SEG(L + M)}, but you do not know that ${SEG(P + F)} is perpendicular to ${SEG(L + M)}.`; }
+  else { why = `${P}${L} = ${P}${M} (marked), so by the Converse of the Perpendicular Bisector Theorem, ${P} lies on the perpendicular bisector of ${SEG(L + M)}.`; }
+  const draw = k === 3 ? (cv) => drawFigure(cv, { polys: [{ group: 'g', pts: [[0, 0], [6, 0], [2.2, 4]], names: [L, M, P], ticks: [0, 1, 1] }] }) : g61PerpFig(N, opts);
+  return { topic: 'Perpendicular bisectors: enough information?', stem: `Tell whether the information in the figure allows you to conclude that point ${P} lies on the perpendicular bisector of ${SEG(L + M)}.`,
+    ...buildChoices(r, ans, [ans === 'Yes' ? 'No' : 'Yes'], () => null), fr: FR.select('Conclusion:', ['Yes', 'No'], ans), draw, size: [400, 280], solution: why };
+};
+// angle bisector figure: vertex J, rays through F and G, D on the bisector with DF ⊥ JF, DG ⊥ JG
+function g61AngFig(N, { right = true, ticks = true, labF = '', labG = '', angF = '', angG = '' } = {}) {
+  const [J, F, G, D] = N, th = 0.42, d = 6, pF = [d * Math.cos(th) ** 2, d * Math.cos(th) * Math.sin(th)], pG = [pF[0], -pF[1]];
+  return (cv) => drawFigure(cv, { polys: [
+    { group: 'g', pts: [[0, 0], pF, [d, 0]], names: [J, F, D], right: [0, right ? 1 : 0, 0], ticks: [0, ticks ? 1 : 0, 0], slab: ['', labF, ''], alab: [angF, '', ''], arcs: [angF ? 1 : 0, 0, 0] },
+    { group: 'g', pts: [[0, 0], pG, [d, 0]], names: [J, G, D], right: [0, right ? 1 : 0, 0], ticks: [0, ticks ? 1 : 0, 0], slab: ['', labG, ''], alab: [angG, '', ''], arcs: [angG ? 2 : 0, 0, 0] }] });
+}
+TEMPLATES.g61AngBis = (r) => {
+  const N = pickLetters(r, 4), [J, F, G, D] = N, k = ri(r, 0, 2);
+  let stem, ans, draw, why, lab;
+  if (k === 0) { const v = ri(r, 5, 20); ans = v; stem = `${D}${G}`; draw = g61AngFig(N, { ticks: false, labF: String(v), angF: '', angG: '' });
+    draw = (cv) => drawFigure(cv, { polys: [
+      { group: 'g', pts: [[0, 0], [6 * Math.cos(0.42) ** 2, 6 * Math.cos(0.42) * Math.sin(0.42)], [6, 0]], names: [J, F, D], right: [0, 1, 0], slab: ['', String(v), ''], arcs: [1, 0, 0] },
+      { group: 'g', pts: [[0, 0], [6 * Math.cos(0.42) ** 2, -6 * Math.cos(0.42) * Math.sin(0.42)], [6, 0]], names: [J, G, D], right: [0, 1, 0], arcs: [1, 0, 0] }] });
+    why = `${SEG(J + D)} bisects ∠${F}${J}${G} (marked congruent angles) and ${D} is on the bisector, so ${D} is equidistant from the sides (Angle Bisector Theorem): ${D}${G} = ${D}${F} = ${v}.`; }
+  else if (k === 1) { const E = g6Eq(r, 2, 9, 4); ans = E.val; stem = `${F}${D}`; draw = g61AngFig(N, { ticks: false, labF: E.L, labG: E.R, angF: '', angG: '' });
+    draw = (cv) => drawFigure(cv, { polys: [
+      { group: 'g', pts: [[0, 0], [6 * Math.cos(0.42) ** 2, 6 * Math.cos(0.42) * Math.sin(0.42)], [6, 0]], names: [J, F, D], right: [0, 1, 0], slab: ['', E.L, ''], arcs: [1, 0, 0] },
+      { group: 'g', pts: [[0, 0], [6 * Math.cos(0.42) ** 2, -6 * Math.cos(0.42) * Math.sin(0.42)], [6, 0]], names: [J, G, D], right: [0, 1, 0], slab: ['', E.R, ''], arcs: [1, 0, 0] }] });
+    why = `${D} is on the bisector of ∠${F}${J}${G}, so ${D}${F} = ${D}${G}: ${E.L} = ${E.R}, so x = ${E.x}, and ${F}${D} = ${E.val}.`; }
+  else { // equal distances → equal angles (book #16)
+    let E; do E = g6Eq(r, 2, 10, 8); while (!E || E.val > 40);
+    ans = 2 * E.val; stem = `m∠${F}${J}${G}`; draw = g61AngFig(N, { angF: /^\d*x$/.test(E.L) ? `${E.L}°` : `(${E.L})°`, angG: /^\d*x$/.test(E.R) ? `${E.R}°` : `(${E.R})°` });
+    why = `${D}${F} = ${D}${G} with ${SEG(D + F)} ⊥ ${SEG(J + F)} and ${SEG(D + G)} ⊥ ${SEG(J + G)}, so ${D} is on the bisector of ∠${F}${J}${G} (Converse of the Angle Bisector Theorem): ${E.L} = ${E.R}, so x = ${E.x}. Each half is ${E.val}°, so m∠${F}${J}${G} = ${2 * E.val}°.`; }
+  const deg = k === 2;
+  return { topic: 'Angle Bisector Theorem', stem: `Find the indicated measure. ${stem}`, ...g6Choices(r, ans, (x) => (deg ? x + '°' : String(x))), fr: FR.num(`${stem} =`, ans, { suffix: deg ? '°' : '' }), draw, size: [400, 300], solution: why };
+};
+TEMPLATES.g61AngConclude = (r) => {
+  const N = pickLetters(r, 4), [J, F, G, D] = N, k = ri(r, 0, 2), ans = k === 0 ? 'Yes' : 'No';
+  const draw = g61AngFig(N, { right: k !== 1, ticks: k !== 2 });
+  const why = k === 0 ? `${D} is equidistant from both sides (perpendicular distances marked congruent), so ${SEG(J + D)} bisects the angle (Converse of the Angle Bisector Theorem).`
+    : k === 1 ? `The segments ${SEG(D + F)} and ${SEG(D + G)} are congruent, but they are not shown perpendicular to the sides, so they are not the distances from ${D} to the sides.`
+    : `The segments are perpendicular to the sides, but they are not shown congruent, so you do not know that ${D} is equidistant from the sides.`;
+  return { topic: 'Angle bisectors: enough information?', stem: `Tell whether the information in the figure allows you to conclude that ${J}${D} bisects ∠${F}${J}${G}.`,
+    ...buildChoices(r, ans, [ans === 'Yes' ? 'No' : 'Yes'], () => null), fr: FR.select('Conclusion:', ['Yes', 'No'], ans), draw, size: [400, 300], solution: why };
+};
+TEMPLATES.g61PerpEq = (r) => {
+  let P, Q; do { P = [ri(r, -10, 10), ri(r, -8, 12)]; Q = [ri(r, -10, 10), ri(r, -8, 12)]; } while ((P[0] - Q[0]) % 2 || (P[1] - Q[1]) % 2 || (P[0] === Q[0] && P[1] === Q[1]));
+  const [n1, n2] = pickLetters(r, 2), M = [(P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2], dx = Q[0] - P[0], dy = Q[1] - P[1];
+  const line = [dx, dy, -(dx * M[0] + dy * M[1])];
+  let correct, key, wrongs;
+  if (dy === 0) { correct = `x = ${fracT(M[0])}`; key = `x=${fracL(M[0])}`; wrongs = [`y = ${fracT(M[1])}`, `x = ${fracT(M[0] + 1)}`, `y = ${fracT(M[0])}`]; }
+  else if (dx === 0) { correct = `y = ${fracT(M[1])}`; key = `y=${fracL(M[1])}`; wrongs = [`x = ${fracT(M[0])}`, `y = ${fracT(M[1] + 1)}`, `x = ${fracT(M[1])}`]; }
+  else { const m = -dx / dy, b = M[1] - m * M[0]; correct = lineText(m, b); key = lineLatex(m, b); const s = dy / dx; wrongs = [lineText(s, M[1] - s * M[0]), lineText(-s, M[1] + s * M[0]), lineText(m, M[0] - m * M[1]), lineText(1 / s, P[1] - P[0] / s)]; }
+  return { topic: 'Equation of a perpendicular bisector', stem: `Write an equation of the perpendicular bisector of the segment with endpoints ${n1}${ptT(P)} and ${n2}${ptT(Q)}.`,
+    ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => lineText(i + 2, i)),
+    fr: { fields: [{ kind: 'expr', keys: 'func', label: '' }], key: [key], display: correct, check: (v) => lineOk(v[0], line) },
+    solution: `Midpoint: ${ptT(M)}. Slope of ${SEG(n1 + n2)}: ${dx === 0 ? 'undefined' : fracT(dy / dx)}, so the perpendicular slope is ${dy === 0 ? 'undefined (vertical line)' : dx === 0 ? '0 (horizontal line)' : fracT(-dx / dy)}.\nThe perpendicular bisector passes through the midpoint: ${correct}`,
+  };
+};
+
+/* ---------- 6.2 Bisectors of Triangles ---------- */
+TEMPLATES.g62Centers = (r) => {
+  const k = ri(r, 0, 3), [A, B, C, P] = pickLetters(r, 4);
+  let stem, ans, why, lab;
+  if (k <= 1) { // circumcenter: equal distances to vertices
+    const E = g6Eq(r, 2, 10, 4), [u, v, w] = shuffle(r, [A, B, C]);
+    stem = `Point ${P} is the circumcenter of △${A}${B}${C}. ${P}${u} = ${E.L} and ${P}${v} = ${E.R}. Find ${P}${w}.`; ans = E.val; lab = `${P}${w} =`;
+    why = `The circumcenter is equidistant from the vertices (Circumcenter Theorem): ${E.L} = ${E.R}, so x = ${E.x}, and ${P}${w} = ${P}${u} = ${E.val}.`;
+  } else if (k === 2) { // incenter: equal distances to sides
+    const E = g6Eq(r, 2, 10, 4), [D, F, H] = pickLetters(r, 3, [A, B, C, P]);
+    stem = `Point ${P} is the incenter of △${A}${B}${C}. ${D}, ${F}, and ${H} are the points where the perpendicular segments from ${P} meet the sides. ${P}${D} = ${E.L} and ${P}${F} = ${E.R}. Find ${P}${H}.`; ans = E.val; lab = `${P}${H} =`;
+    why = `The incenter is equidistant from the sides (Incenter Theorem), so ${P}${D} = ${P}${F} = ${P}${H}: ${E.L} = ${E.R}, so x = ${E.x}, and ${P}${H} = ${E.val}.`;
+  } else { // incenter with a right triangle (book #5–6)
+    const [a, b, c] = pick(r, [[9, 12, 15], [5, 12, 13], [8, 15, 17], [6, 8, 10], [7, 24, 25], [12, 16, 20]]), [K, Y] = pickLetters(r, 2, [A, B, C, P]);
+    stem = `The angle bisectors of △${A}${B}${C} meet at point ${P}. Point ${K} is on ${SEG(A + B)} with ${SEG(P + K)} ⊥ ${SEG(A + B)}. ${P}${A} = ${c} and ${A}${K} = ${b}. Find the distance from ${P} to ${SEG(B + C)}.`; ans = a; lab = 'Distance =';
+    why = `In right △${P}${K}${A}, ${P}${K} = √(${c}² − ${b}²) = ${a}. ${P} is the incenter, so it is the same distance from every side: ${a}.`;
+  }
+  return { topic: 'Circumcenter and incenter', stem, ...g6Choices(r, ans), fr: FR.num(lab, ans), solution: why };
+};
+// points with integer offsets at distance r
+const G6_CIRC = { 5: [[3, 4], [4, 3], [5, 0], [0, 5]], 10: [[6, 8], [8, 6], [10, 0], [0, 10]], 13: [[5, 12], [12, 5], [13, 0], [0, 13]] };
+TEMPLATES.g62CircumCoord = (r) => {
+  for (;;) {
+    let V, h, k;
+    if (r() < 0.35) { const a = 2 * ri(r, 1, 5), b = 2 * ri(r, 1, 5), x0 = ri(r, -4, 3), y0 = ri(r, -4, 3); V = shuffle(r, [[x0, y0], [x0, y0 + b], [x0 + a, y0]]); h = x0 + a / 2; k = y0 + b / 2; }
+    else { const R = pick(r, [5, 10, 13]); h = ri(r, -6, 6); k = ri(r, -6, 6);
+      const offs = G6_CIRC[R].flatMap(([a, b]) => [[a, b], [-a, b], [a, -b], [-a, -b]]); const pts = shuffle(r, [...new Set(offs.map(String))].map((s) => s.split(',').map(Number))).slice(0, 3);
+      V = pts.map(([a, b]) => [h + a, k + b]); }
+    const [p, q, s] = V, area = (q[0] - p[0]) * (s[1] - p[1]) - (s[0] - p[0]) * (q[1] - p[1]); if (Math.abs(area) < 4 || V.some((v) => Math.abs(v[0]) > 15 || Math.abs(v[1]) > 15)) continue;
+    const [A, B, C] = pickLetters(r, 3), Cc = [h, k], correct = ptT(Cc);
+    const cen = [(p[0] + q[0] + s[0]) / 3, (p[1] + q[1] + s[1]) / 3];
+    const wrongs = [ptT([k, h]), ptT([-h, -k]), fracParts(cen[0]) && fracParts(cen[1]) ? ptT(cen) : ptT([h + 1, k]), ptT([h, k + 2])].filter((w) => w !== correct);
+    return { topic: 'Circumcenter from coordinates', stem: `Find the coordinates of the circumcenter of the triangle with vertices ${A}${ptT(p)}, ${B}${ptT(q)}, and ${C}${ptT(s)}.`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => ptT([h - i - 2, k])),
+      fr: { fields: [{ kind: 'expr', keys: 'point', label: 'Circumcenter:' }], key: [`\\left(${fracL(h)},${fracL(k)}\\right)`], display: correct, check: (v) => onePointOk(v[0], Cc) },
+      solution: `The circumcenter is where the perpendicular bisectors of the sides meet; it is the same distance from all three vertices.\nIt is ${correct}: the distance to each vertex is ${exactT(Math.hypot(p[0] - h, p[1] - k))}.` };
+  }
+};
+TEMPLATES.g62WhichCenter = (r) => {
+  const verts = r() < 0.5;
+  const ctx = verts ? pick(r, [['your house', 'your friend’s apartment', 'your other friend’s house', 'a meeting place'], ['a department store', 'an electronics store', 'a grocery store', 'a donation center'], ['three towns', '', '', 'a cell tower']])
+    : pick(r, [['three straight roads that form a triangular park', 'a fountain'], ['the three sides of a triangular garden', 'a sprinkler'], ['three straight walls of a triangular room', 'a light fixture']]);
+  const ans = verts ? 'Circumcenter' : 'Incenter';
+  const stem = verts ? `You want to locate ${ctx[3]} the same distance from ${ctx[1] ? `${ctx[0]}, ${ctx[1]}, and ${ctx[2]}` : ctx[0]}. Which point of the triangle formed by the three locations should you use?`
+    : `You want to place ${ctx[1]} the same distance from ${ctx[0]}. Which point of the triangle should you use?`;
+  return { topic: 'Which point of concurrency?', stem, ...buildChoices(r, ans, ['Circumcenter', 'Incenter', 'Centroid', 'Orthocenter'].filter((x) => x !== ans), () => null),
+    fr: FR.select('Use the', ['Circumcenter', 'Incenter', 'Centroid', 'Orthocenter'], ans),
+    solution: verts ? 'The circumcenter (where the perpendicular bisectors meet) is equidistant from the three vertices.' : 'The incenter (where the angle bisectors meet) is equidistant from the three sides.' };
+};
+
+/* ---------- 6.3 Medians and Altitudes of Triangles ---------- */
+TEMPLATES.g63Centroid = (r) => {
+  const [L, M, N, P, Q] = pickLetters(r, 5), k = ri(r, 0, 2);
+  let stem, fields, vals, why;
+  if (k === 0) { const m = 3 * ri(r, 3, 16); stem = `Point ${P} is the centroid of △${L}${M}${N}, and ${SEG(N + Q)} is a median (${Q} is the midpoint of ${SEG(L + M)}). ${N}${Q} = ${m}. Find ${P}${Q} and ${N}${P}.`; vals = [m / 3, (2 * m) / 3]; fields = [`${P}${Q} =`, `${N}${P} =`];
+    why = `The centroid is two-thirds of the way from each vertex to the midpoint of the opposite side: ${N}${P} = (2/3)(${m}) = ${vals[1]} and ${P}${Q} = (1/3)(${m}) = ${vals[0]}.`; }
+  else if (k === 1) { const d = ri(r, 3, 16); stem = `Point ${P} is the centroid of △${L}${M}${N}, and ${SEG(N + Q)} is a median. ${P}${Q} = ${d}. Find ${N}${P} and ${N}${Q}.`; vals = [2 * d, 3 * d]; fields = [`${N}${P} =`, `${N}${Q} =`];
+    why = `${N}${P} is twice ${P}${Q}: ${N}${P} = 2(${d}) = ${2 * d}. The whole median is ${N}${Q} = ${d} + ${2 * d} = ${3 * d}.`; }
+  else { const d = ri(r, 4, 16); stem = `Point ${P} is the centroid of △${L}${M}${N}, and ${SEG(N + Q)} is a median. ${N}${P} = ${2 * d}. Find ${P}${Q} and ${N}${Q}.`; vals = [d, 3 * d]; fields = [`${P}${Q} =`, `${N}${Q} =`];
+    why = `${P}${Q} is half of ${N}${P}: ${d}. The median is ${N}${Q} = ${2 * d} + ${d} = ${3 * d}.`; }
+  const T = (a, b) => `${fields[0].replace(' =', '')} = ${fmt(a)}, ${fields[1].replace(' =', '')} = ${fmt(b)}`, correct = T(...vals);
+  return { topic: 'Centroid segments', stem, ...buildChoices(r, correct, [T(vals[1], vals[0]), T(vals[0] / 2, vals[1]), T(vals[0], vals[1] * 1.5), T(vals[0] + 1, vals[1] + 2)].filter((w) => w !== correct), (i) => T(vals[0] + i + 3, vals[1])),
+    fr: FR.nums(fields, vals, correct), solution: `Centroid Theorem: the centroid is 2/3 of the distance from each vertex to the midpoint of the opposite side. ${why}` };
+};
+TEMPLATES.g63CentroidFind = (r) => {
+  const bg = 2 * ri(r, 2, 9), af = ri(r, 5, 18), ae = 3 * ri(r, 3, 9);
+  const asks = [['FC', af, `F is the midpoint of ${SEG('AC')}, so FC = AF = ${af}.`], ['BF', bg * 1.5, `BG is 2/3 of median BF: BF = (3/2)(${bg}) = ${bg * 1.5}.`], ['AG', (2 * ae) / 3, `AG = (2/3)AE = (2/3)(${ae}) = ${(2 * ae) / 3}.`], ['GE', ae / 3, `GE = (1/3)AE = (1/3)(${ae}) = ${ae / 3}.`], ['GF', bg / 2, `GF = (1/2)BG = ${bg / 2}.`]];
+  const [seg, ans, why] = pick(r, asks);
+  return { topic: 'Centroid segments', stem: `Point G is the centroid of △ABC. ${SEG('BF')}, ${SEG('AE')}, and ${SEG('CD')} are medians (D, E, and F are midpoints of ${SEG('AB')}, ${SEG('BC')}, and ${SEG('AC')}). BG = ${bg}, AF = ${af}, and AE = ${ae}. Find ${SEG(seg)}.`,
+    ...g6Choices(r, ans, fmt), fr: FR.num(`${seg} =`, ans), solution: why };
+};
+TEMPLATES.g63CentroidCoord = (r) => {
+  for (;;) {
+    const V = [0, 1, 2].map(() => [ri(r, -6, 9), ri(r, -6, 9)]), s = V.reduce((a, b) => [a[0] + b[0], a[1] + b[1]], [0, 0]);
+    if (s[0] % 3 || s[1] % 3) continue;
+    const area = (V[1][0] - V[0][0]) * (V[2][1] - V[0][1]) - (V[2][0] - V[0][0]) * (V[1][1] - V[0][1]); if (Math.abs(area) < 6) continue;
+    const G = [s[0] / 3, s[1] / 3], [A, B, C] = pickLetters(r, 3), correct = ptT(G);
+    const wrongs = [ptT([s[0] / 2, s[1] / 2]), ptT([G[1], G[0]]), ptT(s), ptT([G[0] + 1, G[1] - 1])].filter((w) => w !== correct);
+    return { topic: 'Centroid from coordinates', stem: `Find the coordinates of the centroid of the triangle with vertices ${A}${ptT(V[0])}, ${B}${ptT(V[1])}, and ${C}${ptT(V[2])}.`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => ptT([G[0] - i - 2, G[1]])),
+      fr: { fields: [{ kind: 'expr', keys: 'point', label: 'Centroid:' }], key: [`\\left(${G[0]},${G[1]}\\right)`], display: correct, check: (v) => onePointOk(v[0], G) },
+      solution: `The centroid is the average of the vertices: ((${V.map((p) => (p[0] < 0 ? `(${fmt(p[0])})` : fmt(p[0]))).join(' + ')})/3, (${V.map((p) => (p[1] < 0 ? `(${fmt(p[1])})` : fmt(p[1]))).join(' + ')})/3) = ${correct}.` };
+  }
+};
+function g6Ortho(p, q, s) { // intersection of altitudes
+  const a1 = q[0] - s[0], b1 = q[1] - s[1], c1 = a1 * p[0] + b1 * p[1]; // altitude from p ⟂ qs
+  const a2 = p[0] - s[0], b2 = p[1] - s[1], c2 = a2 * q[0] + b2 * q[1]; // altitude from q ⟂ ps
+  const det = a1 * b2 - a2 * b1; return [(c1 * b2 - c2 * b1) / det, (a1 * c2 - a2 * c1) / det];
+}
+TEMPLATES.g63Ortho = (r) => {
+  const want = pick(r, ['inside', 'on', 'outside']);
+  for (let t = 0; t < 3000; t++) {
+    let V;
+    if (want === 'on') { const x0 = ri(r, -5, 4), y0 = ri(r, -5, 4); V = shuffle(r, [[x0, y0], [x0 + ri(r, 2, 7) * pick(r, [1, -1]), y0], [x0, y0 + ri(r, 2, 7) * pick(r, [1, -1])]]); }
+    else V = [0, 1, 2].map(() => [ri(r, -6, 8), ri(r, -6, 8)]);
+    const [p, q, s] = V, area = (q[0] - p[0]) * (s[1] - p[1]) - (s[0] - p[0]) * (q[1] - p[1]); if (Math.abs(area) < 6) continue;
+    const H = g6Ortho(p, q, s); if (!H.every((c) => Number.isInteger(Math.round(c * 2) / 2) && Math.abs(c * 2 - Math.round(c * 2)) < 1e-9 && Math.abs(c) <= 14)) continue;
+    const dots = [[p, q, s], [q, s, p], [s, p, q]].map(([v, a, b]) => (a[0] - v[0]) * (b[0] - v[0]) + (a[1] - v[1]) * (b[1] - v[1]));
+    const kind = dots.some((d) => d === 0) ? 'on' : dots.some((d) => d < 0) ? 'outside' : 'inside'; if (kind !== want) continue;
+    const [A, B, C] = pickLetters(r, 3), loc = { inside: 'Inside', on: 'On', outside: 'Outside' }[kind];
+    const T = (l, P) => `${l} the triangle; ${ptT(P)}`, correct = T(loc, H);
+    const cen = [(p[0] + q[0] + s[0]) / 3, (p[1] + q[1] + s[1]) / 3];
+    const wrongs = [T(loc, [H[1], H[0]]), ...['Inside', 'On', 'Outside'].filter((x) => x !== loc).map((x) => T(x, H)), fracParts(cen[0]) && fracParts(cen[1]) ? T(loc, cen) : T(loc, [H[0] + 1, H[1]])].filter((w) => w !== correct);
+    const ok = (v) => [v[0] === loc, onePointOk(v[1], H)];
+    return { topic: 'Orthocenter', stem: `Tell whether the orthocenter of the triangle with vertices ${A}${ptT(p)}, ${B}${ptT(q)}, and ${C}${ptT(s)} is inside, on, or outside the triangle. Then find its coordinates.`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(loc, [H[0] - i - 2, H[1]])),
+      fr: { fields: [{ kind: 'select', label: 'The orthocenter is', options: ['Inside', 'On', 'Outside'] }, { kind: 'expr', keys: 'point', label: 'Orthocenter:' }], key: [loc, `\\left(${fracL(H[0])},${fracL(H[1])}\\right)`], display: correct,
+        check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+      solution: `The triangle is ${kind === 'on' ? 'a right triangle, so the orthocenter is at the right-angle vertex' : kind === 'outside' ? 'obtuse, so the orthocenter is outside' : 'acute, so the orthocenter is inside'}.\nIntersect two altitudes (each passes through a vertex, perpendicular to the opposite side): ${ptT(H)}.` };
+  }
+  return TEMPLATES.g63Ortho(r);
+};
+
+/* ---------- 6.4 The Triangle Midsegment Theorem ---------- */
+TEMPLATES.g64Coords = (r) => {
+  for (;;) {
+    const V = [0, 1, 2].map(() => [ri(r, -7, 7), ri(r, -7, 7)]), [p, q, s] = V;
+    const area = (q[0] - p[0]) * (s[1] - p[1]) - (s[0] - p[0]) * (q[1] - p[1]); if (Math.abs(area) < 10) continue;
+    const [A, B, C, D, E, F] = pickLetters(r, 6), mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const M = [mid(p, s), mid(s, q), mid(q, p)]; // D on AC, E on CB, F on BA
+    const T = (L) => `${D}${ptT(L[0])}, ${E}${ptT(L[1])}, ${F}${ptT(L[2])}`, correct = T(M);
+    const wrongs = [T([mid(p, q), mid(q, s), mid(s, p)]), T(M.map(([x, y]) => [y, x])), T([[p[0] + s[0], p[1] + s[1]], M[1], M[2]]), T([M[0], M[1], mid(p, s)])].filter((w) => w !== correct);
+    const ok = (v) => M.map((P, i) => onePointOk(v[i], P));
+    return { topic: 'Midsegments on the coordinate plane', stem: `△${A}${B}${C} has vertices ${A}${ptT(p)}, ${B}${ptT(q)}, and ${C}${ptT(s)}. ${D}, ${E}, and ${F} are the midpoints of ${SEG(A + C)}, ${SEG(C + B)}, and ${SEG(B + A)}. Find the coordinates of ${D}, ${E}, and ${F}.`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T([M[0], M[1], [M[2][0] + i + 1, M[2][1]]])),
+      fr: { fields: [D, E, F].map((n) => ({ kind: 'expr', keys: 'point', label: `${n}:` })), key: M.map(([x, y]) => `\\left(${fracL(x)},${fracL(y)}\\right)`), display: correct, check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 3 },
+      solution: `Midpoint formula ((x₁ + x₂)/2, (y₁ + y₂)/2): ${correct}. Each midsegment, such as ${SEG(D + E)}, is parallel to the third side (${SEG(A + B)}) and half as long.` };
+  }
+};
+TEMPLATES.g64FindX = (r) => {
+  const [A, B, C, D, E] = pickLetters(r, 5), k = ri(r, 0, 2);
+  let labDE, labBC, ans, why, lab = 'x =';
+  if (k === 0) { const v = ri(r, 3, 15); labDE = 'x'; labBC = String(2 * v); ans = v; why = `By the Triangle Midsegment Theorem, ${D}${E} = (1/2)${B}${C} = (1/2)(${2 * v}) = ${v}.`; }
+  else if (k === 1) { const v = ri(r, 3, 15); labDE = String(v); labBC = 'x'; ans = 2 * v; why = `${D}${E} = (1/2)${B}${C}, so ${B}${C} = 2(${v}) = ${2 * v}.`; }
+  else { for (;;) { const x = ri(r, 2, 10), a = ri(r, 1, 4), b = ri(r, -3, 9), c = ri(r, 1, 9); const de = a * x + b, bc = 2 * de, d = bc - c * x; if (de <= 0 || c === 2 * a || Math.abs(d) > 40) continue; labDE = g4Lin(a, b); labBC = g4Lin(c, d); ans = x; why = `${B}${C} = 2·${D}${E}: ${labBC} = 2(${labDE}), so x = ${x}.`; break; } }
+  const draw = (cv) => drawFigure(cv, { polys: [
+    { group: 'g', pts: [[3, 5], [1.5, 2.5], [5, 2.5]], names: [A, D, E], ticks: [1, 0, 2], slab: ['', labDE, ''] },
+    { group: 'g', pts: [[1.5, 2.5], [0, 0], [7, 0], [5, 2.5]], names: [D, B, C, E], ticks: [1, 0, 2, 0], slab: ['', labBC, '', ''] }] });
+  return { topic: 'Triangle Midsegment Theorem', stem: `${SEG(D + E)} is a midsegment of △${A}${B}${C}. Find the value of x.`, ...g6Choices(r, ans, (x) => `x = ${x}`), fr: FR.num(lab, ans), draw, size: [400, 280], solution: why };
+};
+TEMPLATES.g64Complete = (r) => {
+  const [X, Y, Z, J, K, L] = pickLetters(r, 6); // J mid XY, K mid YZ, L mid XZ
+  const side = { [J + K]: X + Z, [K + L]: X + Y, [J + L]: Y + Z };
+  const k = ri(r, 0, 3);
+  let stem, ans, opts, why;
+  if (k === 0) { const m = pick(r, [J + K, K + L, J + L]); stem = `${SEG(m)} ∥ ___`; ans = side[m]; opts = [X + Y, Y + Z, X + Z].map(SEG); why = `${SEG(m)} joins the midpoints of two sides, so it is parallel to the third side, ${SEG(ans)}.`; ans = SEG(ans); }
+  else if (k === 1) { const m = pick(r, [X + Z, X + Y, Y + Z]); const ms = Object.keys(side).find((q) => side[q] === m); stem = `${SEG(m)} ∥ ___`; ans = SEG(ms); opts = Object.keys(side).map(SEG); why = `The midsegment that does not touch ${SEG(m)} is parallel to it: ${ans}.`; }
+  else if (k === 2) { const half = pick(r, [[J + Y, X + J, K + L], [Y + K, K + Z, J + L], [X + L, L + Z, J + K]]); stem = `${SEG(half[0])} ≅ ___ ≅ ___`; ans = `${SEG(half[1])} ≅ ${SEG(half[2])}`;
+    opts = [ans, `${SEG(half[1])} ≅ ${SEG(Object.keys(side).find((q) => q !== half[2]))}`, `${SEG(half[2])} ≅ ${SEG(side[half[2]])}`, `${SEG(half[1])} ≅ ${SEG(side[half[2]])}`]; why = `${half[0][0] === half[1][1] || half[1].includes(half[0][0]) ? '' : ''}Each half of a side is congruent to the other half and to the midsegment parallel to that side (the midsegment is half as long): ${SEG(half[0])} ≅ ${ans}.`; }
+  else { const m = pick(r, Object.keys(side)); stem = `If ${side[m]} = ${2 * ri(r, 3, 15)}, then ${m} = ___`; const v = +stem.match(/= (\d+)/)[1] / 2; ans = String(v); opts = [String(v), String(2 * v), String(v + 2), String(4 * v)]; why = `${SEG(m)} is the midsegment parallel to ${SEG(side[m])}, so it is half as long: ${v}.`; }
+  const draw = (cv) => drawFigure(cv, { polys: [{ group: 'g', pts: [[0, 0], [3, 5], [8, 0]], names: [X, Y, Z] }, { group: 'g', pts: [[1.5, 2.5], [5.5, 2.5], [4, 0]], names: [J, K, L] }] });
+  const fr = k === 3 ? FR.num(`${stem.split('then ')[1].replace(' = ___', '')} =`, +ans) : k === 2
+    ? { fields: [{ kind: 'text', label: '', prefix: '' }, { kind: 'text', label: '≅', prefix: '' }], key: ans.replace(/(.)̅/g, '$1').split(' ≅ '), display: ans,
+      check: (v) => { const want = ans.replace(/(.)̅/g, '$1').split(' ≅ ').map((s) => s.split('').sort().join('')); const got = v.map((x) => normLetters(x).split('').sort().join('')); return got.length === 2 && want.every((w) => got.includes(w)) && got[0] !== got[1]; } }
+    : { fields: [{ kind: 'text', label: '', prefix: '' }], key: [ans.replace(/(.)̅/g, '$1')], display: ans, check: (v) => normLetters(v[0]).split('').sort().join('') === ans.replace(/(.)̅/g, '$1').split('').sort().join('') };
+  return { topic: 'Midsegments: complete the statement', stem: `In △${X}${Y}${Z}, ${J}, ${K}, and ${L} are the midpoints of ${SEG(X + Y)}, ${SEG(Y + Z)}, and ${SEG(X + Z)}. Complete the statement.   ${stem}`,
+    ...buildChoices(r, ans, [...new Set(opts)].filter((o) => o !== ans), () => null), fr, draw, size: [400, 280], solution: why };
+};
+TEMPLATES.g64Word = (r) => {
+  if (r() < 0.5) {
+    const d = pick(r, [90, 60, 80, 70, 100]);
+    return { topic: 'Midsegments in real life', stem: `The distance between consecutive bases on a baseball field is ${d} feet. The pitcher fields a ball halfway between first base and third base, and the shortstop stands halfway between second base and third base. The pitcher, shortstop, and the bases form a triangle with a midsegment. Find the distance between the shortstop and the pitcher.`,
+      ...g6Choices(r, d / 2, (x) => `${fmt(x)} ft`), fr: FR.num('Distance =', d / 2, { suffix: ' ft' }),
+      solution: `The segment from the pitcher (midpoint of first-to-third) to the shortstop (midpoint of second-to-third) is a midsegment of the triangle formed by first, second, and third base. It is half of the distance from first to second base: ${d}/2 = ${fmt(d / 2)} feet.` };
+  }
+  const a = pick(r, [1.8, 2.4, 3, 1.2]), b = pick(r, [1.8, 2.2, 2.6, 3.2]), c = Math.round(a * 0.5 * 10) / 10;
+  const total = a / 2 + b / 2 + a / 2;
+  return { topic: 'Midsegments in real life', stem: `Oak Street joins the midpoints of Walnut Street and Maple Street, which form two sides of a triangle with Spruce Street. Walnut Street is ${a} miles long, Maple Street is ${a} miles long, and Spruce Street is ${b} miles long. A parade float starts where Walnut Street meets Spruce Street, travels up Walnut Street to Oak Street, along Oak Street to Maple Street, and then down Maple Street to Spruce Street. About how far does the float travel?`,
+    ...g6Choices(r, Math.round(total * 100) / 100, (x) => `${fmt(x)} mi`), fr: FR.num('Distance =', Math.round(total * 100) / 100, { suffix: ' mi' }),
+    solution: `Half of Walnut Street (${a / 2} mi) + Oak Street, a midsegment half as long as Spruce Street (${b / 2} mi) + half of Maple Street (${a / 2} mi) = ${fmt(total)} miles.` };
+};
+
+/* ---------- 6.5 Indirect Proof and Inequalities in One Triangle ---------- */
+const G65_STMTS = [
+  ['If WV + VU ≠ 12 inches and VU = 5 inches, then WV ≠ 7 inches.', 'WV = 7 inches', 'WV + VU = 12 inches', 'WV ≠ 7 inches'],
+  ['If x and y are odd integers, then xy is odd.', 'xy is even', 'x and y are even integers', 'xy is odd'],
+  ['In △ABC, if m∠A = 100°, then ∠B is not a right angle.', '∠B is a right angle', 'm∠A ≠ 100°', '∠B is not a right angle'],
+  ['In △JKL, if M is the midpoint of KL̅, then JM̅ is a median.', 'JM̅ is not a median', 'M is not the midpoint of KL̅', 'JM̅ is a median'],
+  ['If a triangle is equilateral, then it is not a right triangle.', 'the triangle is a right triangle', 'the triangle is not equilateral', 'the triangle is not a right triangle'],
+  ['If n² is even, then n is even.', 'n is odd', 'n² is odd', 'n is even'],
+  ['A triangle cannot have two obtuse angles.', 'a triangle has two obtuse angles', 'a triangle has no obtuse angles', 'a triangle has one obtuse angle'],
+  ['If 3x + 5 ≠ 17, then x ≠ 4.', 'x = 4', '3x + 5 = 17', 'x ≠ 4'],
+  ['If m∠1 + m∠2 = 180°, then ∠1 and ∠2 are not both acute.', '∠1 and ∠2 are both acute', 'm∠1 + m∠2 ≠ 180°', '∠1 and ∠2 are both obtuse'],
+  ['An odd number is not divisible by 4.', 'an odd number is divisible by 4', 'an even number is divisible by 4', 'an odd number is divisible by 2'],
+];
+TEMPLATES.g65FirstStep = (r) => {
+  const [st, neg, w1, w2] = pick(r, G65_STMTS), ans = `Assume temporarily that ${neg}.`;
+  const opts = [ans, `Assume temporarily that ${w1}.`, `Assume temporarily that ${w2}.`, `Assume temporarily that ${st.replace(/\.$/, '').replace(/^If /, 'if ').replace(/^In /, 'in ')} is true.`];
+  return { topic: 'Indirect proof: first step', stem: `Write the first step in an indirect proof of the statement.   ${st}`,
+    ...buildChoices(r, ans, opts.slice(1), () => null), fr: FR.select('First step:', shuffle(r, opts), ans),
+    solution: `An indirect proof starts by assuming the conclusion is false (its opposite is true): ${ans}` };
+};
+function g65Tri(r, a, b, c) { // vertices for side lengths a (opposite A), b (opposite B), c (opposite C)
+  const A = [0, 0], B = [c, 0], x = (b * b + c * c - a * a) / (2 * c), y = Math.sqrt(Math.max(0, b * b - x * x)); return [A, B, [x, y]];
+}
+TEMPLATES.g65OrderAngles = (r) => {
+  for (;;) {
+    const s = [ri(r, 4, 30), ri(r, 4, 30), ri(r, 4, 30)]; const [p, q, u] = [...s].sort((x, y) => x - y); if (p + q <= u || new Set(s).size < 3 || p + q - u < 2) continue;
+    const N = pickLetters(r, 3), pts = g65Tri(r, ...s); // side s[i] is opposite vertex i
+    const order = [0, 1, 2].sort((i, j) => s[i] - s[j]), ans = order.map((i) => N[i]).join(''), disp = order.map((i) => `∠${N[i]}`).join(', ');
+    const wrongs = [[...order].reverse(), [order[1], order[0], order[2]], [order[0], order[2], order[1]]].map((o) => o.map((i) => `∠${N[i]}`).join(', '));
+    return { topic: 'Ordering angles by side lengths', stem: `List the angles of △${N.join('')} in order from smallest to largest.`, draw: (cv) => drawFigure(cv, { polys: [{ pts, names: N, slab: [String(s[2]), String(s[0]), String(s[1])] }] }), size: [400, 280],
+      ...buildChoices(r, disp, wrongs, () => null), fr: FR.letters('', ans, disp),
+      solution: `The smallest angle is opposite the shortest side and the largest angle is opposite the longest side. Sides: ${order.map((i) => `${s[i]} (opposite ∠${N[i]})`).join(', ')}. So ${disp}.` };
+  }
+};
+TEMPLATES.g65OrderSides = (r) => {
+  for (;;) {
+    const a1 = ri(r, 20, 120), a2 = ri(r, 15, 110), a3 = 180 - a1 - a2; if (a3 < 10 || new Set([a1, a2, a3]).size < 3) continue;
+    const ang = [a1, a2, a3], N = pickLetters(r, 3), hide = ri(r, 0, 2);
+    const s = ang.map((d) => Math.sin(d * D2R)); const pts = g65Tri(r, s[0] * 6, s[1] * 6, s[2] * 6);
+    const sideOpp = (i) => N[(i + 1) % 3] + N[(i + 2) % 3];
+    const order = [0, 1, 2].sort((i, j) => ang[i] - ang[j]), disp = order.map((i) => SEG(sideOpp(i))).join(', ');
+    const wrongs = [[...order].reverse(), [order[1], order[0], order[2]], [order[0], order[2], order[1]]].map((o) => o.map((i) => SEG(sideOpp(i))).join(', '));
+    const check = (v) => { const g = String(v[0] || '').toUpperCase().match(/[A-Z]{2}/g) || []; return g.length === 3 && order.every((i, k) => g[k].split('').sort().join('') === sideOpp(i).split('').sort().join('')); };
+    return { topic: 'Ordering sides by angle measures', stem: `List the sides of △${N.join('')} in order from shortest to longest.${hide !== null ? '' : ''}`,
+      draw: (cv) => drawFigure(cv, { polys: [{ pts, names: N, alab: ang.map((d, i) => (i === hide ? '' : d + '°')), arcs: ang.map((_, i) => (i === hide ? 0 : 1)) }] }), size: [400, 280],
+      ...buildChoices(r, disp, wrongs, () => null),
+      fr: { fields: [{ kind: 'text', label: 'Sides (shortest to longest):', prefix: '' }], key: [order.map((i) => sideOpp(i)).join(', ')], display: disp, check },
+      solution: `The third angle is 180° − ${ang.filter((_, i) => i !== hide).join('° − ')}° = ${ang[hide]}°. The shortest side is opposite the smallest angle: ${order.map((i) => `${SEG(sideOpp(i))} (opposite ${ang[i]}°)`).join(', ')}.` };
+  }
+};
+TEMPLATES.g65Possible = (r) => {
+  const yes = r() < 0.5;
+  let s; for (;;) { s = [ri(r, 2, 40), ri(r, 2, 40), ri(r, 2, 60)]; const [p, q, u] = [...s].sort((x, y) => x - y); const ok = p + q > u; if (ok === yes && (yes || p + q >= u - 15)) break; }
+  if (!yes && r() < 0.3) { const [p, q] = [ri(r, 2, 20), ri(r, 2, 20)]; s = shuffle(r, [p, q, p + q]); }
+  const [p, q, u] = [...s].sort((x, y) => x - y), ans = yes ? 'Yes' : 'No';
+  return { topic: 'Triangle Inequality Theorem', stem: `Is it possible to construct a triangle with the given side lengths?   ${s.join(', ')}`,
+    ...buildChoices(r, ans, [yes ? 'No' : 'Yes'], () => null), fr: FR.select('Possible?', ['Yes', 'No'], ans),
+    solution: `Check that the two shorter sides add to more than the longest side: ${p} + ${q} = ${p + q} ${p + q > u ? '>' : p + q === u ? '=' : '<'} ${u}. ${yes ? 'Yes, a triangle is possible.' : 'No — the sum of the two shorter sides must be greater than the longest side.'}` };
+};
+TEMPLATES.g65ThirdSide = (r) => {
+  let a, b, unit, txt;
+  if (r() < 0.3) { const ft = ri(r, 1, 4); const inch = ri(r, 6, 60); a = 12 * ft; b = inch; unit = 'inches'; txt = `${ft} ${ft === 1 ? 'foot' : 'feet'}, ${inch} inches`; }
+  else { a = ri(r, 3, 30); b = ri(r, 3, 30); unit = pick(r, ['inches', 'feet', 'meters', 'centimeters']); txt = `${a} ${unit}, ${b} ${unit}`; }
+  const lo = Math.abs(a - b), hi = a + b, T = (l, h) => `${l} < x < ${h}`, correct = T(lo, hi);
+  const ok = (v) => [numOk(v[0], lo), numOk(v[1], hi)];
+  return { topic: 'Possible lengths of the third side', stem: `Describe the possible lengths x of the third side of a triangle given the lengths of the other two sides${unit === 'inches' && /feet|foot/.test(txt) ? ' (answer in inches)' : ''}.   ${txt}`,
+    ...buildChoices(r, `${correct} ${unit}`, [T(0, hi), T(lo, hi - 1), T(Math.min(a, b), Math.max(a, b)), T(lo + 1, hi + 1)].filter((w) => w !== correct).map((w) => `${w} ${unit}`), (i) => `${T(lo, hi + i + 2)} ${unit}`),
+    fr: { fields: [{ kind: 'number', label: 'x is greater than' }, { kind: 'number', label: 'and less than' }], key: [String(lo), String(hi)], display: `${correct} ${unit}`, check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
+    solution: `By the Triangle Inequality Theorem, the third side is longer than the difference of the other two sides and shorter than their sum: ${Math.max(a, b)} − ${Math.min(a, b)} < x < ${a} + ${b}, so ${correct} ${unit}.` };
+};
+
+/* ---------- 6.6 Inequalities in Two Triangles ---------- */
+TEMPLATES.g66Hinge = (r) => {
+  for (;;) {
+    const s1 = ri(r, 3, 6), s2 = ri(r, 3, 6), a1 = ri(r, 25, 140), a2 = ri(r, 25, 140); if (Math.abs(a1 - a2) < 8) continue;
+    const N1 = pickLetters(r, 3), N2 = pickLetters(r, 3, N1), conv = r() < 0.5;
+    const tri = (a) => [[0, 0], [s1, 0], [s2 * Math.cos(a * D2R), s2 * Math.sin(a * D2R)]];
+    const T1 = tri(a1), T2 = tri(a2).map(([x, y]) => [x + 9, y]);
+    const opp = (a) => Math.round(Math.sqrt(s1 * s1 + s2 * s2 - 2 * s1 * s2 * Math.cos(a * D2R)) * 10) / 10;
+    const o1 = opp(a1), o2 = opp(a2); if (o1 === o2) continue;
+    let stem, ans, why, poly1, poly2;
+    if (!conv) { stem = `${N1[1]}${N1[2]} ___ ${N2[1]}${N2[2]}`; ans = o1 > o2 ? '>' : '<';
+      poly1 = { pts: T1, names: N1, ticks: [1, 0, 2], alab: [a1 + '°', '', ''], arcs: [1, 0, 0] }; poly2 = { pts: T2, names: N2, ticks: [1, 0, 2], alab: [a2 + '°', '', ''], arcs: [1, 0, 0] };
+      why = `Two pairs of sides are congruent and the included angle is larger in the ${a1 > a2 ? 'first' : 'second'} triangle (${Math.max(a1, a2)}° > ${Math.min(a1, a2)}°), so the third side opposite it is longer (Hinge Theorem): ${N1[1]}${N1[2]} ${ans} ${N2[1]}${N2[2]}.`; }
+    else { stem = `m∠${N1[0]} ___ m∠${N2[0]}`; ans = a1 > a2 ? '>' : '<';
+      poly1 = { pts: T1, names: N1, ticks: [1, 0, 2], slab: ['', fmt(o1), ''] }; poly2 = { pts: T2, names: N2, ticks: [1, 0, 2], slab: ['', fmt(o2), ''] };
+      why = `Two pairs of sides are congruent and the third side is longer in the ${o1 > o2 ? 'first' : 'second'} triangle (${Math.max(o1, o2)} > ${Math.min(o1, o2)}), so the included angle opposite it is larger (Converse of the Hinge Theorem): m∠${N1[0]} ${ans} m∠${N2[0]}.`; }
+    return { topic: 'Hinge Theorem', stem: `Complete the statement with < or >.   ${stem}`, ...buildChoices(r, ans, [ans === '<' ? '>' : '<'], () => null), fr: FR.select('Symbol:', ['<', '>'], ans),
+      draw: (cv) => drawFigure(cv, { polys: [poly1, poly2] }), size: [600, 260], pair: true, solution: why };
+  }
+};
+TEMPLATES.g66Flights = (r) => {
+  const d1 = pick(r, [100, 150, 210, 80, 120]), d2 = pick(r, [50, 80, 100, 60]);
+  let t1, t2; do { t1 = pick(r, [10, 20, 30, 40, 50, 60, 70]); t2 = pick(r, [10, 20, 30, 40, 50, 60, 70]); } while (t1 === t2);
+  const dirs = [['due west', 'north'], ['due north', 'east'], ['due south', 'west'], ['due east', 'south']];
+  const [f1, f2] = [pick(r, dirs), pick(r, dirs)];
+  const ans = t1 > t2 ? 'Flight 1' : 'Flight 2';
+  return { topic: 'Hinge Theorem in real life', stem: `Two flights leave from the same airport. Flight 1 flies ${d1} miles ${f1[0]}, then turns ${t1}° toward ${f1[1]} and flies ${d2} miles. Flight 2 flies ${d1} miles ${f2[0]}, then turns ${t2}° toward ${f2[1]} and flies ${d2} miles. Which flight is farther from the airport?`,
+    ...buildChoices(r, ans, [ans === 'Flight 1' ? 'Flight 2' : 'Flight 1', 'They are the same distance'], () => null), fr: FR.select('Farther:', ['Flight 1', 'Flight 2', 'They are the same distance'], ans),
+    solution: `Each flight path forms a triangle with sides ${d1} and ${d2} miles. The angle between those sides is 180° minus the turn: ${180 - t1}° for Flight 1 and ${180 - t2}° for Flight 2. The larger included angle gives the longer third side (Hinge Theorem), so ${ans} is farther from the airport.` };
+};
+TEMPLATES.g66PossibleX = (r) => {
+  for (;;) {
+    const [A, B, C, D] = pickLetters(r, 4), big = ri(r, 30, 60), small = big - ri(r, 5, 20);
+    const both = r() < 0.5;
+    let stem, S, txt, why;
+    if (both) { // AD (bigger angle) = ax + b, CD = cx + d → ax + b > cx + d, and the smaller side > 0
+      const a = ri(r, 2, 6), c = ri(r, 1, a - 1), b = ri(r, -8, 6), d = ri(r, 1, 12); if (a === c) continue;
+      const lo1 = (d - b) / (a - c), lo2 = -d / c, lo = Math.max(lo1, lo2); if (!fracParts(lo) || fracParts(lo)[1] > 6) continue;
+      S = [{ a: lo, b: Infinity, ca: false, cb: false }]; txt = `x > ${fracT(lo)}`;
+      stem = `In △${A}${B}${D} and △${C}${B}${D}, ${SEG(A + B)} ≅ ${SEG(C + B)} and the triangles share ${SEG(B + D)}. m∠${A}${B}${D} = ${big}°, m∠${C}${B}${D} = ${small}°, ${A}${D} = ${g4Lin(a, b)}, and ${C}${D} = ${g4Lin(c, d)}. Find the possible values of x.`;
+      why = `${big}° > ${small}°, so ${A}${D} > ${C}${D} (Hinge Theorem): ${g4Lin(a, b)} > ${g4Lin(c, d)}, so x > ${fracT(lo1)}.${lo2 > lo1 ? ` Also ${C}${D} > 0 requires x > ${fracT(lo2)}.` : ''} So ${txt}.`;
+    } else { // smaller-angle side = ax + b, bigger-angle side = n → 0 < ax + b < n
+      const a = ri(r, 2, 6), b = ri(r, -10, 6), n = ri(r, 6, 30), lo = -b / a, hi = (n - b) / a; if (hi <= lo || !fracParts(lo) || !fracParts(hi) || fracParts(lo)[1] > 6 || fracParts(hi)[1] > 6) continue;
+      S = [{ a: lo, b: hi, ca: false, cb: false }]; txt = `${fracT(lo)} < x < ${fracT(hi)}`;
+      stem = `In △${A}${B}${D} and △${C}${B}${D}, ${SEG(A + B)} ≅ ${SEG(C + B)} and the triangles share ${SEG(B + D)}. m∠${A}${B}${D} = ${big}°, m∠${C}${B}${D} = ${small}°, ${A}${D} = ${n}, and ${C}${D} = ${g4Lin(a, b)}. Find the possible values of x.`;
+      why = `${small}° < ${big}°, so ${C}${D} < ${A}${D} (Hinge Theorem): ${g4Lin(a, b)} < ${n}, so x < ${fracT(hi)}. A length must be positive: ${g4Lin(a, b)} > 0, so x > ${fracT(lo)}. So ${txt}.`;
+    }
+    const wrongs = both ? [`x < ${txt.slice(4)}`, `x > ${fracT(S[0].a + 1)}`, `x > 0`] : [`x < ${fracT(S[0].b)}`, `x > ${fracT(S[0].a)}`, `${fracT(S[0].a)} < x < ${fracT(S[0].b + 2)}`];
+    return { topic: 'Hinge Theorem with algebra', stem, ...buildChoices(r, txt, wrongs.filter((w) => w !== txt), (i) => `x > ${i + 7}`),
+      fr: { fields: [{ kind: 'expr', keys: 'set', label: '' }], key: [txt.replace(/</g, '<').replace(/ /g, '')], display: txt, check: (v) => setOk(v[0], S) }, solution: why };
+  }
+};
+/* ==== GEOMETRY CH6 END ==== */
+
+/* ==== TRIG LIKE TERMS BEGIN ==== */
+/* ---------- Chapter 1 review: combining like terms with trig functions ---------- */
+// a "kind" is a trig power like sin x or cos² x; '' is a constant
+const LT_FNS = ['sin', 'cos', 'tan', 'sec', 'csc', 'cot'];
+const LT_SUP = { 1: '', 2: '²', 3: '³' };
+const ltKindT = (k, v) => (k === '' ? '' : `${k.f}${LT_SUP[k.p]} ${v}`);
+const ltKindL = (k, v) => (k === '' ? '' : `\\${k.f}${k.p > 1 ? `^{${k.p}}` : ''} ${v === 'θ' ? '\\theta' : v}`);
+function ltTermT(c, k, v, first) { // signed term text
+  const a = Math.abs(c), body = k === '' ? String(a) : `${a === 1 ? '' : a + ' '}${ltKindT(k, v)}`;
+  return first ? (c < 0 ? MINUS : '') + body : (c < 0 ? ` ${MINUS} ` : ' + ') + body;
+}
+const ltExprT = (terms, v) => terms.filter(([c]) => c !== 0).map(([c, k], i) => ltTermT(c, k, v, i === 0)).join('') || '0';
+const ltExprL = (terms, v) => terms.filter(([c]) => c !== 0).map(([c, k], i) => `${c < 0 ? '-' : i ? '+' : ''}${k === '' ? Math.abs(c) : (Math.abs(c) === 1 ? '' : Math.abs(c)) + ltKindL(k, v)}`).join('') || '0';
+// number of top-level terms in a typed expression
+function ltTermCount(raw) {
+  let s = /[\\{}]/.test(raw) ? latexToPlain(raw) : String(raw || '');
+  s = s.replace(/\s+/g, '').replace(/[−–]/g, '-').replace(/^[+-]/, '');
+  let d = 0, n = 1;
+  for (let i = 0; i < s.length; i++) { const c = s[i]; if ('([{'.includes(c)) d++; else if (')]}'.includes(c)) d--; else if (d === 0 && (c === '+' || c === '-') && s[i - 1] !== '^' && s[i - 1] !== '(' && s[i - 1] !== '*' && s[i - 1] !== '/') n++; }
+  return n;
+}
+TEMPLATES.t1Combine = (r) => {
+  for (;;) {
+    const v = pick(r, ['x', 'x', 'θ']);
+    const nk = ri(r, 2, 3), kinds = [];
+    while (kinds.length < nk) { const f = pick(r, LT_FNS.slice(0, r() < 0.6 ? 2 : 6)), p = pick(r, [1, 1, 2, 2, 3]); if (!kinds.some((k) => k.f === f && k.p === p)) kinds.push({ f, p }); }
+    // each kind (and the constant) appears 1–3 times; final coefficients nonzero
+    const groups = [...kinds, ''];
+    const terms = [], final = [];
+    for (const k of groups) {
+      const cnt = k === '' ? ri(r, 1, 2) : ri(r, 2, 3); let sum = 0; const cs = [];
+      for (let j = 0; j < cnt; j++) { let c; do c = ri(r, -9, 9); while (!c); cs.push(c); sum += c; }
+      if (sum === 0 && r() < 0.8) { cs[0] += cs[0] > 0 ? 1 : -1; sum = cs.reduce((a, b) => a + b, 0); }
+      cs.forEach((c) => terms.push([c, k])); final.push([sum, k]);
+    }
+    if (terms.length < 5 || terms.length > 8) continue;
+    // same-function different-power pair so that "unlike" mistakes are tempting
+    const mixed = shuffle(r, terms), stemT = ltExprT(mixed, v);
+    const ans = final.filter(([c]) => c !== 0), correct = ltExprT(ans, v);
+    if (ans.length < 2) continue;
+    // wrong: merge powers of the same function, sign slip, drop the constant, add the powers
+    const merge = (() => { const m = {}; for (const [c, k] of terms) { const key = k === '' ? '' : k.f; m[key] = (m[key] || 0) + c; } return Object.entries(m).map(([f, c]) => [c, f === '' ? '' : { f, p: 1 }]); })();
+    const slip = ans.map(([c, k], i) => [i === 0 ? -c : c, k]);
+    const noConst = ans.filter(([, k]) => k !== '');
+    const sumAll = [[terms.filter(([, k]) => k !== '').reduce((a, [c]) => a + c, 0), kinds[0]], ...ans.filter(([, k]) => k === '')];
+    const wrongs = [merge, slip, noConst.length ? noConst : slip.map(([c, k]) => [c + 1, k]), sumAll].map((t) => ltExprT(t, v)).filter((w) => w !== correct);
+    const F = (x) => ans.reduce((s, [c, k]) => s + c * (k === '' ? 1 : ({ sin: Math.sin, cos: Math.cos, tan: Math.tan, sec: (t) => 1 / Math.cos(t), csc: (t) => 1 / Math.sin(t), cot: (t) => 1 / Math.tan(t) }[k.f](x)) ** k.p), 0);
+    const check = (vals) => { const raw = String(vals[0] || '').replace(/^\s*[a-zA-Z]\s*=/, ''); const n = parseTrig(raw); if (!n) return false;
+      const xs = [0.37, 0.81, 1.23, 2.05, 2.71, 4.02, 5.3]; if (!xs.every((x) => { const a = evalTrig(n, x), b = F(x); return isFinite(a) && Math.abs(a - b) < 1e-6 * Math.max(1, Math.abs(b)); })) return false;
+      return ltTermCount(raw) <= ans.length; };
+    return {
+      topic: 'Combining like terms with trig functions', stem: `Simplify by combining like terms.   ${stemT}`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => ltExprT(ans.map(([c, k], j) => [j === i % ans.length ? c + 2 : c, k]), v)),
+      frStem: `Simplify by combining like terms. Write each kind of term only once.   ${stemT}`,
+      fr: { fields: [{ kind: 'expr', keys: 'trigcombine', label: '' }], key: [ltExprL(ans, v)], display: correct, check },
+      solution: `Like terms have the same function and the same power: ${groups.map((k) => (k === '' ? 'numbers' : ltKindT(k, v))).join(', ')} are each a different kind (${(() => { const pr = kinds.find((a) => kinds.some((b) => a !== b && a.f === b.f)); if (!pr) return 'different functions are not like terms'; const q = kinds.find((b) => b !== pr && b.f === pr.f); return `${ltKindT(pr, v)} and ${ltKindT(q, v)} are not like terms`; })()}).\n${groups.map((k) => { const cs = terms.filter(([, kk]) => kk === k).map(([c]) => c); return `${k === '' ? 'Numbers' : ltKindT(k, v)}: ${cs.map((c, i) => (i ? (c < 0 ? ` ${MINUS} ${-c}` : ` + ${c}`) : fmt(c))).join('')}${cs.length > 1 ? ` = ${fmt(cs.reduce((a, b) => a + b, 0))}` : ''}`; }).join('\n')}\n${correct}`,
+    };
+  }
+};
+KEYROWS_P.trigcombine = [['sin', '\\sin '], ['cos', '\\cos '], ['tan', '\\tan '], ['sec', '\\sec '], ['csc', '\\csc '], ['cot', '\\cot '], ['xⁿ', '^{#?}'], ['θ', '\\theta']];
+/* ==== TRIG LIKE TERMS END ==== */
+
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -10122,6 +10594,30 @@ const QUESTION_TYPES = [
   { id: 'g54IsoT', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Values that make it isosceles', desc: 'Sides like 3t, 5t − 12, t + 20 (#23)' },
   { id: 'g54BaseFacts', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'What can you prove?', desc: 'Legs and base angles (#18)' },
   { id: 'g54Lighthouse', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Lighthouse problem', desc: 'Exterior angle → isosceles (#28)' },
+  { id: 'g61PerpBis', subject: 'geometry', section: '6.1 Perpendicular and Angle Bisectors', label: 'Perpendicular Bisector Theorem', desc: 'Find the indicated measure (#5–8)' },
+  { id: 'g61PerpConclude', subject: 'geometry', section: '6.1 Perpendicular and Angle Bisectors', label: 'Is P on the perpendicular bisector?', desc: 'Enough information? (#1–4)' },
+  { id: 'g61AngBis', subject: 'geometry', section: '6.1 Perpendicular and Angle Bisectors', label: 'Angle Bisector Theorem', desc: 'Find the indicated measure (#13–16)' },
+  { id: 'g61AngConclude', subject: 'geometry', section: '6.1 Perpendicular and Angle Bisectors', label: 'Does the ray bisect the angle?', desc: 'Enough information? (#9–12)' },
+  { id: 'g61PerpEq', subject: 'geometry', section: '6.1 Perpendicular and Angle Bisectors', label: 'Equation of a perpendicular bisector', desc: 'From two endpoints (#19–22)' },
+  { id: 'g62Centers', subject: 'geometry', section: '6.2 Bisectors of Triangles', label: 'Circumcenter and incenter distances', desc: 'Including algebra (#1–2, 5–6, 11–16)' },
+  { id: 'g62CircumCoord', subject: 'geometry', section: '6.2 Bisectors of Triangles', label: 'Circumcenter from coordinates', desc: '(#7–10)' },
+  { id: 'g62WhichCenter', subject: 'geometry', section: '6.2 Bisectors of Triangles', label: 'Which point of concurrency?', desc: 'Equidistant from places or sides (#3–4)' },
+  { id: 'g63Centroid', subject: 'geometry', section: '6.3 Medians and Altitudes of Triangles', label: 'Centroid on a median', desc: 'Find the pieces (#1–8)' },
+  { id: 'g63CentroidFind', subject: 'geometry', section: '6.3 Medians and Altitudes of Triangles', label: 'Centroid segment lengths', desc: 'BG, AF, AE given (#9–12)' },
+  { id: 'g63CentroidCoord', subject: 'geometry', section: '6.3 Medians and Altitudes of Triangles', label: 'Centroid from coordinates', desc: '(#15–16)' },
+  { id: 'g63Ortho', subject: 'geometry', section: '6.3 Medians and Altitudes of Triangles', label: 'Orthocenter', desc: 'Inside, on, or outside, and coordinates (#17–20)' },
+  { id: 'g64Coords', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Midpoints on the coordinate plane', desc: '(#1–4)' },
+  { id: 'g64FindX', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Find x with a midsegment', desc: '(#7–10)' },
+  { id: 'g64Complete', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Complete the statement', desc: 'Parallel and congruent segments (#11–16)' },
+  { id: 'g64Word', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Midsegment word problems', desc: '(#17–18)' },
+  { id: 'g65FirstStep', subject: 'geometry', section: '6.5 Indirect Proof and Inequalities in One Triangle', label: 'Indirect proof: first step', desc: '(#1–4)' },
+  { id: 'g65OrderAngles', subject: 'geometry', section: '6.5 Indirect Proof and Inequalities in One Triangle', label: 'Order the angles', desc: 'From side lengths (#11–14)' },
+  { id: 'g65OrderSides', subject: 'geometry', section: '6.5 Indirect Proof and Inequalities in One Triangle', label: 'Order the sides', desc: 'From angle measures (#15–18)' },
+  { id: 'g65ThirdSide', subject: 'geometry', section: '6.5 Indirect Proof and Inequalities in One Triangle', label: 'Possible third side lengths', desc: '(#19–22)' },
+  { id: 'g65Possible', subject: 'geometry', section: '6.5 Indirect Proof and Inequalities in One Triangle', label: 'Is the triangle possible?', desc: 'Triangle Inequality (#23–26)' },
+  { id: 'g66Hinge', subject: 'geometry', section: '6.6 Inequalities in Two Triangles', label: 'Hinge Theorem: < or >', desc: '(#1–8)' },
+  { id: 'g66Flights', subject: 'geometry', section: '6.6 Inequalities in Two Triangles', label: 'Which flight is farther?', desc: '(#11–12)' },
+  { id: 'g66PossibleX', subject: 'geometry', section: '6.6 Inequalities in Two Triangles', label: 'Possible values of x', desc: '(#15)' },
   { id: 'p1Classify', subject: 'precalc',  section: 'P.1 Review of Real Numbers', label: 'Classifying real numbers', desc: 'Natural, whole, integer, rational, irrational (#7–10)' },
   { id: 'p1Order', subject: 'precalc',  section: 'P.1 Review of Real Numbers', label: 'Ordering real numbers', desc: '< or > (#11–16)' },
   { id: 'p1Interval', subject: 'precalc',  section: 'P.1 Review of Real Numbers', label: 'Intervals and inequalities', desc: 'Interval ↔ inequality ↔ words (#17–28)' },
@@ -10181,6 +10677,7 @@ const QUESTION_TYPES = [
   { id: 'p10HasInverse', subject: 'precalc',  section: 'P.10 Inverse Functions', label: 'Horizontal Line Test', desc: '(#37–40)' },
   { id: 'p10Determine', subject: 'precalc',  section: 'P.10 Inverse Functions', label: 'Does it have an inverse?', desc: 'Find it if it does (#55–68)' },
   { id: 'p10CompInverse', subject: 'precalc',  section: 'P.10 Inverse Functions', label: 'Composition with inverses', desc: '(#71–74)' },
+  { id: 't1Combine', subject: 'precalc',  section: '1 Review: Combining Like Terms', label: 'Combine like terms with trig functions', desc: 'Like 3 sin x + 4 − sin x + 2cos² x − 7' },
   { id: 't1Quadrant', subject: 'precalc',  section: '1.1 Radian and Degree Measure', label: 'Quadrant of an angle', desc: 'Degrees, D°M′, or radians (#11–12, 25–26)' },
   { id: 't1Coterminal', subject: 'precalc',  section: '1.1 Radian and Degree Measure', label: 'Coterminal angles', desc: 'One positive, one negative (#15–16, 29–30)' },
   { id: 't1CompSupp', subject: 'precalc',  section: '1.1 Radian and Degree Measure', label: 'Complements and supplements', desc: 'If possible (#17–20, 31–34)' },
@@ -10455,8 +10952,72 @@ const setting = (setKey, name) => {
 /* ---------- storage (best effort) ---------- */
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  set(k, v) { let same = false; try { const t = JSON.stringify(v); same = localStorage.getItem(k) === t; localStorage.setItem(k, t); } catch {} if (!same && typeof cloudNote === 'function') cloudNote(k); },
 };
+
+/* ---------- progress saved online (finish at home what you started at school) ---------- */
+// Everything a student has done on an assignment (answers, tries, hints, typed work, submission) is copied to the
+// Progress tab of your Sheet a few seconds after each change. Starting the same assignment on another device with
+// the same name and period loads it back. Drawings on diagrams stay on the device where they were made.
+let cloudTimer = null, cloudRestoring = false, cloudQuiet = false, cloudStatus = '';
+function cloudNote(k) {
+  if (cloudQuiet) return; // leaving the tab is counted locally and rides along with the next real save
+  if (cloudRestoring || !CONFIG.SCRIPT_URL || !state || state.teacher || !String(k).startsWith(state.base) || /:(draw|cloudts)$/.test(k)) return;
+  try { localStorage.setItem(state.base + ':cloudts', String(Date.now())); } catch {}
+  clearTimeout(cloudTimer); cloudTimer = setTimeout(() => cloudFlush(false), 2500);
+}
+function cloudPayload() {
+  const b = state.base;
+  return { action: 'saveProgress', key: b, period: state.period, name: state.name, title: SETS[state.setKey].title, updated: +(store.get(b + ':cloudts') || Date.now()),
+    data: (() => { const d = { meta: store.get(b + ':meta'), curKey: state.key, saved: store.get(state.key), work: store.get(state.key + ':work') }; let t = JSON.stringify(d); if (t.length > 48000) { delete d.work; t = JSON.stringify(d); } return t; })() };
+}
+async function cloudFlush(leaving) {
+  clearTimeout(cloudTimer); cloudTimer = null;
+  if (!state || state.teacher || !CONFIG.SCRIPT_URL) return;
+  setCloudStatus('Saving…');
+  try {
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(cloudPayload()), keepalive: !!leaving });
+    const g = await res.json().catch(() => ({}));
+    setCloudStatus(g && g.ok ? 'Progress saved online ✓' : 'Progress saved on this device (online save failed)');
+  } catch (e) { setCloudStatus('Progress saved on this device (no internet right now)'); cloudTimer = setTimeout(() => cloudFlush(false), 20000); }
+}
+function setCloudStatus(t) { cloudStatus = t; const e = document.getElementById('cloudStatus'); if (e) e.textContent = t; }
+// before leaving the page, send anything not yet saved
+addEventListener('pagehide', () => { if (cloudTimer) cloudFlush(true); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudTimer) cloudFlush(true); });
+// newer saved work from another device → copy it onto this device before the assignment opens
+async function cloudRestore(base) {
+  if (!CONFIG.SCRIPT_URL) return;
+  try {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 8000);
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'loadProgress', key: base }), signal: ctl.signal });
+    clearTimeout(timer);
+    const g = await res.json();
+    if (!g || !g.ok || !g.data) return;
+    const localTs = +(store.get(base + ':cloudts') || 0);
+    if (!(g.updated > localTs)) return;
+    const d = JSON.parse(g.data);
+    cloudRestoring = true;
+    try {
+      if (d.meta) store.set(base + ':meta', d.meta);
+      if (d.curKey && d.saved) store.set(d.curKey, d.saved);
+      if (d.curKey && d.work) store.set(d.curKey + ':work', d.work);
+      localStorage.setItem(base + ':cloudts', String(g.updated));
+    } finally { cloudRestoring = false; }
+    return true;
+  } catch (e) { /* offline or not set up: keep what is on this device */ }
+  return false;
+}
+// a tab left open at school (or home) that comes back to the front picks up work done on the other device since
+let cloudChecking = false;
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || cloudChecking || !state || state.teacher || cloudTimer || !CONFIG.SCRIPT_URL) return;
+  cloudChecking = true;
+  try {
+    const st = state;
+    if (await cloudRestore(st.base) && state === st) begin(st.setKey, st.period, st.name, false);
+  } finally { cloudChecking = false; }
+});
 
 /* ---------- UI ---------- */
 const app = document.getElementById('app');
@@ -10522,6 +11083,8 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1) {
   document.getElementById('title').textContent = SETS[setKey].title;
   document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period`;
   const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${norm(name)}`;
+  if (!teacher && CONFIG.SCRIPT_URL) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
+  cloudStatus = '';
   const attempts = setting(setKey, 'attempts'), retries = setting(setKey, 'retries');
   const meta = teacher ? { attempt: teacherAttempt, scores: [] } : store.get(base + ':meta') || { attempt: 1, scores: [] };
   const attempt = Math.min(meta.attempt, attempts);
@@ -10602,7 +11165,7 @@ function render() {
   if (!submitted && !teacher) {
     const done = qs.filter((q, i) => isAnswered(q, answers[i])).length;
     const err = el('span', { class: 'err', id: 'submitErr' });
-    app.append(el('div', { class: 'bar' }, el('span', {}, el('strong', { id: 'doneCount' }, `${done} of ${qs.length}`), ' answered ', err),
+    app.append(el('div', { class: 'bar' }, el('span', {}, el('strong', { id: 'doneCount' }, `${done} of ${qs.length}`), ' answered ', err, el('span', { id: 'cloudStatus', class: 'small', style: 'margin-left:10px;opacity:.75' }, cloudStatus)),
       el('button', { class: 'btn', onclick: submit }, 'Submit')));
   }
 }
@@ -10831,6 +11394,7 @@ function latexToText(latex) {
   }).join('').replace(/\s+/g, ' ').trim();
 }
 
+const frLab = (l) => (/^\s*[a-zA-Zθαβ]\s*$/.test(l || '') ? l.trim() + ' =' : l); // "x" → "x ="
 function frArea(q, i) {
   const reveal = state.submitted || state.teacher || !!state.status[i];
   const vals = state.teacher ? q.fr.key.slice() : Array.isArray(state.answers[i]) ? state.answers[i].slice() : q.fr.fields.map(() => '');
@@ -10904,7 +11468,7 @@ function frArea(q, i) {
       input.addEventListener('focus', () => { lastAns = input; });
       // the | key starts a LaTeX command in the math editor; type a plain bar instead (absolute value)
       input.addEventListener('keydown', (e) => { if (e.key === '|') { e.preventDefault(); e.stopPropagation(); input.insert('|'); input.dispatchEvent(new Event('input')); } }, true);
-      row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
+      row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, frLab(f.label)) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
       hasMath = true; if (f.kind === 'expr') { if (f.keys === 'angles') hasAngles = true; else if (f.keys === 'inverse') hasInverse = true; else if (f.keys === 'degrees') hasDegrees = true; else if (f.keys === 'vector') hasVector = true; else if (f.keys === 'complex') hasComplex = true; else if (f.keys === 'trigform') hasTF = true; else if (KEYROWS_P[f.keys]) pKeys = pKeys || f.keys; else hasExpr = true; }
       return;
     }
@@ -10920,7 +11484,7 @@ function frArea(q, i) {
     controls[k] = input;
     const onIn = () => { vals[k] = input.value; save(); };
     input.addEventListener('input', onIn); input.addEventListener('change', onIn);
-    row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
+    row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, frLab(f.label)) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
   });
   applyLocks();
   if (hasMath && !reveal) { // small symbol row for the answer boxes
@@ -11166,7 +11730,7 @@ function recordLeave() {
   away = true;
   state.tabAways++;
   const saved = store.get(state.key) || {};
-  store.set(state.key, { ...saved, tabAways: state.tabAways });
+  cloudQuiet = true; try { store.set(state.key, { ...saved, tabAways: state.tabAways }); } finally { cloudQuiet = false; }
   if (locked()) showShield('left');
 }
 function cameBack() {
@@ -11277,7 +11841,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get('builder:open') || {}, secs = {};
-  const CH_TITLES = { precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set('builder:open', openSaved); };
@@ -11422,7 +11986,7 @@ function previewQuestion(q) {
   if (q.mode === 'fr') {
     box.append(el('div', { class: 'fr' }, el('div', { class: 'frrow' }, ...q.fr.fields.map((f) => el('label', { class: 'frfield', style: f.part ? 'flex-basis:100%' : '' },
       f.part ? el('span', { class: 'frpart', style: 'margin:6px 8px 0 0' }, f.part) : '',
-      f.label ? el('span', { class: 'frlabel' }, f.label) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '',
+      f.label ? el('span', { class: 'frlabel' }, frLab(f.label)) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '',
       f.kind === 'choice' ? el('span', { class: 'small' }, f.options.map((o, j) => `${LETTERS[j]}. ${o}`).join('   ')) :
       f.kind === 'select' ? el('select', { disabled: 'disabled' }, el('option', {}, 'Choose…')) : f.kind === 'proof' ? el('span', { class: 'small' }, 'Students type the proof one line at a time; each line is checked, then the AI grades it.') : el('input', { disabled: 'disabled', class: f.kind === 'number' ? 'num' : 'let' }),
       f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''))),
