@@ -216,6 +216,7 @@ const SETS = {
   'geo-transform': { subject: 'geometry', hidden: true, title: 'Ch. 4 Transformations',     items: [['dilation', 5], ['composite', 5]] },
   'geo-5-1':       { subject: 'geometry', title: '5.1 Angles of Triangles',   items: [['classifyTriangle', 3], ['angleSum', 3], ['extAngleAlgebra', 2], ['extAngleRatio', 2]] },
   'geo-5-2':       { subject: 'geometry', title: '5.2 Congruent Polygons',    items: [['congStatement', 3], ['correspondingParts', 3], ['findXY', 2], ['congReason', 2], ['thirdAngle', 2]] },
+  'geo-5-2-name':  { subject: 'geometry', title: '5.2 Naming Corresponding Parts', items: [['g52Name', 6], ['g52AllPairs', 2], ['g52TrueFalse', 4], ['g52Rewrite', 2]] },
   'geo-5-3-6':     { subject: 'geometry', title: '5.3–5.6 Triangle Congruence (SSS, SAS, ASA, AAS, HL)', items: [['triCongruence', 9], ['triCongruenceGiven', 3]] },
   'geo-5-4':       { subject: 'geometry', title: '5.4 Equilateral and Isosceles Triangles', items: [['g54Complete', 2], ['g54FindX', 3], ['g54FindXY', 2], ['g54Perimeter', 2], ['g54Angles', 2], ['g54IsoT', 1], ['g54BaseFacts', 1], ['g54Lighthouse', 1]] },
   // ----- Pre-Calculus -----
@@ -9835,6 +9836,96 @@ function triCong(r, givenText) {
 TEMPLATES.triCongruence = (r) => triCong(r, false);
 TEMPLATES.triCongruenceGiven = (r) => triCong(r, true);
 
+/* ==== GEOMETRY 5.2 NAMING BEGIN ==== */
+/* ---------- Geometry 5.2: naming corresponding parts from a congruence statement ---------- */
+// two polygons with n vertices and distinct letters: P ≅ Q (P[i] ↔ Q[i])
+function g52Pair(r, n) {
+  const pool = shuffle(r, 'ABCDEFGHJKLMNPQRSTUVWXYZ'.split(''));
+  const run = (k) => { const s = ri(r, 0, 24 - k); return 'ABCDEFGHJKLMNPQRSTUVWXYZ'.slice(s, s + k).split(''); };
+  let P = r() < 0.6 ? run(n) : pool.slice(0, n), Q;
+  do Q = r() < 0.5 ? shuffle(r, run(n)) : shuffle(r, pool.slice(n, 2 * n)); while (Q.some((c) => P.includes(c)));
+  return { P, Q, n, sym: n === 3 ? '△' : '', name: n === 3 ? 'triangle' : n === 4 ? 'quadrilateral' : 'pentagon' };
+}
+const g52Stmt = (G) => `${G.sym}${G.P.join('')} ≅ ${G.sym}${G.Q.join('')}`;
+// angle answer: one letter (the vertex) or three letters with that vertex in the middle and its two neighbors on the ends
+function g52AngOk(raw, poly, i) {
+  const t = normLetters(raw), n = poly.length, v = poly[i], a = poly[(i + n - 1) % n], b = poly[(i + 1) % n];
+  return t === v || t === a + v + b || t === b + v + a;
+}
+const g52SideOk = (raw, s) => { const t = normLetters(raw); return t === s || t === [...s].reverse().join(''); };
+const g52Ang = (poly, i, three) => { const n = poly.length; return three || n > 3 ? `∠${poly[(i + n - 1) % n]}${poly[i]}${poly[(i + 1) % n]}` : `∠${poly[i]}`; };
+const g52Side = (poly, i) => poly[i] + poly[(i + 1) % poly.length];
+TEMPLATES.g52Name = (r) => {
+  const n = pick(r, [3, 3, 4, 4, 5]), G = g52Pair(r, n), i = ri(r, 0, n - 1), fromP = r() < 0.5, isAng = r() < 0.5;
+  const [S, T] = fromP ? [G.P, G.Q] : [G.Q, G.P];
+  let ask, ans, ok, why, wrongs;
+  if (isAng) {
+    ask = `the angle that corresponds to ${g52Ang(S, i)}`; ans = g52Ang(T, i); ok = (v) => g52AngOk(v[0], T, i);
+    wrongs = [1, 2, n - 1].map((d) => g52Ang(T, (i + d) % n)).concat([g52Ang(S, (i + 1) % n)]);
+    why = `${S[i]} is letter ${i + 1} of ${S.join('')}, so it matches letter ${i + 1} of ${T.join('')}: ${T[i]}. ${g52Ang(S, i)} ≅ ${ans}.`;
+  } else {
+    ask = `the side that corresponds to ${SEG(g52Side(S, i))}`; ans = SEG(g52Side(T, i)); ok = (v) => g52SideOk(v[0], g52Side(T, i));
+    wrongs = [1, 2, n - 1].map((d) => SEG(g52Side(T, (i + d) % n))).concat([SEG(T[i] + T[(i + 2) % n])]);
+    why = `${g52Side(S, i)} uses letters ${i + 1} and ${((i + 1) % n) + 1} of ${S.join('')}. The same positions in ${T.join('')} are ${T[i]} and ${T[(i + 1) % n]}, so ${SEG(g52Side(S, i))} ≅ ${ans}.`;
+  }
+  return {
+    topic: 'Naming corresponding parts', stem: `${g52Stmt(G)}. Name ${ask}.`,
+    ...buildChoices(r, ans, [...new Set(wrongs)].filter((w) => w !== ans), () => null),
+    fr: { fields: [{ kind: 'text', label: '', prefix: isAng ? '∠' : '' }], key: [isAng ? T[i] : g52Side(T, i)], display: ans, check: ok },
+    solution: `Corresponding vertices are listed in the same order in a congruence statement. ${why}`,
+  };
+};
+// name every pair of corresponding parts (triangle or quadrilateral)
+TEMPLATES.g52AllPairs = (r) => {
+  const n = pick(r, [3, 3, 4]), G = g52Pair(r, n), { P, Q } = G;
+  const angT = (k) => `∠${P[k]} ≅ ∠${Q[k]}`, sideT = (k) => `${SEG(g52Side(P, k))} ≅ ${SEG(g52Side(Q, k))}`;
+  const all = (perm) => [...P.map((_, k) => `∠${P[k]} ≅ ∠${Q[perm[k]]}`), ...P.map((_, k) => `${SEG(g52Side(P, k))} ≅ ${SEG(Q[perm[k]] + Q[perm[(k + 1) % n]])}`)].join(';  ');
+  const id = P.map((_, k) => k), correct = all(id);
+  const perms = [id.slice(1).concat(id[0]), id.slice().reverse(), [id[1], id[0], ...id.slice(2)], [id[0], ...id.slice(2), id[1]]];
+  const wrongs = perms.map(all).filter((w) => w !== correct);
+  const fields = [...P.map((c) => ({ kind: 'text', label: `∠${c} ≅`, prefix: '∠' })), ...P.map((_, k) => ({ kind: 'text', label: `${SEG(g52Side(P, k))} ≅`, prefix: '' }))];
+  const ok = (v) => [...P.map((_, k) => g52AngOk(v[k], Q, k)), ...P.map((_, k) => g52SideOk(v[n + k], g52Side(Q, k)))];
+  return {
+    topic: 'All corresponding parts', stem: `${g52Stmt(G)}. Identify all pairs of congruent corresponding parts.`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], () => null),
+    fr: { fields, key: [...Q, ...P.map((_, k) => g52Side(Q, k))], display: correct, check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / (2 * n) },
+    solution: `Match the letters in order: ${P.map((c, k) => `${c} ↔ ${Q[k]}`).join(', ')}.\nAngles: ${P.map((_, k) => angT(k)).join(';  ')}\nSides: ${P.map((_, k) => sideT(k)).join(';  ')}`,
+  };
+};
+// true or false: a statement about corresponding parts
+TEMPLATES.g52TrueFalse = (r) => {
+  const n = pick(r, [3, 3, 4, 5]), G = g52Pair(r, n), { P, Q } = G, isTrue = r() < 0.5, i = ri(r, 0, n - 1), d = ri(r, 1, n - 1), isAng = r() < 0.5;
+  let st;
+  if (isAng) st = `${g52Ang(P, i)} ≅ ${g52Ang(Q, isTrue ? i : (i + d) % n)}`;
+  else { const j = isTrue ? i : (i + d) % n; const rev = r() < 0.4; st = `${SEG(g52Side(P, i))} ≅ ${SEG(rev ? [...g52Side(Q, j)].reverse().join('') : g52Side(Q, j))}`; }
+  const ans = isTrue ? 'True' : 'False';
+  return {
+    topic: 'Corresponding parts: true or false', stem: `${g52Stmt(G)}. Is the statement true or false?   ${st}`,
+    ...buildChoices(r, ans, [isTrue ? 'False' : 'True'], () => null), fr: FR.select('The statement is', ['True', 'False'], ans),
+    solution: `Match the letters in order: ${P.map((c, k) => `${c} ↔ ${Q[k]}`).join(', ')}. ${isAng ? `${g52Ang(P, i)} corresponds to ${g52Ang(Q, i)}` : `${SEG(g52Side(P, i))} corresponds to ${SEG(g52Side(Q, i))}`}, so the statement is ${ans.toLowerCase()}.`,
+  };
+};
+// another correct way to write the congruence statement
+TEMPLATES.g52Rewrite = (r) => {
+  const n = pick(r, [3, 3, 4]), G = g52Pair(r, n), { P, Q } = G;
+  const sh = ri(r, 1, n - 1), rev = n === 3 ? r() < 0.5 : r() < 0.4;
+  const order = Array.from({ length: n }, (_, k) => (rev ? (sh - k + n) % n : (k + sh) % n));
+  const S = (a, b) => `${G.sym}${a.join('')} ≅ ${G.sym}${b.join('')}`, correct = S(order.map((k) => P[k]), order.map((k) => Q[k]));
+  const bad = (f) => S(order.map((k) => P[k]), f(order).map((k) => Q[k]));
+  const wrongs = [bad((o) => o.slice(1).concat(o[0])), bad((o) => o.slice().reverse()), bad((o) => [o[1], o[0], ...o.slice(2)]), S(order.map((k) => P[k]), Q)].filter((w) => w !== correct);
+  const one = (a, b, X, Y) => a.length === n && b.length === n && new Set(a).size === n && [...a].every((c, k) => X.includes(c) && Y[X.indexOf(c)] === b[k]) && (n === 3 || isCyc(a, X));
+  const ok = (v) => { const a = normLetters(v[0]), b = normLetters(v[1]); if (a === P.join('') && b === Q.join('')) return false; return one(a, b, P, Q) || one(a, b, Q, P); };
+  return {
+    topic: 'Rewriting a congruence statement', stem: `${S(P, Q)}. Which is another correct way to write the congruence statement${n > 3 ? ' (the vertices of each polygon must stay in order around it)' : ''}?`,
+    frStem: `${S(P, Q)}. Write the congruence statement another correct way (different from the one given).`,
+    ...buildChoices(r, correct, [...new Set(wrongs)], () => null),
+    fr: { fields: [{ kind: 'text', label: '', prefix: G.sym }, { kind: 'text', label: '≅', prefix: G.sym }], key: [order.map((k) => P[k]).join(''), order.map((k) => Q[k]).join('')], display: correct, check: ok },
+    solution: `Any order works as long as corresponding vertices stay paired (${P.map((c, k) => `${c} ↔ ${Q[k]}`).join(', ')})${n > 3 ? ' and the vertices still go around the polygon in order' : ''}: ${correct}.`,
+  };
+};
+const isCyc = (s, P) => { const n = P.length, i = P.indexOf(s[0]); if (i < 0) return false; const fw = [...s].every((c, k) => c === P[(i + k) % n]), bw = [...s].every((c, k) => c === P[(i - k + n) % n]); return fw || bw; };
+/* ==== GEOMETRY 5.2 NAMING END ==== */
+
 /* ==== GEOMETRY 5.4 BEGIN ==== */
 /* ---------- Geometry 5.4 Equilateral and Isosceles Triangles ---------- */
 const g4Lin = (a, b, v = 'x') => lnSumT([[a, null, v], [b, null, '']]);
@@ -10017,6 +10108,10 @@ const QUESTION_TYPES = [
   { id: 'findXY',             subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Find x and y', desc: 'Congruent triangles with expressions (#7–8)' },
   { id: 'congReason',         subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Show polygons are congruent', desc: 'Reflexive Property, Third Angles Theorem (#9–10)' },
   { id: 'thirdAngle',         subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Third Angles Theorem', desc: 'Find m∠1 (#13–14)' },
+  { id: 'g52Name', subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Name a corresponding part', desc: 'From a congruence statement: triangles, quadrilaterals, pentagons' },
+  { id: 'g52AllPairs', subject: 'geometry', section: '5.2 Congruent Polygons', label: 'All pairs of corresponding parts', desc: 'Every congruent angle and side pair' },
+  { id: 'g52TrueFalse', subject: 'geometry', section: '5.2 Congruent Polygons', label: 'True or false', desc: 'Is this pair of parts corresponding?' },
+  { id: 'g52Rewrite', subject: 'geometry', section: '5.2 Congruent Polygons', label: 'Rewrite the congruence statement', desc: 'Another correct order' },
   { id: 'triCongruence',      subject: 'geometry', section: '5.3–5.6 Triangle Congruence', label: 'Prove congruent (marked figure)', desc: 'Part A: SSS, SAS, ASA, AAS, HL, or not possible. Part B: write the congruence statement' },
   { id: 'triCongruenceGiven', subject: 'geometry', section: '5.3–5.6 Triangle Congruence', label: 'Prove congruent (“Given:” text)', desc: 'Same two parts, with the facts given in words instead of marks' },
   { id: 'g54Complete', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: 'Complete the statement', desc: 'Base Angles Theorem or its converse (#1–4)' },
