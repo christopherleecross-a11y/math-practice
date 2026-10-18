@@ -149,6 +149,15 @@ const CONFIG = {
   // Send each student's work (answers, typed work, drawings) to a Google Doc in your Drive.
   // Needs the updated PracticeResults.gs. Set to false to send scores only.
   SEND_WORK: true,
+  // Students pick their period and name from your Roster tab (Practice > Refresh roster from Classroom in the Sheet).
+  // The list shows first name + last initial only. With no Roster tab, students type their names like before.
+  ROSTER_SIGNIN: true,
+  // Sign in with Google: paste the URL of your SECOND deployment ("Anyone within" your school) here.
+  // Leave it empty to turn sign-in off. Setup steps are at the top of PracticeResults.gs.
+  SIGNIN_URL: 'https://script.google.com/a/macros/atoka.org/s/AKfycbznxrlxQqktH6_7yRUVciYV4PtFtDy3FMfxnAg6gPq7Llz0Eo_3mdFAxrRhq4EBMmje/exec',
+  // true = students must sign in with Google (the name list is hidden). false = signing in is offered first,
+  // and students can still pick their name from the list.
+  REQUIRE_SIGNIN: false,
 
   // Defaults for the menu assignments (the assignment builder can set these per link):
   // RETRIES  = extra tries on a missed question (0 = no Check button; graded only at Submit).
@@ -10928,9 +10937,11 @@ const scoreOf = (q, a) => (q.mode === 'fr'
   : a === q.answer ? 1 : 0);
 const isCorrect = (q, a) => scoreOf(q, a) === 1;
 const norm = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
-function generate(setKey, period, name, attempt = 1) {
+// who a student is: their Classroom ID when they picked their name from the list, otherwise the letters of the typed name
+const sidOf = (name, rid) => (rid ? 'id' + rid : norm(name));
+function generate(setKey, period, sid, attempt = 1) {
   // same: true → one version for the whole class (retries and new attempts are also the same for everyone)
-  const who = setting(setKey, 'same') ? 'everyone' : `${period}|${norm(name)}`;
+  const who = setting(setKey, 'same') ? 'everyone' : `${period}|${sid}`;
   const seedStr = `${CONFIG.SALT}|${setKey}|${who}` + (attempt > 1 ? `|a${attempt}` : '');
   const r = mulberry32(cyrb53(seedStr));
   let qs = [];
@@ -10969,14 +10980,15 @@ const store = {
 let cloudTimer = null, cloudRestoring = false, cloudQuiet = false, cloudStatus = '';
 function cloudNote(k) {
   if (cloudQuiet) return; // leaving the tab is counted locally and rides along with the next real save
-  if (cloudRestoring || !CONFIG.SCRIPT_URL || !state || state.teacher || !String(k).startsWith(state.base) || /:(draw|cloudts)$/.test(k)) return;
+  if (cloudRestoring || !CONFIG.SCRIPT_URL || !state || state.teacher || !String(k).startsWith(state.base) || /:cloudts$/.test(k)) return;
   try { localStorage.setItem(state.base + ':cloudts', String(Date.now())); } catch {}
   clearTimeout(cloudTimer); cloudTimer = setTimeout(() => cloudFlush(false), 2500);
 }
 function cloudPayload() {
   const b = state.base;
-  return { action: 'saveProgress', key: b, period: state.period, name: state.name, title: SETS[state.setKey].title, updated: +(store.get(b + ':cloudts') || Date.now()),
-    data: (() => { const d = { meta: store.get(b + ':meta'), curKey: state.key, saved: store.get(state.key), work: store.get(state.key + ':work') }; let t = JSON.stringify(d); if (t.length > 48000) { delete d.work; t = JSON.stringify(d); } return t; })() };
+  return { action: 'saveProgress', key: b, period: state.period, name: state.name, rid: state.rid || undefined, token: state.token || undefined, title: SETS[state.setKey].title, updated: +(store.get(b + ':cloudts') || Date.now()),
+    data: (() => { const d = { meta: store.get(b + ':meta'), curKey: state.key, saved: store.get(state.key), work: store.get(state.key + ':work'), draw: store.get(state.key + ':draw') };
+      let t = JSON.stringify(d); if (t.length > 190000) { delete d.draw; t = JSON.stringify(d); } if (t.length > 190000) { delete d.work; t = JSON.stringify(d); } return t; })() };
 }
 async function cloudFlush(leaving) {
   clearTimeout(cloudTimer); cloudTimer = null;
@@ -11009,6 +11021,7 @@ async function cloudRestore(base) {
       if (d.meta) store.set(base + ':meta', d.meta);
       if (d.curKey && d.saved) store.set(d.curKey, d.saved);
       if (d.curKey && d.work) store.set(d.curKey + ':work', d.work);
+      if (d.curKey && d.draw) store.set(d.curKey + ':draw', d.draw);
       localStorage.setItem(base + ':cloudts', String(g.updated));
     } finally { cloudRestoring = false; }
     return true;
@@ -11022,7 +11035,7 @@ document.addEventListener('visibilitychange', async () => {
   cloudChecking = true;
   try {
     const st = state;
-    if (await cloudRestore(st.base) && state === st) begin(st.setKey, st.period, st.name, false);
+    if (await cloudRestore(st.base) && state === st) begin(st.setKey, st.period, st.name, false, 1, st.rid);
   } finally { cloudChecking = false; }
 });
 
@@ -11042,6 +11055,54 @@ function el(tag, attrs = {}, ...kids) {
 }
 const contentWidth = () => Math.min(700, app.clientWidth) - 38;
 
+// the sign-in list: { '1st': [{ id, label: 'Ava S.' }, …], … } from the Roster tab; {} = students type their names
+let ROSTER = null;
+/* ---------- Sign in with Google: the script sends the student back here with a signed pass in the address ---------- */
+// Chromebooks are shared, so a sign-in lasts only for this tab: closing it (or opening the next assignment
+// from Classroom in a new tab) means signing in again, which is one click on a school Chromebook.
+let passMem = '', signinBroken = false;
+try { localStorage.removeItem('signin:pass'); localStorage.removeItem('signin:me'); } catch {} // from earlier versions
+(function catchPass() {
+  const m = /[#&]signin=([\w-]+\.[\w-]+)/.exec(location.hash);
+  if (!m) return;
+  passMem = m[1]; try { sessionStorage.setItem('signin:pass', m[1]); } catch {}
+  history.replaceState(null, '', location.pathname + location.search);
+  if (CONFIG.SCRIPT_URL) fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'checkPass', token: m[1] }) })
+    .then((r) => r.json()).then((g) => {
+      if (!g || g.valid !== false) return;
+      signOut(); signinBroken = true;
+      if (!state) startScreen(false); // still on the sign-in screen: show the name list instead
+    }).catch(() => {}); // offline: keep the pass; the script checks it again with every score
+})();
+// { rid, n: full name, ps: [periods], exp, token } or null. The page only reads the pass; the script checks its signature.
+function signinPass() {
+  if (!CONFIG.SIGNIN_URL) return null;
+  let t = passMem; try { t = sessionStorage.getItem('signin:pass') || t; } catch {}
+  if (!t) return null;
+  try {
+    const b = t.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    const o = JSON.parse(decodeURIComponent(escape(atob(b + '==='.slice((b.length + 3) % 4)))));
+    if (!o || !o.rid || !(o.exp > Date.now()) || !Array.isArray(o.ps) || !o.ps.length) return null;
+    return { ...o, token: t };
+  } catch { return null; }
+}
+const signinGo = () => { location.href = CONFIG.SIGNIN_URL + (CONFIG.SIGNIN_URL.includes('?') ? '&' : '?') + 'signin=1&back=' + encodeURIComponent(location.href.split('#')[0]); };
+const signOut = () => { passMem = ''; try { sessionStorage.removeItem('signin:pass'); sessionStorage.setItem('signin:tried', '1'); } catch {} };
+async function loadRoster() {
+  if (ROSTER) return ROSTER;
+  let cached = null; try { cached = JSON.parse(localStorage.getItem('signin:roster') || 'null'); } catch {}
+  if (CONFIG.SCRIPT_URL && CONFIG.ROSTER_SIGNIN !== false) {
+    try {
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 7000);
+      const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'roster' }), signal: ctl.signal });
+      clearTimeout(timer);
+      const g = await res.json();
+      if (g && g.ok) { ROSTER = g.periods || {}; try { localStorage.setItem('signin:roster', JSON.stringify(ROSTER)); } catch {} return ROSTER; }
+    } catch (e) { /* offline or older script: use the last list this device saw */ }
+  }
+  ROSTER = cached || {};
+  return ROSTER;
+}
 function startScreen(teacher = false) {
   if (teacher) teacherNav('key');
   const setKey = CUSTOM_KEY || params.get('set');
@@ -11063,47 +11124,114 @@ function startScreen(teacher = false) {
     document.getElementById('title').textContent = SETS[setKey].title;
     document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${CONFIG.TEACHER_NAME}`;
   }
+  const pass = teacher ? null : signinPass();
+  if (pass) { // signed in with Google
+    const err0 = el('div', { class: 'err' });
+    const pSel = pass.ps.length > 1 ? el('select', { id: 'period' }, el('option', { value: '' }, 'Which class is this for?'), ...pass.ps.map((p) => el('option', { value: p }, p + ' period'))) : null;
+    card.append(el('div', { style: 'display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:10px;background:var(--accent-soft)' },
+      el('div', { style: 'flex:1;min-width:200px' }, el('div', { class: 'small' }, 'Signed in with Google as'), el('strong', {}, pass.n), pass.ps.length === 1 ? el('span', {}, ` · ${pass.ps[0]} period`) : ''),
+      el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); signOut(); startScreen(false); } }, 'Not you? Sign out')));
+    if (pSel) card.append(el('label', { for: 'period' }, 'Class period'), pSel);
+    card.append(el('button', { class: 'btn', onclick: () => {
+      const sk = setSel ? setSel.value : setKey, period = pSel ? pSel.value : pass.ps[0];
+      if (!sk) return (err0.textContent = 'Choose an assignment first.');
+      if (!period) return (err0.textContent = 'Choose your class period.');
+      begin(sk, period, pass.n, false, 1, pass.rid);
+    } }, 'Start'), err0);
+    app.append(card);
+    return;
+  }
+  // students arrive from Google Classroom already signed in to their school account, so sign them in automatically
+  // (once per tab; if it doesn't work, the button and the name list below are still here)
+  if (!teacher && CONFIG.SIGNIN_URL && !params.has('teacher') && !signinBroken) {
+    let tried = true; try { tried = sessionStorage.getItem('signin:tried') === '1'; if (!tried) sessionStorage.setItem('signin:tried', '1'); } catch {}
+    if (!tried) { card.append(el('p', {}, 'Signing you in with your school account…')); app.append(card); signinGo(); return; }
+  }
+  if (!teacher && CONFIG.SIGNIN_URL && signinBroken) card.append(el('div', { class: 'err', style: 'margin:0 0 10px' }, 'Google sign-in isn’t working right now. Pick your name below. (Teacher: SIGNIN_URL must be a deployment of the same script as SCRIPT_URL.)'));
+  if (!teacher && CONFIG.SIGNIN_URL && !signinBroken) {
+    card.append(el('button', { class: 'btn', type: 'button', style: 'margin-top:6px;display:flex;align-items:center;gap:10px', onclick: signinGo },
+      el('span', { style: 'display:inline-flex;width:22px;height:22px;border-radius:50%;background:#fff;color:#1f5fa8;font:700 15px system-ui;align-items:center;justify-content:center' }, 'G'), 'Sign in with Google'),
+      el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Use your school account. On a school Chromebook it’s one click.'));
+    if (CONFIG.REQUIRE_SIGNIN) { app.append(card); return; }
+    card.append(el('div', { style: 'display:flex;align-items:center;gap:10px;margin:18px 0 0;color:var(--muted)' }, el('hr', { style: 'flex:1;border:0;border-top:1px solid var(--line)' }), 'or', el('hr', { style: 'flex:1;border:0;border-top:1px solid var(--line)' })));
+  }
   const per = el('select', { id: 'period' }, el('option', { value: '' }, 'Choose your class period…'), ...CONFIG.PERIODS.map((p) => el('option', { value: p }, p + ' period')));
   const nm = el('input', { type: 'text', id: 'name', placeholder: 'First and last name', autocomplete: 'off' });
+  // with a Roster tab, students pick their name from a list (first name + last initial) instead of typing it
+  const nameSel = el('select', { id: 'nameSel', style: 'display:none' });
+  const nmLabel = el('label', { for: 'name' }, teacher ? "Student's name (as they typed it)" : 'Your name');
+  const typedNote = el('p', { class: 'small', style: 'display:none;margin:6px 0 0' }, teacher ? 'For a student who typed their name instead of picking it.' : 'Type your first and last name. Tell Mr. Cross your name was missing so he can add you.');
+  let roster = null;
+  const fillNames = () => {
+    if (!roster) return;
+    const list = roster[per.value] || [], keep = nameSel.value;
+    nameSel.innerHTML = '';
+    nameSel.append(el('option', { value: '' }, per.value ? (teacher ? 'Choose the student…' : 'Choose your name…') : 'Choose your class period first'),
+      ...list.map((s) => el('option', { value: s.id }, s.label)), el('option', { value: '__typed' }, teacher ? 'A name the student typed…' : 'My name isn’t on the list'));
+    nameSel.disabled = !per.value;
+    if ([...nameSel.options].some((o) => o.value === keep)) nameSel.value = keep;
+    showTyped();
+  };
+  const showTyped = () => { const t = roster && nameSel.value === '__typed'; nm.style.display = !roster || t ? '' : 'none'; typedNote.style.display = t ? '' : 'none'; };
+  per.addEventListener('change', fillNames);
+  nameSel.addEventListener('change', showTyped);
+  loadRoster().then((r) => {
+    if (!r || !Object.keys(r).length || !card.isConnected) return;
+    roster = r;
+    const have = Object.keys(r).sort((a, b) => perOrder(a) - perOrder(b)), cur = per.value;
+    per.innerHTML = ''; per.append(el('option', { value: '' }, teacher ? 'Choose the class period…' : 'Choose your class period…'), ...have.map((p) => el('option', { value: p }, p + ' period')));
+    nmLabel.textContent = teacher ? "Student's name" : 'Your name'; nmLabel.setAttribute('for', 'nameSel');
+    nameSel.style.display = '';
+    per.value = have.includes(cur) ? cur : ''; // nothing pre-picked: the next student on a shared Chromebook is usually someone else
+    fillNames();
+    if (hintP) hintP.textContent = teacher ? '' : 'Pick your class period and your name. Your questions are made just for you, so your answers won’t match anyone else’s.';
+  });
   const err = el('div', { class: 'err' });
   const clear = () => (err.textContent = '');
-  [per, nm, setSel].forEach((x) => x && x.addEventListener('input', clear));
-  card.append(el('label', { for: 'period' }, teacher ? "Student's class period" : 'Class period'), per,
-    el('label', { for: 'name' }, teacher ? "Student's name (as they typed it)" : 'Your name'), nm);
+  [per, nm, setSel, nameSel].forEach((x) => x && x.addEventListener('input', clear));
+  card.append(el('label', { for: 'period' }, teacher ? "Student's class period" : 'Class period'), per, nmLabel, nameSel, nm, typedNote);
   const attSel = el('select', { id: 'attempt' }, ...Array.from({ length: 10 }, (_, n) => el('option', { value: String(n + 1) }, `Attempt ${n + 1}`)));
   if (teacher) card.append(el('label', { for: 'attempt' }, 'Which attempt'), attSel,
     el('p', { class: 'small' }, 'Shows the first version of each question. If retries are on, later versions are listed in the student’s work Doc.'));
-  if (!teacher) card.append(el('p', { class: 'small' }, setKey && setting(setKey, 'same') ? 'Type your full name exactly the same way every time.'
-    : 'Type your full name exactly the same way every time. Your questions are made just for you, so your answers won’t match anyone else’s.'));
+  const hintP = teacher ? null : el('p', { class: 'small' }, setKey && setting(setKey, 'same') ? 'Type your full name exactly the same way every time.'
+    : 'Type your full name exactly the same way every time. Your questions are made just for you, so your answers won’t match anyone else’s.');
+  if (hintP) card.append(hintP);
   card.append(el('button', { class: 'btn', onclick: () => {
     const sk = setSel ? setSel.value : setKey;
-    const name = nm.value.trim().replace(/\s+/g, ' ');
     if (!sk) return (err.textContent = 'Choose an assignment first.');
     if (!per.value) return (err.textContent = 'Choose your class period.');
+    if (roster && nameSel.value && nameSel.value !== '__typed') {
+      const s = (roster[per.value] || []).find((x) => x.id === nameSel.value);
+      return begin(sk, per.value, s.label, teacher, teacher ? +attSel.value : 1, s.id);
+    }
+    if (roster && !nameSel.value) return (err.textContent = teacher ? 'Choose the student.' : 'Choose your name.');
+    const name = nm.value.trim().replace(/\s+/g, ' ');
     if (norm(name).length < 4 || !name.includes(' ')) return (err.textContent = 'Enter your first and last name.');
     begin(sk, per.value, name, teacher, teacher ? +attSel.value : 1);
   } }, teacher ? 'Show answer key' : 'Start'), err);
   app.append(card);
 }
 
-async function begin(setKey, period, name, teacher, teacherAttempt = 1) {
+async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = null) {
   if (!mathReady) { app.innerHTML = '<div class="card">Loading…</div>'; await mathLoading; }
   document.getElementById('title').textContent = SETS[setKey].title;
   document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period`;
-  const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${norm(name)}`;
+  const sid = sidOf(name, rid);
+  const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${sid}`;
   if (!teacher && CONFIG.SCRIPT_URL) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
   cloudStatus = '';
   const attempts = setting(setKey, 'attempts'), retries = setting(setKey, 'retries');
   const meta = teacher ? { attempt: teacherAttempt, scores: [] } : store.get(base + ':meta') || { attempt: 1, scores: [] };
   const attempt = Math.min(meta.attempt, attempts);
   const key = attempt > 1 ? `${base}:a${attempt}` : base;
-  const { qs, version, seedStr } = generate(setKey, period, name, attempt);
+  const { qs, version, seedStr } = generate(setKey, period, sid, attempt);
   const sig = qs.map(qSig);
   const saved = teacher ? {} : store.get(key) || {};
   if (!teacher) remapSaved(key, saved, sig);
   const tries = saved.tries || {};
   Object.keys(tries).forEach((i) => { if (tries[i] > 0 && qs[i]) qs[i] = regenQuestion(seedStr, qs[i], +i, tries[i]); });
-  state = { setKey, period, name, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, teacher, hints: !!setting(setKey, 'hints'), hintUsed: saved.hintUsed || {},
+  const ps = !teacher && rid ? signinPass() : null;
+  state = { setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, teacher, hints: !!setting(setKey, 'hints'), hintUsed: saved.hintUsed || {},
     answers: Array.from({ length: qs.length }, (_, i) => (saved.answers && saved.answers[i] !== undefined ? saved.answers[i] : null)),
     submitted: !teacher && saved.submitted ? saved.submitted : null,
     started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
@@ -11696,6 +11824,7 @@ async function send(pts) {
   const sub = state.submitted;
   if (!CONFIG.SCRIPT_URL) { sub.saveStatus = 'none'; return refreshStatus(); }
   const payload = {
+    rid: state.rid || undefined, token: state.token || undefined,
     set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, subject: SUBJECTS[SETS[state.setKey].subject] || '', setTitle: SETS[state.setKey].title, period: state.period, name: state.name,
     score: sub.score, total: sub.total, percent: Math.round((100 * sub.score) / sub.total),
     detail: state.qs.map((q, i) => { const a = state.answers[i];
@@ -11739,7 +11868,7 @@ function resultsCard() {
     const next = state.attempt + 1;
     card.append(el('button', { class: 'btn', type: 'button', onclick: () => {
       state.meta.attempt = next; store.set(state.base + ':meta', state.meta);
-      begin(state.setKey, state.period, state.name, false); window.scrollTo(0, 0);
+      begin(state.setKey, state.period, state.name, false, 1, state.rid); window.scrollTo(0, 0);
     } }, `Start attempt ${next} of ${state.attempts} (new questions)`));
   } else if (multi) card.append(el('p', { class: 'small' }, 'You have used all of your attempts.'));
   setTimeout(refreshStatus, 0);
