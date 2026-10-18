@@ -11043,6 +11043,7 @@ function el(tag, attrs = {}, ...kids) {
 const contentWidth = () => Math.min(700, app.clientWidth) - 38;
 
 function startScreen(teacher = false) {
+  if (teacher) teacherNav('key');
   const setKey = CUSTOM_KEY || params.get('set');
   app.innerHTML = '';
   const card = el('div', { class: 'card' });
@@ -11845,6 +11846,7 @@ function dashLabels(setCol) {
 const who = (period, name) => period + '|' + norm(name);
 
 async function dashboard() {
+  teacherNav('dash');
   document.getElementById('title').textContent = 'Results dashboard';
   document.getElementById('subtitle').textContent = 'Scores from your Sheet, by assignment, period, and student.';
   const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '1100px';
@@ -12047,9 +12049,27 @@ function dashStudent(s) {
 }
 /* ==== RESULTS DASHBOARD END ==== */
 /* ---------- teacher tools: menu + assignment builder ---------- */
+// tabs across the top of every teacher screen (only appears after the teacher PIN)
+function teacherNav(active) {
+  let nav = document.getElementById('tnav');
+  if (!nav) {
+    nav = el('nav', { id: 'tnav', style: 'display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:12px' });
+    app.before(nav);
+  }
+  const go = (fn) => () => { const w = document.querySelector('.wrap'); if (w) w.style.maxWidth = ''; fn(); window.scrollTo(0, 0); };
+  const tabs = [
+    ['build', 'Build an assignment', go(builder)],
+    ['dash', 'Results dashboard', go(() => { DASH.title = ''; DASH.student = null; dashboard(); })],
+    ['key', 'Look up an answer key', go(() => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); })],
+  ];
+  nav.innerHTML = '';
+  tabs.forEach(([id, label, fn]) => nav.append(el('button', { type: 'button', onclick: fn, 'aria-current': id === active ? 'page' : 'false',
+    style: `flex:1;min-width:150px;padding:9px 12px;font:600 15px system-ui,sans-serif;border-radius:8px;border:1px solid ${id === active ? 'var(--accent)' : 'transparent'};background:${id === active ? 'var(--accent)' : 'transparent'};color:${id === active ? '#fff' : 'var(--accent)'};cursor:pointer` }, label)));
+}
 function teacherMenu() {
   if (CUSTOM_KEY || SETS[params.get('set')]) { document.getElementById('title').textContent = 'Answer key'; return startScreen(true); }
   document.getElementById('title').textContent = 'Teacher tools';
+  teacherNav('');
   const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '';
   app.innerHTML = '';
   app.append(el('div', { class: 'card' },
@@ -12060,6 +12080,7 @@ function teacherMenu() {
 }
 
 function builder() {
+  teacherNav('build');
   document.getElementById('title').textContent = 'Build an assignment';
   document.getElementById('subtitle').textContent = 'Choose question types and how many of each, then copy the link.';
   app.innerHTML = '';
