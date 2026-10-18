@@ -11815,14 +11815,247 @@ window.addEventListener('resize', () => {
   window._rt = setTimeout(() => { if (state && Math.abs(app.clientWidth - lastW) > 30) { lastW = app.clientWidth; const y = window.scrollY; render(); window.scrollTo(0, y); } }, 200);
 });
 
+/* ==== RESULTS DASHBOARD BEGIN ==== */
+/* ---------- teacher results dashboard: reads your Sheet through the script (password in Script properties) ---------- */
+const DASH = { data: null, subject: '', period: '', title: '', student: null, sort: 'name', dir: 1, days: 200 };
+const dashPw = { get() { try { return localStorage.getItem('dash:pw') || ''; } catch { return ''; } }, set(v) { try { v ? localStorage.setItem('dash:pw', v) : localStorage.removeItem('dash:pw'); } catch {} } };
+const perOrder = (p) => { const n = parseInt(p, 10); return isNaN(n) ? 99 : n; };
+const dashDate = (t) => { const d = new Date(t), now = new Date(); const same = d.toDateString() === now.toDateString();
+  return same ? 'Today ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+const pctT = (p) => Math.round(100 * p) + '%';
+const band = (p) => (p >= 0.9 ? '#e7f3e4' : p >= 0.7 ? '#f3f6e2' : p >= 0.5 ? '#fbf1dc' : '#f9e1de');
+// "3✓(try 2)(hint) 4✗– 5½(…)" → [{n, pts, hint}]
+function parseDetail(s) {
+  const out = [], re = /(?:^|\s)(\d+)([✓✗½])/g; let m; const idx = [];
+  while ((m = re.exec(s))) idx.push({ n: +m[1], mark: m[2], at: m.index });
+  idx.forEach((x, k) => { const seg = s.slice(x.at, k + 1 < idx.length ? idx[k + 1].at : s.length);
+    out.push({ n: x.n, pts: x.mark === '✓' ? 1 : x.mark === '½' ? 0.5 : 0, hint: seg.includes('(hint)'), blank: /✗(\([^)]*\))*–/.test(seg) }); });
+  return out;
+}
+// question number → type name, when the order is the same for everyone
+function dashLabels(setCol) {
+  let items = null;
+  if (setCol.startsWith('custom:')) items = setCol.slice(7).split('_').map((p) => p.split('.')).map(([id, n]) => [id, +n]);
+  else if (SETS[setCol] && !SETS[setCol].shuffle) items = SETS[setCol].items;
+  if (!items) return null;
+  const lab = [];
+  items.forEach(([id, n]) => { const t = QUESTION_TYPES.find((q) => q.id === id); for (let i = 0; i < n; i++) lab.push(t ? t.label : id); });
+  return lab;
+}
+const who = (period, name) => period + '|' + norm(name);
+
+async function dashboard() {
+  document.getElementById('title').textContent = 'Results dashboard';
+  document.getElementById('subtitle').textContent = 'Scores from your Sheet, by assignment, period, and student.';
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '1100px';
+  app.innerHTML = '';
+  if (!CONFIG.SCRIPT_URL) { app.append(el('div', { class: 'card' }, 'CONFIG.SCRIPT_URL is empty, so there are no results to show.')); return; }
+  if (!dashPw.get()) return dashLogin('');
+  app.append(el('div', { class: 'card' }, 'Loading results…'));
+  let g;
+  try {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 30000);
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'dashboard', password: dashPw.get(), days: DASH.days }), signal: ctl.signal });
+    clearTimeout(timer); g = await res.json();
+  } catch (e) { app.innerHTML = ''; app.append(el('div', { class: 'card' }, el('p', {}, 'Couldn’t reach your script. If you just pasted the new PracticeResults.gs, make sure you deployed a New version (Deploy > Manage deployments > Edit > Version: New version > Deploy).'), el('button', { class: 'btn', onclick: dashboard }, 'Try again'))); return; }
+  if (!g.ok) {
+    if (g.wrong) { dashPw.set(''); return dashLogin('That password didn’t match DASHBOARD_PASSWORD in Script properties.'); }
+    if (g.locked) { dashPw.set(''); return dashLogin('Too many wrong passwords. Wait 15 minutes and try again.'); }
+    app.innerHTML = '';
+    app.append(el('div', { class: 'card' }, el('strong', {}, g.setup ? 'One-time setup' : 'Something went wrong'),
+      g.setup ? el('p', {}, 'In your Apps Script project: Project Settings (gear) > Script properties > Add script property. Name it DASHBOARD_PASSWORD and give it a password only you know. Then come back here.') : el('p', {}, String(g.error || '')),
+      el('button', { class: 'btn', onclick: dashboard }, 'Try again')));
+    return;
+  }
+  DASH.data = g; dashRender();
+}
+function dashLogin(msg) {
+  app.innerHTML = '';
+  const pw = el('input', { type: 'password', placeholder: 'Dashboard password', autocomplete: 'current-password' });
+  const go = () => { if (!pw.value) return; dashPw.set(pw.value); dashboard(); };
+  pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  app.append(el('div', { class: 'card' }, el('label', {}, 'Dashboard password'), pw, msg ? el('div', { class: 'err' }, msg) : '',
+    el('p', { class: 'small' }, 'This is the DASHBOARD_PASSWORD you saved in your Apps Script’s Script properties. It’s remembered on this computer only.'),
+    el('button', { class: 'btn', onclick: go }, 'Open dashboard')));
+  pw.focus();
+}
+
+function dashRender() {
+  const D = DASH.data; app.innerHTML = '';
+  const all = D.results;
+  const tabs = [...new Set(all.map((r) => r.tab))].sort();
+  const periods = [...new Set([...all.map((r) => r.period), ...D.progress.map((p) => p.period), ...D.roster.map((r) => r.period)])].filter(Boolean).sort((a, b) => perOrder(a) - perOrder(b));
+  const inSubj = (r) => !DASH.subject || r.tab === DASH.subject;
+  const inPer = (r) => !DASH.period || r.period === DASH.period;
+  const rows = all.filter((r) => inSubj(r) && inPer(r));
+  // assignments, most recent first
+  const byTitle = {};
+  rows.forEach((r) => { const a = (byTitle[r.title] = byTitle[r.title] || { title: r.title, tab: r.tab, set: r.set, last: 0, rows: [] }); a.rows.push(r); if (r.t > a.last) { a.last = r.t; a.set = r.set; } });
+  const titles = Object.values(byTitle).sort((a, b) => b.last - a.last);
+  if (DASH.title && !byTitle[DASH.title] && !D.progress.some((p) => p.title === DASH.title)) DASH.title = '';
+
+  const sel = (opts, val, on) => { const s = el('select', {}, ...opts.map(([v, t]) => el('option', { value: v }, t))); s.value = val; s.addEventListener('change', () => on(s.value)); return s; };
+  const ctl = el('div', { class: 'card', style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end' },
+    el('div', {}, el('label', {}, 'Subject'), sel([['', 'All subjects'], ...tabs.map((t) => [t, t])], DASH.subject, (v) => { DASH.subject = v; DASH.title = ''; DASH.student = null; dashRender(); })),
+    el('div', {}, el('label', {}, 'Period'), sel([['', 'All periods'], ...periods.map((p) => [p, p + ' period'])], DASH.period, (v) => { DASH.period = v; dashRender(); })),
+    el('div', {}, el('label', {}, 'Assignment'), sel([['', 'All assignments (overview)'], ...titles.map((a) => [a.title, a.title])], DASH.title, (v) => { DASH.title = v; DASH.student = null; dashRender(); })),
+    el('div', {}, el('label', {}, 'Show the last'), sel([['30', '30 days'], ['90', '90 days'], ['200', '200 days'], ['400', '400 days']], String(DASH.days), (v) => { DASH.days = +v; dashboard(); })),
+    el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+      el('button', { class: 'btn', style: 'margin-top:0', onclick: dashboard }, 'Refresh'),
+      el('button', { class: 'btn secondary', style: 'margin-top:0', onclick: () => { dashPw.set(''); dashLogin(''); } }, 'Lock')));
+  app.append(ctl);
+  if (DASH.student) return dashStudent(DASH.student);
+  if (!DASH.title) return dashOverview(titles);
+  dashAssignment(byTitle[DASH.title] || { title: DASH.title, rows: [], set: '' });
+}
+
+// table helper with clickable headers
+function dashTable(cols, data, key) {
+  const sk = DASH.sort in Object.fromEntries(cols.map((c) => [c.k, 1])) ? DASH.sort : cols[0].k;
+  const c0 = cols.find((c) => c.k === sk), val = c0.sort || ((r) => r[sk]);
+  const sorted = data.slice().sort((a, b) => { const x = val(a), y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * DASH.dir; });
+  const th = (c) => el('th', { style: 'text-align:left;padding:8px 10px;border-bottom:2px solid var(--line);cursor:pointer;white-space:nowrap;font-size:14px', onclick: () => { if (DASH.sort === c.k) DASH.dir *= -1; else { DASH.sort = c.k; DASH.dir = c.desc ? -1 : 1; } dashRender(); } },
+    c.t + (c.k === sk ? (DASH.dir > 0 ? ' ▲' : ' ▼') : ''));
+  return el('div', { style: 'overflow-x:auto' }, el('table', { style: 'width:100%;border-collapse:collapse;font-size:15px' },
+    el('thead', {}, el('tr', {}, ...cols.map(th))),
+    el('tbody', {}, ...sorted.map((r) => el('tr', {}, ...cols.map((c) => { const v = c.show ? c.show(r) : r[c.k];
+      return el('td', { style: `padding:7px 10px;border-bottom:1px solid var(--line);${c.bg ? 'background:' + c.bg(r) : ''}` }, v instanceof Node ? v : String(v ?? '')); }))))));
+}
+const linkBtn = (text, on) => el('a', { href: '#', style: 'color:var(--accent);font-weight:600;text-decoration:none', onclick: (e) => { e.preventDefault(); on(); } }, text);
+const tile = (big, small, color) => el('div', { style: `flex:1;min-width:130px;padding:14px;border-radius:10px;background:${color || 'var(--accent-soft)'}` }, el('div', { style: 'font-size:26px;font-weight:700' }, big), el('div', { class: 'small' }, small));
+const caps = (t) => (String(t).match(/[A-Z]/g) || []).length;
+function bestRows(rows) { // each student's best try (and how many tries)
+  const m = {};
+  rows.forEach((r) => { const k = who(r.period, r.name), b = m[k];
+    if (!b) m[k] = { ...r, tries: 1, lastT: r.t, shown: r.name }; else { b.tries++; b.lastT = Math.max(b.lastT, r.t); if (caps(r.name) > caps(b.shown)) b.shown = r.name;
+      if (r.pct > b.pct || (r.pct === b.pct && r.t > b.t)) Object.assign(m[k], r, { tries: b.tries, lastT: b.lastT, shown: b.shown }); } });
+  return Object.values(m).map((b) => ({ ...b, name: b.shown })); // show the best-capitalized spelling the student typed
+}
+function dashCsv(name, head, lines) {
+  const q = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const blob = new Blob([[head, ...lines].map((r) => r.map(q).join(',')).join('\n')], { type: 'text/csv' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: name.replace(/[^\w.-]+/g, '_') + '.csv' }); document.body.append(a); a.click(); a.remove();
+}
+
+function dashOverview(titles) {
+  const D = DASH.data;
+  const prog = D.progress.filter((p) => !p.submitted && (!DASH.period || p.period === DASH.period));
+  const allBest = titles.flatMap((a) => bestRows(a.rows));
+  const card = el('div', { class: 'card' });
+  card.append(el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px' },
+    tile(String(allBest.length), 'assignments turned in (one per student per assignment)'),
+    tile(allBest.length ? pctT(allBest.reduce((s, r) => s + r.pct, 0) / allBest.length) : '—', 'average best score'),
+    tile(String(prog.length), 'started but not turned in yet', '#fbf1dc')));
+  if (!titles.length) card.append(el('p', {}, 'No results yet for these choices.'));
+  else card.append(dashTable([
+    { k: 'title', t: 'Assignment', show: (a) => linkBtn(a.title, () => { DASH.title = a.title; dashRender(); }) },
+    { k: 'tab', t: 'Subject' },
+    { k: 'n', t: 'Turned in', desc: true },
+    { k: 'wip', t: 'Still working', desc: true },
+    { k: 'avg', t: 'Average', desc: true, show: (a) => pctT(a.avg), bg: (a) => band(a.avg) },
+    { k: 'last', t: 'Last turned in', desc: true, show: (a) => dashDate(a.last) },
+  ], titles.map((a) => { const b = bestRows(a.rows); return { ...a, n: b.length, avg: b.reduce((s, r) => s + r.pct, 0) / (b.length || 1), wip: prog.filter((p) => p.title === a.title).length }; })));
+  app.append(card);
+  card.append(el('p', { class: 'small', style: 'margin-top:10px' }, 'Click an assignment for each student’s score and which questions the class missed. Click a column title to sort.'));
+}
+
+function dashAssignment(a) {
+  const D = DASH.data, best = bestRows(a.rows);
+  const done = new Set(best.map((r) => who(r.period, r.name)));
+  const wip = D.progress.filter((p) => p.title === a.title && !p.submitted && (!DASH.period || p.period === DASH.period) && !done.has(who(p.period, p.name)));
+  const started = new Set([...done, ...wip.map((p) => who(p.period, p.name))]);
+  // roster students with nothing at all for this assignment
+  const subjPeriods = new Set([...a.rows.map((r) => r.period), ...wip.map((p) => p.period)]);
+  const notStarted = D.roster.filter((s) => (DASH.period ? s.period === DASH.period : subjPeriods.has(s.period)) &&
+    ![s.full, ...s.aliases.split(',')].some((n) => n.trim() && started.has(who(s.period, n))));
+  const avg = best.length ? best.reduce((s, r) => s + r.pct, 0) / best.length : 0;
+  const mins = best.map((r) => r.minutes).filter((x) => x > 0).sort((x, y) => x - y), med = mins.length ? mins[Math.floor(mins.length / 2)] : 0;
+
+  const top = el('div', { class: 'card' }, el('h2', { style: 'margin:0 0 12px;font-size:20px' }, a.title),
+    el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' },
+      tile(String(best.length), 'turned in'), tile(String(wip.length), 'still working', '#fbf1dc'),
+      D.roster.length ? tile(String(notStarted.length), 'not started (from your Roster tab)', '#f9e1de') : '',
+      tile(best.length ? pctT(avg) : '—', 'class average (best try)', best.length ? band(avg) : undefined),
+      tile(med ? med + ' min' : '—', 'typical time')));
+  app.append(top);
+
+  // which questions were missed
+  if (best.length) {
+    const per = {}; let maxN = 0;
+    best.forEach((r) => parseDetail(r.detail).forEach((d) => { const p = (per[d.n] = per[d.n] || { s: 0, c: 0, h: 0, b: 0 }); p.s += d.pts; p.c++; if (d.hint) p.h++; if (d.blank) p.b++; maxN = Math.max(maxN, d.n); }));
+    const labels = dashLabels(a.set), qcard = el('div', { class: 'card' }, el('strong', {}, 'Questions: percent of students who got each one right'),
+      el('p', { class: 'small', style: 'margin:4px 0 12px' }, (labels ? '' : 'Question order differs from student to student on this assignment, so a number isn’t the same question for everyone. ') + 'Red bars are the ones to reteach.'));
+    for (let n = 1; n <= maxN; n++) {
+      const p = per[n]; if (!p) continue; const f = p.s / p.c;
+      qcard.append(el('div', { style: 'display:grid;grid-template-columns:40px 1fr 60px;gap:10px;align-items:center;margin:5px 0' },
+        el('div', { style: 'font-weight:700' }, '#' + n),
+        el('div', {}, el('div', { style: 'background:#eee;border-radius:6px;height:16px;overflow:hidden' }, el('div', { style: `height:100%;width:${Math.round(100 * f)}%;background:${f >= 0.8 ? '#4e9a51' : f >= 0.6 ? '#c9a227' : '#c0392b'}` })),
+          el('div', { class: 'small' }, (labels && labels[n - 1] ? labels[n - 1] : '') + (p.h ? `${labels && labels[n - 1] ? ' · ' : ''}${p.h} used a hint` : '') + (p.b ? ` · ${p.b} left blank` : ''))),
+        el('div', { style: 'text-align:right' }, pctT(f))));
+    }
+    app.append(qcard);
+  }
+
+  // students
+  const scard = el('div', { class: 'card' }, el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap' }, el('strong', {}, 'Students who turned it in'),
+    best.length ? el('button', { class: 'btn secondary', style: 'margin-top:0;padding:7px 14px', onclick: () => dashCsv(a.title, ['Period', 'Name', 'Best score', 'Out of', 'Percent', 'Tries', 'Last turned in', 'Minutes', 'Times left tab', 'Hints', 'Work'],
+      best.map((r) => [r.period, r.name, r.score, r.total, Math.round(100 * r.pct), r.tries, new Date(r.lastT).toLocaleString(), r.minutes, r.away, parseDetail(r.detail).filter((d) => d.hint).length, r.work])) }, 'Download CSV') : ''));
+  if (!best.length) scard.append(el('p', {}, 'Nobody has turned this in yet.'));
+  else scard.append(dashTable([
+    { k: 'name', t: 'Student', sort: (r) => norm(r.name), show: (r) => linkBtn(r.name, () => { DASH.student = { period: r.period, name: r.name }; dashRender(); }) },
+    { k: 'period', t: 'Period', sort: (r) => perOrder(r.period) * 1000 + 0 },
+    { k: 'pct', t: 'Best', desc: true, show: (r) => `${r.score}/${r.total} (${pctT(r.pct)})`, bg: (r) => band(r.pct) },
+    { k: 'tries', t: 'Tries', desc: true },
+    { k: 'lastT', t: 'Turned in', desc: true, show: (r) => dashDate(r.lastT) },
+    { k: 'minutes', t: 'Minutes', desc: true },
+    { k: 'away', t: 'Left tab', desc: true, bg: (r) => (r.away >= 3 ? '#fbf1dc' : '') },
+    { k: 'hints', t: 'Hints', desc: true, sort: (r) => parseDetail(r.detail).filter((d) => d.hint).length, show: (r) => parseDetail(r.detail).filter((d) => d.hint).length || '' },
+    { k: 'work', t: 'Work', sort: (r) => (r.work ? 1 : 0), show: (r) => (r.work ? el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'View') : '') },
+  ], best));
+  app.append(scard);
+
+  if (wip.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Started but not turned in'),
+    dashTable([{ k: 'name', t: 'Student', sort: (p) => norm(p.name) }, { k: 'period', t: 'Period', sort: (p) => perOrder(p.period) },
+      { k: 'answered', t: 'Answered', desc: true, show: (p) => `${p.answered} of ${p.total || '?'}` }, { k: 't', t: 'Last saved', desc: true, show: (p) => dashDate(p.t) }], wip)));
+  if (notStarted.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Not started'),
+    el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'From your Roster tab. A student who typed their name differently than the roster (and has no nickname set) may show up here and above.'),
+    el('div', { style: 'columns:3 180px;font-size:15px' }, ...notStarted.sort((x, y) => perOrder(x.period) - perOrder(y.period) || x.full.localeCompare(y.full)).map((s) => el('div', {}, `${s.full} `, el('span', { class: 'small' }, s.period))))));
+}
+
+function dashStudent(s) {
+  const D = DASH.data, k = who(s.period, s.name);
+  const mine = D.results.filter((r) => who(r.period, r.name) === k && (!DASH.subject || r.tab === DASH.subject));
+  const prog = D.progress.filter((p) => who(p.period, p.name) === k && !p.submitted);
+  const by = {}; mine.forEach((r) => (by[r.title] = by[r.title] || []).push(r));
+  const best = Object.entries(by).map(([title, rs]) => ({ ...bestRows(rs)[0], title }));
+  const avg = best.length ? best.reduce((a, r) => a + r.pct, 0) / best.length : 0;
+  app.append(el('div', { class: 'card' },
+    el('p', { style: 'margin:0 0 6px' }, linkBtn('← Back', () => { DASH.student = null; dashRender(); })),
+    el('h2', { style: 'margin:0 0 12px;font-size:20px' }, `${s.name} · ${s.period} period`),
+    el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px' }, tile(String(best.length), 'assignments turned in'),
+      tile(best.length ? pctT(avg) : '—', 'average best score', best.length ? band(avg) : undefined), tile(String(prog.length), 'started, not turned in', '#fbf1dc')),
+    best.length ? dashTable([
+      { k: 'title', t: 'Assignment', sort: (r) => r.title },
+      { k: 'pct', t: 'Best', desc: true, show: (r) => `${r.score}/${r.total} (${pctT(r.pct)})`, bg: (r) => band(r.pct) },
+      { k: 'tries', t: 'Tries', desc: true },
+      { k: 'lastT', t: 'Turned in', desc: true, show: (r) => dashDate(r.lastT) },
+      { k: 'minutes', t: 'Minutes', desc: true },
+      { k: 'missed', t: 'Missed', sort: (r) => parseDetail(r.detail).filter((d) => d.pts < 1).length, show: (r) => parseDetail(r.detail).filter((d) => d.pts < 1).map((d) => '#' + d.n).join(' ') },
+      { k: 'work', t: 'Work', sort: (r) => (r.work ? 1 : 0), show: (r) => (r.work ? el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'View') : '') },
+    ], best) : el('p', {}, 'Nothing turned in yet.'),
+    prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered, ${dashDate(p.t)})`).join('; ')) : ''));
+}
+/* ==== RESULTS DASHBOARD END ==== */
 /* ---------- teacher tools: menu + assignment builder ---------- */
 function teacherMenu() {
   if (CUSTOM_KEY || SETS[params.get('set')]) { document.getElementById('title').textContent = 'Answer key'; return startScreen(true); }
   document.getElementById('title').textContent = 'Teacher tools';
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '';
   app.innerHTML = '';
   app.append(el('div', { class: 'card' },
     el('p', {}, 'What would you like to do?'),
     el('button', { class: 'btn', onclick: builder }, 'Build an assignment'), ' ',
+    el('button', { class: 'btn', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard'), ' ',
     el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key')));
 }
 
