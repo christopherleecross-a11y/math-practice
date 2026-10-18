@@ -185,6 +185,30 @@ const CONFIG = {
   TEACHER_PIN_HASH: '676594817605674',
 };
 
+/* =====================================================================
+   OTHER TEACHERS who share this page
+   Their links carry &t=<id> (for example practice.html?t=spencer). Anything not listed here comes from CONFIG above.
+   Each teacher has their own Google Sheet + script (their scores, roster, Classroom grades, and dashboard stay separate),
+   their own teacher PIN, and only sees their own subjects. Give each teacher a different SALT.
+   ===================================================================== */
+const TEACHERS = {
+  spencer: {
+    TEACHER_NAME: 'Mr. Spencer',
+    SUBJECTS: ['algebra1', 'algebra2'],
+    PERIODS: ['1st', '2nd', '3rd', '4th', '6th', '7th', '8th'],
+    SALT: 'spencer-fall-2026',
+    SCRIPT_URL: '',        // his first deployment ("Anyone")
+    SIGNIN_URL: '',        // his second deployment ("Anyone within atoka.org")
+    TEACHER_PIN_HASH: '',  // he opens practice.html?t=spencer&makehash=HIS-PIN and sends you the number it shows
+    AI_GRADING: false,
+  },
+};
+const TEACHER_ID = (() => { const t = (new URLSearchParams(location.search).get('t') || '').toLowerCase(); return TEACHERS[t] ? t : ''; })();
+if (TEACHER_ID) Object.assign(CONFIG, TEACHERS[TEACHER_ID]);
+CONFIG.SUBJECTS = CONFIG.SUBJECTS || ['geometry', 'precalc', 'act'];
+// this-device settings (sign-in, dashboard password, builder) are kept separately for each teacher
+const TK = (k) => (TEACHER_ID ? TEACHER_ID + ':' + k : k);
+
 // Assignments, grouped by subject.
 //   One assignment:          practice.html?set=KEY
 //   A subject's list only:   practice.html?subject=geometry   (or precalc, act)
@@ -219,7 +243,10 @@ const SUBJECTS = {
   geometry: 'Geometry',
   precalc:  'Pre-Calculus',
   act:      'ACT Prep',
+  algebra1: 'Algebra I',
+  algebra2: 'Algebra II',
 };
+Object.keys(SUBJECTS).forEach((k) => { if (!CONFIG.SUBJECTS.includes(k)) delete SUBJECTS[k]; }); // each teacher sees only their subjects
 const SETS = {
   // ----- Geometry -----
   'geo-transform': { subject: 'geometry', hidden: true, title: 'Ch. 4 Transformations',     items: [['dilation', 5], ['composite', 5]] },
@@ -11061,11 +11088,11 @@ let ROSTER = null;
 // Chromebooks are shared, so a sign-in lasts only for this tab: closing it (or opening the next assignment
 // from Classroom in a new tab) means signing in again, which is one click on a school Chromebook.
 let passMem = '', signinBroken = false;
-try { localStorage.removeItem('signin:pass'); localStorage.removeItem('signin:me'); } catch {} // from earlier versions
+try { localStorage.removeItem(TK('signin:pass')); localStorage.removeItem('signin:me'); } catch {} // from earlier versions
 (function catchPass() {
   const m = /[#&]signin=([\w-]+\.[\w-]+)/.exec(location.hash);
   if (!m) return;
-  passMem = m[1]; try { sessionStorage.setItem('signin:pass', m[1]); } catch {}
+  passMem = m[1]; try { sessionStorage.setItem(TK('signin:pass'), m[1]); } catch {}
   history.replaceState(null, '', location.pathname + location.search);
   if (CONFIG.SCRIPT_URL) fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'checkPass', token: m[1] }) })
     .then((r) => r.json()).then((g) => {
@@ -11077,7 +11104,7 @@ try { localStorage.removeItem('signin:pass'); localStorage.removeItem('signin:me
 // { rid, n: full name, ps: [periods], exp, token } or null. The page only reads the pass; the script checks its signature.
 function signinPass() {
   if (!CONFIG.SIGNIN_URL) return null;
-  let t = passMem; try { t = sessionStorage.getItem('signin:pass') || t; } catch {}
+  let t = passMem; try { t = sessionStorage.getItem(TK('signin:pass')) || t; } catch {}
   if (!t) return null;
   try {
     const b = t.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
@@ -11087,17 +11114,17 @@ function signinPass() {
   } catch { return null; }
 }
 const signinGo = () => { location.href = CONFIG.SIGNIN_URL + (CONFIG.SIGNIN_URL.includes('?') ? '&' : '?') + 'signin=1&back=' + encodeURIComponent(location.href.split('#')[0]); };
-const signOut = () => { passMem = ''; try { sessionStorage.removeItem('signin:pass'); sessionStorage.setItem('signin:tried', '1'); } catch {} };
+const signOut = () => { passMem = ''; try { sessionStorage.removeItem(TK('signin:pass')); sessionStorage.setItem(TK('signin:tried'), '1'); } catch {} };
 async function loadRoster() {
   if (ROSTER) return ROSTER;
-  let cached = null; try { cached = JSON.parse(localStorage.getItem('signin:roster') || 'null'); } catch {}
+  let cached = null; try { cached = JSON.parse(localStorage.getItem(TK('signin:roster')) || 'null'); } catch {}
   if (CONFIG.SCRIPT_URL && CONFIG.ROSTER_SIGNIN !== false) {
     try {
       const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 7000);
       const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'roster' }), signal: ctl.signal });
       clearTimeout(timer);
       const g = await res.json();
-      if (g && g.ok) { ROSTER = g.periods || {}; try { localStorage.setItem('signin:roster', JSON.stringify(ROSTER)); } catch {} return ROSTER; }
+      if (g && g.ok) { ROSTER = g.periods || {}; try { localStorage.setItem(TK('signin:roster'), JSON.stringify(ROSTER)); } catch {} return ROSTER; }
     } catch (e) { /* offline or older script: use the last list this device saw */ }
   }
   ROSTER = cached || {};
@@ -11120,6 +11147,7 @@ function startScreen(teacher = false) {
         return g;
       }).filter((g) => g.children.length));
     card.append(el('label', { for: 'set' }, 'Assignment'), setSel);
+    if (!setSel.querySelector('option[value]:not([value=""])')) card.append(el('p', { class: 'small' }, 'No assignments here yet.'));
   } else {
     document.getElementById('title').textContent = SETS[setKey].title;
     document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${CONFIG.TEACHER_NAME}`;
@@ -11144,7 +11172,7 @@ function startScreen(teacher = false) {
   // students arrive from Google Classroom already signed in to their school account, so sign them in automatically
   // (once per tab; if it doesn't work, the button and the name list below are still here)
   if (!teacher && CONFIG.SIGNIN_URL && !params.has('teacher') && !signinBroken) {
-    let tried = true; try { tried = sessionStorage.getItem('signin:tried') === '1'; if (!tried) sessionStorage.setItem('signin:tried', '1'); } catch {}
+    let tried = true; try { tried = sessionStorage.getItem(TK('signin:tried')) === '1'; if (!tried) sessionStorage.setItem(TK('signin:tried'), '1'); } catch {}
     if (!tried) { card.append(el('p', {}, 'Signing you in with your school account…')); app.append(card); signinGo(); return; }
   }
   if (!teacher && CONFIG.SIGNIN_URL && signinBroken) card.append(el('div', { class: 'err', style: 'margin:0 0 10px' }, 'Google sign-in isn’t working right now. Pick your name below. (Teacher: SIGNIN_URL must be a deployment of the same script as SCRIPT_URL.)'));
@@ -11160,7 +11188,7 @@ function startScreen(teacher = false) {
   // with a Roster tab, students pick their name from a list (first name + last initial) instead of typing it
   const nameSel = el('select', { id: 'nameSel', style: 'display:none' });
   const nmLabel = el('label', { for: 'name' }, teacher ? "Student's name (as they typed it)" : 'Your name');
-  const typedNote = el('p', { class: 'small', style: 'display:none;margin:6px 0 0' }, teacher ? 'For a student who typed their name instead of picking it.' : 'Type your first and last name. Tell Mr. Cross your name was missing so he can add you.');
+  const typedNote = el('p', { class: 'small', style: 'display:none;margin:6px 0 0' }, teacher ? 'For a student who typed their name instead of picking it.' : `Type your first and last name. Tell ${CONFIG.TEACHER_NAME} your name was missing so they can add you.`);
   let roster = null;
   const fillNames = () => {
     if (!roster) return;
@@ -11948,7 +11976,7 @@ window.addEventListener('resize', () => {
 /* ==== RESULTS DASHBOARD BEGIN ==== */
 /* ---------- teacher results dashboard: reads your Sheet through the script (password in Script properties) ---------- */
 const DASH = { data: null, subject: '', period: '', title: '', student: null, sort: 'name', dir: 1, days: 200 };
-const dashPw = { get() { try { return localStorage.getItem('dash:pw') || ''; } catch { return ''; } }, set(v) { try { v ? localStorage.setItem('dash:pw', v) : localStorage.removeItem('dash:pw'); } catch {} } };
+const dashPw = { get() { try { return localStorage.getItem(TK('dash:pw')) || ''; } catch { return ''; } }, set(v) { try { v ? localStorage.setItem(TK('dash:pw'), v) : localStorage.removeItem(TK('dash:pw')); } catch {} } };
 const perOrder = (p) => { const n = parseInt(p, 10); return isNaN(n) ? 99 : n; };
 const dashDate = (t) => { const d = new Date(t), now = new Date(); const same = d.toDateString() === now.toDateString();
   return same ? 'Today ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
@@ -12213,14 +12241,14 @@ function builder() {
   document.getElementById('title').textContent = 'Build an assignment';
   document.getElementById('subtitle').textContent = 'Choose question types and how many of each, then copy the link.';
   app.innerHTML = '';
-  const saved = store.get('builder:last') || {};
+  const saved = store.get(TK('builder:last')) || {};
   const editId = saved.editId || null;
   const counts = Object.assign({}, saved.counts || {});
   const formats = Object.assign({}, saved.formats || {});
   const frCounts = Object.assign({}, saved.frCounts || {}); // "Some of each": how many of a type are free response
   const titleIn = el('input', { type: 'text', value: saved.title || '', placeholder: 'e.g. 5.6 Quiz Review' });
   const subjSel = el('select', {}, ...Object.entries(SUBJECTS).map(([k, v]) => el('option', { value: k }, v)));
-  subjSel.value = saved.subject || 'geometry';
+  subjSel.value = saved.subject && SUBJECTS[saved.subject] ? saved.subject : Object.keys(SUBJECTS)[0];
   const orderSel = el('select', {}, el('option', { value: 'grouped' }, 'Grouped by type (in the order listed)'), el('option', { value: 'mixed' }, 'Mixed up (different order for each student)'));
   orderSel.value = saved.order || 'grouped';
   const numIn = (val, min, max) => el('input', { type: 'number', min: String(min), max: String(max), value: String(val), style: 'width:80px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
@@ -12243,7 +12271,7 @@ function builder() {
       const prev = f[id]; c[id] = (c[id] || 0) + n;
       if (m === 'fr') { frc[id] = (frc[id] || 0) + n; f[id] = prev && prev !== 'fr' ? 'both' : 'fr'; } else f[id] = prev && prev !== 'mc' ? 'both' : 'mc'; });
     Object.keys(f).forEach((id) => { if (f[id] !== 'both') delete frc[id]; });
-    store.set('builder:last', { counts: c, formats: f, frCounts: frc, title: q.get('title') || '', subject: q.get('subject') || 'geometry', order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
+    store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, title: q.get('title') || '', subject: q.get('subject') || 'geometry', order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
       retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', editId: customKeyFor(q) });
     builder(); window.scrollTo(0, 0);
   };
@@ -12251,7 +12279,7 @@ function builder() {
     ? el('div', { class: 'card', style: 'border-left:4px solid var(--accent, #1f5fa8)' },
         el('strong', {}, `Editing “${saved.title || 'Custom Practice'}”`),
         el('p', { class: 'small' }, 'Make your changes below, then copy the new student link and replace the old link in Google Classroom. Students who already started keep their answers to every question that is still in the assignment, and scores already turned in stay in your gradebook.'),
-        el('button', { class: 'btn', type: 'button', style: 'background:#fff;color:inherit;border:1px solid var(--line)', onclick: () => { const b = store.get('builder:last') || {}; delete b.editId; store.set('builder:last', b); builder(); } }, 'Stop editing (make a new assignment instead)'))
+        el('button', { class: 'btn', type: 'button', style: 'background:#fff;color:inherit;border:1px solid var(--line)', onclick: () => { const b = store.get(TK('builder:last')) || {}; delete b.editId; store.set(TK('builder:last'), b); builder(); } }, 'Stop editing (make a new assignment instead)'))
     : el('details', { class: 'card' }, el('summary', {}, el('strong', {}, 'Edit an assignment you already made')),
         el('p', { class: 'small' }, 'Paste the student link of an assignment you built. Its questions and settings load here so you can change them.'),
         el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, editIn, el('button', { class: 'btn', type: 'button', onclick: loadEdit }, 'Load it')), editMsg);
@@ -12275,18 +12303,18 @@ function builder() {
   const totalEl = el('strong', {}, '0');
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
-  const openSaved = store.get('builder:open') || {}, secs = {};
+  const openSaved = store.get(TK('builder:open')) || {}, secs = {};
   const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
-  const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set('builder:open', openSaved); };
+  const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
   const foldBox = (key, label, big) => {
     const badge = el('span', { class: 'small', style: 'margin-left:auto;font-weight:600;color:var(--accent, #1f5fa8)' });
     const arrow = el('span', { style: 'display:inline-block;width:14px;transition:transform .15s' }, '▸');
     const sum = el('summary', { style: `display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 4px;font-size:${big ? 17 : 16}px;font-weight:${big ? 700 : 600};list-style:none` }, arrow, el('span', {}, label), badge);
     const body = el('div', big ? { style: 'padding-left:22px' } : {});
     const box = el('details', { style: `border-top:${big ? '2px solid var(--line)' : '1px solid var(--line)'}` }, sum, body);
-    box.addEventListener('toggle', () => { arrow.style.transform = box.open ? 'rotate(90deg)' : ''; openSaved[key] = box.open; store.set('builder:open', openSaved); });
+    box.addEventListener('toggle', () => { arrow.style.transform = box.open ? 'rotate(90deg)' : ''; openSaved[key] = box.open; store.set(TK('builder:open'), openSaved); });
     secs[key] = { ids: [], badge, box };
     return { box, body };
   };
@@ -12388,10 +12416,11 @@ function builder() {
     const total = items.reduce((a, [, n]) => a + n, 0);
     totalEl.textContent = String(total);
     const title = titleIn.value.trim() || 'Custom Practice';
-    store.set('builder:last', { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, ...(editId ? { editId } : {}) });
+    store.set(TK('builder:last'), { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, ...(editId ? { editId } : {}) });
     if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
+    if (TEACHER_ID) q.set('t', TEACHER_ID);
     q.set('mix', items.map(([id, n, f]) => `${id}.${n}${f === 'fr' ? '.fr' : ''}`).join('_'));
     q.set('title', title); q.set('subject', subjSel.value);
     if (orderSel.value === 'mixed') q.set('order', 'mixed');
@@ -12438,8 +12467,11 @@ function previewQuestion(q) {
 /* ---------- entry ---------- */
 (function init() {
   lastW = app.clientWidth;
+  document.title = CONFIG.TEACHER_NAME + ' — Practice';
+  document.getElementById('subtitle').textContent = CONFIG.TEACHER_NAME;
   if (params.has('makehash')) {
-    app.append(el('div', { class: 'card' }, el('p', {}, 'Paste this into TEACHER_PIN_HASH:'), el('p', {}, el('code', {}, String(cyrb53(params.get('makehash')))))));
+    app.append(el('div', { class: 'card' }, el('p', {}, TEACHER_ID ? `Send this number to whoever keeps practice.html, for TEACHERS.${TEACHER_ID}.TEACHER_PIN_HASH (it isn’t your PIN, so it’s safe to send):` : 'Paste this into TEACHER_PIN_HASH:'),
+      el('p', {}, el('code', {}, String(cyrb53(params.get('makehash')))))));
     return;
   }
   if (params.has('teacher')) {
@@ -12448,7 +12480,8 @@ function previewQuestion(q) {
     const err = el('div', { class: 'err' });
     app.append(el('div', { class: 'card' }, el('label', {}, 'Teacher PIN'), pin,
       el('button', { class: 'btn', onclick: () => {
-        if (String(cyrb53(pin.value)) === CONFIG.TEACHER_PIN_HASH) teacherMenu(); else err.textContent = 'Wrong PIN.';
+        if (!CONFIG.TEACHER_PIN_HASH) err.textContent = 'No teacher PIN is set up yet. Open this page with &makehash=YOUR-PIN added to the address to make one.';
+        else if (String(cyrb53(pin.value)) === CONFIG.TEACHER_PIN_HASH) teacherMenu(); else err.textContent = 'Wrong PIN.';
       } }, 'Continue'), err));
     pin.addEventListener('keydown', (e) => { if (e.key === 'Enter') app.querySelector('.btn').click(); });
     return;
