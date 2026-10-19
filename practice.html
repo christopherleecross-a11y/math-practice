@@ -11033,6 +11033,10 @@ async function cloudFlush(leaving) {
   try {
     const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(cloudPayload()), keepalive: !!leaving });
     const g = await res.json().catch(() => ({}));
+    if (g && g.reset && state && !state.teacher) { // reset by the teacher while this tab was open: start over
+      const st = state;
+      if (await cloudRestore(st.base, true) && state === st) { begin(st.setKey, st.period, st.name, false, 1, st.rid); return; }
+    }
     setCloudStatus(g && g.ok ? 'Progress saved online ✓' : 'Progress saved on this device (online save failed)');
   } catch (e) { setCloudStatus('Progress saved on this device (no internet right now)'); cloudTimer = setTimeout(() => cloudFlush(false), 20000); }
 }
@@ -11041,7 +11045,7 @@ function setCloudStatus(t) { cloudStatus = t; const e = document.getElementById(
 addEventListener('pagehide', () => { if (cloudTimer) cloudFlush(true); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudTimer) cloudFlush(true); });
 // newer saved work from another device → copy it onto this device before the assignment opens
-async function cloudRestore(base) {
+async function cloudRestore(base, force = false) {
   if (!CONFIG.SCRIPT_URL || PREVIEW) return;
   try {
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 8000);
@@ -11050,10 +11054,13 @@ async function cloudRestore(base) {
     const g = await res.json();
     if (!g || !g.ok || !g.data) return;
     const localTs = +(store.get(base + ':cloudts') || 0);
-    if (!(g.updated > localTs)) return;
     const d = JSON.parse(g.data);
+    if (!(g.updated > localTs) && !(force && d.reset)) return;
     cloudRestoring = true;
     try {
+      if (d.reset) { // the teacher reset this assignment for this student: clear it on this Chromebook too
+        Object.keys(localStorage).filter((k) => k === base || k.startsWith(base + ':')).forEach((k) => localStorage.removeItem(k));
+      }
       if (d.meta) store.set(base + ':meta', d.meta);
       if (d.curKey && d.saved) store.set(d.curKey, d.saved);
       if (d.curKey && d.work) store.set(d.curKey + ':work', d.work);
@@ -12062,6 +12069,24 @@ function dashLabels(setCol) {
 }
 const who = (period, name) => period + '|' + norm(name);
 
+// start an assignment over for one student: clears their saved work everywhere; earlier scores stop counting
+async function dashReset(s, btn) {
+  if (!confirm(`Reset “${s.title}” for ${s.name} (${s.period} period)?\n\nTheir answers and saved work for it are cleared on every Chromebook, and their earlier score stops counting on this dashboard (it stays in your Sheet, marked RESET). They'll start over with the same questions.`)) return;
+  btn.disabled = true; btn.textContent = 'Resetting…';
+  const keys = [];
+  if (s.set) { // where a student who typed their name keeps their work (others are found by name on the Progress tab)
+    const sk = s.set.startsWith('custom:') ? customKeyFor(new URLSearchParams({ mix: s.set.slice(7), title: s.title })) : s.set;
+    keys.push(`practice:${CONFIG.SALT}:${sk}:${s.period}:${norm(s.name)}`);
+  }
+  try {
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'resetStudent', password: dashPw.get(), period: s.period, name: s.name, title: s.title, keys }) });
+    const g = await res.json();
+    if (!g.ok) throw new Error(g.error || 'failed');
+    btn.textContent = 'Reset ✓';
+    setTimeout(dashboard, 900);
+  } catch (e) { btn.disabled = false; btn.textContent = 'Try again'; }
+}
+const resetBtn = (s) => el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:5px 12px;font-size:14px', onclick: (e) => dashReset(s, e.target) }, 'Reset');
 async function dashUnlock(p, btn) {
   btn.disabled = true; btn.textContent = 'Unlocking…';
   try {
@@ -12160,9 +12185,9 @@ function dashTable(cols, data, key) {
 const linkBtn = (text, on) => el('a', { href: '#', style: 'color:var(--accent);font-weight:600;text-decoration:none', onclick: (e) => { e.preventDefault(); on(); } }, text);
 const tile = (big, small, color) => el('div', { style: `flex:1;min-width:130px;padding:14px;border-radius:10px;background:${color || 'var(--accent-soft)'}` }, el('div', { style: 'font-size:26px;font-weight:700' }, big), el('div', { class: 'small' }, small));
 const caps = (t) => (String(t).match(/[A-Z]/g) || []).length;
-function bestRows(rows) { // each student's best try (and how many tries)
+function bestRows(rows) { // each student's best try (and how many tries); rows the teacher reset don't count
   const m = {};
-  rows.forEach((r) => { const k = who(r.period, r.name), b = m[k];
+  rows.filter((r) => !/^RESET/.test(r.version || '')).forEach((r) => { const k = who(r.period, r.name), b = m[k];
     if (!b) m[k] = { ...r, tries: 1, lastT: r.t, shown: r.name }; else { b.tries++; b.lastT = Math.max(b.lastT, r.t); if (caps(r.name) > caps(b.shown)) b.shown = r.name;
       if (r.pct > b.pct || (r.pct === b.pct && r.t > b.t)) Object.assign(m[k], r, { tries: b.tries, lastT: b.lastT, shown: b.shown }); } });
   return Object.values(m).map((b) => ({ ...b, name: b.shown })); // show the best-capitalized spelling the student typed
@@ -12247,13 +12272,15 @@ function dashAssignment(a) {
     { k: 'away', t: 'Left tab', desc: true, bg: (r) => (r.away >= 3 ? '#fbf1dc' : '') },
     { k: 'hints', t: 'Hints', desc: true, sort: (r) => parseDetail(r.detail).filter((d) => d.hint).length, show: (r) => parseDetail(r.detail).filter((d) => d.hint).length || '' },
     { k: 'work', t: 'Work', sort: (r) => (r.work ? 1 : 0), show: (r) => (r.work ? el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'View') : '') },
+    { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn(r) },
   ], best));
   app.append(scard);
 
   if (wip.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Started but not turned in'),
     dashTable([{ k: 'name', t: 'Student', sort: (p) => norm(p.name) }, { k: 'period', t: 'Period', sort: (p) => perOrder(p.period) },
       { k: 'answered', t: 'Answered', desc: true, show: (p) => `${p.answered} of ${p.total || '?'}` }, { k: 't', t: 'Last saved', desc: true, show: (p) => dashDate(p.t) },
-      { k: 'frozen', t: 'Status', sort: (p) => (p.frozen ? 1 : 0), show: (p) => (p.frozen ? el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:6px 14px', onclick: (e) => dashUnlock(p, e.target) }, '🔒 Unlock') : 'working') }], wip)));
+      { k: 'frozen', t: 'Status', sort: (p) => (p.frozen ? 1 : 0), show: (p) => (p.frozen ? el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:6px 14px', onclick: (e) => dashUnlock(p, e.target) }, '🔒 Unlock') : 'working') },
+      { k: 'reset', t: '', sort: () => 0, show: (p) => resetBtn(p) }], wip)));
   if (notStarted.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Not started'),
     el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'From your Roster tab. A student who typed their name differently than the roster (and has no nickname set) may show up here and above.'),
     el('div', { style: 'columns:3 180px;font-size:15px' }, ...notStarted.sort((x, y) => perOrder(x.period) - perOrder(y.period) || x.full.localeCompare(y.full)).map((s) => el('div', {}, `${s.full} `, el('span', { class: 'small' }, s.period))))));
@@ -12264,7 +12291,7 @@ function dashStudent(s) {
   const mine = D.results.filter((r) => who(r.period, r.name) === k && (!DASH.subject || r.tab === DASH.subject));
   const prog = D.progress.filter((p) => who(p.period, p.name) === k && !p.submitted);
   const by = {}; mine.forEach((r) => (by[r.title] = by[r.title] || []).push(r));
-  const best = Object.entries(by).map(([title, rs]) => ({ ...bestRows(rs)[0], title }));
+  const best = Object.entries(by).map(([title, rs]) => bestRows(rs)[0]).filter(Boolean);
   const avg = best.length ? best.reduce((a, r) => a + r.pct, 0) / best.length : 0;
   app.append(el('div', { class: 'card' },
     el('p', { style: 'margin:0 0 6px' }, linkBtn('← Back', () => { DASH.student = null; dashRender(); })),
@@ -12279,6 +12306,7 @@ function dashStudent(s) {
       { k: 'minutes', t: 'Minutes', desc: true },
       { k: 'missed', t: 'Missed', sort: (r) => parseDetail(r.detail).filter((d) => d.pts < 1).length, show: (r) => parseDetail(r.detail).filter((d) => d.pts < 1).map((d) => '#' + d.n).join(' ') },
       { k: 'work', t: 'Work', sort: (r) => (r.work ? 1 : 0), show: (r) => (r.work ? el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'View') : '') },
+      { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn({ ...r, name: s.name, period: s.period }) },
     ], best) : el('p', {}, 'Nothing turned in yet.'),
     prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered, ${dashDate(p.t)})`).join('; ')) : ''));
 }
