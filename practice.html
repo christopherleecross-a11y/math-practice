@@ -12236,6 +12236,45 @@ function teacherMenu() {
     el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key')));
 }
 
+/* ---------- the builder's list of assignments you made ---------- */
+// every link the builder copies or opens is remembered on this computer and (with the dashboard password) in your Sheet
+function rememberAssignment(url, title, subject, key) {
+  const e = { key, url, title, subject, t: Date.now() };
+  const l = (store.get(TK('builder:library')) || []).filter((x) => x.key !== key); l.unshift(e); store.set(TK('builder:library'), l.slice(0, 300));
+  const pw = dashPw.get();
+  if (pw && CONFIG.SCRIPT_URL) fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'saveAssignment', password: pw, ...e }) }).catch(() => {});
+}
+// this computer's list + the Sheet's (saved, posted to Classroom, turned in), one entry per assignment, newest first
+async function builderLibrary() {
+  const here = location.origin + location.pathname, all = [];
+  (store.get(TK('builder:library')) || []).forEach((e) => all.push({ ...e, src: 'here' }));
+  const pw = dashPw.get();
+  if (pw && CONFIG.SCRIPT_URL) {
+    try {
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 12000);
+      const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'assignments', password: pw }), signal: ctl.signal });
+      clearTimeout(timer);
+      const g = await res.json();
+      if (g && g.ok) (g.list || []).forEach((e) => {
+        if (e.src === 'results') { // rebuild a link from turned-in work: questions, title, subject
+          const sk = Object.keys(SUBJECTS).find((k) => SUBJECTS[k] === e.tab) || '';
+          const q = new URLSearchParams(); if (TEACHER_ID) q.set('t', TEACHER_ID); q.set('mix', e.mix); q.set('title', e.title); if (sk) q.set('subject', sk);
+          all.push({ ...e, url: here + '?' + q.toString() });
+        } else all.push(e);
+      });
+    } catch (err) { /* offline: this computer's list only */ }
+  }
+  const rank = { here: 3, saved: 3, posted: 2, results: 1 }, by = {};
+  all.forEach((e) => {
+    let q; try { q = new URL(e.url).searchParams; } catch { return; }
+    if (!q.get('mix') || (q.get('t') || '') !== TEACHER_ID) return; // only this teacher's built assignments
+    const key = customKeyFor(q), cur = by[key];
+    const x = { key, url: e.url, title: q.get('title') || e.title || 'Custom Practice', subject: q.get('subject') || e.subject || '', t: e.t || 0, src: e.src };
+    if (!cur || rank[x.src] > rank[cur.src] || (rank[x.src] === rank[cur.src] && x.t > cur.t)) by[key] = { ...x, t: Math.max(x.t, cur ? cur.t : 0) };
+    else cur.t = Math.max(cur.t, x.t);
+  });
+  return Object.values(by).sort((a, b) => b.t - a.t);
+}
 function builder() {
   teacherNav('build');
   document.getElementById('title').textContent = 'Build an assignment';
@@ -12259,21 +12298,49 @@ function builder() {
   sameIn.checked = !!saved.same;
   const hintsIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   hintsIn.checked = !!saved.hints;
-  // edit an assignment you already posted: paste its link, change it, then post the new link in its place
+  // edit an assignment you already made: pick it from the list (or paste its link), change it, then post the new link in its place
   const editIn = el('input', { type: 'text', placeholder: 'Paste the student link here', style: 'flex:1;min-width:220px' });
   const editMsg = el('div', { class: 'small', style: 'margin-top:6px' });
-  const loadEdit = () => {
-    let u; try { u = new URL(editIn.value.trim()); } catch { editMsg.textContent = 'That doesn’t look like a link. Copy the whole student link (it starts with https://).'; return; }
-    const q = u.searchParams, mix = q.get('mix');
-    if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Menu assignments are changed in practice.html.'; return; }
+  const loadItems = (items) => { // [[id, n, 'mc'|'fr'], …] → the builder's counts and formats
     const c = {}, f = {}, frc = {};
-    mix.split('_').map((x) => x.split('.')).forEach(([id, n, m]) => { if (!TEMPLATES[id] || !(+n > 0)) return; n = Math.floor(+n);
+    items.forEach(([id, n, m]) => { if (!TEMPLATES[id] || !(+n > 0)) return; n = Math.floor(+n);
       const prev = f[id]; c[id] = (c[id] || 0) + n;
       if (m === 'fr') { frc[id] = (frc[id] || 0) + n; f[id] = prev && prev !== 'fr' ? 'both' : 'fr'; } else f[id] = prev && prev !== 'mc' ? 'both' : 'mc'; });
     Object.keys(f).forEach((id) => { if (f[id] !== 'both') delete frc[id]; });
-    store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, title: q.get('title') || '', subject: q.get('subject') || 'geometry', order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
+    return { counts: c, formats: f, frCounts: frc };
+  };
+  const loadFromUrl = (text) => {
+    let u; try { u = new URL(String(text).trim()); } catch { editMsg.textContent = 'That doesn’t look like a link. Copy the whole student link (it starts with https://).'; return; }
+    const q = u.searchParams, mix = q.get('mix');
+    if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
+    store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
       retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', editId: customKeyFor(q) });
     builder(); window.scrollTo(0, 0);
+  };
+  const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
+    const S = SETS[key]; if (!S) return;
+    store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m]) => [id, n, m === 'fr' ? 'fr' : 'mc'])), title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
+      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints });
+    builder(); window.scrollTo(0, 0);
+  };
+  const loadEdit = () => loadFromUrl(editIn.value);
+  const pick = el('select', { style: 'flex:1;min-width:220px' }, el('option', { value: '' }, 'Loading your assignments…'));
+  const pickNote = el('p', { class: 'small', style: 'margin:6px 0 0' });
+  let lib = [];
+  const fillPick = () => {
+    pick.innerHTML = ''; pick.append(el('option', { value: '' }, 'Choose an assignment…'));
+    Object.entries(SUBJECTS).forEach(([sk, sname]) => {
+      const mine = lib.map((e, i) => [e, i]).filter(([e]) => e.subject === sk);
+      if (mine.length) pick.append(el('optgroup', { label: `${sname} — assignments you built` },
+        ...mine.map(([e, i]) => el('option', { value: 'lib:' + i }, `${e.title}${e.t ? ' · ' + new Date(e.t).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}${e.src === 'results' ? ' (from turned-in work)' : ''}`))));
+      const menu = Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden && !v.custom);
+      if (menu.length) pick.append(el('optgroup', { label: `${sname} — menu assignments (loads a copy)` }, ...menu.map(([k, v]) => el('option', { value: 'set:' + k }, v.title))));
+    });
+  };
+  const loadPick = () => {
+    const v = pick.value; if (!v) return (editMsg.textContent = 'Choose an assignment first.');
+    if (v.startsWith('set:')) return loadFromSet(v.slice(4));
+    const e = lib[+v.slice(4)]; if (e) loadFromUrl(e.url);
   };
   const editCard = saved.editId
     ? el('div', { class: 'card', style: 'border-left:4px solid var(--accent, #1f5fa8)' },
@@ -12281,9 +12348,13 @@ function builder() {
         el('p', { class: 'small' }, 'Make your changes below, then copy the new student link and replace the old link in Google Classroom. Students who already started keep their answers to every question that is still in the assignment, and scores already turned in stay in your gradebook.'),
         el('button', { class: 'btn', type: 'button', style: 'background:#fff;color:inherit;border:1px solid var(--line)', onclick: () => { const b = store.get(TK('builder:last')) || {}; delete b.editId; store.set(TK('builder:last'), b); builder(); } }, 'Stop editing (make a new assignment instead)'))
     : el('details', { class: 'card' }, el('summary', {}, el('strong', {}, 'Edit an assignment you already made')),
-        el('p', { class: 'small' }, 'Paste the student link of an assignment you built. Its questions and settings load here so you can change them.'),
-        el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, editIn, el('button', { class: 'btn', type: 'button', onclick: loadEdit }, 'Load it')), editMsg);
+        el('p', { class: 'small' }, 'Pick an assignment. Its questions and settings load here so you can change them. A menu assignment loads as a copy, which becomes a new link; the menu item itself doesn’t change.'),
+        el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, pick, el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: loadPick }, 'Load it')), pickNote,
+        el('p', { class: 'small', style: 'margin:14px 0 6px' }, 'Or paste its student link:'),
+        el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, editIn, el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: loadEdit }, 'Load link')), editMsg);
   app.append(editCard);
+  if (!saved.editId) builderLibrary().then((l) => { lib = l; fillPick();
+    pickNote.textContent = dashPw.get() ? '' : 'Only assignments made on this computer are listed. Open the Results dashboard once on this computer to see the ones from your other computers too.'; });
   app.append(el('div', { class: 'card' },
     el('label', {}, 'Assignment title'), titleIn,
     el('label', {}, 'Subject (which gradebook tab scores go to)'), subjSel,
@@ -12385,8 +12456,11 @@ function builder() {
   const tryLink = el('a', { target: '_blank', rel: 'noopener' }, 'Try it as a student');
   const codeOut = el('code', { style: 'display:block;white-space:pre-wrap;word-break:break-all;padding:8px;margin-top:6px;font-size:12px' });
   const msg = el('div', { class: 'err' });
+  const remember = () => { if (!linkIn.value) return; try { const q = new URL(linkIn.value).searchParams; rememberAssignment(linkIn.value, q.get('title') || 'Custom Practice', q.get('subject') || '', customKeyFor(q)); } catch {} };
+  [tryLink, keyLink].forEach((a) => a.addEventListener('click', remember));
   const copyBtn = el('button', { class: 'btn', type: 'button', onclick: async () => {
     if (!linkIn.value) return;
+    remember();
     try { await navigator.clipboard.writeText(linkIn.value); copyBtn.textContent = 'Copied!'; }
     catch { linkIn.select(); copyBtn.textContent = 'Press Ctrl+C to copy'; }
     setTimeout(() => (copyBtn.textContent = 'Copy link'), 1800);
