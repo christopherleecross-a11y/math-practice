@@ -176,6 +176,10 @@ const CONFIG = {
   // AI_GRADING = true lets "Prove the identity" questions be graded by Claude through your Apps Script
   // (needs an Anthropic API key saved in the script — see PracticeResults.gs). false = step checker only.
   AI_GRADING: true,
+  // LEAVE_LIMIT = in lockdown mode, leaving the page this many times locks the assignment until you unlock it
+  //               (from the Results dashboard, or your teacher PIN on the student's Chromebook). 0 = never lock.
+  //               Per assignment: leaveLimit: 2 in SETS, or the builder's "Lock after leaving" box.
+  LEAVE_LIMIT: 3,
   // WATERMARK = faint student name, period, and date repeated across every question, so a shared screenshot shows whose it is.
   WATERMARK: true,
   ATTEMPTS: 1,
@@ -10945,9 +10949,10 @@ let CUSTOM_KEY = null;
   const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
   const same = q.get('same') === '1', hints = q.get('hints') === '1';
+  const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints, leaveLimit };
 })();
 
 /* ---------- question generation ---------- */
@@ -10994,6 +10999,7 @@ const setting = (setKey, name) => {
   if (name === 'lockdown') return CONFIG.LOCKDOWN !== false;
   if (name === 'same') return !!CONFIG.SAME_FOR_EVERYONE;
   if (name === 'hints') return !!CONFIG.HINTS;
+  if (name === 'leaveLimit') return CONFIG.LEAVE_LIMIT || 0;
   return CONFIG.RETRIES || 0;
 };
 
@@ -11269,6 +11275,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
     answers: Array.from({ length: qs.length }, (_, i) => (saved.answers && saved.answers[i] !== undefined ? saved.answers[i] : null)),
     submitted: !teacher && saved.submitted ? saved.submitted : null,
     started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
+    frozen: !teacher && !saved.submitted && !!saved.frozen, leaveBase: saved.leaveBase || 0, unlocks: saved.unlocks || 0,
     tries, status: saved.status || {}, history: saved.history || {}, flash: {}, ai: (!teacher && saved.ai) || {}, proofShown: {},
     drawings: (!teacher && store.get(key + ':draw')) || {}, drawOn: {}, work: (!teacher && store.get(key + ':work')) || {} };
   if (!teacher) { saveState(); store.set(base + ':meta', meta); }
@@ -11279,7 +11286,8 @@ function saveState() {
   if (state.teacher) return;
   const saved = store.get(state.key) || {};
   store.set(state.key, { ...saved, answers: state.answers, started: state.started, tabAways: state.tabAways,
-    tries: state.tries, status: state.status, history: state.history, submitted: state.submitted, ai: state.ai, hintUsed: state.hintUsed, sig: state.sig });
+    tries: state.tries, status: state.status, history: state.history, submitted: state.submitted, ai: state.ai, hintUsed: state.hintUsed, sig: state.sig,
+    frozen: state.frozen, leaveBase: state.leaveBase, unlocks: state.unlocks });
 }
 // fingerprint of a question (before any retries), so saved work follows its question if the assignment is edited
 const qSig = (q) => q.tpl + ':' + cyrb53(String(q.stem) + '|' + (q.choices || []).join('|')).toString(36);
@@ -11868,7 +11876,8 @@ async function send(pts) {
       if (pts[i] === 1) return `${i + 1}✓${tr}` + (q.proofQ && state.ai[i] && state.ai[i].ai ? '(AI)' : '');
       if (!isAnswered(q, a)) return `${i + 1}✗${tr}–`;
       if (q.proofQ) return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}(proof${state.ai[i] && state.ai[i].ai ? ', AI' : ''})`;
-      return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}` + (q.mode === 'fr' ? '(' + a.filter((x) => x !== '').join(',').slice(0, 24) + ')' : LETTERS[a]); }).join(' '),
+      return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}` + (q.mode === 'fr' ? '(' + a.filter((x) => x !== '').join(',').slice(0, 24) + ')' : LETTERS[a]); }).join(' ')
+      + (state.unlocks ? ` · locked ${state.unlocks}× for leaving` : ''),
     minutes: Math.round((Date.now() - state.started) / 6000) / 10, tabAways: state.tabAways,
     version: state.version + (state.attempts > 1 ? ` · attempt ${state.attempt} of ${state.attempts}` : ''),
     work: CONFIG.SEND_WORK ? exportWork(pts) : null,
@@ -11923,10 +11932,14 @@ function recordLeave() {
   state.tabAways++;
   const saved = store.get(state.key) || {};
   cloudQuiet = true; try { store.set(state.key, { ...saved, tabAways: state.tabAways }); } finally { cloudQuiet = false; }
-  if (locked()) showShield('left');
+  if (!locked()) return;
+  const lim = setting(state.setKey, 'leaveLimit');
+  if (!state.frozen && lim > 0 && state.tabAways - (state.leaveBase || 0) >= lim) { state.frozen = true; saveState(); } // saved online too, so another Chromebook won't get around it
+  if (state.frozen) showFrozen(); else showShield('left');
 }
 function cameBack() {
   away = false;
+  if (state && state.frozen && active()) return showFrozen();
   if (locked() && !(fsSupported() && !inFullscreen())) hideShield();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) recordLeave(); else cameBack(); });
@@ -11934,8 +11947,8 @@ window.addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus(
 window.addEventListener('focus', cameBack);
 ['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => document.addEventListener(ev, () => {
   if (!locked()) return;
-  if (inFullscreen()) { if (!away) hideShield(); }
-  else { recordLeave(); showShield('fullscreen'); away = false; }
+  if (inFullscreen()) { if (!away && !state.frozen) hideShield(); }
+  else { recordLeave(); if (!state.frozen) showShield('fullscreen'); away = false; }
 }));
 // no right-click (Search with Google Lens, copy), no copying or dragging question content, no printing
 document.addEventListener('contextmenu', (e) => { if (locked()) e.preventDefault(); });
@@ -11961,10 +11974,48 @@ function showShield(why) {
     el('h2', {}, first ? 'This assignment runs in full screen' : 'Your questions are hidden'),
     el('p', {}, first
       ? 'Your questions will appear when you go full screen. Leaving full screen, switching tabs, or opening other apps (like Google Lens) will hide them and is recorded for ' + CONFIG.TEACHER_NAME + '.'
-      : `You left the assignment. This was recorded for ${CONFIG.TEACHER_NAME} (${state.tabAways} ${state.tabAways === 1 ? 'time' : 'times'} so far).`),
+      : (() => { const lim = setting(state.setKey, 'leaveLimit'), n = state.tabAways - (state.leaveBase || 0);
+          return `You left the assignment. This was recorded for ${CONFIG.TEACHER_NAME} (${state.tabAways} ${state.tabAways === 1 ? 'time' : 'times'} so far).` +
+            (lim > 0 ? ` ${lim - n === 1 ? 'If you leave one more time' : `If you leave ${lim - n} more times`}, the assignment locks until ${CONFIG.TEACHER_NAME} unlocks it.` : ''); })()),
     el('button', { class: 'btn', type: 'button', onclick: () => { if (needFs) goFullscreen(); else hideShield(); } }, needFs ? (first ? 'Start in full screen' : 'Return to full screen') : 'Continue')));
   sh.style.display = 'flex';
   document.body.classList.add('shielded');
+}
+// locked after leaving too many times: only the teacher can unlock (dashboard, or PIN on this Chromebook)
+let frozenPoll = null;
+function showFrozen() {
+  let sh = document.getElementById('shield');
+  if (!sh) { sh = el('div', { id: 'shield' }); document.body.append(sh); }
+  sh.innerHTML = '';
+  const pin = el('input', { type: 'password', placeholder: 'Teacher PIN', autocomplete: 'off', style: 'max-width:200px;margin:8px auto 0;display:block' });
+  const msg = el('div', { class: 'err' });
+  const unlock = () => {
+    if (!CONFIG.TEACHER_PIN_HASH || String(cyrb53(pin.value)) !== CONFIG.TEACHER_PIN_HASH) { msg.textContent = 'That PIN didn’t work.'; pin.value = ''; return; }
+    state.frozen = false; state.leaveBase = state.tabAways; state.unlocks = (state.unlocks || 0) + 1; saveState();
+    clearInterval(frozenPoll); frozenPoll = null; hideShield(); startLockdown();
+  };
+  pin.addEventListener('keydown', (e) => { if (e.key === 'Enter') unlock(); });
+  const check = el('button', { class: 'btn', type: 'button', onclick: () => frozenCheck(true) }, 'Check if I’m unlocked');
+  sh.append(el('div', { class: 'shieldcard' },
+    el('div', { style: 'font-size:40px' }, '🔒'),
+    el('h2', {}, 'This assignment is locked'),
+    el('p', {}, `You left the assignment ${state.tabAways} times. Raise your hand and ask ${CONFIG.TEACHER_NAME} to unlock it. Your answers so far are saved.`),
+    CONFIG.SCRIPT_URL && !PREVIEW ? check : '',
+    el('details', { style: 'margin-top:16px;text-align:center' }, el('summary', { class: 'small', style: 'cursor:pointer' }, 'Teacher: unlock on this Chromebook'),
+      pin, el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:8px', onclick: unlock }, 'Unlock'), msg)));
+  sh.style.display = 'flex';
+  document.body.classList.add('shielded');
+  // the teacher can also unlock from the Results dashboard: check for that every few seconds
+  if (!frozenPoll && CONFIG.SCRIPT_URL && !PREVIEW) frozenPoll = setInterval(() => frozenCheck(false), 8000);
+}
+async function frozenCheck(byHand) {
+  if (!state || !state.frozen) { clearInterval(frozenPoll); frozenPoll = null; return; }
+  const st = state;
+  if (await cloudRestore(st.base)) {
+    const sv = store.get(st.key) || {};
+    if (!sv.frozen && state === st) { clearInterval(frozenPoll); frozenPoll = null; hideShield(); begin(st.setKey, st.period, st.name, false, 1, st.rid); return; }
+  }
+  if (byHand) { const p = document.querySelector('#shield .shieldcard p'); if (p) p.textContent = `Still locked. Ask ${CONFIG.TEACHER_NAME} to unlock it from the Results dashboard.`; }
 }
 function hideShield() {
   const sh = document.getElementById('shield');
@@ -11972,6 +12023,7 @@ function hideShield() {
   document.body.classList.remove('shielded');
 }
 function startLockdown() {
+  if (state && state.frozen && active()) { showFrozen(); return; }
   if (!locked()) { hideShield(); return; }
   if (fsSupported() && !inFullscreen()) showShield('start'); else hideShield();
 }
@@ -12010,6 +12062,15 @@ function dashLabels(setCol) {
 }
 const who = (period, name) => period + '|' + norm(name);
 
+async function dashUnlock(p, btn) {
+  btn.disabled = true; btn.textContent = 'Unlocking…';
+  try {
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'unlock', password: dashPw.get(), key: p.key }) });
+    const g = await res.json();
+    if (!g.ok) throw new Error(g.error || 'failed');
+    p.frozen = false; btn.textContent = 'Unlocked ✓';
+  } catch (e) { btn.disabled = false; btn.textContent = 'Try again'; }
+}
 async function dashboard() {
   teacherNav('dash');
   document.getElementById('title').textContent = 'Results dashboard';
@@ -12071,6 +12132,14 @@ function dashRender() {
       el('button', { class: 'btn', style: 'margin-top:0', onclick: dashboard }, 'Refresh'),
       el('button', { class: 'btn secondary', style: 'margin-top:0', onclick: () => { dashPw.set(''); dashLogin(''); } }, 'Lock')));
   app.append(ctl);
+  // students locked out right now (left the page too many times): unlock them from here
+  const frozen = D.progress.filter((p) => p.frozen && (!DASH.period || p.period === DASH.period)).sort((a, b) => b.t - a.t);
+  if (frozen.length) app.append(el('div', { class: 'card', style: 'border-left:4px solid #c0392b' },
+    el('strong', {}, `🔒 Locked for leaving the page (${frozen.length})`),
+    el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'Their questions stay hidden until you unlock them. Unlocking takes effect on their screen within about 10 seconds.'),
+    dashTable([{ k: 'name', t: 'Student', sort: (p) => norm(p.name) }, { k: 'period', t: 'Period', sort: (p) => perOrder(p.period) }, { k: 'title', t: 'Assignment' },
+      { k: 'away', t: 'Times left', desc: true }, { k: 't', t: 'Locked', desc: true, show: (p) => dashDate(p.t) },
+      { k: 'unlock', t: '', sort: () => 0, show: (p) => el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:6px 14px', onclick: (e) => dashUnlock(p, e.target) }, 'Unlock') }], frozen)));
   if (DASH.student) return dashStudent(DASH.student);
   if (!DASH.title) return dashOverview(titles);
   dashAssignment(byTitle[DASH.title] || { title: DASH.title, rows: [], set: '' });
@@ -12183,7 +12252,8 @@ function dashAssignment(a) {
 
   if (wip.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Started but not turned in'),
     dashTable([{ k: 'name', t: 'Student', sort: (p) => norm(p.name) }, { k: 'period', t: 'Period', sort: (p) => perOrder(p.period) },
-      { k: 'answered', t: 'Answered', desc: true, show: (p) => `${p.answered} of ${p.total || '?'}` }, { k: 't', t: 'Last saved', desc: true, show: (p) => dashDate(p.t) }], wip)));
+      { k: 'answered', t: 'Answered', desc: true, show: (p) => `${p.answered} of ${p.total || '?'}` }, { k: 't', t: 'Last saved', desc: true, show: (p) => dashDate(p.t) },
+      { k: 'frozen', t: 'Status', sort: (p) => (p.frozen ? 1 : 0), show: (p) => (p.frozen ? el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:6px 14px', onclick: (e) => dashUnlock(p, e.target) }, '🔒 Unlock') : 'working') }], wip)));
   if (notStarted.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Not started'),
     el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'From your Roster tab. A student who typed their name differently than the roster (and has no nickname set) may show up here and above.'),
     el('div', { style: 'columns:3 180px;font-size:15px' }, ...notStarted.sort((x, y) => perOrder(x.period) - perOrder(y.period) || x.full.localeCompare(y.full)).map((s) => el('div', {}, `${s.full} `, el('span', { class: 'small' }, s.period))))));
@@ -12299,7 +12369,7 @@ function builder() {
   const orderSel = el('select', {}, el('option', { value: 'grouped' }, 'Grouped by type (in the order listed)'), el('option', { value: 'mixed' }, 'Mixed up (different order for each student)'));
   orderSel.value = saved.order || 'grouped';
   const numIn = (val, min, max) => el('input', { type: 'number', min: String(min), max: String(max), value: String(val), style: 'width:80px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
-  const retriesIn = numIn(saved.retries ?? 0, 0, 5), attemptsIn = numIn(saved.attempts ?? 1, 1, 10);
+  const retriesIn = numIn(saved.retries ?? 0, 0, 5), attemptsIn = numIn(saved.attempts ?? 1, 1, 10), leaveIn = numIn(saved.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, 0, 20);
   const lockIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   lockIn.checked = saved.lockdown !== false;
   const sameIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
@@ -12322,13 +12392,14 @@ function builder() {
     const q = u.searchParams, mix = q.get('mix');
     if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
-      retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', editId: customKeyFor(q) });
+      retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1',
+      leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q) });
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
     const S = SETS[key]; if (!S) return;
     store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m]) => [id, n, m === 'fr' ? 'fr' : 'mc'])), title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
-      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints });
+      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0 });
     builder(); window.scrollTo(0, 0);
   };
   const loadEdit = () => loadFromUrl(editIn.value);
@@ -12373,6 +12444,8 @@ function builder() {
       el('span', { class: 'small' }, '1 = one try. Each new attempt has all new numbers; every attempt is recorded.')),
     el('label', {}, 'Lockdown mode'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, lockIn,
       el('span', { class: 'small' }, 'Full screen required; right-click, copy, and printing blocked; leaving the page hides the questions and is recorded.')),
+    el('label', {}, 'Lock after leaving (lockdown mode only)'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, leaveIn,
+      el('span', { class: 'small' }, 'Leaving the page this many times locks the assignment until you unlock it from the Results dashboard. 0 = never lock.')),
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
       el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Unchecked = a different version for each student.')),
     el('label', {}, 'Hints'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
@@ -12480,7 +12553,7 @@ function builder() {
     el('details', { style: 'margin-top:10px' }, el('summary', { class: 'small' }, 'Make it a permanent menu item (optional)'),
       el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut));
   app.append(out);
-  [titleIn, subjSel, orderSel, retriesIn, attemptsIn].forEach((x) => x.addEventListener('input', update));
+  [titleIn, subjSel, orderSel, retriesIn, attemptsIn, leaveIn].forEach((x) => x.addEventListener('input', update));
   lockIn.addEventListener('change', update);
   sameIn.addEventListener('change', update);
   hintsIn.addEventListener('change', update);
@@ -12498,7 +12571,7 @@ function builder() {
     const total = items.reduce((a, [, n]) => a + n, 0);
     totalEl.textContent = String(total);
     const title = titleIn.value.trim() || 'Custom Practice';
-    store.set(TK('builder:last'), { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, ...(editId ? { editId } : {}) });
+    store.set(TK('builder:last'), { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, ...(editId ? { editId } : {}) });
     if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
@@ -12508,6 +12581,8 @@ function builder() {
     if (orderSel.value === 'mixed') q.set('order', 'mixed');
     const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), at = Math.max(1, Math.min(10, Math.floor(+attemptsIn.value || 1)));
     if (rt) q.set('retries', String(rt));
+    const lv = Math.max(0, Math.min(20, Math.floor(+leaveIn.value || 0)));
+    if (lv !== (CONFIG.LEAVE_LIMIT || 0)) q.set('leave', String(lv));
     if (at > 1) q.set('attempts', String(at));
     if (!lockIn.checked) q.set('lock', '0');
     if (sameIn.checked) q.set('same', '1');
