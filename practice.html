@@ -11461,13 +11461,14 @@ function workArea(q, i) {
   });
   wrap.append(toggle);
   if (!open) return wrap;
+  // typing first, then the drawing pad
+  if (!done || typed) wrap.append(mathReady ? mathWork(i, done) : plainWork(i, done));
   if (!done || strokes.length) {
     const L = done && state.drawings['Lw' + i] ? state.drawings['Lw' + i] : contentWidth() < 480 ? [360, 300] : PAD; // taller pad on phones
     const pad = makeCanvas(L[0], L[1]); paintGrid(pad);
+    if (!done) wrap.append(el('div', { class: 'small', style: 'margin:12px 0 4px' }, 'Or draw it:'));
     wrap.append(drawable(pad, 'w' + i, { label: 'Write', startOn: !coarse, readOnly: done }));
   }
-  if (done && !typed) return wrap;
-  wrap.append(mathReady ? mathWork(i, done) : plainWork(i, done));
   return wrap;
 }
 
