@@ -203,6 +203,8 @@ const TEACHERS = {
     AI_GRADING: false,
   },
 };
+// "Try it as a student" from the builder: no Google sign-in, and nothing is saved to the gradebook
+const PREVIEW = new URLSearchParams(location.search).has('preview');
 const TEACHER_ID = (() => { const t = (new URLSearchParams(location.search).get('t') || '').toLowerCase(); return TEACHERS[t] ? t : ''; })();
 if (TEACHER_ID) Object.assign(CONFIG, TEACHERS[TEACHER_ID]);
 CONFIG.SUBJECTS = CONFIG.SUBJECTS || ['geometry', 'precalc', 'act'];
@@ -10965,7 +10967,8 @@ const scoreOf = (q, a) => (q.mode === 'fr'
 const isCorrect = (q, a) => scoreOf(q, a) === 1;
 const norm = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
 // who a student is: their Classroom ID when they picked their name from the list, otherwise the letters of the typed name
-const sidOf = (name, rid) => (rid ? 'id' + rid : norm(name));
+const PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); // each preview tab starts fresh
+const sidOf = (name, rid) => (PREVIEW ? PREVIEW_ID : rid ? 'id' + rid : norm(name));
 function generate(setKey, period, sid, attempt = 1) {
   // same: true → one version for the whole class (retries and new attempts are also the same for everyone)
   const who = setting(setKey, 'same') ? 'everyone' : `${period}|${sid}`;
@@ -11006,7 +11009,7 @@ const store = {
 // the same name and period loads it back. Drawings on diagrams stay on the device where they were made.
 let cloudTimer = null, cloudRestoring = false, cloudQuiet = false, cloudStatus = '';
 function cloudNote(k) {
-  if (cloudQuiet) return; // leaving the tab is counted locally and rides along with the next real save
+  if (cloudQuiet || PREVIEW) return; // leaving the tab is counted locally and rides along with the next real save
   if (cloudRestoring || !CONFIG.SCRIPT_URL || !state || state.teacher || !String(k).startsWith(state.base) || /:cloudts$/.test(k)) return;
   try { localStorage.setItem(state.base + ':cloudts', String(Date.now())); } catch {}
   clearTimeout(cloudTimer); cloudTimer = setTimeout(() => cloudFlush(false), 2500);
@@ -11033,7 +11036,7 @@ addEventListener('pagehide', () => { if (cloudTimer) cloudFlush(true); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudTimer) cloudFlush(true); });
 // newer saved work from another device → copy it onto this device before the assignment opens
 async function cloudRestore(base) {
-  if (!CONFIG.SCRIPT_URL) return;
+  if (!CONFIG.SCRIPT_URL || PREVIEW) return;
   try {
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 8000);
     const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'loadProgress', key: base }), signal: ctl.signal });
@@ -11152,7 +11155,9 @@ function startScreen(teacher = false) {
     document.getElementById('title').textContent = SETS[setKey].title;
     document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${CONFIG.TEACHER_NAME}`;
   }
-  const pass = teacher ? null : signinPass();
+  const pass = teacher || PREVIEW ? null : signinPass();
+  if (PREVIEW && !teacher) card.append(el('div', { style: 'padding:10px 14px;border-radius:10px;background:#fbf1dc;margin-bottom:6px' },
+    el('strong', {}, 'Teacher preview. '), 'You’re trying this as a student. Nothing is saved to your gradebook, and Google sign-in is skipped.'));
   if (pass) { // signed in with Google
     const err0 = el('div', { class: 'err' });
     const pSel = pass.ps.length > 1 ? el('select', { id: 'period' }, el('option', { value: '' }, 'Which class is this for?'), ...pass.ps.map((p) => el('option', { value: p }, p + ' period'))) : null;
@@ -11171,12 +11176,12 @@ function startScreen(teacher = false) {
   }
   // students arrive from Google Classroom already signed in to their school account, so sign them in automatically
   // (once per tab; if it doesn't work, the button and the name list below are still here)
-  if (!teacher && CONFIG.SIGNIN_URL && !params.has('teacher') && !signinBroken) {
+  if (!teacher && CONFIG.SIGNIN_URL && !params.has('teacher') && !signinBroken && !PREVIEW) {
     let tried = true; try { tried = sessionStorage.getItem(TK('signin:tried')) === '1'; if (!tried) sessionStorage.setItem(TK('signin:tried'), '1'); } catch {}
     if (!tried) { card.append(el('p', {}, 'Signing you in with your school account…')); app.append(card); signinGo(); return; }
   }
   if (!teacher && CONFIG.SIGNIN_URL && signinBroken) card.append(el('div', { class: 'err', style: 'margin:0 0 10px' }, 'Google sign-in isn’t working right now. Pick your name below. (Teacher: SIGNIN_URL must be a deployment of the same script as SCRIPT_URL.)'));
-  if (!teacher && CONFIG.SIGNIN_URL && !signinBroken) {
+  if (!teacher && CONFIG.SIGNIN_URL && !signinBroken && !PREVIEW) {
     card.append(el('button', { class: 'btn', type: 'button', style: 'margin-top:6px;display:flex;align-items:center;gap:10px', onclick: signinGo },
       el('span', { style: 'display:inline-flex;width:22px;height:22px;border-radius:50%;background:#fff;color:#1f5fa8;font:700 15px system-ui;align-items:center;justify-content:center' }, 'G'), 'Sign in with Google'),
       el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Use your school account. On a school Chromebook it’s one click.'));
@@ -11203,7 +11208,8 @@ function startScreen(teacher = false) {
   const showTyped = () => { const t = roster && nameSel.value === '__typed'; nm.style.display = !roster || t ? '' : 'none'; typedNote.style.display = t ? '' : 'none'; };
   per.addEventListener('change', fillNames);
   nameSel.addEventListener('change', showTyped);
-  loadRoster().then((r) => {
+  if (PREVIEW && !teacher) nm.value = 'Teacher Preview';
+  (PREVIEW && !teacher ? Promise.resolve(null) : loadRoster()).then((r) => {
     if (!r || !Object.keys(r).length || !card.isConnected) return;
     roster = r;
     const have = Object.keys(r).sort((a, b) => perOrder(a) - perOrder(b)), cur = per.value;
@@ -11243,7 +11249,7 @@ function startScreen(teacher = false) {
 async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = null) {
   if (!mathReady) { app.innerHTML = '<div class="card">Loading…</div>'; await mathLoading; }
   document.getElementById('title').textContent = SETS[setKey].title;
-  document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period`;
+  document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period` + (PREVIEW ? ' · preview, not saved' : '');
   const sid = sidOf(name, rid);
   const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${sid}`;
   if (!teacher && CONFIG.SCRIPT_URL) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
@@ -11850,6 +11856,7 @@ function exportWork(pts) {
 
 async function send(pts) {
   const sub = state.submitted;
+  if (PREVIEW) { sub.saveStatus = 'preview'; return refreshStatus(); }
   if (!CONFIG.SCRIPT_URL) { sub.saveStatus = 'none'; return refreshStatus(); }
   const payload = {
     rid: state.rid || undefined, token: state.token || undefined,
@@ -11878,8 +11885,8 @@ function refreshStatus() {
   s.className = 'status ' + (st === 'ok' ? 'ok' : st === 'fail' ? 'fail' : 'wait');
   s.textContent = st === 'ok' ? `Saved — ${CONFIG.TEACHER_NAME} has your score.`
     : st === 'fail' ? `Your score could not be saved. Show this screen to ${CONFIG.TEACHER_NAME}.`
-    : st === 'none' ? 'Score not sent (no gradebook connected).' : 'Saving your score…';
-  if (st === 'none') s.className = 'status wait';
+    : st === 'none' ? 'Score not sent (no gradebook connected).' : st === 'preview' ? 'Teacher preview: this score was not sent to your gradebook.' : 'Saving your score…';
+  if (st === 'none' || st === 'preview') s.className = 'status wait';
 }
 function resultsCard() {
   const { score, total, at } = state.submitted;
@@ -12506,7 +12513,7 @@ function builder() {
     if (hintsIn.checked) q.set('hints', '1');
     if (editId) q.set('id', editId);
     const url = location.origin + location.pathname + '?' + q.toString();
-    linkIn.value = url; tryLink.href = url; keyLink.href = url + '&teacher=1';
+    linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1';
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
     codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''} },`;
   }
