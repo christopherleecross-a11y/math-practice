@@ -198,7 +198,7 @@ const CONFIG = {
 const TEACHERS = {
   spencer: {
     TEACHER_NAME: 'Mr. Spencer',
-    SUBJECTS: ['algebra1', 'algebra2'],
+    SUBJECTS: ['algebra1', 'algebra2', 'geometry', 'precalc'],
     PERIODS: ['1st', '2nd', '3rd', '4th', '6th', '7th', '8th'],
     SALT: 'spencer-fall-2026',
     SCRIPT_URL: '',        // his first deployment ("Anyone")
@@ -211,7 +211,7 @@ const TEACHERS = {
 const PREVIEW = new URLSearchParams(location.search).has('preview');
 const TEACHER_ID = (() => { const t = (new URLSearchParams(location.search).get('t') || '').toLowerCase(); return TEACHERS[t] ? t : ''; })();
 if (TEACHER_ID) Object.assign(CONFIG, TEACHERS[TEACHER_ID]);
-CONFIG.SUBJECTS = CONFIG.SUBJECTS || ['geometry', 'precalc', 'act'];
+CONFIG.SUBJECTS = CONFIG.SUBJECTS || ['geometry', 'precalc', 'act', 'algebra1', 'algebra2'];
 // this-device settings (sign-in, dashboard password, builder) are kept separately for each teacher
 const TK = (k) => (TEACHER_ID ? TEACHER_ID + ':' + k : k);
 
@@ -252,7 +252,7 @@ const SUBJECTS = {
   algebra1: 'Algebra I',
   algebra2: 'Algebra II',
 };
-Object.keys(SUBJECTS).forEach((k) => { if (!CONFIG.SUBJECTS.includes(k)) delete SUBJECTS[k]; }); // each teacher sees only their subjects
+{ const all = { ...SUBJECTS }; Object.keys(SUBJECTS).forEach((k) => delete SUBJECTS[k]); CONFIG.SUBJECTS.forEach((k) => { if (all[k]) SUBJECTS[k] = all[k]; }); } // each teacher sees only their subjects, in their own order
 const SETS = {
   // ----- Geometry -----
   'geo-transform': { subject: 'geometry', hidden: true, title: 'Ch. 4 Transformations',     items: [['dilation', 5], ['composite', 5]] },
