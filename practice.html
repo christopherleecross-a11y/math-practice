@@ -9136,8 +9136,10 @@ function makeCanvas(w, h) {
 }
 
 const TEXT_FONT = '17px Georgia, "Times New Roman", serif';
+const NOWRAP = '\u2063'; // a line that starts with this stays on one line (shrunk to fit if needed)
 function wrapLines(ctx, text, maxW) {
   if (text.includes('\n')) return text.split('\n').flatMap((part) => (part ? wrapLines(ctx, part, maxW) : ['']));
+  if (text.startsWith(NOWRAP)) return [text];
   text = text.replace(/\([^()]*\)/g, (m) => (m.length > 28 ? m : m.replace(/ /g, ' '))); // keep (x + 30) on one line (short ones only)
   const words = text.split(' '); const lines = []; let line = '';
   for (const w of words) {
@@ -9156,6 +9158,12 @@ function textCanvas(text, width, font = TEXT_FONT, lh = 26) {
   const ctx = cv._ctx;
   ctx.font = font; ctx.fillStyle = '#1d1d1b'; ctx.strokeStyle = '#1d1d1b'; ctx.lineWidth = 1.2; ctx.textBaseline = 'top';
   lines.forEach((l, i) => {
+    ctx.font = font;
+    if (l.startsWith(NOWRAP)) { // one-line expression: shrink the font if it's wider than the space
+      l = l.slice(1);
+      const w0 = ctx.measureText(l.replace(/\u0305/g, '')).width;
+      if (w0 > width - 4) ctx.font = font.replace(/(\d+(?:\.\d+)?)px/, (m, px) => (Math.floor(px * (width - 4) / w0 * 10) / 10) + 'px');
+    }
     // draw letters followed by U+0305 with a real bar over the whole run
     const parts = l.split(/((?:.\u0305)+)/);
     let x = 2; const y = 4 + i * lh;
@@ -10600,9 +10608,9 @@ TEMPLATES.t1Combine = (r) => {
       const xs = [0.37, 0.81, 1.23, 2.05, 2.71, 4.02, 5.3]; if (!xs.every((x) => { const a = evalTrig(n, x), b = F(x); return isFinite(a) && Math.abs(a - b) < 1e-6 * Math.max(1, Math.abs(b)); })) return false;
       return ltTermCount(raw) <= ans.length; };
     return {
-      topic: 'Combining like terms with trig functions', stem: `Simplify by combining like terms.   ${stemT}`,
+      topic: 'Combining like terms with trig functions', stem: `Simplify by combining like terms.\n${NOWRAP}${stemT}`,
       ...buildChoices(r, correct, [...new Set(wrongs)], (i) => ltExprT(ans.map(([c, k], j) => [j === i % ans.length ? c + 2 : c, k]), v)),
-      frStem: `Simplify by combining like terms. Write each kind of term only once.   ${stemT}`,
+      frStem: `Simplify by combining like terms. Write each kind of term only once.\n${NOWRAP}${stemT}`,
       fr: { fields: [{ kind: 'expr', keys: 'trigcombine', label: '' }], key: [ltExprL(ans, v)], display: correct, check },
       solution: `Like terms have the same function and the same power: ${groups.map((k) => (k === '' ? 'numbers' : ltKindT(k, v))).join(', ')} are each a different kind (${(() => { const pr = kinds.find((a) => kinds.some((b) => a !== b && a.f === b.f)); if (!pr) return 'different functions are not like terms'; const q = kinds.find((b) => b !== pr && b.f === pr.f); return `${ltKindT(pr, v)} and ${ltKindT(q, v)} are not like terms`; })()}).\n${groups.map((k) => { const cs = terms.filter(([, kk]) => kk === k).map(([c]) => c); return `${k === '' ? 'Numbers' : ltKindT(k, v)}: ${cs.map((c, i) => (i ? (c < 0 ? ` ${MINUS} ${-c}` : ` + ${c}`) : fmt(c))).join('')}${cs.length > 1 ? ` = ${fmt(cs.reduce((a, b) => a + b, 0))}` : ''}`; }).join('\n')}\n${correct}`,
     };
@@ -11771,7 +11779,7 @@ function checkBar(q, i) {
   else if (!state.submitted) {
     const left = state.retries - used;
     const btn = el('button', { class: 'btn checkbtn', type: 'button' }, 'Check');
-    btn.addEventListener('click', () => checkQ(i));
+    btn.addEventListener('click', () => { hideVK(); checkQ(i); });
     bar.append(btn, el('span', { class: 'small' }, `${left + 1} ${left === 0 ? 'try' : 'tries'} left`));
     if (state.flash[i]) bar.append(el('div', { class: 'flash' }, state.flash[i]));
   }
@@ -11809,7 +11817,20 @@ function choose(i, j) {
 
 let confirmArmed = false;
 let submitting = false;
+// the on-screen math keyboard (opened with the keyboard icon in an answer box) closes when the student
+// checks or submits, or moves on to anything that isn't a math box
+function hideVK() { try { if (window.mathVirtualKeyboard && window.mathVirtualKeyboard.visible) window.mathVirtualKeyboard.hide(); } catch {} }
+document.addEventListener('focusout', (e) => {
+  if (!e.target || e.target.tagName !== 'MATH-FIELD') return;
+  setTimeout(() => { const a = document.activeElement; if (!a || a.tagName !== 'MATH-FIELD') hideVK(); }, 200);
+});
+document.addEventListener('pointerdown', (e) => { // a tap on the page outside any math box and outside the keyboard itself
+  const t = e.target;
+  if (!t || !t.closest || t.closest('math-field, .ML__keyboard, .mkeys, .anskeys, [class*="keyboard"]')) return;
+  hideVK();
+}, true);
 async function submit() {
+  hideVK();
   if (submitting) return;
   const blanks = state.qs.filter((q, i) => !isAnswered(q, state.answers[i])).length;
   if (blanks && !confirmArmed) {
