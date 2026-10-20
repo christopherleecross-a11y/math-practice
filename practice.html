@@ -14515,7 +14515,7 @@ function recordLeave() {
   cloudQuiet = true; try { store.set(state.key, { ...saved, tabAways: state.tabAways }); } finally { cloudQuiet = false; }
   if (!locked()) return;
   const lim = setting(state.setKey, 'leaveLimit');
-  if (!state.frozen && lim > 0 && state.tabAways - (state.leaveBase || 0) >= lim) { state.frozen = true; saveState(); } // saved online too, so another Chromebook won't get around it
+  if (!state.frozen && lim > 0 && state.tabAways - (state.leaveBase || 0) >= lim) { state.frozen = true; saveState(); if (CONFIG.SCRIPT_URL && !PREVIEW) cloudFlush(true); } // saved online too, so another Chromebook won't get around it
   if (state.frozen) showFrozen(); else showShield('left');
 }
 function cameBack() {
@@ -14695,6 +14695,23 @@ async function dashboard() {
     return;
   }
   DASH.data = g; dashRender();
+  if (!(g.v >= 2)) app.prepend(el('div', { class: 'card', style: 'border-left:4px solid #c0392b' }, el('strong', {}, 'Your Apps Script needs updating'),
+    el('p', {}, 'The script your Sheet is running is older than this page, so locked students and the Unlock buttons can’t show up here. In the Apps Script editor, replace everything with the newest PracticeResults.gs, save, then Deploy > Manage deployments > pencil icon > Version: New version > Deploy. The web app URL stays the same.')));
+  dashWatch();
+}
+// while the dashboard is open, check every 30 seconds for students who just got locked out
+let dashTimer = null;
+function dashWatch() {
+  clearInterval(dashTimer);
+  dashTimer = setInterval(async () => {
+    if (document.getElementById('title').textContent !== 'Results dashboard' || !dashPw.get() || document.hidden) return;
+    try {
+      const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'dashboard', password: dashPw.get(), days: DASH.days }) });
+      const g = await res.json(); if (!g || !g.ok || !DASH.data) return;
+      const keys = (D) => D.progress.filter((p) => p.frozen).map((p) => p.key).sort().join('|');
+      if (keys(g) !== keys(DASH.data)) { const y = scrollY; DASH.data = g; dashRender(); scrollTo(0, y); }
+    } catch {}
+  }, 30000);
 }
 function dashLogin(msg) {
   app.innerHTML = '';
