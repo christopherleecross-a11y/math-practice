@@ -15767,7 +15767,7 @@ async function dashboard() {
     return;
   }
   DASH.data = g; dashRender();
-  if (!(g.v >= 2)) app.prepend(el('div', { class: 'card', style: 'border-left:4px solid #c0392b' }, el('strong', {}, 'Your Apps Script needs updating'),
+  if (!(g.v >= 3)) app.prepend(el('div', { class: 'card', style: 'border-left:4px solid #c0392b' }, el('strong', {}, 'Your Apps Script needs updating'),
     el('p', {}, 'The script your Sheet is running is older than this page, so locked students and the Unlock buttons can’t show up here. In the Apps Script editor, replace everything with the newest PracticeResults.gs, save, then Deploy > Manage deployments > pencil icon > Version: New version > Deploy. The web app URL stays the same.')));
   dashWatch();
 }
@@ -16010,12 +16010,13 @@ function teacherMenu() {
 function rememberAssignment(url, title, subject, key) {
   const e = { key, url, title, subject, t: Date.now() };
   const l = (store.get(TK('builder:library')) || []).filter((x) => x.key !== key); l.unshift(e); store.set(TK('builder:library'), l.slice(0, 300));
+  store.set(TK('builder:deleted'), (store.get(TK('builder:deleted')) || []).filter((k) => k !== key)); // copying it again brings it back
   const pw = dashPw.get();
   if (pw && CONFIG.SCRIPT_URL) fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'saveAssignment', password: pw, ...e }) }).catch(() => {});
 }
 // this computer's list + the Sheet's (saved, posted to Classroom, turned in), one entry per assignment, newest first
 async function builderLibrary() {
-  const here = location.origin + location.pathname, all = [];
+  const here = location.origin + location.pathname, all = [], deleted = new Set(store.get(TK('builder:deleted')) || []);
   (store.get(TK('builder:library')) || []).forEach((e) => all.push({ ...e, src: 'here' }));
   const pw = dashPw.get();
   if (pw && CONFIG.SCRIPT_URL) {
@@ -16024,6 +16025,7 @@ async function builderLibrary() {
       const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'assignments', password: pw }), signal: ctl.signal });
       clearTimeout(timer);
       const g = await res.json();
+      if (g && g.ok) (g.deleted || []).forEach((k) => deleted.add(k));
       if (g && g.ok) (g.list || []).forEach((e) => {
         if (e.src === 'results') { // rebuild a link from turned-in work: questions, title, subject
           const sk = Object.keys(SUBJECTS).find((k) => SUBJECTS[k] === e.tab) || '';
@@ -16042,7 +16044,14 @@ async function builderLibrary() {
     if (!cur || rank[x.src] > rank[cur.src] || (rank[x.src] === rank[cur.src] && x.t > cur.t)) by[key] = { ...x, t: Math.max(x.t, cur ? cur.t : 0) };
     else cur.t = Math.max(cur.t, x.t);
   });
-  return Object.values(by).sort((a, b) => b.t - a.t);
+  return Object.values(by).filter((e) => !deleted.has(e.key)).sort((a, b) => b.t - a.t);
+}
+// take a built assignment off the list (on this computer and in your Sheet)
+function deleteAssignment(key) {
+  store.set(TK('builder:deleted'), [...new Set([key, ...(store.get(TK('builder:deleted')) || [])])].slice(0, 500));
+  store.set(TK('builder:library'), (store.get(TK('builder:library')) || []).filter((x) => x.key !== key));
+  const pw = dashPw.get();
+  if (pw && CONFIG.SCRIPT_URL) fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'deleteAssignment', password: pw, key }) }).catch(() => {});
 }
 function builder() {
   teacherNav('build');
@@ -16112,14 +16121,25 @@ function builder() {
     if (v.startsWith('set:')) return loadFromSet(v.slice(4));
     const e = lib[+v.slice(4)]; if (e) loadFromUrl(e.url);
   };
+  let delArmed = null;
+  const delPick = () => {
+    const v = pick.value;
+    if (!v.startsWith('lib:')) { delArmed = null; delBtn.textContent = 'Delete'; return (editMsg.textContent = v ? 'Menu assignments can’t be deleted. Choose one you built.' : 'Choose an assignment you built first.'); }
+    const e = lib[+v.slice(4)]; if (!e) return;
+    if (delArmed !== e.key) { delArmed = e.key; delBtn.textContent = 'Click again to delete'; editMsg.textContent = `Delete “${e.title}” from this list? Click again to confirm.`; return; }
+    deleteAssignment(e.key); lib = lib.filter((x) => x.key !== e.key); delArmed = null; delBtn.textContent = 'Delete'; fillPick();
+    editMsg.textContent = `Deleted “${e.title}” from your list. Students who already have the link can still open it, and scores already turned in stay in your gradebook.`;
+  };
+  const delBtn = el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: delPick }, 'Delete');
+  pick.addEventListener('change', () => { delArmed = null; delBtn.textContent = 'Delete'; editMsg.textContent = ''; });
   const editCard = saved.editId
     ? el('div', { class: 'card', style: 'border-left:4px solid var(--accent, #1f5fa8)' },
         el('strong', {}, `Editing “${saved.title || 'Custom Practice'}”`),
         el('p', { class: 'small' }, 'Make your changes below, then copy the new student link and replace the old link in Google Classroom. Students who already started keep their answers to every question that is still in the assignment, and scores already turned in stay in your gradebook.'),
         el('button', { class: 'btn', type: 'button', style: 'background:#fff;color:inherit;border:1px solid var(--line)', onclick: () => { const b = store.get(TK('builder:last')) || {}; delete b.editId; store.set(TK('builder:last'), b); builder(); } }, 'Stop editing (make a new assignment instead)'))
     : el('details', { class: 'card' }, el('summary', {}, el('strong', {}, 'Edit an assignment you already made')),
-        el('p', { class: 'small' }, 'Pick an assignment. Its questions and settings load here so you can change them. A menu assignment loads as a copy, which becomes a new link; the menu item itself doesn’t change.'),
-        el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, pick, el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: loadPick }, 'Load it')), pickNote,
+        el('p', { class: 'small' }, 'Pick an assignment. Its questions and settings load here so you can change them. A menu assignment loads as a copy, which becomes a new link; the menu item itself doesn’t change. Delete takes an assignment you built off this list.'),
+        el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, pick, el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: loadPick }, 'Load it'), delBtn), pickNote,
         el('p', { class: 'small', style: 'margin:14px 0 6px' }, 'Or paste its student link:'),
         el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, editIn, el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: loadEdit }, 'Load link')), editMsg);
   app.append(editCard);
