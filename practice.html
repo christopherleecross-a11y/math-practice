@@ -14560,11 +14560,11 @@ let CUSTOM_KEY = null;
   const shuffleQs = q.get('order') === 'mixed';
   const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
-  const same = q.get('same') === '1', hints = q.get('hints') === '1';
+  const same = q.get('same') === '1', hints = q.get('hints') === '1', redo = q.get('redo') === 'missed' ? 'missed' : 'all';
   const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints, leaveLimit };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints, leaveLimit, redo };
 })();
 
 /* ---------- question generation ---------- */
@@ -14612,6 +14612,7 @@ const setting = (setKey, name) => {
   if (name === 'same') return !!CONFIG.SAME_FOR_EVERYONE;
   if (name === 'hints') return !!CONFIG.HINTS;
   if (name === 'leaveLimit') return CONFIG.LEAVE_LIMIT || 0;
+  if (name === 'redo') return CONFIG.REDO === 'missed' ? 'missed' : 'all';
   return CONFIG.RETRIES || 0;
 };
 
@@ -14917,13 +14918,24 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
   const tries = saved.tries || {};
   const origQs = qs.slice(); // version 0 of each question, for showing earlier tries
   Object.keys(tries).forEach((i) => { if (tries[i] > 0 && qs[i]) qs[i] = regenQuestion(seedStr, qs[i], +i, tries[i]); });
+  // "redo only the ones you missed": questions answered right on an earlier attempt come back as they were, already correct
+  const carry = (!teacher && saved.carry) || {}, carried = {};
+  Object.entries(carry).forEach(([i, c]) => {
+    if (!qs[i] || !c || !(c.from >= 1)) return;
+    try {
+      const g = generate(setKey, period, meta.seedSid || sid, c.from);
+      let cq = g.qs[i]; if (!cq || cq.tpl !== qs[i].tpl) return;
+      if (c.t > 0) cq = regenQuestion(g.seedStr, cq, +i, c.t);
+      qs[i] = cq; carried[i] = c;
+    } catch {}
+  });
   const ps = !teacher && rid ? signinPass() : null;
   state = { origQs, setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, teacher, hints: !!setting(setKey, 'hints'), hintUsed: saved.hintUsed || {},
-    answers: Array.from({ length: qs.length }, (_, i) => (saved.answers && saved.answers[i] !== undefined ? saved.answers[i] : null)),
+    answers: Array.from({ length: qs.length }, (_, i) => (carried[i] ? carried[i].a : saved.answers && saved.answers[i] !== undefined ? saved.answers[i] : null)),
     submitted: !teacher && saved.submitted ? saved.submitted : null,
     started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
     frozen: !teacher && !saved.submitted && !!saved.frozen, leaveBase: saved.leaveBase || 0, unlocks: saved.unlocks || 0,
-    tries, status: saved.status || {}, history: saved.history || {}, flash: {}, ai: (!teacher && saved.ai) || {}, proofShown: {},
+    tries, status: { ...(saved.status || {}), ...Object.fromEntries(Object.keys(carried).map((i) => [i, 'kept'])) }, carry: carried, history: saved.history || {}, flash: {}, ai: (!teacher && saved.ai) || {}, proofShown: {},
     drawings: (!teacher && store.get(key + ':draw')) || {}, drawOn: {}, work: (!teacher && store.get(key + ':work')) || {} };
   if (!teacher) { saveState(); store.set(base + ':meta', meta); }
   render();
@@ -15408,9 +15420,11 @@ function hintBar(q, i) {
 }
 /* ---------- per-question Check button and retries ---------- */
 function checkBar(q, i) {
-  if (!state.retries || state.teacher) return el('span');
+  if (state.teacher) return el('span');
   const st = state.status[i], used = state.tries[i] || 0;
   const bar = el('div', { class: 'checkbar' });
+  if (st === 'kept') { bar.append(el('span', { class: 'tag good' }, `✓ Correct on attempt ${state.carry && state.carry[i] ? state.carry[i].from : ''} — kept`)); return bar; }
+  if (!state.retries) return el('span');
   if (st === 'correct') bar.append(el('span', { class: 'tag good' }, used ? `Correct on try ${used + 1}` : 'Correct'));
   else if (st === 'locked') bar.append(el('span', { class: 'tag ' + (scoreOf(q, state.answers[i]) > 0 ? 'part' : 'bad') }, scoreOf(q, state.answers[i]) > 0 ? 'Out of tries (½ credit)' : 'Out of tries'));
   else if (!state.submitted) {
@@ -15594,12 +15608,28 @@ function resultsCard() {
     multi && scores.length > 1 ? el('div', { style: 'font-weight:600' }, `Best score so far: ${fmt(best)} / ${total}`) : '',
     el('div', { class: 'small' }, `Turned in ${new Date(at).toLocaleString()} · Version ${state.version}`),
     el('div', { id: 'saveStatus', class: 'status wait' }, ''));
-  if (state.attempt < state.attempts) {
+  const missedOnly = setting(state.setKey, 'redo') === 'missed';
+  const right = state.qs.map((q, i) => scoreOf(q, state.answers[i]) === 1), nMissed = right.filter((x) => !x).length;
+  if (state.attempt < state.attempts && missedOnly && !nMissed) card.append(el('p', { class: 'small' }, 'You got every question right — nothing to redo.'));
+  else if (state.attempt < state.attempts) {
     const next = state.attempt + 1;
     card.append(el('button', { class: 'btn', type: 'button', onclick: () => {
+      if (missedOnly) { // questions already right carry over to the next attempt
+        const carry = {};
+        right.forEach((ok, i) => { if (ok) carry[i] = state.carry && state.carry[i] ? state.carry[i] : { a: state.answers[i], from: state.attempt, t: state.tries[i] || 0 }; });
+        const nk = `${state.base}:a${next}`;
+        if (!store.get(nk)) {
+          store.set(nk, { carry });
+          ['work', 'draw'].forEach((w) => { // their typed work and drawings on the kept questions come along too
+            const old = store.get(`${state.key}:${w}`) || {}, keep = {};
+            Object.keys(old).forEach((k) => { if (carry[parseInt(k, 10)]) keep[k] = old[k]; });
+            if (Object.keys(keep).length) store.set(`${nk}:${w}`, keep);
+          });
+        }
+      }
       state.meta.attempt = next; store.set(state.base + ':meta', state.meta);
       begin(state.setKey, state.period, state.name, false, 1, state.rid); window.scrollTo(0, 0);
-    } }, `Start attempt ${next} of ${state.attempts} (new questions)`));
+    } }, missedOnly ? `Start attempt ${next} of ${state.attempts} (redo the ${nMissed} you missed)` : `Start attempt ${next} of ${state.attempts} (new questions)`));
   } else if (multi) card.append(el('p', { class: 'small' }, 'You have used all of your attempts.'));
   setTimeout(refreshStatus, 0);
   return card;
@@ -16116,6 +16146,8 @@ function builder() {
   sameIn.checked = !!saved.same;
   const hintsIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   hintsIn.checked = !!saved.hints;
+  const redoSel = el('select', {}, el('option', { value: 'all' }, 'Redo every question (all new numbers)'), el('option', { value: 'missed' }, 'Redo only the questions they missed (correct answers carry over)'));
+  redoSel.value = saved.redo === 'missed' ? 'missed' : 'all';
   // edit an assignment you already made: pick it from the list (or paste its link), change it, then post the new link in its place
   const editIn = el('input', { type: 'text', placeholder: 'Paste the student link here', style: 'flex:1;min-width:220px' });
   const editMsg = el('div', { class: 'small', style: 'margin-top:6px' });
@@ -16132,14 +16164,14 @@ function builder() {
     const q = u.searchParams, mix = q.get('mix');
     if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
-      retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1',
+      retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
       leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), note });
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
     const S = SETS[key]; if (!S) return;
     store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m]) => [id, n, m === 'fr' ? 'fr' : 'mc'])), title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
-      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0 });
+      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0 });
     builder(); window.scrollTo(0, 0);
   };
   const loadEdit = () => loadFromUrl(editIn.value);
@@ -16193,7 +16225,9 @@ function builder() {
     el('label', {}, 'Retries on a missed question'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, retriesIn,
       el('span', { class: 'small' }, '0 = graded only at Submit. 1 or more adds a Check button; each retry is a new version of the question.')),
     el('label', {}, 'Attempts at the whole assignment'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, attemptsIn,
-      el('span', { class: 'small' }, '1 = one try. Each new attempt has all new numbers; every attempt is recorded.')),
+      el('span', { class: 'small' }, '1 = one try. Every attempt is recorded.')),
+    el('label', {}, 'When a student starts another attempt'), el('div', { style: 'display:flex;flex-direction:column;gap:4px' }, redoSel,
+      el('span', { class: 'small' }, 'Only matters when attempts is 2 or more. “Only the ones they missed” keeps each question they got right (already marked correct) and gives new versions of the rest.')),
     el('label', {}, 'Lockdown mode'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, lockIn,
       el('span', { class: 'small' }, 'Full screen required; right-click, copy, and printing blocked; leaving the page hides the questions and is recorded.')),
     el('label', {}, 'Lock after leaving (lockdown mode only)'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, leaveIn,
@@ -16310,6 +16344,7 @@ function builder() {
   lockIn.addEventListener('change', update);
   sameIn.addEventListener('change', update);
   hintsIn.addEventListener('change', update);
+  redoSel.addEventListener('change', update);
 
   function update() {
     const items = [];
@@ -16324,7 +16359,7 @@ function builder() {
     const total = items.reduce((a, [, n]) => a + n, 0);
     totalEl.textContent = String(total);
     const title = titleIn.value.trim() || 'Custom Practice';
-    store.set(TK('builder:last'), { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, ...(editId ? { editId } : {}) });
+    store.set(TK('builder:last'), { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, redo: redoSel.value, ...(editId ? { editId } : {}) });
     if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
@@ -16337,6 +16372,7 @@ function builder() {
     const lv = Math.max(0, Math.min(20, Math.floor(+leaveIn.value || 0)));
     if (lv !== (CONFIG.LEAVE_LIMIT || 0)) q.set('leave', String(lv));
     if (at > 1) q.set('attempts', String(at));
+    if (at > 1 && redoSel.value === 'missed') q.set('redo', 'missed');
     if (!lockIn.checked) q.set('lock', '0');
     if (sameIn.checked) q.set('same', '1');
     if (hintsIn.checked) q.set('hints', '1');
@@ -16344,7 +16380,7 @@ function builder() {
     const url = location.origin + location.pathname + '?' + q.toString();
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1';
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
   }
   update();
 }
