@@ -15723,6 +15723,14 @@ window.addEventListener('resize', () => {
 const DASH = { data: null, subject: '', period: '', title: '', student: null, sort: 'name', dir: 1, days: 200 };
 const dashPw = { get() { try { return localStorage.getItem(TK('dash:pw')) || ''; } catch { return ''; } }, set(v) { try { v ? localStorage.setItem(TK('dash:pw'), v) : localStorage.removeItem(TK('dash:pw')); } catch {} } };
 const perOrder = (p) => { const n = parseInt(p, 10); return isNaN(n) ? 99 : n; };
+// sort students by class period, then last name, then first name ("Smith, Ava" works too; Jr./III are skipped)
+function lastFirst(name) {
+  let s = String(name || '').trim(), last, first;
+  if (s.includes(',')) { [last, first] = s.split(','); }
+  else { const w = s.split(/\s+/).filter(Boolean); while (w.length > 2 && /^(jr|sr|ii|iii|iv|v)\.?$/i.test(w[w.length - 1])) w.pop(); last = w.length > 1 ? w[w.length - 1] : w[0] || ''; first = w.slice(0, -1).join(' '); }
+  return norm(last || '') + ' ' + norm(first || '');
+}
+const byStudent = (p) => String(perOrder(p.period)).padStart(2, '0') + '|' + lastFirst(p.name);
 const dashDate = (t) => { const d = new Date(t), now = new Date(); const same = d.toDateString() === now.toDateString();
   return same ? 'Today ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
 const pctT = (p) => Math.round(100 * p) + '%';
@@ -15845,7 +15853,7 @@ function dashRender() {
   const sel = (opts, val, on) => { const s = el('select', {}, ...opts.map(([v, t]) => el('option', { value: v }, t))); s.value = val; s.addEventListener('change', () => on(s.value)); return s; };
   const ctl = el('div', { class: 'card', style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end' },
     el('div', {}, el('label', {}, 'Subject'), sel([['', 'All subjects'], ...tabs.map((t) => [t, t])], DASH.subject, (v) => { DASH.subject = v; DASH.title = ''; DASH.student = null; dashRender(); })),
-    el('div', {}, el('label', {}, 'Period'), sel([['', 'All periods'], ...periods.map((p) => [p, p + ' period'])], DASH.period, (v) => { DASH.period = v; dashRender(); })),
+    el('div', {}, el('label', {}, 'Period'), sel([['', 'All periods'], ...periods.map((p) => [p, p + ' period'])], DASH.period, (v) => { DASH.period = v; DASH.sort = 'name'; DASH.dir = 1; dashRender(); })),
     el('div', {}, el('label', {}, 'Assignment'), sel([['', 'All assignments (overview)'], ...titles.map((a) => [a.title, a.title])], DASH.title, (v) => { DASH.title = v; DASH.student = null; dashRender(); })),
     el('div', {}, el('label', {}, 'Show the last'), sel([['30', '30 days'], ['90', '90 days'], ['200', '200 days'], ['400', '400 days']], String(DASH.days), (v) => { DASH.days = +v; dashboard(); })),
     el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
@@ -15857,7 +15865,7 @@ function dashRender() {
   if (frozen.length) app.append(el('div', { class: 'card', style: 'border-left:4px solid #c0392b' },
     el('strong', {}, `🔒 Locked for leaving the page (${frozen.length})`),
     el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'Their questions stay hidden until you unlock them. Unlocking takes effect on their screen within about 10 seconds.'),
-    dashTable([{ k: 'name', t: 'Student', sort: (p) => norm(p.name) }, { k: 'period', t: 'Period', sort: (p) => perOrder(p.period) }, { k: 'title', t: 'Assignment' },
+    dashTable([{ k: 'name', t: 'Student', sort: byStudent }, { k: 'period', t: 'Period', sort: byStudent }, { k: 'title', t: 'Assignment' },
       { k: 'away', t: 'Times left', desc: true }, { k: 't', t: 'Locked', desc: true, show: (p) => dashDate(p.t) },
       { k: 'unlock', t: '', sort: () => 0, show: (p) => el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:6px 14px', onclick: (e) => dashUnlock(p, e.target) }, 'Unlock') }], frozen)));
   if (DASH.student) return dashStudent(DASH.student);
@@ -15958,7 +15966,7 @@ function dashAssignment(a) {
       best.map((r) => [r.period, r.name, r.score, r.total, Math.round(100 * r.pct), r.tries, new Date(r.lastT).toLocaleString(), r.minutes, r.away, parseDetail(r.detail).filter((d) => d.hint).length, r.work])) }, 'Download CSV') : ''));
   if (!best.length) scard.append(el('p', {}, 'Nobody has turned this in yet.'));
   else scard.append(dashTable([
-    { k: 'name', t: 'Student', sort: (r) => norm(r.name), show: (r) => linkBtn(r.name, () => { DASH.student = { period: r.period, name: r.name }; dashRender(); }) },
+    { k: 'name', t: 'Student', sort: byStudent, show: (r) => linkBtn(r.name, () => { DASH.student = { period: r.period, name: r.name }; dashRender(); }) },
     { k: 'period', t: 'Period', sort: (r) => perOrder(r.period) * 1000 + 0 },
     { k: 'pct', t: 'Best', desc: true, show: (r) => `${r.score}/${r.total} (${pctT(r.pct)})`, bg: (r) => band(r.pct) },
     { k: 'tries', t: 'Tries', desc: true },
@@ -15972,13 +15980,13 @@ function dashAssignment(a) {
   app.append(scard);
 
   if (wip.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Started but not turned in'),
-    dashTable([{ k: 'name', t: 'Student', sort: (p) => norm(p.name) }, { k: 'period', t: 'Period', sort: (p) => perOrder(p.period) },
+    dashTable([{ k: 'name', t: 'Student', sort: byStudent }, { k: 'period', t: 'Period', sort: byStudent },
       { k: 'answered', t: 'Answered', desc: true, show: (p) => `${p.answered} of ${p.total || '?'}` }, { k: 't', t: 'Last saved', desc: true, show: (p) => dashDate(p.t) },
       { k: 'frozen', t: 'Status', sort: (p) => (p.frozen ? 1 : 0), show: (p) => (p.frozen ? el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:6px 14px', onclick: (e) => dashUnlock(p, e.target) }, '🔒 Unlock') : 'working') },
       { k: 'reset', t: '', sort: () => 0, show: (p) => resetBtn(p) }], wip)));
   if (notStarted.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Not started'),
     el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'From your Roster tab. A student who typed their name differently than the roster (and has no nickname set) may show up here and above.'),
-    el('div', { style: 'columns:3 180px;font-size:15px' }, ...notStarted.sort((x, y) => perOrder(x.period) - perOrder(y.period) || x.full.localeCompare(y.full)).map((s) => el('div', {}, `${s.full} `, el('span', { class: 'small' }, s.period))))));
+    el('div', { style: 'columns:3 180px;font-size:15px' }, ...notStarted.sort((x, y) => perOrder(x.period) - perOrder(y.period) || lastFirst(x.full).localeCompare(lastFirst(y.full))).map((s) => el('div', {}, `${s.full} `, el('span', { class: 'small' }, s.period))))));
 }
 
 function dashStudent(s) {
