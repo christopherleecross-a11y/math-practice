@@ -15837,8 +15837,8 @@ async function dashboard() {
     return;
   }
   DASH.data = g; dashRender();
-  if (!(g.v >= 4)) app.prepend(el('div', { class: 'card', style: 'border-left:4px solid #c0392b' }, el('strong', {}, 'Your Apps Script needs updating'),
-    el('p', {}, 'The script your Sheet is running is older than this page, so some features won’t work (unlocking students, deleting assignments, remembering assignment settings). In the Apps Script editor, replace everything with the newest PracticeResults.gs, save, then Deploy > Manage deployments > pencil icon > Version: New version > Deploy. The web app URL stays the same.')));
+  if (!(g.v >= 5)) app.prepend(el('div', { class: 'card', style: 'border-left:4px solid #c0392b' }, el('strong', {}, 'Your Apps Script needs updating'),
+    el('p', {}, 'The script your Sheet is running is older than this page, so some features won’t work (unlocking students, deleting assignments, remembering assignment settings, picking up an assignment you were building on another computer). In the Apps Script editor, replace everything with the newest PracticeResults.gs, save, then Deploy > Manage deployments > pencil icon > Version: New version > Deploy. The web app URL stays the same.')));
   dashWatch();
 }
 // while the dashboard is open, check every 30 seconds for students who just got locked out
@@ -16085,16 +16085,27 @@ function rememberAssignment(url, title, subject, key) {
   if (pw && CONFIG.SCRIPT_URL) fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'saveAssignment', password: pw, ...e }) }).catch(() => {});
 }
 // this computer's list + the Sheet's (saved, posted to Classroom, turned in), one entry per assignment, newest first
+let LIB_STATUS = { state: 'nopw', draft: null };
 async function builderLibrary() {
   const here = location.origin + location.pathname, all = [], deleted = new Set(store.get(TK('builder:deleted')) || []);
   (store.get(TK('builder:library')) || []).forEach((e) => all.push({ ...e, src: 'here' }));
   const pw = dashPw.get();
+  LIB_STATUS = { state: pw && CONFIG.SCRIPT_URL ? 'offline' : 'nopw', draft: null };
   if (pw && CONFIG.SCRIPT_URL) {
     try {
       const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 12000);
       const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'assignments', password: pw }), signal: ctl.signal });
       clearTimeout(timer);
       const g = await res.json();
+      if (g && g.wrong) { dashPw.set(''); LIB_STATUS = { state: 'wrong', draft: null }; }
+      else if (g && g.locked) LIB_STATUS = { state: 'locked', draft: null };
+      else if (g && g.ok) {
+        LIB_STATUS = { state: g.v >= 5 ? 'ok' : 'old', draft: g.draft || null };
+        // assignments made on this computer before it knew your password: put them in your Sheet now
+        const inSheet = new Set((g.list || []).filter((e) => e.src === 'saved').map((e) => e.key)), del = new Set(g.deleted || []);
+        (store.get(TK('builder:library')) || []).filter((e) => e.key && e.url && !inSheet.has(e.key) && !del.has(e.key) && !deleted.has(e.key)).slice(0, 40)
+          .forEach((e) => fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'saveAssignment', password: pw, key: e.key, url: e.url, title: e.title, subject: e.subject, t: e.t }) }).catch(() => {}));
+      }
       if (g && g.ok) (g.deleted || []).forEach((k) => deleted.add(k));
       if (g && g.ok) (g.list || []).forEach((e) => {
         if (e.src === 'results') { // rebuild a link from turned-in work: questions, title, subject
@@ -16123,6 +16134,20 @@ function deleteAssignment(key) {
   const pw = dashPw.get();
   if (pw && CONFIG.SCRIPT_URL) fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'deleteAssignment', password: pw, key }) }).catch(() => {});
 }
+// the assignment you're in the middle of building is copied to your Sheet a few seconds after each change,
+// so "Continue it here" can pick it up on your other computer
+const draftSig = (d) => { if (!d) return ''; const { t, note, ...rest } = d; return JSON.stringify(rest); };
+const draftBlank = (d) => !d || !Object.values(d.counts || {}).some((n) => n > 0);
+let draftTimer = null, draftPending = null;
+function pushDraft(now) {
+  if (draftTimer) { clearTimeout(draftTimer); draftTimer = null; }
+  const d = draftPending, pw = dashPw.get(); if (!d || !pw || !CONFIG.SCRIPT_URL) return;
+  draftPending = null;
+  fetch(CONFIG.SCRIPT_URL, { method: 'POST', keepalive: !!now, headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'saveDraft', password: pw, t: d.t, draft: JSON.stringify(d) }) }).catch(() => {});
+}
+function queueDraft(d) { draftPending = d; if (draftTimer) clearTimeout(draftTimer); draftTimer = setTimeout(() => pushDraft(false), 2500); }
+window.addEventListener('pagehide', () => pushDraft(true));
+document.addEventListener('visibilitychange', () => { if (document.hidden) pushDraft(true); });
 function builder() {
   teacherNav('build');
   document.getElementById('title').textContent = 'Build an assignment';
@@ -16130,6 +16155,7 @@ function builder() {
   app.innerHTML = '';
   const saved = store.get(TK('builder:last')) || {};
   const editId = saved.editId || null;
+  let opening = true, changedNow = false, remTimer = null;
   const counts = Object.assign({}, saved.counts || {});
   const formats = Object.assign({}, saved.formats || {});
   const frCounts = Object.assign({}, saved.frCounts || {}); // "Some of each": how many of a type are free response
@@ -16165,13 +16191,13 @@ function builder() {
     if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
       retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
-      leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), note });
+      leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), note, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
     const S = SETS[key]; if (!S) return;
     store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m]) => [id, n, m === 'fr' ? 'fr' : 'mc'])), title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
-      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0 });
+      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadEdit = () => loadFromUrl(editIn.value);
@@ -16209,15 +16235,52 @@ function builder() {
         el('strong', {}, `Editing “${saved.title || 'Custom Practice'}”`),
         saved.note ? el('p', { class: 'err', style: 'margin:6px 0' }, saved.note) : '',
         el('p', { class: 'small' }, 'Make your changes below, then copy the new student link and replace the old link in Google Classroom. Students who already started keep their answers to every question that is still in the assignment, and scores already turned in stay in your gradebook.'),
-        el('button', { class: 'btn', type: 'button', style: 'background:#fff;color:inherit;border:1px solid var(--line)', onclick: () => { const b = store.get(TK('builder:last')) || {}; delete b.editId; store.set(TK('builder:last'), b); builder(); } }, 'Stop editing (make a new assignment instead)'))
+        el('button', { class: 'btn', type: 'button', style: 'background:#fff;color:inherit;border:1px solid var(--line)', onclick: () => { const b = store.get(TK('builder:last')) || {}; delete b.editId; b.t = Date.now(); store.set(TK('builder:last'), b); builder(); } }, 'Stop editing (make a new assignment instead)'))
     : el('details', { class: 'card' }, el('summary', {}, el('strong', {}, 'Edit an assignment you already made')),
         el('p', { class: 'small' }, 'Pick an assignment. Its questions and settings load here so you can change them. A menu assignment loads as a copy, which becomes a new link; the menu item itself doesn’t change. Delete takes an assignment you built off this list.'),
         el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, pick, el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: loadPick }, 'Load it'), delBtn), pickNote,
         el('p', { class: 'small', style: 'margin:14px 0 6px' }, 'Or paste its student link:'),
         el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, editIn, el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: loadEdit }, 'Load link')), editMsg);
-  app.append(editCard);
-  if (!saved.editId) builderLibrary().then((l) => { lib = l; fillPick();
-    pickNote.textContent = dashPw.get() ? '' : 'Only assignments made on this computer are listed. Open the Results dashboard once on this computer to see the ones from your other computers too.'; });
+  const syncCard = el('div', { class: 'card', style: 'display:none;border-left:4px solid var(--accent, #1f5fa8)' });
+  app.append(syncCard, editCard);
+  const showSync = () => {
+    syncCard.innerHTML = ''; syncCard.style.display = 'none';
+    const st = LIB_STATUS.state;
+    if (!CONFIG.SCRIPT_URL) return;
+    if (st === 'nopw' || st === 'wrong' || st === 'locked') {
+      const pwIn = el('input', { type: 'password', placeholder: 'Dashboard password', style: 'flex:1;min-width:180px;max-width:280px', autocomplete: 'current-password' });
+      const go = () => { if (!pwIn.value) return; dashPw.set(pwIn.value); syncCard.querySelector('.syncmsg').textContent = 'Checking…'; refresh(); };
+      pwIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      syncCard.append(el('strong', {}, 'Use your assignments on any computer'),
+        el('p', { class: 'small', style: 'margin:6px 0' }, 'Enter your Results dashboard password once on this computer. Then everything you build here is saved to your Sheet, and the assignments you built on your other computers (even one you were still in the middle of) show up here to edit.'),
+        el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, pwIn, el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: go }, 'Connect')),
+        el('p', { class: 'small err syncmsg', style: 'margin:6px 0 0' }, st === 'wrong' ? 'That password didn’t match DASHBOARD_PASSWORD in Script properties.' : st === 'locked' ? 'Too many wrong passwords. Wait 15 minutes and try again.' : ''));
+      syncCard.style.display = '';
+      return;
+    }
+    if (st === 'old') {
+      syncCard.append(el('strong', {}, 'Your Apps Script needs updating'), el('p', { class: 'small', style: 'margin:6px 0 0' }, 'Finished assignments already sync between computers, but to pick up one you were still building, replace the Apps Script with the newest PracticeResults.gs and deploy a new version (Deploy > Manage deployments > pencil > Version: New version).'));
+      syncCard.style.display = ''; return;
+    }
+    const dr = LIB_STATUS.draft; if (!dr || !dr.data) return;
+    let d; try { d = JSON.parse(dr.data); } catch { return; }
+    const here = store.get(TK('builder:last')) || {};
+    if (draftBlank(d) || draftSig(d) === draftSig(here) || !(dr.t > (here.t || 0) + 1000) || store.get(TK('builder:draftSkip')) === dr.t) return;
+    const n = Object.values(d.counts || {}).reduce((a, x) => a + (x || 0), 0);
+    syncCard.append(el('strong', {}, d.editId ? 'You were editing an assignment on another computer' : 'You were building an assignment on another computer'),
+      el('p', { style: 'margin:6px 0' }, `“${d.title || 'Custom Practice'}” · ${n} question${n === 1 ? '' : 's'} · last changed ${new Date(dr.t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`),
+      el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: () => { store.set(TK('builder:last'), { ...d, t: dr.t }); store.set(TK('builder:sentSig'), draftSig(d)); builder(); window.scrollTo(0, 0); } }, 'Continue it here'), ' ',
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: () => { store.set(TK('builder:draftSkip'), dr.t); syncCard.style.display = 'none'; } }, 'No thanks'),
+      draftBlank(here) ? '' : el('p', { class: 'small', style: 'margin:6px 0 0' }, 'Continuing replaces what is in the builder on this computer right now.'));
+    syncCard.style.display = '';
+  };
+  const refresh = () => builderLibrary().then((l) => {
+    lib = l; if (!saved.editId) fillPick(); showSync();
+    pickNote.textContent = dashPw.get() ? '' : 'Only assignments made on this computer are listed. Connect with your dashboard password (above) to see the ones from your other computers too.';
+    const here = store.get(TK('builder:last')) || {}, dr = LIB_STATUS.draft;
+    if (LIB_STATUS.state === 'ok' && here.t && !draftBlank(here) && here.t > ((dr && dr.t) || 0)) queueDraft(here); // the Sheet is behind this computer (built before connecting)
+  });
+  refresh();
   app.append(el('div', { class: 'card' },
     el('label', {}, 'Assignment title'), titleIn,
     el('label', {}, 'Subject (which gradebook tab scores go to)'), subjSel,
@@ -16359,7 +16422,19 @@ function builder() {
     const total = items.reduce((a, [, n]) => a + n, 0);
     totalEl.textContent = String(total);
     const title = titleIn.value.trim() || 'Custom Practice';
-    store.set(TK('builder:last'), { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, redo: redoSel.value, ...(editId ? { editId } : {}) });
+    changedNow = false;
+    const prevLast = store.get(TK('builder:last')) || {};
+    const nextLast = { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, redo: redoSel.value, ...(editId ? { editId } : {}) };
+    const sig = draftSig(nextLast);
+    if (sig === store.get(TK('builder:sentSig'))) nextLast.t = prevLast.t || 0;
+    else if (opening) { // first look at what was already here: copy it only if it came from loading an assignment just now
+      nextLast.t = prevLast.t || 0; store.set(TK('builder:sentSig'), sig);
+      if (prevLast.t && Date.now() - prevLast.t < 60000) queueDraft(nextLast);
+    } else { // a real change: stamp it and copy it to your Sheet
+      changedNow = true; nextLast.t = Date.now(); store.set(TK('builder:sentSig'), sig);
+      if (!draftBlank(nextLast) || !draftBlank(prevLast)) queueDraft(nextLast);
+    }
+    store.set(TK('builder:last'), nextLast);
     if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
@@ -16379,10 +16454,11 @@ function builder() {
     if (editId) q.set('id', editId);
     const url = location.origin + location.pathname + '?' + q.toString();
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1';
+    if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
     codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
   }
-  update();
+  update(); opening = false;
 }
 
 function previewQuestion(q) {
