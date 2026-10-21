@@ -7630,8 +7630,10 @@ const ANG_TOL = 0.06;
 const sideTol = (t) => Math.max(0.021, 0.002 * Math.abs(t));
 const nearV = (raw, t, tol) => { const n = parseNum(stripDeg(raw)); return isFinite(n) && Math.abs(n - t) <= tol; };
 // a given angle: whole degrees, tenths, or degrees and minutes (like the book)
+let ANGLE_WHOLE = false; // Geometry reuses these: whole degrees only
 function angleGiv(r, lo, hi) {
   const k = r(), d = ri(r, lo, hi - 1);
+  if (ANGLE_WHOLE) return { v: d, t: `${d}°` };
   if (k < 0.65) return { v: d, t: `${d}°` };
   if (k < 0.8) { const v = d + ri(r, 1, 9) / 10; return { v, t: `${fmt(v)}°` }; }
   const m = pick(r, [10, 15, 20, 30, 35, 40, 45, 50]);
@@ -13697,6 +13699,266 @@ TEMPLATES.g84Bisector = (r) => {
 };
 for (const name of Object.keys(TEMPLATES)) if (/^g8\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 /* ==== GEOMETRY CH8 END ==== */
+/* ==== GEOMETRY CH9 BEGIN ==== */
+/* ---------- Geometry (Big Ideas Math), Chapter 9: Right Triangles and Trigonometry ---------- */
+const g9r = (x, d = 1) => (Math.round(x * 10 ** d) / 10 ** d).toFixed(d).replace('-', MINUS);
+const g9sin = (d) => Math.sin((d * Math.PI) / 180), g9cos = (d) => Math.cos((d * Math.PI) / 180), g9tan = (d) => Math.tan((d * Math.PI) / 180);
+const g9deg = (x) => (Math.atan(x) * 180) / Math.PI;
+// exact √n in simplest form
+const g9rad = (n, k = 1) => { const s = Sd(k, 1, n); return { t: sAbsText(s), l: sAbsText(s, true), v: sVal(s) }; };
+// a rounded (or exact) number answer
+const g9FR = (label, val, tenth = true, key) => ({ fields: [{ kind: 'expr', keys: 'num', label }], key: [key ?? (tenth ? g9r(val) : fracL(val))], display: key ? undefined : tenth ? `≈ ${g9r(val)}` : fmt(val),
+  check: (v) => (tenth ? numOk(v[0], val, 0.051 / Math.max(1, Math.abs(val))) : numOk(v[0], val)) });
+const g9Choices = (r, val, f = g9r) => { const c = f(val); return buildChoices(r, c, [...new Set([val * 1.3, val * 0.7, val + 2.5, val / 2, val * 2].map((x) => f(x)))].filter((x) => x !== c), (i) => f(val + i + 1)); };
+const g9FRx = (label, ex) => ({ fields: [{ kind: 'expr', keys: 'num', label }], key: [ex.l], display: ex.t, check: (v) => numOk(v[0], ex.v) });
+// right triangle: right angle at R = names[0], legs a (horizontal) and b (vertical)
+function g9rt(r, names, a, b, { sides = ['', '', ''], angs = ['', '', ''] } = {}) {
+  const k = 5 / Math.max(a, b), A = [a * k, 0], B = [0, b * k], flip = r() < 0.5, rot = r() < 0.3;
+  let P = [[0, 0], A, B];
+  if (flip) P = P.map((p) => [-p[0], p[1]]);
+  if (rot) P = P.map((p) => [p[1], -p[0]]);
+  return g7Fig([{ pts: P, names, right: [1, 0, 0], slab: sides, alab: ['', angs[1], angs[2]] }]);
+}
+// sides of the triangle above: [R→A (leg a), A→B (hypotenuse), B→R (leg b)]
+
+/* ---------- 9.1 The Pythagorean Theorem ---------- */
+const G9TRIPLES = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [20, 21, 29], [9, 40, 41], [6, 8, 10], [10, 24, 26], [12, 16, 20], [15, 20, 25], [9, 12, 15], [12, 35, 37], [11, 60, 61], [18, 24, 30], [16, 30, 34]];
+TEMPLATES.g91Find = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 3), trip = r() < 0.55, hypMissing = r() < 0.5;
+    let a, b, c; if (trip) [a, b, c] = pick(r, G9TRIPLES); else { a = ri(r, 2, 15); b = ri(r, 2, 18); c = Math.sqrt(a * a + b * b); if (Number.isInteger(c)) continue; }
+    if (!hypMissing && !trip) { c = ri(r, 6, 20); a = ri(r, 2, c - 1); b = Math.sqrt(c * c - a * a); if (Number.isInteger(b)) continue; }
+    const ans = hypMissing ? c : b, ex = hypMissing ? g9rad(a * a + b * b) : g9rad(c * c - a * a), isTrip = Number.isInteger(ans);
+    const labs = hypMissing ? [String(a), 'x', String(b)] : [String(a), String(c), 'x'];
+    const T = (x, y) => `x = ${x}; ${y ? 'yes' : 'no'}, ${y ? 'they form' : 'they do not form'} a Pythagorean triple`, correct = T(ex.t, isTrip);
+    return { topic: 'The Pythagorean Theorem', stem: 'Find the value of x. Then tell whether the side lengths form a Pythagorean triple.',
+      ...buildChoices(r, correct, [T(ex.t, !isTrip), T(g9rad(hypMissing ? Math.abs(b * b - a * a) || 2 : a * a + c * c).t, isTrip), T(String(hypMissing ? a + b : c - a), true)].filter((x, i, X) => x !== correct && X.indexOf(x) === i), (i) => T(String(i + 3), true)),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'x =' }, { kind: 'select', label: 'Pythagorean triple?', options: ['Yes', 'No'] }], key: [ex.l, isTrip ? 'Yes' : 'No'], display: `x = ${ex.t}; ${isTrip ? 'Yes' : 'No'}`,
+        check: (v) => numOk(v[0], ans) && v[1] === (isTrip ? 'Yes' : 'No'), score: (v) => numOk(v[0], ans) * 0.5 + (v[1] === (isTrip ? 'Yes' : 'No')) * 0.5 },
+      draw: g9rt(r, N, a, hypMissing ? b : ans, { sides: labs }), size: [380, 300],
+      solution: `${hypMissing ? `x² = ${a}² + ${b}² = ${a * a + b * b}` : `x² + ${a}² = ${c}²  →  x² = ${c * c - a * a}`}, so x = ${ex.t}.\n${isTrip ? 'All three lengths are whole numbers, so they form a Pythagorean triple.' : 'x is not a whole number, so the lengths do not form a Pythagorean triple.'}` };
+  }
+};
+function g91kind(a, b, c) { const [p, q, s] = [a, b, c].sort((x, y) => x - y); if (p + q <= s + 1e-9) return 'Not a triangle'; const d = s * s - (p * p + q * q); return Math.abs(d) < 1e-9 ? 'Right' : d < 0 ? 'Acute' : 'Obtuse'; }
+const g91txt = (x) => (typeof x === 'number' ? fmt(x) : x.t);
+TEMPLATES.g91Classify = (r) => {
+  for (;;) {
+    const kind = pick(r, ['Acute', 'Right', 'Obtuse', 'Not a triangle', 'Right']);
+    let s;
+    if (kind === 'Right') { const t = pick(r, G9TRIPLES), m = pick(r, [1, 1, 0.5, 1.5]); s = t.map((x) => x * m); if (r() < 0.25) { const a = ri(r, 2, 9), b = ri(r, 2, 9); s = [a, b, { v: Math.sqrt(a * a + b * b), t: g9rad(a * a + b * b).t, sq: a * a + b * b }]; if (Number.isInteger(s[2].v)) continue; } }
+    else { const a = ri(r, 3, 25), b = ri(r, 3, 25), c = ri(r, 3, 30); s = [a, b, c]; }
+    const vals = s.map((x) => (typeof x === 'number' ? x : x.v)), got = g91kind(...vals); if (got !== kind) continue;
+    const sq = s.map((x) => (typeof x === 'number' ? x * x : x.sq)), order = vals.map((v, i) => i).sort((i, j) => vals[i] - vals[j]), big = order[2], [p, q] = [order[0], order[1]];
+    return { topic: 'Classifying triangles by their sides', stem: `Determine whether the segment lengths form a triangle. If so, is the triangle acute, right, or obtuse?   ${shuffle(r, s).map(g91txt).join(', ')}`,
+      ...buildChoices(r, kind, ['Acute', 'Right', 'Obtuse', 'Not a triangle'].filter((x) => x !== kind), () => null), fr: FR.select('The triangle is', ['Acute', 'Right', 'Obtuse', 'Not a triangle'], kind),
+      solution: kind === 'Not a triangle' ? `The two shorter lengths add to ${fmt(vals[p] + vals[q])}, which is not more than ${fmt(vals[big])}, so they do not form a triangle (Triangle Inequality).` : `Compare the square of the longest side with the sum of the squares of the other two:\n${fmt(sq[big])} ${kind === 'Right' ? '=' : kind === 'Acute' ? '<' : '>'} ${fmt(sq[p])} + ${fmt(sq[q])} = ${fmt(sq[p] + sq[q])}\nSo the triangle is ${kind.toLowerCase()}.` };
+  }
+};
+TEMPLATES.g91IsRight = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 3), right = r() < 0.5, t = pick(r, G9TRIPLES), m = pick(r, [1, 1, 2, 0.5]);
+    let [a, b, c] = t.map((x) => x * m); if (!right) c += pick(r, [-1, 1, 2]);
+    if (g91kind(a, b, c) === 'Not a triangle' || !Number.isInteger(c * 2)) continue;
+    const ang = Math.acos((a * a + b * b - c * c) / (2 * a * b)), P = [[0, 0], [a, 0], [b * Math.cos(ang), b * Math.sin(ang)]];
+    return { topic: 'Is it a right triangle?', stem: 'Tell whether the triangle is a right triangle.', ...buildChoices(r, right ? 'Yes' : 'No', [right ? 'No' : 'Yes'], () => null), fr: FR.select('Right triangle?', ['Yes', 'No'], right ? 'Yes' : 'No'),
+      draw: g7Fig([{ pts: P, names: N, slab: [fmt(a), fmt(c), fmt(b)] }]), size: [380, 280],
+      solution: `${fmt(c)}² = ${fmt(c * c)} and ${fmt(a)}² + ${fmt(b)}² = ${fmt(a * a + b * b)}.\n${right ? 'They are equal, so it is a right triangle (Converse of the Pythagorean Theorem).' : 'They are not equal, so it is not a right triangle.'}` };
+  }
+};
+TEMPLATES.g91Word = (r) => {
+  if (r() < 0.5) {
+    const h = ri(r, 80, 200) / 10, d = ri(r, 50, 120) / 10, x = Math.sqrt(h * h + d * d);
+    return { topic: 'The Pythagorean Theorem in real life', stem: `A ladder runs straight from one platform to another. The upper platform is ${fmt(h)} feet above the lower one, and the platforms are ${fmt(d)} feet apart horizontally. Find the length of the ladder. Round to the nearest tenth.`,
+      ...g9Choices(r, x), fr: g9FR('Length (ft):', x), solution: `x² = ${fmt(h)}² + ${fmt(d)}²  →  x = √${fmt(h * h + d * d)} ≈ ${g9r(x)} ft` };
+  }
+  const w = pick(r, [36, 40, 44, 48, 52]), hh = pick(r, [20.25, 22.5, 24, 27, 30]), need = pick(r, [40, 46, 50, 55]), dgl = Math.sqrt(w * w + hh * hh), ok = dgl >= need;
+  const correct = ok ? `Yes; the diagonal is about ${g9r(dgl)} in.` : `No; the diagonal is only about ${g9r(dgl)} in.`;
+  return { topic: 'The Pythagorean Theorem in real life', stem: `Television sizes are measured by the length of their diagonal. You want a television that is at least ${need} inches. A television is ${w} inches wide and ${fmt(hh)} inches tall. Should you buy it?`,
+    ...buildChoices(r, correct, [ok ? `No; the diagonal is only about ${g9r(dgl)} in.` : `Yes; the diagonal is about ${g9r(dgl)} in.`, `${w + hh >= need ? 'Yes' : 'No'}; the diagonal is about ${g9r(w + hh)} in.`, `Yes; the diagonal is about ${g9r(Math.sqrt(w * w - hh * hh))} in.`].filter((x, i, X) => x !== correct && X.indexOf(x) === i), () => null),
+    fr: FR.select('Should you buy it?', ['Yes', 'No'], ok ? 'Yes' : 'No'), solution: `Diagonal = √(${w}² + ${fmt(hh)}²) ≈ ${g9r(dgl)} in., which is ${ok ? 'at least' : 'less than'} ${need} in.` };
+};
+
+/* ---------- 9.2 Special Right Triangles ---------- */
+// exact value text a√b
+const g9ex = (k, n = 1) => { const s = Sd(k, 1, n); return { t: sAbsText(s), l: sAbsText(s, true), v: sVal(s) }; };
+TEMPLATES.g92Find = (r) => {
+  const N = pickLetters(r, 3), kind = pick(r, ['45', '45', '30', '30', '30']), base = pick(r, [[ri(r, 2, 12), 1], [ri(r, 2, 12), 2], [ri(r, 2, 9), 3]]);
+  if (kind === '45') {
+    const [k, m] = base, leg = g9ex(k, m), hyp = g9ex(k, 2 * m), giveLeg = r() < 0.5, ans = giveLeg ? hyp : leg;
+    return { topic: '45°-45°-90° triangles', stem: 'Find the value of x. Write your answer in simplest form.', ...buildChoices(r, ans.t, [g9ex(k * 2, m).t, g9ex(k, giveLeg ? m : 3 * m).t, giveLeg ? leg.t : hyp.t, g9ex(k, giveLeg ? 3 * m : m * 2 + 1).t].filter((x, i, X) => x !== ans.t && X.indexOf(x) === i), (i) => g9ex(k + i + 1, m).t),
+      fr: g9FRx('x =', ans), draw: g9rt(r, N, 1, 1, { sides: giveLeg ? [leg.t, 'x', ''] : ['x', hyp.t, ''], angs: ['', '45°', '45°'] }), size: [360, 300],
+      solution: `In a 45°-45°-90° triangle, hypotenuse = leg · √2.\n${giveLeg ? `x = ${leg.t} · √2 = ${hyp.t}` : `${hyp.t} = x√2  →  x = ${leg.t}`}` };
+  }
+  const [k, m] = base, sh = g9ex(k, m), lg = g9ex(k, 3 * m), hy = g9ex(2 * k, m), give = pick(r, ['short', 'long', 'hyp']);
+  const askA = give === 'short' ? pick(r, ['long', 'hyp']) : give === 'long' ? pick(r, ['short', 'hyp']) : pick(r, ['short', 'long']);
+  const V = { short: sh, long: lg, hyp: hy }, ans = V[askA];
+  const sides = ['', '', '']; const idx = { long: 0, hyp: 1, short: 2 }; sides[idx[give]] = V[give].t; sides[idx[askA]] = 'x';
+  return { topic: '30°-60°-90° triangles', stem: 'Find the value of x. Write your answer in simplest form.', ...buildChoices(r, ans.t, [...Object.values(V).map((x) => x.t), g9ex(k, m + 1).t, g9ex(2 * k, 3 * m).t].filter((x, i, X) => x !== ans.t && X.indexOf(x) === i), (i) => g9ex(k + i + 1, m).t),
+    fr: g9FRx('x =', ans), draw: g9rt(r, N, Math.sqrt(3), 1, { sides, angs: ['', '30°', '60°'] }), size: [380, 300],
+    solution: `In a 30°-60°-90° triangle: hypotenuse = 2 · shorter leg, longer leg = shorter leg · √3.\nShorter leg = ${sh.t}, longer leg = ${lg.t}, hypotenuse = ${hy.t}.\nx = ${ans.t}` };
+};
+TEMPLATES.g92Figure = (r) => {
+  if (r() < 0.5) {
+    const P = ri(r, 2, 15) * 4, s = P / 4, d = g9ex(s, 2);
+    return { topic: 'Special right triangles in figures', stem: `The perimeter of a square is ${P} inches. Find the length of a diagonal. Write your answer in simplest form.`, ...buildChoices(r, `${d.t} in.`, [`${g9ex(s, 3).t} in.`, `${g9ex(2 * s).t} in.`, `${g9ex(P, 2).t} in.`, `${g9ex(s).t} in.`].filter((x, i, X) => x !== `${d.t} in.` && X.indexOf(x) === i), (i) => `${g9ex(s + i + 1, 2).t} in.`),
+      fr: g9FRx('Diagonal (in.):', d), solution: `Each side is ${P} ÷ 4 = ${s} in. A diagonal splits the square into two 45°-45°-90° triangles, so the diagonal is ${s}√2 = ${d.t} in.` };
+  }
+  const s = ri(r, 2, 15) * pick(r, [1, 2]), h = s % 2 ? { t: `${s}√3/2`, l: `\\frac{${s}\\sqrt{3}}{2}`, v: (s * Math.sqrt(3)) / 2 } : g9ex(s / 2, 3);
+  return { topic: 'Special right triangles in figures', stem: `The side length of an equilateral triangle is ${s} centimeters. Find the length of an altitude. Write your answer in simplest form.`, ...buildChoices(r, `${h.t} cm`, [`${g9ex(s, 3).t} cm`, `${g9ex(s, 2).t} cm`, `${fmt(s / 2)} cm`, `${g9ex(s, 2).t}/2 cm`].filter((x, i, X) => x !== `${h.t} cm` && X.indexOf(x) === i), (i) => `${g9ex(s + i + 1, 3).t} cm`),
+    fr: g9FRx('Altitude (cm):', h), solution: `The altitude splits the triangle into two 30°-60°-90° triangles with shorter leg ${fmt(s / 2)} and hypotenuse ${s}.\nAltitude = longer leg = ${fmt(s / 2)} · √3 = ${h.t} cm` };
+};
+TEMPLATES.g92Word = (r) => {
+  const L = pick(r, [284, 200, 150, 120, 96, 180]), a = pick(r, [30, 45, 60]), h = L * g9sin(a), ex = a === 30 ? { t: fmt(L / 2) } : a === 45 ? { t: g9ex(L / 2, 2).t } : { t: g9ex(L / 2, 3).t };
+  return { topic: 'Special right triangles in real life', stem: `Each half of a drawbridge is about ${L} feet long. How high does the drawbridge rise when it makes an angle of ${a}° with the road? Round to the nearest tenth if needed.`,
+    ...g9Choices(r, h), fr: g9FR('Height (ft):', h),
+    solution: `The raised half is the hypotenuse of a ${a === 45 ? '45°-45°-90°' : '30°-60°-90°'} triangle. The height is the leg opposite the ${a}° angle.\nh = ${a === 30 ? `${L} ÷ 2 = ${ex.t}` : a === 45 ? `${L} ÷ √2 = ${ex.t} ≈ ${g9r(h)}` : `(${L} ÷ 2)√3 = ${ex.t} ≈ ${g9r(h)}`} feet` };
+};
+
+/* ---------- 9.3 Similar Right Triangles ---------- */
+TEMPLATES.g93GeoMean = (r) => {
+  for (;;) {
+    const a = ri(r, 2, 40), b = ri(r, 2, 50); if (a >= b) continue;
+    const g = g9ex(1, a * b);
+    return { topic: 'Geometric mean', stem: `Find the geometric mean of the two numbers.   ${a} and ${b}`, ...buildChoices(r, g.t, [fmt((a + b) / 2), g9ex(1, a + b).t, fmt(a * b), g9ex(2, a * b).t].filter((x, i, X) => x !== g.t && X.indexOf(x) === i), (i) => g9ex(1, a * b + i + 2).t),
+      fr: g9FRx('Geometric mean:', g), solution: `The geometric mean of a and b is √(ab) = √(${a} · ${b}) = √${a * b} = ${g.t}` };
+  }
+};
+// right triangle with the altitude to the hypotenuse: hypotenuse split into p and q
+TEMPLATES.g93Altitude = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), [A, B, C, D] = N, p = ri(r, 2, 20), q = ri(r, 2, 25), kind = pick(r, ['alt', 'alt', 'leg', 'seg']);
+    const H = [0, Math.sqrt(p * q)], Pa = [-p, 0], Qb = [q, 0], cen = [0, Math.sqrt(p * q) / 3];
+    const scale = 6 / (p + q), S = (pt) => VEC.mul(pt, scale), alt = g9ex(1, p * q), legA = g9ex(1, p * (p + q));
+    let texts, ans, why, what;
+    if (kind === 'alt') { texts = [g8lab(S(Pa), S([0, 0]), S(cen), String(p), 0.4), g8lab(S([0, 0]), S(Qb), S(cen), String(q), 0.4), { p: VEC.add(S([0, Math.sqrt(p * q) / 2]), [0.3, 0]), t: 'x' }]; ans = alt; what = 'altitude'; why = `The altitude is the geometric mean of the two segments of the hypotenuse:\nx = √(${p} · ${q}) = ${alt.t}`; }
+    else if (kind === 'leg') { texts = [g8lab(S(Pa), S([0, 0]), S(cen), String(p), 0.4), g8lab(S([0, 0]), S(Qb), S(cen), String(q), 0.4), g8lab(S(Pa), S(H), S([0, -5]), 'x', 0.4)]; ans = legA; what = 'leg'; why = `Each leg is the geometric mean of the hypotenuse and the segment next to that leg:\nx = √(${p} · ${p + q}) = ${legA.t}`; }
+    else { const x = (p * q) / q; texts = [g8lab(S(Pa), S([0, 0]), S(cen), 'x', 0.4), g8lab(S([0, 0]), S(Qb), S(cen), String(q), 0.4), { p: VEC.add(S([0, Math.sqrt(p * q) / 2]), [0.35, 0]), t: alt.t }]; ans = { t: String(p), l: String(p), v: p }; what = 'segment'; why = `The altitude is the geometric mean of the segments: (${alt.t})² = x · ${q}\n${p * q} = ${q}x  →  x = ${p}`; }
+    if (Math.sqrt(p * q) * scale < 1 || Math.sqrt(p * q) * scale > 4.5) continue;
+    return { topic: 'Geometric Mean Theorems', stem: 'Find the value of x. Write your answer in simplest form.', ...buildChoices(r, ans.t, [alt.t, legA.t, g9ex(1, q * (p + q)).t, fmt((p + q) / 2), String(p + q)].filter((x, i, X) => x !== ans.t && X.indexOf(x) === i), (i) => g9ex(1, p * q + i + 3).t),
+      fr: g9FRx('x =', ans), draw: g7Fig([{ group: 'g', pts: [S(Pa), S([0, 0]), S(H)], names: [A, D, C], right: [0, 1, 0] }, { group: 'g', pts: [S([0, 0]), S(Qb), S(H)], names: [D, B, C] }, { pts: [S(Pa), S(Qb), S(H)], right: [0, 0, 1] }], { texts }), size: [440, 280], solution: why };
+  }
+};
+
+/* ---------- 9.4–9.6 Trigonometric ratios ---------- */
+// a right triangle with integer sides, named angles
+function g9tri(r) { const t = pick(r, G9TRIPLES), m = pick(r, [1, 1, 1, 2]); return t.map((x) => x * m); }
+TEMPLATES.g94Tan = (r) => {
+  const N = pickLetters(r, 3), [a, b, c] = g9tri(r), which = ri(r, 1, 2), opp = which === 1 ? b : a, adj = which === 1 ? a : b;
+  // N[0] right angle, N[1] at the end of leg a (horizontal), N[2] at the end of leg b
+  const ans = opp / adj, T = (x) => `${fracT(x)} ≈ ${g9r(x, 4)}`;
+  return { topic: 'The tangent ratio', stem: `Find tan ${N[which]}. Write your answer as a fraction and as a decimal rounded to four places.`, ...buildChoices(r, T(ans), [T(1 / ans), T(opp / c), T(adj / c)].filter((x, i, X) => x !== T(ans) && X.indexOf(x) === i), (i) => T(ans + 0.1 * (i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: `tan ${N[which]} =` }], key: [fracL(ans)], display: T(ans), check: (v) => numOk(v[0], ans, 0.00051 / Math.max(1, ans)) },
+    draw: g9rt(r, N, a, b, { sides: [String(a), String(c), String(b)] }), size: [380, 300],
+    solution: `tan ${N[which]} = opposite/adjacent = ${opp}/${adj} = ${T(ans)}` };
+};
+// find a side with a trig ratio (tan, sin, or cos)
+function g9side(r, fns) {
+  const N = pickLetters(r, 3), ang = ri(r, 20, 70), fn = pick(r, fns), given = ri(r, 4, 40), at = 1; // angle at N[1]
+  // N[1] at the end of leg a: opposite = leg b, adjacent = leg a, hypotenuse
+  let a, b, c, labs, ans, why, solveFor;
+  const kind = pick(r, ['top', 'bottom']);
+  if (fn === 'tan') { if (kind === 'top') { a = given; b = a * g9tan(ang); ans = b; labs = [String(a), '', 'x']; why = `tan ${ang}° = x/${a}  →  x = ${a} tan ${ang}° ≈ ${g9r(b)}`; } else { b = given; a = b / g9tan(ang); ans = a; labs = ['x', '', String(b)]; why = `tan ${ang}° = ${b}/x  →  x = ${b}/tan ${ang}° ≈ ${g9r(a)}`; } }
+  else if (fn === 'sin') { if (kind === 'top') { c = given; b = c * g9sin(ang); a = c * g9cos(ang); ans = b; labs = ['', String(c), 'x']; why = `sin ${ang}° = x/${c}  →  x = ${c} sin ${ang}° ≈ ${g9r(b)}`; } else { b = given; c = b / g9sin(ang); a = c * g9cos(ang); ans = c; labs = ['', 'x', String(b)]; why = `sin ${ang}° = ${b}/x  →  x = ${b}/sin ${ang}° ≈ ${g9r(c)}`; } }
+  else { if (kind === 'top') { c = given; a = c * g9cos(ang); b = c * g9sin(ang); ans = a; labs = ['x', String(c), '']; why = `cos ${ang}° = x/${c}  →  x = ${c} cos ${ang}° ≈ ${g9r(a)}`; } else { a = given; c = a / g9cos(ang); b = c * g9sin(ang); ans = c; labs = [String(a), 'x', '']; why = `cos ${ang}° = ${a}/x  →  x = ${a}/cos ${ang}° ≈ ${g9r(c)}`; } }
+  return { N, a, b, ang, labs, ans, why };
+}
+TEMPLATES.g94FindX = (r) => {
+  const S = g9side(r, ['tan']);
+  return { topic: 'Using tangent to find a side', stem: 'Find the value of x. Round to the nearest tenth.', ...g9Choices(r, S.ans), fr: g9FR('x ≈', S.ans),
+    draw: g9rt(r, S.N, S.a, S.b, { sides: S.labs, angs: ['', `${S.ang}°`, ''] }), size: [380, 300], solution: S.why };
+};
+TEMPLATES.g94Word = (r) => {
+  const d = pick(r, [100, 118, 150, 200, 250, 300]), ang = ri(r, 40, 80), h = d * g9tan(ang), thing = pick(r, ['monument', 'tower', 'building', 'flagpole']);
+  return { topic: 'Tangent in real life', stem: `You stand ${d} feet from the base of a ${thing}. The angle of elevation from the ground to the top of the ${thing} is ${ang}°. Find the height h of the ${thing}. Round to the nearest foot.`,
+    ...g9Choices(r, h, (x) => `${Math.round(x)} ft`), fr: { fields: [{ kind: 'expr', keys: 'num', label: 'h ≈' }], key: [String(Math.round(h))], display: `${Math.round(h)} ft`, check: (v) => numOk(v[0], h, 0.51 / h) },
+    solution: `tan ${ang}° = h/${d}  →  h = ${d} tan ${ang}° ≈ ${Math.round(h)} feet` };
+};
+TEMPLATES.g95Ratios = (r) => {
+  const N = pickLetters(r, 3), [a, b, c] = g9tri(r), which = ri(r, 1, 2), fn = pick(r, ['sin', 'cos']), opp = which === 1 ? b : a, adj = which === 1 ? a : b, ans = fn === 'sin' ? opp / c : adj / c;
+  const T = (x) => `${fracT(x)} ≈ ${g9r(x, 4)}`;
+  return { topic: 'Sine and cosine ratios', stem: `Find ${fn} ${N[which]}. Write your answer as a fraction and as a decimal rounded to four places.`, ...buildChoices(r, T(ans), [T(fn === 'sin' ? adj / c : opp / c), T(c / opp), T(opp / adj)].filter((x, i, X) => x !== T(ans) && X.indexOf(x) === i), (i) => T(ans * 0.9 - 0.01 * i)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: `${fn} ${N[which]} =` }], key: [fracL(ans)], display: T(ans), check: (v) => numOk(v[0], ans, 0.00051) },
+    draw: g9rt(r, N, a, b, { sides: [String(a), String(c), String(b)] }), size: [380, 300],
+    solution: `${fn} ${N[which]} = ${fn === 'sin' ? 'opposite' : 'adjacent'}/hypotenuse = ${fn === 'sin' ? opp : adj}/${c} = ${T(ans)}` };
+};
+TEMPLATES.g95Cofunction = (r) => {
+  const d = ri(r, 5, 85), fn = pick(r, ['sin', 'cos']), other = fn === 'sin' ? 'cos' : 'sin', correct = `${other} ${90 - d}°`;
+  return { topic: 'Sine and cosine of complementary angles', stem: `Write the expression in terms of ${fn === 'sin' ? 'cosine' : 'sine'}.   ${fn} ${d}°`,
+    ...buildChoices(r, correct, [`${other} ${d}°`, `${other} ${180 - d}°`, `${other} ${d + 90}°`], () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: `${fn} ${d}° = ${other}`, suffix: '°' }], key: [String(90 - d)], display: correct, check: (v) => numOk(String(v[0]).replace(/°|\\circ|\^\{?\\circ\}?/g, ''), 90 - d) },
+    solution: `The sine of an acute angle equals the cosine of its complement: ${fn} ${d}° = ${other}(90° − ${d}°) = ${correct}` };
+};
+TEMPLATES.g95FindVars = (r) => {
+  const N = pickLetters(r, 3), ang = ri(r, 20, 70), c = ri(r, 5, 40), opp = c * g9sin(ang), adj = c * g9cos(ang);
+  const T = (u, v) => `x ≈ ${g9r(u)}, y ≈ ${g9r(v)}`, correct = T(opp, adj);
+  return { topic: 'Finding legs with sine and cosine', stem: 'Find the value of each variable using sine and cosine. Round to the nearest tenth.',
+    ...buildChoices(r, correct, [T(adj, opp), T(c * g9tan(ang), adj), T(c / g9sin(ang), c / g9cos(ang))].filter((x, i, X) => x !== correct && X.indexOf(x) === i), (i) => T(opp + i + 1, adj)),
+    fr: frNums([{ label: 'x ≈', val: opp, tol: 0.051 / Math.max(1, opp) }, { label: 'y ≈', val: adj, tol: 0.051 / Math.max(1, adj) }], correct),
+    draw: g9rt(r, N, Math.max(adj, 0.3), Math.max(opp, 0.3), { sides: ['y', String(c), 'x'], angs: ['', `${ang}°`, ''] }), size: [380, 300],
+    solution: `sin ${ang}° = x/${c}  →  x = ${c} sin ${ang}° ≈ ${g9r(opp)}\ncos ${ang}° = y/${c}  →  y = ${c} cos ${ang}° ≈ ${g9r(adj)}` };
+};
+TEMPLATES.g96Inverse = (r) => {
+  const fn = pick(r, ['sin', 'cos', 'tan']), v = fn === 'tan' ? ri(r, 15, 400) / 100 : ri(r, 10, 95) / 100, ang = fn === 'sin' ? (Math.asin(v) * 180) / Math.PI : fn === 'cos' ? (Math.acos(v) * 180) / Math.PI : g9deg(v);
+  return { topic: 'Inverse trigonometric ratios', stem: `Let ∠D be an acute angle. Use technology to approximate m∠D to the nearest tenth of a degree.   ${fn} D = ${v.toFixed(2)}`,
+    ...g9Choices(r, ang, (x) => `${g9r(x)}°`), fr: { fields: [{ kind: 'expr', keys: 'num', label: 'm∠D ≈', suffix: '°' }], key: [g9r(ang)], display: `${g9r(ang)}°`, check: (vv) => numOk(String(vv[0]).replace(/°|\\circ|\^\{?\\circ\}?/g, ''), ang, 0.051 / ang) },
+    solution: `m∠D = ${fn}⁻¹(${v.toFixed(2)}) ≈ ${g9r(ang)}°` };
+};
+TEMPLATES.g96Which = (r) => {
+  const N = pickLetters(r, 3), [a, b, c] = g9tri(r), fn = pick(r, ['sin', 'cos', 'tan']), which = ri(r, 1, 2), opp = which === 1 ? b : a, adj = which === 1 ? a : b;
+  const val = fn === 'sin' ? opp / c : fn === 'cos' ? adj / c : opp / adj, other = which === 1 ? 2 : 1;
+  return { topic: 'Which angle has this ratio?', stem: `Determine which of the two acute angles has the given trigonometric ratio.   The ${{ sin: 'sine', cos: 'cosine', tan: 'tangent' }[fn]} of the angle is ${fracT(val)}.`,
+    ...buildChoices(r, `∠${N[which]}`, [`∠${N[other]}`], () => null), fr: FR.select('Angle:', [`∠${N[1]}`, `∠${N[2]}`], `∠${N[which]}`),
+    draw: g9rt(r, N, a, b, { sides: [String(a), String(c), String(b)] }), size: [380, 300],
+    solution: `${fn} ${N[which]} = ${fn === 'cos' ? 'adjacent' : 'opposite'}/${fn === 'tan' ? 'adjacent' : 'hypotenuse'} = ${fn === 'sin' ? opp : fn === 'cos' ? adj : opp}/${fn === 'tan' ? adj : c} = ${fracT(val)}, so the angle is ∠${N[which]}.` };
+};
+TEMPLATES.g96Solve = (r) => {
+  const N = pickLetters(r, 3), [R, A, B] = N, kind = pick(r, ['legs', 'leghyp', 'angle']);
+  let a, b, c, angA, labs, angs = ['', '', ''], given;
+  if (kind === 'legs') { a = ri(r, 3, 20); b = ri(r, 3, 20); c = Math.hypot(a, b); labs = [String(a), '', String(b)]; given = 'two legs'; }
+  else if (kind === 'leghyp') { c = ri(r, 8, 30); a = ri(r, 3, c - 2); b = Math.sqrt(c * c - a * a); labs = [String(a), String(c), '']; given = 'a leg and the hypotenuse'; }
+  else { angA = ri(r, 20, 70); c = ri(r, 6, 30); a = c * g9cos(angA); b = c * g9sin(angA); labs = ['', String(c), '']; angs = ['', `${angA}°`, '']; given = 'an angle and the hypotenuse'; }
+  angA = angA ?? g9deg(b / a); const angB = 90 - angA;
+  // unknowns
+  const items = [];
+  if (kind === 'legs') items.push({ label: `${A}${B} ≈`, val: c }, { label: `m∠${A} ≈`, val: angA }, { label: `m∠${B} ≈`, val: angB });
+  else if (kind === 'leghyp') items.push({ label: `${R}${B} ≈`, val: b }, { label: `m∠${A} ≈`, val: angA }, { label: `m∠${B} ≈`, val: angB });
+  else items.push({ label: `${R}${A} ≈`, val: a }, { label: `${R}${B} ≈`, val: b }, { label: `m∠${B} =`, val: angB });
+  const T = items.map((it) => `${it.label} ${g9r(it.val)}`).join(', ');
+  return { topic: 'Solving right triangles', stem: `Solve the right triangle. Round decimal answers to the nearest tenth.`,
+    ...buildChoices(r, T, [items.map((it, i) => `${it.label} ${g9r(i === 0 ? it.val + 1.5 : it.val)}`).join(', '), items.map((it, i) => `${it.label} ${g9r(i === 1 ? items[2].val : i === 2 ? items[1].val : it.val)}`).join(', '), items.map((it, i) => `${it.label} ${g9r(i === 0 ? it.val * 0.8 : it.val + 3)}`).join(', ')].filter((x, i, X) => x !== T && X.indexOf(x) === i), (i) => items.map((it) => `${it.label} ${g9r(it.val + i + 2)}`).join(', ')),
+    fr: frNums(items.map((it) => ({ label: it.label, val: it.val, tol: 0.051 / Math.max(1, Math.abs(it.val)) })), T),
+    draw: g9rt(r, N, a, b, { sides: labs, angs }), size: [380, 300],
+    solution: kind === 'legs' ? `${A}${B} = √(${a}² + ${b}²) ≈ ${g9r(c)}\nm∠${A} = tan⁻¹(${b}/${a}) ≈ ${g9r(angA)}°\nm∠${B} = 90° − ${g9r(angA)}° ≈ ${g9r(angB)}°` : kind === 'leghyp' ? `${R}${B} = √(${c}² − ${a}²) ≈ ${g9r(b)}\nm∠${A} = cos⁻¹(${a}/${c}) ≈ ${g9r(angA)}°\nm∠${B} = 90° − ${g9r(angA)}° ≈ ${g9r(angB)}°` : `m∠${B} = 90° − ${angA}° = ${angB}°\n${R}${A} = ${c} cos ${angA}° ≈ ${g9r(a)}\n${R}${B} = ${c} sin ${angA}° ≈ ${g9r(b)}` };
+};
+TEMPLATES.g96Word = (r) => {
+  if (r() < 0.5) {
+    const h = pick(r, [8, 10, 12, 15, 20]), d = pick(r, [5, 6, 7, 9, 12]), ang = g9deg(h / d);
+    return { topic: 'Angles of elevation and depression', stem: `You are standing on a footbridge that is ${h} feet above a lake. You see a duck in the water ${d} feet from the point on the water directly below you. What is the angle of depression from you to the duck? Round to the nearest tenth of a degree.`,
+      ...g9Choices(r, ang, (x) => `${g9r(x)}°`), fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Angle ≈', suffix: '°' }], key: [g9r(ang)], display: `${g9r(ang)}°`, check: (v) => numOk(String(v[0]).replace(/°|\\circ/g, ''), ang, 0.051 / ang) },
+      solution: `The angle of depression equals the angle of elevation from the duck to you: tan θ = ${h}/${d}, so θ = tan⁻¹(${h}/${d}) ≈ ${g9r(ang)}°.` };
+  }
+  const len = pick(r, [12, 14, 16, 18]), rise = pick(r, [6, 8, 9, 10, 12].filter((x) => x < len)), need = pick(r, [40, 45, 50]), ang = (Math.asin(rise / len) * 180) / Math.PI, ok = ang >= need;
+  const correct = ok ? `Yes; the angle is about ${g9r(ang)}°` : `No; the angle is only about ${g9r(ang)}°`;
+  return { topic: 'Solving right triangles in real life', stem: `To unload clay easily, the body of a dump truck must be elevated to at least ${need}°. The body of a dump truck that is ${len} feet long has been raised ${rise} feet. Will the clay pour out easily?`,
+    ...buildChoices(r, correct, [ok ? `No; the angle is only about ${g9r(ang)}°` : `Yes; the angle is about ${g9r(ang)}°`, `${g9deg(rise / len) >= need ? 'Yes' : 'No'}; the angle is about ${g9r(g9deg(rise / len))}°`].filter((x, i, X) => x !== correct && X.indexOf(x) === i), () => `Yes; the angle is about ${need + 5}°`),
+    fr: FR.select('Will it pour out easily?', ['Yes', 'No'], ok ? 'Yes' : 'No'), solution: `The truck body is the hypotenuse and the rise is the opposite side: sin θ = ${rise}/${len}, so θ = sin⁻¹(${rise}/${len}) ≈ ${g9r(ang)}°, which is ${ok ? 'at least' : 'less than'} ${need}°.` };
+};
+
+/* ---------- 9.7 Law of Sines and Law of Cosines ---------- */
+TEMPLATES.g97Calc = (r) => {
+  const fn = pick(r, ['sin', 'cos', 'tan']), d = ri(r, 91, 179), v = fn === 'sin' ? g9sin(d) : fn === 'cos' ? g9cos(d) : g9tan(d);
+  return { topic: 'Trigonometric ratios of obtuse angles', stem: `Use technology to find the trigonometric ratio. Round to four decimal places.   ${fn} ${d}°`, ...g9Choices(r, v, (x) => g9r(x, 4)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: `${fn} ${d}° ≈` }], key: [v.toFixed(4)], display: g9r(v, 4), check: (x) => numOk(x[0], v, 0.00051 / Math.max(1, Math.abs(v))) },
+    solution: `Make sure your calculator is in degree mode: ${fn} ${d}° ≈ ${g9r(v, 4)}` };
+};
+const g9whole = (name) => (r) => { ANGLE_WHOLE = true; try { return TEMPLATES[name](r); } finally { ANGLE_WHOLE = false; } };
+TEMPLATES.g97Area = g9whole('triAreaSAS');
+TEMPLATES.g97SinesAAS = g9whole('triSinesAAS');
+TEMPLATES.g97SinesSSA = g9whole('triSinesSSA');
+TEMPLATES.g97CosSSS = g9whole('triCosSSS');
+TEMPLATES.g97CosSAS = g9whole('triCosSAS');
+for (const name of Object.keys(TEMPLATES)) if (/^g9\d[A-Z]/.test(name) && !/^g97(Area|Sines|Cos)/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== GEOMETRY CH9 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -14059,6 +14321,14 @@ Object.assign(SETS, {
   'geo-8-2': { subject: 'geometry', title: '8.2 Proving Triangle Similarity by AA', items: [['g82AA', 6], ['g82Solve', 2], ['g82Word', 2]] },
   'geo-8-3': { subject: 'geometry', title: '8.3 Proving Triangle Similarity by SSS and SAS', items: [['g83SSS', 4], ['g83SAS', 3], ['g83FindX', 2], ['g83Word', 2]] },
   'geo-8-4': { subject: 'geometry', title: '8.4 Proportionality Theorems', items: [['g84TPT', 4], ['g84IsPar', 3], ['g84Lines', 2], ['g84Bisector', 3]] },
+  // ----- Geometry, Chapter 9: Right Triangles and Trigonometry -----
+  'geo-9-1': { subject: 'geometry', title: '9.1 The Pythagorean Theorem', items: [['g91Find', 4], ['g91IsRight', 2], ['g91Classify', 4], ['g91Word', 2]] },
+  'geo-9-2': { subject: 'geometry', title: '9.2 Special Right Triangles', items: [['g92Find', 7], ['g92Figure', 2], ['g92Word', 1]] },
+  'geo-9-3': { subject: 'geometry', title: '9.3 Similar Right Triangles', items: [['g93GeoMean', 4], ['g93Altitude', 6]] },
+  'geo-9-4': { subject: 'geometry', title: '9.4 The Tangent Ratio', items: [['g94Tan', 4], ['g94FindX', 5], ['g94Word', 2]] },
+  'geo-9-5': { subject: 'geometry', title: '9.5 The Sine and Cosine Ratios', items: [['g95Ratios', 4], ['g95Cofunction', 3], ['g95FindVars', 4]] },
+  'geo-9-6': { subject: 'geometry', title: '9.6 Solving Right Triangles', items: [['g96Which', 2], ['g96Inverse', 3], ['g96Solve', 5], ['g96Word', 2]] },
+  'geo-9-7': { subject: 'geometry', title: '9.7 Law of Sines and Law of Cosines', items: [['g97Calc', 2], ['g97Area', 3], ['g97SinesAAS', 2], ['g97SinesSSA', 1], ['g97CosSSS', 2], ['g97CosSAS', 2]] },
 });
 QUESTION_TYPES.push(
   { id: 'a41SlopeInt', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'From slope and y-intercept', desc: 'Write y = mx + b (#1–6)' },
@@ -14232,7 +14502,32 @@ QUESTION_TYPES.push(
   { id: 'g84TPT', subject: 'geometry', section: '8.4 Proportionality Theorems', label: 'Triangle Proportionality Theorem', desc: '#1–2' },
   { id: 'g84IsPar', subject: 'geometry', section: '8.4 Proportionality Theorems', label: 'Is the segment parallel?', desc: '#3–6' },
   { id: 'g84Lines', subject: 'geometry', section: '8.4 Proportionality Theorems', label: 'Three Parallel Lines Theorem', desc: '#15–16' },
-  { id: 'g84Bisector', subject: 'geometry', section: '8.4 Proportionality Theorems', label: 'Triangle Angle Bisector Theorem', desc: '#17–20' }
+  { id: 'g84Bisector', subject: 'geometry', section: '8.4 Proportionality Theorems', label: 'Triangle Angle Bisector Theorem', desc: '#17–20' },
+  { id: 'g91Find', subject: 'geometry', section: '9.1 The Pythagorean Theorem', label: 'Find x; Pythagorean triple?', desc: '#1–4' },
+  { id: 'g91IsRight', subject: 'geometry', section: '9.1 The Pythagorean Theorem', label: 'Is it a right triangle?', desc: '#9–14' },
+  { id: 'g91Classify', subject: 'geometry', section: '9.1 The Pythagorean Theorem', label: 'Acute, right, or obtuse?', desc: 'Or not a triangle (#15–22)' },
+  { id: 'g91Word', subject: 'geometry', section: '9.1 The Pythagorean Theorem', label: 'Word problems', desc: 'Ladder, TV size (#7–8)' },
+  { id: 'g92Find', subject: 'geometry', section: '9.2 Special Right Triangles', label: '45°-45°-90° and 30°-60°-90°', desc: 'Find x in simplest form (#1–8)' },
+  { id: 'g92Figure', subject: 'geometry', section: '9.2 Special Right Triangles', label: 'Square diagonal, equilateral altitude', desc: '#11–12' },
+  { id: 'g92Word', subject: 'geometry', section: '9.2 Special Right Triangles', label: 'Drawbridge', desc: '#15' },
+  { id: 'g93GeoMean', subject: 'geometry', section: '9.3 Similar Right Triangles', label: 'Geometric mean of two numbers', desc: '#9–16' },
+  { id: 'g93Altitude', subject: 'geometry', section: '9.3 Similar Right Triangles', label: 'Altitude to the hypotenuse', desc: 'Geometric Mean Theorems (#3–8, 17–24)' },
+  { id: 'g94Tan', subject: 'geometry', section: '9.4 The Tangent Ratio', label: 'Tangent of an angle', desc: 'Fraction and decimal (#1–4)' },
+  { id: 'g94FindX', subject: 'geometry', section: '9.4 The Tangent Ratio', label: 'Find a side with tangent', desc: '#5–8' },
+  { id: 'g94Word', subject: 'geometry', section: '9.4 The Tangent Ratio', label: 'Angle of elevation', desc: '#13' },
+  { id: 'g95Ratios', subject: 'geometry', section: '9.5 The Sine and Cosine Ratios', label: 'Sine or cosine of an angle', desc: '#1–6' },
+  { id: 'g95Cofunction', subject: 'geometry', section: '9.5 The Sine and Cosine Ratios', label: 'Complementary angles', desc: 'sin 37° = cos 53° (#7–14)' },
+  { id: 'g95FindVars', subject: 'geometry', section: '9.5 The Sine and Cosine Ratios', label: 'Find legs with sine and cosine', desc: '#15–20' },
+  { id: 'g96Which', subject: 'geometry', section: '9.6 Solving Right Triangles', label: 'Which angle has the ratio?', desc: '#1–4' },
+  { id: 'g96Inverse', subject: 'geometry', section: '9.6 Solving Right Triangles', label: 'Inverse trig: find the angle', desc: '#5–10' },
+  { id: 'g96Solve', subject: 'geometry', section: '9.6 Solving Right Triangles', label: 'Solve the right triangle', desc: '#11–16' },
+  { id: 'g96Word', subject: 'geometry', section: '9.6 Solving Right Triangles', label: 'Word problems', desc: 'Angle of depression, dump truck (#19–20)' },
+  { id: 'g97Calc', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Ratios of obtuse angles', desc: '#1–6' },
+  { id: 'g97Area', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Area with ½ab sin C', desc: '#7–12' },
+  { id: 'g97SinesAAS', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Law of Sines (two angles and a side)', desc: '#13–20' },
+  { id: 'g97SinesSSA', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Law of Sines (two sides and an angle)', desc: '#13–20' },
+  { id: 'g97CosSSS', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Law of Cosines (three sides)', desc: '#21–26' },
+  { id: 'g97CosSAS', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Law of Cosines (two sides, included angle)', desc: '#21–26' }
 );
 { // keep each subject's question types together (stable)
   const first = {}; QUESTION_TYPES.forEach((t, i) => { if (!(t.subject in first)) first[t.subject] = i; });
@@ -15826,7 +16121,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations' }, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations' }, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
