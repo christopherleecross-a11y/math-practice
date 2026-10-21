@@ -13442,6 +13442,261 @@ TEMPLATES.g75Specific = (r) => {
     fr: FR.select('Most specific name:', kinds, k), draw: g7Fig([{ ...poly, names: N }]), size: [380, 300], solution: `The marks show ${why}, so it is a${/^[AEIOU]/.test(k) ? 'n' : ''} ${k.toLowerCase()}.` };
 };
 /* ==== GEOMETRY CH7 END ==== */
+/* ==== GEOMETRY CH8 BEGIN ==== */
+/* ---------- Geometry (Big Ideas Math), Chapter 8: Similarity ---------- */
+// a label beside segment pq, on the side away from cen
+function g8lab(p, q, cen, t, off = 0.5) {
+  const m = VEC.mul(VEC.add(p, q), 0.5); let n = VEC.norm([-(q[1] - p[1]), q[0] - p[0]]);
+  if ((m[0] - cen[0]) * n[0] + (m[1] - cen[1]) * n[1] < 0) n = VEC.mul(n, -1);
+  return { p: VEC.add(m, VEC.mul(n, off)), t };
+}
+const g8cen = (P) => VEC.mul(P.reduce((a, b) => VEC.add(a, b), [0, 0]), 1 / P.length);
+const g8fr = (x) => fracT(x);
+// side lengths (even integers) for a shape, roughly in proportion to how it is drawn
+function g8sides(r, pts, lo = 4, hi = 14) {
+  const L = pts.map((p, i) => VEC.len(VEC.sub(pts[(i + 1) % pts.length], p))), u = ri(r, lo, hi) / Math.min(...L);
+  const S = L.map((l) => Math.max(2, 2 * Math.round((l * u) / 2)));
+  return new Set(S).size === S.length ? S : null;
+}
+const G8K = [2, 3, 1.5, 2.5, 0.5, 4, 0.75, 1.25];
+// a pair of similar polygons: A (sides s1) and B = k·A (sides s2), with names
+function g8pair(r, n) {
+  for (;;) {
+    const shape = n === 3 ? triShape(triAngles(r)) : quadShape(r), s1 = g8sides(r, shape); if (!s1) continue;
+    const k = pick(r, G8K), s2 = s1.map((s) => s * k); if (s2.some((s) => !Number.isInteger(s * 2))) continue;
+    const B0 = transformPts(shape, r, { reflect: r() < 0.3, scale: Math.min(1.7, Math.max(0.65, k)) });
+    const [A, B] = layoutPair(shape, B0), L1 = pickLetters(r, n), L2 = pickLetters(r, n, L1);
+    return { A, B, s1, s2, k, L1, L2, n };
+  }
+}
+const g8name = (L) => (L.length === 3 ? '△' : '') + L.join('');
+const g8side = (L, i) => L[i] + L[(i + 1) % L.length];
+
+/* ---------- 8.1 Similar Polygons ---------- */
+TEMPLATES.g81Scale = (r) => {
+  const n = pick(r, [3, 4]), G = g8pair(r, n), per = r() < 0.35, i = ri(r, 0, n - 1);
+  const lab1 = G.s1.map(String), lab2 = G.s2.map(fmt); if (n === 4) { const h = (i + 2) % 4; lab2[h] = ''; }
+  const k = G.k, what = per ? `the ratio of the perimeter of ${g8name(G.L2)} to the perimeter of ${g8name(G.L1)}` : `the scale factor from ${g8name(G.L1)} to ${g8name(G.L2)}`;
+  return { topic: per ? 'Perimeters of similar polygons' : 'Scale factor', stem: `${g8name(G.L1)} ~ ${g8name(G.L2)}. Find ${what}.`,
+    ...buildChoices(r, g8fr(k), [g8fr(1 / k), g8fr(k * k), g8fr(k + 1), g8fr(G.s2[i] - G.s1[i])].filter((x, j, X) => x !== g8fr(k) && X.indexOf(x) === j), (j) => g8fr(k + j + 2)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: per ? 'Ratio:' : 'Scale factor:' }], key: [fracL(k)], display: g8fr(k), check: (v) => numOk(String(v[0]).replace(/:/, '/'), k) },
+    draw: g7Fig([{ pts: G.A, names: G.L1, slab: lab1 }, { pts: G.B, names: G.L2, slab: lab2 }]), size: [460, 280],
+    solution: `Corresponding sides: ${g8side(G.L2, i)}/${g8side(G.L1, i)} = ${fmt(G.s2[i])}/${G.s1[i]} = ${g8fr(k)}.\n${per ? `The ratio of the perimeters equals the scale factor: ${g8fr(k)}.` : `The scale factor from ${g8name(G.L1)} to ${g8name(G.L2)} is ${g8fr(k)}.`}` };
+};
+TEMPLATES.g81Prop = (r) => {
+  const n = pick(r, [3, 4]), L1 = pickLetters(r, n), L2 = pickLetters(r, n, L1), S = (A, B) => A.map((_, i) => `${g8side(A, i)}/${g8side(B, i)}`).join(' = ');
+  const correct = S(L1, L2), rot = (X, k) => X.map((_, i) => X[(i + k) % X.length]), rev = (X) => [X[0], ...X.slice(1).reverse()];
+  const w = [S(L1, rot(L2, 1)), S(L1, rev(L2)), S(rot(L1, 1), L2), `${g8side(L1, 0)}/${g8side(L2, 0)} = ${g8side(L2, 1)}/${g8side(L1, 1)}${n > 2 ? ` = ${g8side(L1, 2)}/${g8side(L2, 2)}` : ''}`];
+  return { topic: 'Statements of proportionality', stem: `${g8name(L1)} ~ ${g8name(L2)}. Which is a correct statement of proportionality?`,
+    ...buildChoices(r, correct, [...new Set(w)].filter((x) => x !== correct), () => null), fr: FR.select('Statement:', shuffle(r, [correct, ...[...new Set(w)].filter((x) => x !== correct).slice(0, 3)]), correct),
+    solution: `Corresponding vertices are listed in the same order: ${L1.map((c, i) => `${c} ↔ ${L2[i]}`).join(', ')}.\nSo ${correct}.\nCongruent angles: ${L1.map((c, i) => `∠${c} ≅ ∠${L2[i]}`).join(', ')}` };
+};
+TEMPLATES.g81FindX = (r) => {
+  const n = pick(r, [3, 4]), G = g8pair(r, n), i = ri(r, 0, n - 1), j = (i + 1) % n, inB = r() < 0.6;
+  const lab1 = G.s1.map(String), lab2 = G.s2.map(fmt); lab1.fill(''); lab2.fill('');
+  lab1[i] = String(G.s1[i]); lab2[i] = fmt(G.s2[i]);
+  let ans; if (inB) { lab1[j] = String(G.s1[j]); lab2[j] = 'x'; ans = G.s2[j]; } else { lab2[j] = fmt(G.s2[j]); lab1[j] = 'x'; ans = G.s1[j]; }
+  return { topic: 'Similar polygons: find a side', stem: `The polygons are similar: ${g8name(G.L1)} ~ ${g8name(G.L2)}. Find the value of x.`, ...g6Choices(r, ans, (x) => fmt(x)), fr: FR.num('x =', ans),
+    draw: g7Fig([{ pts: G.A, names: G.L1, slab: lab1 }, { pts: G.B, names: G.L2, slab: lab2 }]), size: [460, 280],
+    solution: `Corresponding sides are proportional: ${g8side(G.L2, j)}/${g8side(G.L1, j)} = ${g8side(G.L2, i)}/${g8side(G.L1, i)}\n${inB ? `x/${G.s1[j]} = ${fmt(G.s2[i])}/${G.s1[i]}` : `${fmt(G.s2[j])}/x = ${fmt(G.s2[i])}/${G.s1[i]}`}  →  x = ${fmt(ans)}` };
+};
+TEMPLATES.g81Perim = (r) => {
+  for (;;) {
+    const [a, b] = pick(r, [[2, 3], [3, 4], [1, 6], [2, 5], [3, 5], [4, 5], [1, 2], [5, 8]]), unit = pick(r, ['cm', 'ft', 'yd', 'm', 'in.']), P = ri(r, 2, 30) * a * b, small = r() < 0.5;
+    const ans = small ? (P * b) / a : (P * a) / b, Pa = small ? P : P;
+    if (!Number.isInteger(ans) || !Number.isInteger(P)) continue;
+    const correct = `${fmt(ans)} ${unit}`;
+    return { topic: 'Perimeters of similar polygons', stem: `Two polygons are similar. The perimeter of the ${small ? 'smaller' : 'larger'} polygon is ${Pa} ${unit}, and the ratio of corresponding side lengths (smaller to larger) is ${a}/${b}. Find the perimeter of the other polygon.`,
+      ...buildChoices(r, correct, [small ? (P * a) / b : (P * b) / a, small ? (P * b * b) / (a * a) : (P * a * a) / (b * b), P + b - a].map((x) => `${fmt(Math.round(x * 100) / 100)} ${unit}`).filter((x, i, X) => x !== correct && X.indexOf(x) === i), (i) => `${fmt(ans + i + 2)} ${unit}`),
+      fr: FR.num(`Perimeter (${unit}):`, ans),
+      solution: `The ratio of the perimeters equals the ratio of the side lengths: ${a}/${b}.\n${small ? `${P}/x = ${a}/${b}` : `x/${P} = ${a}/${b}`}  →  x = ${fmt(ans)} ${unit}` };
+  }
+};
+TEMPLATES.g81Area = (r) => {
+  for (;;) {
+    const s1 = ri(r, 2, 12), k = pick(r, [2, 3, 1.5, 2.5, 0.5, 4, 5]), s2 = s1 * k; if (!Number.isInteger(s2)) continue;
+    const A1 = ri(r, 2, 40) * (k === 1.5 || k === 2.5 ? 4 : k === 0.5 ? 4 : 1), A2 = A1 * k * k; if (!Number.isInteger(A2 * 4)) continue;
+    const unit = pick(r, ['ft', 'cm', 'in.', 'm']), shape = pick(r, ['rectangles', 'triangles', 'pentagons', 'trapezoids']);
+    const correct = `${fmt(A2)} ${unit}²`;
+    return { topic: 'Areas of similar polygons', stem: `The ${shape} are similar. A side of the first has length ${s1} ${unit}, and the corresponding side of the second has length ${s2} ${unit}. The area of the first is ${A1} ${unit}². Find the area of the second.`,
+      ...buildChoices(r, correct, [A1 * k, A1 / k, A1 / (k * k), A1 + (s2 - s1) ** 2].map((x) => `${fmt(Math.round(x * 100) / 100)} ${unit}²`).filter((x, i, X) => x !== correct && X.indexOf(x) === i), (i) => `${fmt(A2 + i + 3)} ${unit}²`),
+      fr: FR.num(`Area (${unit}²):`, A2),
+      solution: `Scale factor: ${s2}/${s1} = ${g8fr(k)}. Areas change by the square of the scale factor:\n${A1} · (${g8fr(k)})² = ${A1} · ${g8fr(k * k)} = ${fmt(A2)} ${unit}²` };
+  }
+};
+TEMPLATES.g81Word = (r) => {
+  if (r() < 0.5) {
+    const l = pick(r, [40, 50, 60, 80]), w = pick(r, [20, 25, 30, 40].filter((x) => x < l)), l2 = pick(r, [15, 18, 24, 30, 36, 45]), k = l2 / l, w2 = w * k; if (!Number.isInteger(w2 * 2)) return TEMPLATES.g81Word(r);
+    const P1 = 2 * (l + w), P2 = 2 * (l2 + w2), tot = P1 + P2;
+    return { topic: 'Similar polygons in real life', stem: `Scientists rope off two excavation sites. Site A is rectangular with a length of ${l} meters and a width of ${w} meters. Site B is similar in shape to Site A but has a length of ${l2} meters. How much rope is needed for both sites?`,
+      ...buildChoices(r, `${fmt(tot)} meters`, [P1 + 2 * (l2 + w), P1, P1 + 2 * l2, 2 * (l + w + l2)].map((x) => `${fmt(x)} meters`).filter((x, i, X) => x !== `${fmt(tot)} meters` && X.indexOf(x) === i), (i) => `${fmt(tot + 10 * (i + 1))} meters`),
+      fr: FR.num('Rope (meters):', tot), solution: `Scale factor from A to B: ${l2}/${l} = ${g8fr(k)}, so B's width is ${w} · ${g8fr(k)} = ${fmt(w2)} m.\nPerimeters: A = 2(${l} + ${w}) = ${P1} m; B = 2(${l2} + ${fmt(w2)}) = ${fmt(P2)} m.\nTotal: ${fmt(tot)} meters` };
+  }
+  const L = pick(r, [45, 40, 60, 50]), W = pick(r, [20, 24, 30]), pl = pick(r, [15, 18, 12, 20, 9]), k = pl / L, pw = W * k; if (!Number.isInteger(pw * 2)) return TEMPLATES.g81Word(r);
+  const P = 2 * (pl + pw);
+  return { topic: 'Similar polygons in real life', stem: `Your family puts a rectangular patio in your backyard, similar to the shape of the backyard. The backyard has a length of ${L} feet and a width of ${W} feet. The length of the patio is ${pl} feet. Find the perimeter of the patio.`,
+    ...buildChoices(r, `${fmt(P)} feet`, [2 * (L + W), 2 * (pl + W), 2 * (L + W) * k * k, P / 2].map((x) => `${fmt(Math.round(x * 100) / 100)} feet`).filter((x, i, X) => x !== `${fmt(P)} feet` && X.indexOf(x) === i), (i) => `${fmt(P + i + 2)} feet`),
+    fr: FR.num('Perimeter (feet):', P), solution: `Scale factor: ${pl}/${L} = ${g8fr(k)}.\nBackyard perimeter: 2(${L} + ${W}) = ${2 * (L + W)} ft. Patio: ${2 * (L + W)} · ${g8fr(k)} = ${fmt(P)} feet` };
+};
+TEMPLATES.g81Segment = (r) => {
+  for (;;) {
+    const seg = pick(r, ['altitude', 'median', 'angle bisector']), s1 = ri(r, 6, 30), k = pick(r, [1.5, 2, 3, 0.5, 2.5, 0.75]), s2 = s1 * k, h1 = ri(r, 4, 24), h2 = h1 * k;
+    if (![s2, h2].every((x) => Number.isInteger(x * 2))) continue;
+    const [A, B, C] = pickLetters(r, 3), [D, E, F] = pickLetters(r, 3, [A, B, C]);
+    return { topic: 'Corresponding lengths in similar triangles', stem: `△${A}${B}${C} ~ △${D}${E}${F}. ${A}${B} = ${s1} and ${D}${E} = ${fmt(s2)}. The ${seg} from ${C} in △${A}${B}${C} has length ${h1}. Find the length of the corresponding ${seg} from ${F} in △${D}${E}${F}.`,
+      ...g6Choices(r, h2, (x) => fmt(x)), fr: FR.num('Length:', h2),
+      solution: `Corresponding ${seg}s of similar triangles are in the same ratio as corresponding sides: ${fmt(s2)}/${s1} = ${g8fr(k)}.\n${h1} · ${g8fr(k)} = ${fmt(h2)}` };
+  }
+};
+
+/* ---------- 8.2 Proving Triangle Similarity by AA ---------- */
+TEMPLATES.g82AA = (r) => {
+  for (;;) {
+    const ang = triAngles(r, 30, 105), L1 = pickLetters(r, 3), L2 = pickLetters(r, 3, L1), sim = r() < 0.65, perm = shuffle(r, [0, 1, 2]);
+    let ang2 = perm.map((p) => ang[p]);
+    if (!sim) { const d = pick(r, [-6, -5, 5, 6, 8]); const k = ri(r, 0, 2), m = (k + 1) % 3; ang2 = ang2.slice(); ang2[k] += d; ang2[m] -= d; if (ang2.some((a) => a < 20)) continue; }
+    const A = triShape(ang), B0 = transformPts(triShape(ang2), r, { scale: pick(r, [0.8, 1.2, 1.4]) }), [P1, P2] = layoutPair(A, B0);
+    const show1 = shuffle(r, [0, 1, 2]).slice(0, 2), show2 = shuffle(r, [0, 1, 2]).slice(0, 2);
+    const lab = (angs, show) => angs.map((a, i) => (show.includes(i) ? (a === 90 ? '' : `${a}°`) : ''));
+    const right = (angs, show) => angs.map((a, i) => (show.includes(i) && a === 90 ? 1 : 0));
+    // correspondence: vertex i of the first ↔ the vertex of the second with the same angle
+    const corr = [0, 1, 2].map((i) => ang2.indexOf(ang[i])), correct = sim ? `Similar: △${L1.join('')} ~ △${corr.map((j) => L2[j]).join('')}` : 'Not similar';
+    const others = [[0, 2, 1], [1, 0, 2], [2, 1, 0], [1, 2, 0]].map((p) => `Similar: △${L1.join('')} ~ △${p.map((j) => L2[j]).join('')}`).filter((x) => x !== correct);
+    const known1 = ang, known2 = ang2;
+    return { topic: 'AA Similarity', stem: 'Determine whether the triangles are similar. If they are, write a similarity statement.',
+      ...buildChoices(r, correct, [...(sim ? ['Not similar'] : []), ...others], () => null), fr: FR.select('Answer:', [correct, ...shuffle(r, [...(sim ? ['Not similar'] : []), ...others]).slice(0, 3)].sort(), correct),
+      draw: g7Fig([{ pts: P1, names: L1, alab: lab(ang, show1), right: right(ang, show1) }, { pts: P2, names: L2, alab: lab(ang2, show2), right: right(ang2, show2) }]), size: [460, 280],
+      solution: `Use the Triangle Sum Theorem to find the missing angles.\n△${L1.join('')}: ${L1.map((c, i) => `∠${c} = ${known1[i]}°`).join(', ')}\n△${L2.join('')}: ${L2.map((c, i) => `∠${c} = ${known2[i]}°`).join(', ')}\n${sim ? `Two pairs of angles are congruent, so the triangles are similar (AA): ${correct.replace('Similar: ', '')}.` : 'The angles do not match, so the triangles are not similar.'}` };
+  }
+};
+TEMPLATES.g82Solve = (r) => {
+  const A = ri(r, 25, 80), B = ri(r, 30, 120 - A + 30); if (A + B >= 170) return TEMPLATES.g82Solve(r);
+  const p = nz(r, -10, 15), q = nz(r, -10, 15), x = A - p, y = B - q;
+  const T = (u, v) => `x = ${u}, y = ${v}`, correct = T(x, y);
+  return { topic: 'AA Similarity', stem: `In △ABC, m∠A = ${A}° and m∠B = ${B}°. In △DEF, m∠D = (x ${p < 0 ? MINUS : '+'} ${Math.abs(p)})° and m∠E = (y ${q < 0 ? MINUS : '+'} ${Math.abs(q)})°. Find the values of x and y that make △ABC ~ △DEF.`.replace(/ \+ 0\)/g, ')').replace(/ − 0\)/g, ')'),
+    ...buildChoices(r, correct, [T(A + p, B + q), T(B - p, A - q), T(180 - A - B - p, y), T(x, 180 - A - B - q)].filter((t, i, X) => t !== correct && X.indexOf(t) === i), (i) => T(x + i + 1, y)),
+    fr: frNums([{ label: 'x =', val: x }, { label: 'y =', val: y }], correct),
+    solution: `For △ABC ~ △DEF, ∠D ≅ ∠A and ∠E ≅ ∠B.\nx ${p < 0 ? '−' : '+'} ${Math.abs(p)} = ${A}  →  x = ${x}\ny ${q < 0 ? '−' : '+'} ${Math.abs(q)} = ${B}  →  y = ${y}` };
+};
+TEMPLATES.g82Word = (r) => {
+  if (r() < 0.6) {
+    const thing = pick(r, [['saguaro cactus', 'a person', 5, 'inches'], ['flagpole', 'a student', 5, 'inches'], ['tree', 'a meter stick', 3.28, '']]);
+    const s = pick(r, [20, 24, 30, 36, 40]), ph = pick(r, [5, 6]), ps = pick(r, [40, 45, 48, 50, 60]), H = (s * ph * 12) / ps; if (!Number.isInteger(H * 2)) return TEMPLATES.g82Word(r);
+    return { topic: 'Similar triangles in real life', stem: `A ${thing[0]} casts a shadow that is ${s} feet long. At the same time, a person standing nearby who is ${ph} feet tall casts a shadow that is ${ps} inches long. How tall is the ${thing[0]}?`,
+      ...g6Choices(r, H, (x) => `${fmt(x)} feet`), fr: FR.num('Height (feet):', H),
+      solution: `The sun's rays make similar triangles. Use the same units: ${ps} inches = ${fracT(ps / 12)} feet.\nx/${s} = ${ph}/${fracT(ps / 12)}  →  x = ${fmt(H)} feet` };
+  }
+  const a = pick(r, [6, 8, 10, 12]), b = pick(r, [8, 9, 10, 15]), c = pick(r, [72, 80, 96, 104, 120]), x = (c * b) / a; if (!Number.isInteger(x * 2)) return TEMPLATES.g82Word(r);
+  return { topic: 'Similar triangles in real life', stem: `You measure the width of a lake using a surveying technique. Segments VW and YZ are parallel, and VY and WZ intersect at X, with W and X on opposite shores of the lake. VW = ${c} m, YZ = ${a} m, and XZ = ${b} m. Find the width WX of the lake.`,
+    ...g6Choices(r, x, (v) => `${fmt(v)} m`), fr: FR.num('Width (m):', x),
+    solution: `The triangles are similar by AA (vertical angles and alternate interior angles of parallel segments).\nx/${b} = ${c}/${a}  →  x = ${fmt(x)} m` };
+};
+
+/* ---------- 8.3 Proving Triangle Similarity by SSS and SAS ---------- */
+function g83ans(r, sim, k, stemExtra, why, L1, L2) {
+  const T = (s, f) => (s ? `Similar; scale factor ${g8fr(f)}` : 'Not similar'), correct = T(sim, k);
+  return {
+    ...buildChoices(r, correct, [T(!sim, sim ? k : 2), T(true, 1 / (k || 2)), T(true, (k || 2) + 1)].filter((x, i, X) => x !== correct && X.indexOf(x) === i), (i) => T(true, i + 3)),
+    fr: { fields: [{ kind: 'select', label: 'Similar?', options: ['Yes', 'No'] }, { kind: 'expr', keys: 'num', label: 'Scale factor (if similar):' }], key: [sim ? 'Yes' : 'No', sim ? fracL(k) : ''], display: correct,
+      check: (v) => (sim ? v[0] === 'Yes' && numOk(v[1], k) : v[0] === 'No'), score: (v) => (sim ? (v[0] === 'Yes') * 0.5 + numOk(v[1], k) * 0.5 : +(v[0] === 'No')) },
+    solution: why,
+  };
+}
+TEMPLATES.g83SSS = (r) => {
+  for (;;) {
+    const s = shuffle(r, [ri(r, 4, 20), ri(r, 4, 20), ri(r, 4, 20)]).sort((a, b) => a - b); if (s[0] + s[1] <= s[2] || new Set(s).size < 3) continue;
+    const k = pick(r, G8K), sim = r() < 0.6, t = s.map((x) => x * k); if (!sim) t[ri(r, 0, 2)] += pick(r, [1, 2, -1]);
+    if (t.some((x) => !Number.isInteger(x * 2) || x <= 0) || t[0] + t[1] <= t[2]) continue;
+    const L1 = pickLetters(r, 3), L2 = pickLetters(r, 3, L1), ord = shuffle(r, [0, 1, 2]);
+    const list = (L, v, o) => o.map((i) => `${L[i]}${L[(i + 1) % 3]} = ${fmt(v[i])}`).join(', ');
+    const ratios = s.map((x, i) => `${fmt(t[i])}/${x}`).join(', ');
+    return { topic: 'SSS Similarity', stem: `Determine whether the triangles are similar. If they are, find the scale factor of △${L1.join('')} to △${L2.join('')}.   △${L1.join('')}: ${list(L1, s, ord)};  △${L2.join('')}: ${list(L2, t, ord)}`,
+      ...g83ans(r, sim, k, '', `Compare the shortest sides, the longest sides, and the remaining sides: ${ratios}.\n${sim ? `All the ratios equal ${g8fr(k)}, so the triangles are similar (SSS) with scale factor ${g8fr(k)}.` : 'The ratios are not all equal, so the triangles are not similar.'}`) };
+  }
+};
+TEMPLATES.g83SAS = (r) => {
+  for (;;) {
+    const a = ri(r, 4, 18), b = ri(r, 4, 18), ang = ri(r, 30, 140), k = pick(r, G8K), kind = pick(r, ['sim', 'sim', 'ang', 'side']);
+    const a2 = a * k, b2 = kind === 'side' ? b * k + pick(r, [1, 2]) : b * k, ang2 = kind === 'ang' ? ang + pick(r, [-8, 6, 10]) : ang;
+    if (![a2, b2].every((x) => Number.isInteger(x * 2)) || a === b) continue;
+    const [A, B, C] = pickLetters(r, 3), [D, E, F] = pickLetters(r, 3, [A, B, C]), sim = kind === 'sim';
+    return { topic: 'SAS Similarity', stem: `Determine whether the triangles are similar. If they are, find the scale factor of △${A}${B}${C} to △${D}${E}${F}.   △${A}${B}${C}: ${A}${B} = ${a}, ${A}${C} = ${b}, m∠${A} = ${ang}°;  △${D}${E}${F}: ${D}${E} = ${fmt(a2)}, ${D}${F} = ${fmt(b2)}, m∠${D} = ${ang2}°`,
+      ...g83ans(r, sim, k, '', `∠${A} and ∠${D} are the included angles: ${ang}° and ${ang2}° (${ang === ang2 ? 'congruent' : 'not congruent'}).\nSide ratios: ${fmt(a2)}/${a} = ${g8fr(a2 / a)}, ${fmt(b2)}/${b} = ${g8fr(b2 / b)} (${a2 / a === b2 / b ? 'equal' : 'not equal'}).\n${sim ? `SAS Similarity: scale factor ${g8fr(k)}.` : 'So the triangles are not similar by SAS.'}`) };
+  }
+};
+TEMPLATES.g83FindX = (r) => {
+  for (;;) {
+    const a = ri(r, 3, 12), b = ri(r, 4, 16), k = pick(r, [2, 3, 1.5, 2.5]), x = ri(r, 2, 9), m = pick(r, [1, 2, 3, 5]), side = a * k, c = side - m * x;
+    if (!Number.isInteger(side) || a === b || !Number.isInteger(b * k) || side <= 0) continue;
+    const expr = g4Lin(m, c);
+    return { topic: 'Similar triangles: find x', stem: `Find the value of x that makes △DEF ~ △XYZ.   DE = ${a}, EF = ${b};  XY = ${expr}, YZ = ${fmt(b * k)}`,
+      ...g6Choices(r, x), fr: FR.num('x =', x),
+      solution: `Corresponding sides must be proportional: XY/DE = YZ/EF = ${fmt(b * k)}/${b} = ${g8fr(k)}.\n(${expr})/${a} = ${g8fr(k)}  →  ${expr} = ${fmt(side)}  →  x = ${x}` };
+  }
+};
+TEMPLATES.g83Word = (r) => {
+  for (;;) {
+    const s = pick(r, [[10, 12, 13], [5, 12, 13], [8, 10, 12], [6, 8, 9], [7, 9, 12], [12, 15, 20]]), shortest = r() < 0.5, k = pick(r, [2, 3, 1.5, 2.5, 4]);
+    const t = s.map((x) => x * k); if (!t.every((x) => Number.isInteger(x * 2))) continue;
+    const given = shortest ? t[0] : t[2], rest = shortest ? [t[1], t[2]] : [t[0], t[1]];
+    const T = (u, v) => `${fmt(u)} and ${fmt(v)}`, correct = T(...rest);
+    return { topic: 'Similar triangles: other sides', stem: `△XYZ has side lengths ${s.join(', ')}. The ${shortest ? 'shortest' : 'longest'} side of a triangle similar to △XYZ is ${fmt(given)} units long. Find the other side lengths of the triangle.`,
+      ...buildChoices(r, correct, [T(...rest.map((x) => x + given - (shortest ? s[0] : s[2]))), T(...rest.map((x) => x / k / k * k + 1)), T(rest[0] * 2, rest[1] * 2)].filter((x, i, X) => x !== correct && X.indexOf(x) === i), (i) => T(rest[0] + i + 1, rest[1] + i + 1)),
+      fr: frNums([{ label: shortest ? 'Middle side:' : 'Shortest side:', val: rest[0] }, { label: shortest ? 'Longest side:' : 'Middle side:', val: rest[1] }], correct),
+      solution: `Scale factor: ${fmt(given)}/${shortest ? s[0] : s[2]} = ${g8fr(k)}.\nMultiply the other sides by ${g8fr(k)}: ${(shortest ? [s[1], s[2]] : [s[0], s[1]]).map((x) => `${x} · ${g8fr(k)} = ${fmt(x * k)}`).join(', ')}` };
+  }
+};
+
+/* ---------- 8.4 Proportionality Theorems ---------- */
+// triangle A (apex), B, C with D on AB and E on AC at fraction t from A
+function g84fig(N, t, labs, par = true) {
+  const A = [2.6, 5], B = [0, 0], C = [6.5, 0], D = VEC.add(A, VEC.mul(VEC.sub(B, A), t)), E = VEC.add(A, VEC.mul(VEC.sub(C, A), t)), cen = g8cen([A, B, C]);
+  const texts = [g8lab(A, D, cen, labs[0]), g8lab(D, B, cen, labs[1]), g8lab(A, E, cen, labs[2]), g8lab(E, C, cen, labs[3])].filter((x) => x.t);
+  return g7Fig([{ group: 'g', pts: [A, B, C], names: [N[0], N[1], N[2]], par: [0, par ? 1 : 0, 0] }, { group: 'g', pts: [D, E], names: [N[3], N[4]], par: [par ? 1 : 0, 0] }], { texts });
+}
+TEMPLATES.g84TPT = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 5), [A, B, C, D, E] = N, ad = ri(r, 3, 16), db = ri(r, 2, 12), ae = ri(r, 3, 18), ec = (db * ae) / ad; if (!Number.isInteger(ec * 2)) continue;
+    const vals = [ad, db, ae, ec], miss = ri(r, 0, 3), labs = vals.map((v, i) => (i === miss ? 'x' : fmt(v))), names = [`${A}${D}`, `${D}${B}`, `${A}${E}`, `${E}${C}`], ans = vals[miss];
+    return { topic: 'Triangle Proportionality Theorem', stem: `${SEG(D + E)} ∥ ${SEG(B + C)}. Find the length of ${SEG(names[miss])}.`, ...g6Choices(r, ans, (x) => fmt(x)), fr: FR.num(`${names[miss]} =`, ans),
+      draw: g84fig(N, ad / (ad + db) > 0.85 || ad / (ad + db) < 0.2 ? 0.5 : ad / (ad + db), labs), size: [420, 300],
+      solution: `A line parallel to one side divides the other two sides proportionally (Triangle Proportionality Theorem):\n${A}${D}/${D}${B} = ${A}${E}/${E}${C}\n${labs[0]}/${labs[1]} = ${labs[2]}/${labs[3]}  →  x = ${fmt(ans)}` };
+  }
+};
+TEMPLATES.g84IsPar = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 5), [A, B, C, D, E] = N, ad = ri(r, 4, 25), db = ri(r, 3, 18), ae = ri(r, 4, 25), yes = r() < 0.5, ec = yes ? (db * ae) / ad : (db * ae) / ad + pick(r, [1, 2, -1, 3]);
+    if (!Number.isInteger(ec * 2) || ec <= 0) continue;
+    const labs = [ad, db, ae, ec].map(fmt);
+    return { topic: 'Converse of the Triangle Proportionality Theorem', stem: `Determine whether ${SEG(D + E)} ∥ ${SEG(B + C)}.`, ...buildChoices(r, yes ? 'Yes' : 'No', [yes ? 'No' : 'Yes'], () => null),
+      fr: FR.select(`Is ${SEG(D + E)} ∥ ${SEG(B + C)}?`, ['Yes', 'No'], yes ? 'Yes' : 'No'), draw: g84fig(N, 0.45, labs, false), size: [420, 300],
+      solution: `${A}${D}/${D}${B} = ${ad}/${db} = ${g8fr(ad / db)} and ${A}${E}/${E}${C} = ${fmt(ae)}/${fmt(ec)} = ${g8fr(ae / ec)}.\n${yes ? 'The ratios are equal, so the segment divides the sides proportionally and is parallel to the third side.' : 'The ratios are not equal, so the segment is not parallel to the third side.'}` };
+  }
+};
+TEMPLATES.g84Lines = (r) => {
+  for (;;) {
+    const a = ri(r, 4, 20), b = ri(r, 4, 20), c = ri(r, 3, 18), x = (b * c) / a; if (!Number.isInteger(x * 2) || a === b) continue;
+    // three parallel lines (nearly vertical) cut by two transversals
+    const ys = [0, a / (a + b) * 6, 6], line = (y) => [[-1, y], [9, y]], t1 = (y) => [1 + 0.25 * y, y], t2 = (y) => [5 + 0.5 * y, y];
+    const P1 = ys.map(t1), P2 = ys.map(t2), cen = [4, 3];
+    const texts = [g8lab(P1[0], P1[1], [9, 3], String(a)), g8lab(P1[1], P1[2], [9, 3], String(b)), g8lab(P2[0], P2[1], [-2, 3], String(c)), g8lab(P2[1], P2[2], [-2, 3], 'x')];
+    return { topic: 'Three Parallel Lines Theorem', stem: 'Three parallel lines intersect two transversals. Find the value of x.', ...g6Choices(r, x, (v) => fmt(v)), fr: FR.num('x =', x),
+      draw: g7Fig([...ys.map((y) => ({ pts: line(y), par: [1, 0] })), { pts: [t1(-0.8), t1(6.8)] }, { pts: [t2(-0.8), t2(6.8)] }], { texts }), size: [420, 300],
+      solution: `Three parallel lines divide the transversals proportionally:\n${a}/${b} = ${c}/x  →  x = ${b} · ${c}/${a} = ${fmt(x)}` };
+  }
+};
+TEMPLATES.g84Bisector = (r) => {
+  for (;;) {
+    const p = ri(r, 4, 20), q = ri(r, 4, 20), m = ri(r, 3, 15), x = (q * m) / p; if (!Number.isInteger(x * 2) || p === q) continue;
+    const N = pickLetters(r, 4), [A, B, C, D] = N, Ap = [2.4, 5], Bp = [0, 0], Cp = [7, 0], t = p / (p + q), Dp = VEC.add(Bp, VEC.mul(VEC.sub(Cp, Bp), t)), cen = g8cen([Ap, Bp, Cp]);
+    const texts = [g8lab(Ap, Bp, cen, String(p)), g8lab(Ap, Cp, cen, String(q)), g8lab(Bp, Dp, cen, String(m)), g8lab(Dp, Cp, cen, 'x')];
+    return { topic: 'Triangle Angle Bisector Theorem', stem: `${SEG(A + D)} bisects ∠${B}${A}${C}. Find the value of x.`, ...g6Choices(r, x, (v) => fmt(v)), fr: FR.num('x =', x),
+      draw: g7Fig([{ group: 'g', pts: [Bp, Dp, Ap], names: [B, D, A], arcs: [0, 0, 1] }, { group: 'g', pts: [Dp, Cp, Ap], names: [D, C, A], arcs: [0, 0, 1] }], { texts }), size: [420, 300],
+      solution: `An angle bisector divides the opposite side into segments proportional to the other two sides:\n${B}${D}/${D}${C} = ${A}${B}/${A}${C}\n${m}/x = ${p}/${q}  →  x = ${fmt(x)}` };
+  }
+};
+for (const name of Object.keys(TEMPLATES)) if (/^g8\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== GEOMETRY CH8 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -13799,6 +14054,11 @@ Object.assign(SETS, {
   'geo-7-3': { subject: 'geometry', title: '7.3 Proving That a Quadrilateral Is a Parallelogram', items: [['g73Theorem', 4], ['g73FindX', 5], ['g73Coord', 3]] },
   'geo-7-4': { subject: 'geometry', title: '7.4 Properties of Special Parallelograms', items: [['g74Always', 3], ['g74Which', 2], ['g74Measure', 4], ['g74RectDiag', 2], ['g74Coord', 2]] },
   'geo-7-5': { subject: 'geometry', title: '7.5 Properties of Trapezoids and Kites', items: [['g75Coord', 2], ['g75IsoAngles', 2], ['g75Midseg', 3], ['g75MidCoord', 1], ['g75Kite', 2], ['g75Specific', 2]] },
+  // ----- Geometry, Chapter 8: Similarity -----
+  'geo-8-1': { subject: 'geometry', title: '8.1 Similar Polygons', items: [['g81Scale', 2], ['g81Prop', 2], ['g81FindX', 3], ['g81Segment', 1], ['g81Perim', 2], ['g81Area', 2], ['g81Word', 1]] },
+  'geo-8-2': { subject: 'geometry', title: '8.2 Proving Triangle Similarity by AA', items: [['g82AA', 6], ['g82Solve', 2], ['g82Word', 2]] },
+  'geo-8-3': { subject: 'geometry', title: '8.3 Proving Triangle Similarity by SSS and SAS', items: [['g83SSS', 4], ['g83SAS', 3], ['g83FindX', 2], ['g83Word', 2]] },
+  'geo-8-4': { subject: 'geometry', title: '8.4 Proportionality Theorems', items: [['g84TPT', 4], ['g84IsPar', 3], ['g84Lines', 2], ['g84Bisector', 3]] },
 });
 QUESTION_TYPES.push(
   { id: 'a41SlopeInt', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'From slope and y-intercept', desc: 'Write y = mx + b (#1–6)' },
@@ -13954,7 +14214,25 @@ QUESTION_TYPES.push(
   { id: 'g75Midseg', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Trapezoid midsegment', desc: '#7–10' },
   { id: 'g75MidCoord', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Midsegment from coordinates', desc: '#11–14' },
   { id: 'g75Kite', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Kite angles', desc: '#15–18' },
-  { id: 'g75Specific', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Most specific name', desc: '#21–24' }
+  { id: 'g75Specific', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Most specific name', desc: '#21–24' },
+  { id: 'g81Scale', subject: 'geometry', section: '8.1 Similar Polygons', label: 'Scale factor or perimeter ratio', desc: 'From a figure (#1–2, 9–10)' },
+  { id: 'g81Prop', subject: 'geometry', section: '8.1 Similar Polygons', label: 'Statement of proportionality', desc: '#1–2' },
+  { id: 'g81FindX', subject: 'geometry', section: '8.1 Similar Polygons', label: 'Find a side', desc: '#3–6' },
+  { id: 'g81Segment', subject: 'geometry', section: '8.1 Similar Polygons', label: 'Corresponding altitudes, medians, bisectors', desc: '#7–8' },
+  { id: 'g81Perim', subject: 'geometry', section: '8.1 Similar Polygons', label: 'Perimeter of the other polygon', desc: '#11–14' },
+  { id: 'g81Area', subject: 'geometry', section: '8.1 Similar Polygons', label: 'Area of the other polygon', desc: '#17–20' },
+  { id: 'g81Word', subject: 'geometry', section: '8.1 Similar Polygons', label: 'Word problems', desc: 'Rope, patio (#15–16)' },
+  { id: 'g82AA', subject: 'geometry', section: '8.2 Proving Triangle Similarity by AA', label: 'Similar by AA?', desc: 'Write a similarity statement (#1–8)' },
+  { id: 'g82Solve', subject: 'geometry', section: '8.2 Proving Triangle Similarity by AA', label: 'Angles that make triangles similar', desc: '#18' },
+  { id: 'g82Word', subject: 'geometry', section: '8.2 Proving Triangle Similarity by AA', label: 'Word problems', desc: 'Shadows, lake width (#19–20)' },
+  { id: 'g83SSS', subject: 'geometry', section: '8.3 Proving Triangle Similarity by SSS and SAS', label: 'SSS Similarity', desc: 'Similar? Scale factor (#1–2, 7–12)' },
+  { id: 'g83SAS', subject: 'geometry', section: '8.3 Proving Triangle Similarity by SSS and SAS', label: 'SAS Similarity', desc: '#5–6' },
+  { id: 'g83FindX', subject: 'geometry', section: '8.3 Proving Triangle Similarity by SSS and SAS', label: 'Find x so the triangles are similar', desc: '#3–4' },
+  { id: 'g83Word', subject: 'geometry', section: '8.3 Proving Triangle Similarity by SSS and SAS', label: 'Other side lengths', desc: '#13–14' },
+  { id: 'g84TPT', subject: 'geometry', section: '8.4 Proportionality Theorems', label: 'Triangle Proportionality Theorem', desc: '#1–2' },
+  { id: 'g84IsPar', subject: 'geometry', section: '8.4 Proportionality Theorems', label: 'Is the segment parallel?', desc: '#3–6' },
+  { id: 'g84Lines', subject: 'geometry', section: '8.4 Proportionality Theorems', label: 'Three Parallel Lines Theorem', desc: '#15–16' },
+  { id: 'g84Bisector', subject: 'geometry', section: '8.4 Proportionality Theorems', label: 'Triangle Angle Bisector Theorem', desc: '#17–20' }
 );
 { // keep each subject's question types together (stable)
   const first = {}; QUESTION_TYPES.forEach((t, i) => { if (!(t.subject in first)) first[t.subject] = i; });
@@ -15548,7 +15826,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations' }, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations' }, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
