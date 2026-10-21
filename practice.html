@@ -93,6 +93,11 @@
   .status.ok { background: var(--good-soft); color: var(--good); }
   .status.fail { background: var(--bad-soft); color: var(--bad); }
   .status.wait { background: var(--accent-soft); color: var(--accent); }
+  .prevtry { background: #fbf3f2; border: 1px solid #e6c4bf; border-radius: 10px; padding: 10px 14px 12px; margin: 8px 0 6px; }
+  .prevtry canvas { max-width: 100%; height: auto; display: block; margin: 6px 0; opacity: 0.92; }
+  .prevhead { font-weight: 700; color: #a33a2c; font-size: 15px; margin-bottom: 6px; }
+  .prevans { margin-top: 6px; } .prevwrong { color: #a33a2c; } .prevright { color: #2e7d4f; }
+  .newver { font-weight: 700; font-size: 15px; margin: 12px 0 4px; color: #1f5fa8; }
   .sol { white-space: pre-line; margin-top: 10px; font-size: 15px; background: #faf9f6; border-left: 3px solid var(--accent); padding: 8px 12px; }
   .tag { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
   .tag.good { background: var(--good-soft); color: var(--good); }
@@ -14883,9 +14888,10 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
   const saved = teacher ? {} : store.get(key) || {};
   if (!teacher) remapSaved(key, saved, sig);
   const tries = saved.tries || {};
+  const origQs = qs.slice(); // version 0 of each question, for showing earlier tries
   Object.keys(tries).forEach((i) => { if (tries[i] > 0 && qs[i]) qs[i] = regenQuestion(seedStr, qs[i], +i, tries[i]); });
   const ps = !teacher && rid ? signinPass() : null;
-  state = { setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, teacher, hints: !!setting(setKey, 'hints'), hintUsed: saved.hintUsed || {},
+  state = { origQs, setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, teacher, hints: !!setting(setKey, 'hints'), hintUsed: saved.hintUsed || {},
     answers: Array.from({ length: qs.length }, (_, i) => (saved.answers && saved.answers[i] !== undefined ? saved.answers[i] : null)),
     submitted: !teacher && saved.submitted ? saved.submitted : null,
     started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
@@ -14943,6 +14949,7 @@ function render() {
     const locked = !!state.status[i];
     const box = el('div', { class: 'q' + (wm ? ' wm' : ''), id: 'q' + i });
     box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic)));
+    const prev = !teacher && prevTry(i, W); if (prev) box.append(prev, el('div', { class: 'newver' }, 'New version — try this one:'));
     box.append(textCanvas(q.stem, W));
     if (q.draw) {
       const graph = q.topic.startsWith('Graphs');
@@ -15398,10 +15405,29 @@ async function checkQ(i) {
     state.answers[i] = null;
     delete state.drawings[String(i)]; delete state.drawings['L' + i]; saveDrawings();
     const left = state.retries - state.tries[i] + 1;
-    state.flash[i] = `Not quite. Here’s a new version of this question — ${left} ${left === 1 ? 'try' : 'tries'} left.`;
+    state.flash[i] = `Not quite. Your last try and its worked-out solution are shown above. Here’s a new version — ${left} ${left === 1 ? 'try' : 'tries'} left.`;
   } else state.status[i] = 'locked';
   saveState();
   rerenderAt(i);
+}
+// the version a student just missed, with its worked-out solution (shown above the new version)
+function prevTry(i, W) {
+  const hist = state.history && state.history[i]; if (!hist || !hist.length || !state.origQs || !state.origQs[i]) return null;
+  const k = hist.length - 1, h = hist[k];
+  let q; try { q = k === 0 ? state.origQs[i] : regenQuestion(state.seedStr, state.origQs[i], i, k); } catch { return null; }
+  if (!q || q.stem !== h.stem) { // can't rebuild it exactly (the assignment changed): show what was saved
+    return el('div', { class: 'prevtry' }, el('div', { class: 'prevhead' }, `✗ Your previous try (try ${k + 1})`), textCanvas(h.stem, W - 34), el('div', { class: 'small' }, 'Your answer: ', el('strong', {}, String(h.answer || '').trim())));
+  }
+  const box = el('div', { class: 'prevtry' }, el('div', { class: 'prevhead' }, `✗ Your previous try (try ${k + 1}) — here’s how to solve it`), textCanvas(q.stem, W - 34));
+  if (q.draw) {
+    const cv = q.size ? makeCanvas(Math.min(q.size[0], W - 40), Math.round(q.size[1] * Math.min(1, (W - 40) / q.size[0]))) : makeCanvas(Math.min(560, W - 40), 300);
+    cv._stack = W < 480 && q.pair; try { q.draw(cv); box.append(cv); } catch {}
+  }
+  const correct = q.mode === 'fr' ? (q.proofQ ? '' : q.fr.display) : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`;
+  box.append(el('div', { class: 'small prevans' }, 'Your answer: ', el('strong', { class: 'prevwrong' }, String(h.answer || '').trim() || '(no answer)')));
+  if (correct) box.append(el('div', { class: 'small prevans' }, 'Correct answer: ', el('strong', { class: 'prevright' }, String(correct).replace(/(.)\u0305/g, '$1'))));
+  box.append(el('div', { class: 'sol' }, q.solution));
+  return box;
 }
 function rerenderAt(i) {
   const y = window.scrollY; render(); window.scrollTo(0, y);
