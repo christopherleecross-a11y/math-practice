@@ -6500,7 +6500,7 @@ function proofEditor(q, i, vals, reveal, save) {
       let input;
       if (mathReady) {
         input = new MathfieldElement();
-        input.smartMode = false; input.mathVirtualKeyboardPolicy = 'manual'; input.menuItems = [];
+        input.smartMode = false; input.mathVirtualKeyboardPolicy = 'manual'; input.menuItems = []; noPmShortcut(input);
         input.className = 'mans wide pfield'; input.value = text; input.setAttribute('aria-label', `Proof line ${k + 1}`);
         if (reveal) input.readOnly = true;
       } else {
@@ -15133,7 +15133,10 @@ const MATH_KEYS = [
   ['π', '\\pi'], ['°', '^{\\circ}'], ['≅', '\\cong'], ['∠', '\\angle'], ['△', '\\triangle'], ['⊥', '\\perp'], ['∥', '\\parallel'],
   ['≠', '\\ne'], ['≤', '\\le'], ['≥', '\\ge'], ['±', '\\pm'], ['×', '\\times'], ['÷', '\\div'], ['θ', '\\theta'],
 ];
+// typing "+-" should mean plus a negative, not ± (students type ± with the ± key)
+function noPmShortcut(mf) { try { const s = { ...(mf.inlineShortcuts || {}) }; delete s['+-']; delete s['-+']; mf.inlineShortcuts = s; } catch {} }
 function configureField(mf) {
+  noPmShortcut(mf);
   mf.smartMode = true;               // typed words become text
   mf.mathModeSpace = '\\:';          // the space bar makes a space
   mf.mathVirtualKeyboardPolicy = 'manual';
@@ -15262,7 +15265,7 @@ function frArea(q, i) {
     let input;
     if ((f.kind === 'number' || f.kind === 'expr') && mathReady) {
       input = new MathfieldElement();
-      input.smartMode = false; input.mathVirtualKeyboardPolicy = 'manual'; input.menuItems = [];
+      input.smartMode = false; input.mathVirtualKeyboardPolicy = 'manual'; input.menuItems = []; noPmShortcut(input);
       input.className = 'mans' + (f.kind === 'expr' ? ' wide' : ''); input.setAttribute('aria-label', f.label || 'Answer');
       input.value = vals[k] || '';
       if (reveal) input.readOnly = true;
