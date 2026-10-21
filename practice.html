@@ -14683,6 +14683,30 @@ async function cloudRestore(base, force = false) {
   } catch (e) { /* offline or not set up: keep what is on this device */ }
   return false;
 }
+// copy saved work from another key for the same student and assignment (here, then online)
+async function adoptProgress(base, altBase) {
+  if (!altBase || altBase === base || altBase.endsWith(':')) return false;
+  const move = (k) => base + k.slice(altBase.length);
+  const ks = Object.keys(localStorage).filter((k) => (k === altBase || k.startsWith(altBase + ':')) && !k.endsWith(':cloudts'));
+  const seedSid = altBase.split(':').pop();
+  if (ks.length) {
+    ks.forEach((k) => { try { localStorage.setItem(move(k), localStorage.getItem(k)); } catch {} });
+    store.set(base + ':meta', { attempt: 1, scores: [], ...(store.get(base + ':meta') || {}), seedSid });
+    return true;
+  }
+  if (!CONFIG.SCRIPT_URL) return false;
+  try {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 8000);
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'loadProgress', key: altBase }), signal: ctl.signal });
+    clearTimeout(timer);
+    const g = await res.json(); if (!g || !g.ok || !g.data) return false;
+    const d = JSON.parse(g.data); if (d.reset || !d.saved) return false;
+    const cur = d.curKey && d.curKey.startsWith(altBase) ? move(d.curKey) : base;
+    store.set(base + ':meta', { attempt: 1, scores: [], ...(d.meta || {}), seedSid });
+    store.set(cur, d.saved); if (d.work) store.set(cur + ':work', d.work); if (d.draw) store.set(cur + ':draw', d.draw);
+    return true;
+  } catch (e) { return false; }
+}
 // a tab left open at school (or home) that comes back to the front picks up work done on the other device since
 let cloudChecking = false;
 document.addEventListener('visibilitychange', async () => {
@@ -14878,12 +14902,15 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
   const sid = sidOf(name, rid);
   const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${sid}`;
   if (!teacher && CONFIG.SCRIPT_URL) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
+  // nothing saved under this sign-in yet: pick up work saved earlier under the student's typed name
+  // (before the class list or Google sign-in was working), on this Chromebook or online
+  if (!teacher && !PREVIEW && rid && !store.get(base + ':meta') && !store.get(base)) await adoptProgress(base, `practice:${CONFIG.SALT}:${setKey}:${period}:${norm(name)}`);
   cloudStatus = '';
   const attempts = setting(setKey, 'attempts'), retries = setting(setKey, 'retries');
   const meta = teacher ? { attempt: teacherAttempt, scores: [] } : store.get(base + ':meta') || { attempt: 1, scores: [] };
   const attempt = Math.min(meta.attempt, attempts);
   const key = attempt > 1 ? `${base}:a${attempt}` : base;
-  const { qs, version, seedStr } = generate(setKey, period, sid, attempt);
+  const { qs, version, seedStr } = generate(setKey, period, (!teacher && meta.seedSid) || sid, attempt); // seedSid: work carried over from a typed name keeps its questions
   const sig = qs.map(qSig);
   const saved = teacher ? {} : store.get(key) || {};
   if (!teacher) remapSaved(key, saved, sig);
@@ -15136,11 +15163,12 @@ const MATH_KEYS = [
 // typing "+-" should mean plus a negative, not ± (students type ± with the ± key)
 function noPmShortcut(mf) { try { const s = { ...(mf.inlineShortcuts || {}) }; delete s['+-']; delete s['-+']; mf.inlineShortcuts = s; } catch {} }
 function configureField(mf) {
-  noPmShortcut(mf);
   mf.smartMode = true;               // typed words become text
   mf.mathModeSpace = '\\:';          // the space bar makes a space
   mf.mathVirtualKeyboardPolicy = 'manual';
   mf.menuItems = [];
+  noPmShortcut(mf);
+  mf.addEventListener('focus', () => noPmShortcut(mf), { once: true });
 }
 function mathWork(i, done) {
   const box = el('div', { class: 'mathwork' });
