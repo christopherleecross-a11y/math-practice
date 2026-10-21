@@ -9411,6 +9411,15 @@ function drawFigure(cv, fig) {
           ctx.beginPath(); ctx.moveTo(...VEC.add(c, VEC.mul(nrm, 6))); ctx.lineTo(...VEC.add(c, VEC.mul(nrm, -6))); ctx.stroke();
         }
       }
+      if (P.par && P.par[i]) { // parallel-side arrowheads, all pointing the same way
+        const w = P.c[(i + 1) % n], mid = VEC.mul(VEC.add(v, w), 0.5);
+        let dirv = VEC.norm(VEC.sub(w, v)); if (dirv[0] < -1e-6 || (Math.abs(dirv[0]) <= 1e-6 && dirv[1] > 0)) dirv = VEC.mul(dirv, -1);
+        const nrm = [-dirv[1], dirv[0]];
+        for (let k = 0; k < P.par[i]; k++) {
+          const c = VEC.add(mid, VEC.mul(dirv, (k - (P.par[i] - 1) / 2) * 7 + 4));
+          ctx.beginPath(); ctx.moveTo(...VEC.add(c, VEC.add(VEC.mul(dirv, -7), VEC.mul(nrm, 5)))); ctx.lineTo(...c); ctx.lineTo(...VEC.add(c, VEC.add(VEC.mul(dirv, -7), VEC.mul(nrm, -5)))); ctx.stroke();
+        }
+      }
     });
   });
   ctx.fillStyle = ink;
@@ -9507,6 +9516,7 @@ function drawFigure(cv, fig) {
       ctx.fillStyle = big ? ink : blue; ctx.fillText(t, best[0], best[1]);
     });
   });
+  (fig.texts || []).forEach(({ p, t }) => { const q = X(p); ctx.font = '16px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = blue; ctx.fillText(t, q[0], q[1]); });
   if (fig.note) { ctx.textAlign = 'left'; ctx.fillStyle = '#6b6a64'; ctx.font = 'italic 13px Georgia, serif'; ctx.fillText('Note: Figure not necessarily drawn to scale.', 10, H - 10); }
 }
 
@@ -13003,6 +13013,435 @@ TEMPLATES.b49FiniteDiff = (r) => {
 };
 for (const name of Object.keys(TEMPLATES)) if (/^b4\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 /* ==== ALGEBRA 2 CH4 END ==== */
+/* ==== GEOMETRY CH7 BEGIN ==== */
+/* ---------- Geometry (Big Ideas Math), Chapter 7: Quadrilaterals and Other Polygons ---------- */
+const G7NAMES = { 3: 'triangle', 4: 'quadrilateral', 5: 'pentagon', 6: 'hexagon', 7: 'heptagon', 8: 'octagon', 9: 'nonagon', 10: 'decagon', 11: 'hendecagon', 12: 'dodecagon' };
+const g7name = (n) => G7NAMES[n] || `${n}-gon`;
+const g7deg = (x) => `${fmt(x)}°`;
+const g7add = (a, b) => `${fmt(a)} + ${b < 0 ? `(${fmt(b)})` : fmt(b)}`;
+const g7Fig = (polys, extra = {}) => (cv) => drawFigure(cv, { polys, ...extra });
+const g7ang = (t) => (/^[\d.]+$/.test(t) || /^\d*x$/.test(t) ? `${t}°` : `(${t})°`);
+// a convex polygon (counterclockwise) with the given interior angles; returns the vertices or null
+function g7polyPts(r, angles) {
+  const n = angles.length, e = angles.map((a) => ((180 - a) * Math.PI) / 180);
+  for (let t = 0; t < 400; t++) {
+    const th0 = r() * 2 * Math.PI, dirs = []; let th = th0;
+    for (let i = 0; i < n; i++) { if (i) th += e[i]; dirs.push([Math.cos(th), Math.sin(th)]); }
+    const L = dirs.map(() => 2 + 2 * r()); let S = [0, 0];
+    for (let i = 0; i < n - 2; i++) S = VEC.add(S, VEC.mul(dirs[i], L[i]));
+    const u = dirs[n - 2], w = dirs[n - 1], det = u[0] * w[1] - u[1] * w[0]; if (Math.abs(det) < 1e-6) continue;
+    const a = (-S[0] * w[1] + S[1] * w[0]) / det, b = (-u[0] * S[1] + u[1] * S[0]) / det;
+    if (a < 1.3 || b < 1.3 || a > 7 || b > 7) continue;
+    L[n - 2] = a; L[n - 1] = b;
+    const pts = [[0, 0]]; for (let i = 0; i < n - 1; i++) pts.push(VEC.add(pts[i], VEC.mul(dirs[i], L[i])));
+    // vertex i has interior angle angles[i] when sides i−1 and i meet there; rotate list so pts[i] ↔ angles[i]
+    return { pts, dirs };
+  }
+  return null;
+}
+// n random interior angles of a convex n-gon (integers, each 60–170)
+function g7angles(r, n) {
+  for (;;) {
+    const total = (n - 2) * 180, a = [...Array(n)].map(() => ri(r, n === 4 ? 60 : 85, 165)), s = a.reduce((p, q) => p + q, 0), k = ri(r, 0, n - 1);
+    a[k] += total - s; if (a[k] >= 50 && a[k] <= 170 && a.every((x) => x > 0)) return a;
+  }
+}
+
+/* ---------- 7.1 Angles of Polygons ---------- */
+TEMPLATES.g71Sum = (r) => {
+  const n = pick(r, [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 24, 30]), s = (n - 2) * 180;
+  return { topic: 'Interior angle sum', stem: `Find the sum of the measures of the interior angles of the indicated convex polygon.   ${n <= 12 && r() < 0.6 ? g7name(n) : `${n}-gon`}`,
+    ...buildChoices(r, g7deg(s), [n * 180, (n - 1) * 180, (n - 2) * 360, 360].filter((x) => x !== s).map(g7deg), (i) => g7deg(s + 180 * (i + 2))),
+    fr: FR.num('Sum:', s, { suffix: '°' }), solution: `(n − 2) · 180° = (${n} − 2) · 180° = ${g7deg(s)}` };
+};
+TEMPLATES.g71Sides = (r) => {
+  const n = ri(r, 4, 24), s = (n - 2) * 180, T = (k) => `${k} sides${G7NAMES[k] ? ` (${G7NAMES[k]})` : ` (${k}-gon)`}`;
+  return { topic: 'Number of sides from the angle sum', stem: `The sum of the measures of the interior angles of a convex polygon is ${s}°. Find the number of sides, and classify the polygon by the number of sides.`,
+    ...buildChoices(r, T(n), [n - 2, n + 2, n - 1, n + 1].filter((k) => k >= 3).map(T), (i) => T(n + 3 + i)),
+    fr: FR.num('Number of sides:', n), solution: `(n − 2) · 180 = ${s}\nn − 2 = ${s / 180}\nn = ${n}: a${/^[aeiou]/.test(g7name(n)) ? 'n' : ''} ${g7name(n)}` };
+};
+// #9–14, #17–20: interior angles shown, solve for x
+TEMPLATES.g71FindX = (r) => {
+  for (;;) {
+    const n = pick(r, [4, 4, 5, 5, 6]), A = g7angles(r, n), N = pickLetters(r, n), P = g7polyPts(r, A); if (!P) continue;
+    const kind = pick(r, ['x', 'x', 'kx', 'pair']), i = ri(r, 0, n - 1);
+    const lab = A.map(String); let ans, mult = 1, why, j = -1;
+    if (kind === 'x') { lab[i] = 'x'; ans = A[i]; }
+    else if (kind === 'kx') { mult = pick(r, [2, 3]); if (A[i] % mult) continue; lab[i] = `${mult}x`; ans = A[i] / mult; }
+    else { j = (i + ri(r, 1, n - 1)) % n; if (j === i) continue; const v = (A[i] + A[j]) / 2; if (!Number.isInteger(v) || v < 60 || v > 170) continue; A[i] = A[j] = v; lab[i] = lab[j] = 'x'; ans = v; }
+    const Q = g7polyPts(r, A); if (!Q) continue;
+    const s = (n - 2) * 180, known = A.filter((_, k) => k !== i && k !== j).reduce((p, q) => p + q, 0);
+    why = `A ${g7name(n)} has an interior angle sum of (${n} − 2) · 180° = ${s}°.\n${lab.map((t) => (/x/.test(t) ? t : t)).join(' + ')} = ${s}\n${kind === 'pair' ? `2x + ${known} = ${s}` : `${lab[i]} + ${known} = ${s}`}  →  x = ${fmt(ans)}`;
+    return { topic: 'Interior angles of a polygon', stem: 'Find the value of x.', ...g6Choices(r, ans, (v) => String(v)), fr: FR.num('x =', ans),
+      draw: g7Fig([{ pts: Q.pts, names: N, alab: lab.map((t) => (/x/.test(t) ? `${t}°` : `${t}°`)) }]), size: [400, 330], solution: why };
+  }
+};
+// #21–24: exterior angles
+TEMPLATES.g71Ext = (r) => {
+  for (;;) {
+    const n = pick(r, [4, 5, 5, 6]), A = g7angles(r, n), E = A.map((a) => 180 - a); if (E.some((e) => e < 25)) continue;
+    const kind = pick(r, ['x', 'kx', 'pair']), i = ri(r, 0, n - 1); const lab = E.map(String); let ans, j = -1;
+    if (kind === 'x') { lab[i] = 'x'; ans = E[i]; }
+    else if (kind === 'kx') { const m = pick(r, [2, 3]); if (E[i] % m) continue; lab[i] = `${m}x`; ans = E[i] / m; }
+    else { j = (i + 1) % n; const v = (E[i] + E[j]) / 2; if (!Number.isInteger(v)) continue; E[i] = E[j] = v; lab[i] = lab[j] = 'x'; ans = v; }
+    const P = g7polyPts(r, E.map((e) => 180 - e)); if (!P) continue;
+    const ext = [], texts = [];
+    P.pts.forEach((v, k) => { const din = P.dirs[(k + n - 1) % n], dout = P.dirs[k]; ext.push({ pts: [v, VEC.add(v, VEC.mul(din, 1.6))] }); texts.push({ p: VEC.add(v, VEC.mul(VEC.norm(VEC.add(din, dout)), 0.75)), t: `${lab[k]}°` }); });
+    const known = E.filter((_, k) => k !== i && k !== j).reduce((p, q) => p + q, 0);
+    return { topic: 'Exterior angles of a polygon', stem: 'Find the value of x.', ...g6Choices(r, ans), fr: FR.num('x =', ans),
+      draw: g7Fig([{ pts: P.pts }, ...ext], { texts }), size: [400, 340],
+      solution: `The exterior angles (one at each vertex) add up to 360°.\n${kind === 'pair' ? `2x + ${known} = 360` : `${lab[i]} + ${known} = 360`}  →  x = ${ans}` };
+  }
+};
+// #25–28: regular polygons
+TEMPLATES.g71Regular = (r) => {
+  for (;;) {
+    const n = pick(r, [5, 6, 8, 9, 10, 12, 15, 18, 20, 24, 30, 36, 40, 45, 60, 90]), int = ((n - 2) * 180) / n, ext = 360 / n;
+    const T = (a, b) => `Interior ${g7deg(Math.round(a * 100) / 100)}; exterior ${g7deg(Math.round(b * 100) / 100)}`, correct = T(int, ext);
+    return { topic: 'Regular polygons', stem: `Find the measure of each interior angle and each exterior angle of the indicated regular polygon.   regular ${n <= 12 ? g7name(n) : `${n}-gon`}`,
+      ...buildChoices(r, correct, [T(ext, int), T(((n - 2) * 180), 360), T(180 - 360 / (n + 1), 360 / (n + 1)), T((n * 180) / n - ext / 2, ext)].filter((x, k, X) => x !== correct && X.indexOf(x) === k), (k) => T(int + k + 1, ext - k - 1)),
+      fr: frNums([{ label: 'Each interior angle (°):', val: int, tol: 0.006 }, { label: 'Each exterior angle (°):', val: ext, tol: 0.006 }], `${g7deg(int)}; ${g7deg(ext)}`),
+      solution: `Exterior: 360° ÷ ${n} = ${g7deg(Math.round(ext * 100) / 100)}\nInterior: 180° − ${g7deg(Math.round(ext * 100) / 100)} = ${g7deg(Math.round(int * 100) / 100)}  (or (${n} − 2) · 180° ÷ ${n})` };
+  }
+};
+
+/* ---------- parallelogram figures ---------- */
+// a parallelogram named counterclockwise from the lower left
+const g7para = (w = 6, h = 3.4, s = 1.6) => [[0, 0], [w, 0], [w + s, h], [s, h]];
+const g7center = (P) => VEC.mul(VEC.add(P[0], P[2]), 0.5);
+// intersection of the diagonals of quadrilateral P
+function g7center2(P) {
+  const [A, B, C, D] = P, d1 = VEC.sub(C, A), d2 = VEC.sub(D, B), det = d1[0] * -d2[1] - d1[1] * -d2[0];
+  const t = ((B[0] - A[0]) * -d2[1] - (B[1] - A[1]) * -d2[0]) / det; return VEC.add(A, VEC.mul(d1, t));
+}
+
+/* ---------- 7.2 Properties of Parallelograms ---------- */
+TEMPLATES.g72Vars = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), P = g7para(ri(r, 5, 7), 3 + r(), pick(r, [1.2, 1.8, -1.4])), kind = pick(r, ['sides', 'angles', 'mixed']);
+    if (kind === 'sides') {
+      const E1 = g6Eq(r, 2, 9, 4), E2 = g6Eq(r, 2, 9, 4); if (!E1 || !E2) continue;
+      const L2 = E2.L.replace(/x/g, 'y'), R2 = E2.R.replace(/x/g, 'y');
+      return { topic: 'Finding variables in a parallelogram', stem: 'Find the value of each variable in the parallelogram.', ...buildChoices(r, `x = ${E1.x}, y = ${E2.x}`, [`x = ${E2.x}, y = ${E1.x}`, `x = ${E1.x + 1}, y = ${E2.x}`, `x = ${E1.x}, y = ${E2.x + 2}`, `x = ${E1.val}, y = ${E2.val}`].filter((c, i, A) => c !== `x = ${E1.x}, y = ${E2.x}` && A.indexOf(c) === i), (i) => `x = ${E1.x + i + 2}, y = ${E2.x}`),
+        fr: frNums([{ label: 'x =', val: E1.x }, { label: 'y =', val: E2.x }], `x = ${E1.x}, y = ${E2.x}`), draw: g7Fig([{ pts: P, names: N, slab: [E1.L, L2, E1.R, R2] }]), size: [400, 280],
+        solution: `Opposite sides of a parallelogram are congruent.\n${E1.L} = ${E1.R}  →  x = ${E1.x}\n${L2} = ${R2}  →  y = ${E2.x}` };
+    }
+    // angles: opposite congruent, consecutive supplementary
+    const a = ri(r, 55, 125); if (a === 90) continue;
+    const x = ri(r, 3, 30), k = pick(r, [1, 2, 3]), b = a - k * x; if (b === 0 || Math.abs(b) > 60) continue;
+    const exprA = g4Lin(k, b), other = 180 - a;
+    if (kind === 'angles') {
+      const m = pick(r, [1, 2]), c = other - m * ri(r, 5, 40); const y = (other - c) / m; if (!Number.isInteger(y) || c === 0) continue;
+      const exprB = g4Lin(m, c, 'y');
+      return { topic: 'Finding variables in a parallelogram', stem: 'Find the value of each variable in the parallelogram.', ...buildChoices(r, `x = ${x}, y = ${y}`, [`x = ${y}, y = ${x}`, `x = ${x}, y = ${(a - c) / m}`, `x = ${(other - b) / k}, y = ${y}`].filter((c2, i, A) => c2 !== `x = ${x}, y = ${y}` && A.indexOf(c2) === i && !/\./.test(c2)), (i) => `x = ${x + i + 1}, y = ${y}`),
+        fr: frNums([{ label: 'x =', val: x }, { label: 'y =', val: y }], `x = ${x}, y = ${y}`), draw: g7Fig([{ pts: P, names: N, alab: [g7ang(exprA), g7ang(exprB), `${a}°`, ''] }]), size: [400, 280],
+        solution: `Opposite angles are congruent: ${exprA} = ${a}  →  x = ${x}\nConsecutive angles are supplementary: ${exprB} = 180 − ${a} = ${other}  →  y = ${y}` };
+    }
+    const E1 = g6Eq(r, 2, 9, 4); if (!E1) continue;
+    return { topic: 'Finding variables in a parallelogram', stem: 'Find the value of each variable in the parallelogram.', ...buildChoices(r, `x = ${E1.x}, y = ${x}`, [`x = ${x}, y = ${E1.x}`, `x = ${E1.x}, y = ${(other - b) / k}`, `x = ${E1.x + 2}, y = ${x}`].filter((c2, i, A) => c2 !== `x = ${E1.x}, y = ${x}` && A.indexOf(c2) === i && !/\./.test(c2)), (i) => `x = ${E1.x}, y = ${x + i + 1}`),
+      fr: frNums([{ label: 'x =', val: E1.x }, { label: 'y =', val: x }], `x = ${E1.x}, y = ${x}`), draw: g7Fig([{ pts: P, names: N, slab: [E1.L, '', E1.R, ''], alab: [`${other}°`, g7ang(exprA.replace(/x/g, 'y')), '', ''] }]), size: [400, 280],
+      solution: `Opposite sides are congruent: ${E1.L} = ${E1.R}  →  x = ${E1.x}\nConsecutive angles are supplementary: ${exprA.replace(/x/g, 'y')} + ${other} = 180  →  y = ${x}` };
+  }
+};
+TEMPLATES.g72Angle = (r) => {
+  const N = pickLetters(r, 4), a = ri(r, 40, 140), P = g7para(6, 3.4, pick(r, [1.6, -1.4])); if (a === 90) return TEMPLATES.g72Angle(r);
+  const t = ri(r, 1, 3), ans = t === 2 ? a : 180 - a;
+  return { topic: 'Angles of a parallelogram', stem: `Find m∠${N[t]}.`, ...g6Choices(r, ans, g7deg), fr: FR.num(`m∠${N[t]} =`, ans, { suffix: '°' }),
+    draw: g7Fig([{ pts: P, names: N, alab: [`${a}°`, '', '', ''] }]), size: [400, 260],
+    solution: t === 2 ? `∠${N[2]} is opposite ∠${N[0]}, and opposite angles of a parallelogram are congruent: m∠${N[2]} = ${a}°.` : `∠${N[t]} and ∠${N[0]} are consecutive angles, which are supplementary: m∠${N[t]} = 180° − ${a}° = ${ans}°.` };
+};
+// #7–14: sides, diagonal halves, angles
+TEMPLATES.g72Diag = (r) => {
+  const N = pickLetters(r, 5), V = N.slice(0, 4), Pn = N[4], P = g7para(6, 3.4, pick(r, [1.5, 1.9])), O = g7center2(P);
+  const s1 = pick(r, [8.2, 7, 9, 12, 13, 15]), s2 = pick(r, [5, 6, 7.5, 8, 11]), h1 = pick(r, [6, 7, 8, 9.5, 10]), h2 = pick(r, [4, 5, 5.5, 6]), ang = ri(r, 95, 130), part = ri(r, 15, 165 - ang);
+  const qs = [
+    [`${V[2]}${V[3]}`, s1, `Opposite sides are congruent: ${V[2]}${V[3]} = ${V[0]}${V[1]} = ${s1}.`],
+    [`${V[1]}${V[2]}`, s2, `Opposite sides are congruent: ${V[1]}${V[2]} = ${V[3]}${V[0]} = ${s2}.`],
+    [`${V[2]}${Pn}`, h1, `The diagonals bisect each other: ${V[2]}${Pn} = ${V[0]}${Pn} = ${h1}.`],
+    [`${V[1]}${V[3]}`, 2 * h2, `The diagonals bisect each other: ${V[1]}${V[3]} = 2(${V[3]}${Pn}) = 2(${h2}) = ${2 * h2}.`],
+    [`m∠${V[1]}`, 180 - ang, `Consecutive angles are supplementary: m∠${V[1]} = 180° − ${ang}° = ${180 - ang}°.`, true],
+    [`m∠${V[2]}`, ang, `Opposite angles are congruent: m∠${V[2]} = m∠${V[0]} = ${ang}°.`, true],
+    [`m∠${V[3]}${V[1]}${V[2]}`, part, `${SEG(V[0] + V[3])} ∥ ${SEG(V[1] + V[2])}, so alternate interior angles are congruent: m∠${V[3]}${V[1]}${V[2]} = m∠${V[0]}${V[3]}${V[1]} = ${part}°.`, true],
+  ];
+  const [what, ans, why, deg] = pick(r, qs);
+  const polys = [{ pts: P, names: V, slab: [String(s1), '', '', String(s2)], alab: [`${ang}°`, '', '', ''] }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }];
+  const texts = [{ p: VEC.add(VEC.mul(VEC.add(P[0], O), 0.5), [0, 0.35]), t: String(h1) }, { p: VEC.add(VEC.mul(VEC.add(P[3], O), 0.5), [0.35, 0.2]), t: String(h2) }, { p: VEC.add(O, [0, -0.45]), t: Pn },
+    { p: VEC.add(P[3], VEC.mul(VEC.norm(VEC.add(VEC.norm(VEC.sub(P[1], P[3])), VEC.norm(VEC.sub(P[0], P[3])))), 1.3)), t: `${part}°` }];
+  return { topic: 'Properties of parallelograms', stem: `Find the indicated measure in ▱${V.join('')}.   ${what}`, ...g6Choices(r, ans, deg ? g7deg : (x) => fmt(x)), fr: FR.num(`${what} =`, ans, { suffix: deg ? '°' : '' }),
+    draw: g7Fig(polys, { texts }), size: [420, 280], solution: why };
+};
+// #15–18: algebra with angles and diagonals
+TEMPLATES.g72Alg = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), P = g7para(6, 3.4, 1.6), kind = pick(r, ['diag', 'supp', 'opp']);
+    if (kind === 'diag') {
+      const E = g6Eq(r, 2, 9, 3); if (!E) continue; const O = g7center2(P);
+      return { topic: 'Algebra in parallelograms', stem: 'Find the value of x in the parallelogram.', ...g6Choices(r, E.x), fr: FR.num('x =', E.x),
+        draw: g7Fig([{ pts: P, names: N }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }], { texts: [{ p: VEC.add(VEC.mul(VEC.add(P[0], O), 0.5), [0, 0.4]), t: E.L }, { p: VEC.add(VEC.mul(VEC.add(P[2], O), 0.5), [0, 0.4]), t: E.R }] }), size: [420, 280],
+        solution: `The diagonals of a parallelogram bisect each other, so the two parts of ${SEG(N[0] + N[2])} are equal:\n${E.L} = ${E.R}  →  x = ${E.x}` };
+    }
+    const x = ri(r, 4, 30), k = pick(r, [1, 2, 3, 4]), b = ri(r, -20, 30), A = k * x + b; if (A < 40 || A > 140 || A === 90) continue;
+    if (kind === 'opp') { const E = g6Eq(r, 2, 12, 40); if (!E || E.val > 150 || E.val === 90) continue;
+      return { topic: 'Algebra in parallelograms', stem: 'Find the value of x in the parallelogram.', ...g6Choices(r, E.x), fr: FR.num('x =', E.x), draw: g7Fig([{ pts: P, names: N, alab: [g7ang(E.L), '', g7ang(E.R), ''] }]), size: [400, 260],
+        solution: `Opposite angles of a parallelogram are congruent: ${E.L} = ${E.R}  →  x = ${E.x}` }; }
+    const B = 180 - A, m = pick(r, [1, 1, 2]), c = B - m * ri(r, 5, 40), y = (B - c) / m; if (!Number.isInteger(y)) continue;
+    return { topic: 'Algebra in parallelograms', stem: 'Find the value of each variable in the parallelogram.', ...buildChoices(r, `x = ${x}, y = ${y}`, [`x = ${y}, y = ${x}`, `x = ${x}, y = ${(A - c) / m}`, `x = ${(B - b) / k}, y = ${y}`].filter((t, i, X) => t !== `x = ${x}, y = ${y}` && X.indexOf(t) === i && !/\./.test(t)), (i) => `x = ${x + 1 + i}, y = ${y}`),
+      fr: frNums([{ label: 'x =', val: x }, { label: 'y =', val: y }], `x = ${x}, y = ${y}`), draw: g7Fig([{ pts: P, names: N, alab: [g7ang(g4Lin(k, b)), g7ang(g4Lin(m, c, 'y')), `${A}°`, ''] }]), size: [400, 260],
+      solution: `Opposite angles are congruent: ${g4Lin(k, b)} = ${A}  →  x = ${x}\nConsecutive angles are supplementary: ${g4Lin(m, c, 'y')} = 180 − ${A} = ${B}  →  y = ${y}` };
+  }
+};
+// #23–24 and the fourth vertex
+TEMPLATES.g72Coord = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), A = [ri(r, -6, 4), ri(r, -6, 4)], u = [ri(r, 2, 7), ri(r, -3, 3)], v = [ri(r, -3, 3), ri(r, 2, 7)];
+    if (u[0] * v[1] - u[1] * v[0] === 0) continue;
+    const B = VEC.add(A, u), D = VEC.add(A, v), C = VEC.add(B, v), M = VEC.mul(VEC.add(A, C), 0.5);
+    if (r() < 0.5) {
+      return { topic: 'Diagonals in the coordinate plane', stem: `Find the coordinates of the intersection of the diagonals of ▱${N.join('')} with vertices ${N[0]}${ptT(A)}, ${N[1]}${ptT(B)}, ${N[2]}${ptT(C)}, and ${N[3]}${ptT(D)}.`,
+        ...buildChoices(r, ptT(M), [ptT(VEC.mul(VEC.add(B, D), 0.25)), ptT(VEC.mul(VEC.add(A, B), 0.5)), ptT(VEC.sub(C, A)), ptT([M[1], M[0]])].filter((x, i, X) => x !== ptT(M) && X.indexOf(x) === i), (i) => ptT([M[0] + i + 1, M[1]])),
+        fr: { fields: [{ kind: 'expr', keys: 'point', label: '' }], key: [`\\left(${fracL(M[0])},${fracL(M[1])}\\right)`], display: ptT(M), check: (x) => onePointOk(x[0], M) },
+        solution: `The diagonals of a parallelogram bisect each other, so they meet at the midpoint of ${SEG(N[0] + N[2])}:\n((${g7add(A[0], C[0])})/2, (${g7add(A[1], C[1])})/2) = ${ptT(M)}` };
+    }
+    return { topic: 'Finding the fourth vertex', stem: `Three vertices of ▱${N.join('')} are ${N[0]}${ptT(A)}, ${N[1]}${ptT(B)}, and ${N[2]}${ptT(C)}. Find the coordinates of vertex ${N[3]}.`,
+      ...buildChoices(r, ptT(D), [ptT(VEC.sub(VEC.add(A, B), C)), ptT(VEC.sub(VEC.add(B, C), A)), ptT(VEC.add(A, VEC.sub(B, C))), ptT([D[0], -D[1]])].filter((x, i, X) => x !== ptT(D) && X.indexOf(x) === i), (i) => ptT([D[0] + i + 1, D[1]])),
+      fr: { fields: [{ kind: 'expr', keys: 'point', label: `${N[3]} =` }], key: [`\\left(${D[0]},${D[1]}\\right)`], display: ptT(D), check: (x) => onePointOk(x[0], D) },
+      solution: `Opposite sides are parallel and congruent, so ${N[3]} = ${N[0]} + (${N[2]} − ${N[1]}).\n${N[2]} − ${N[1]} = (${fmt(C[0] - B[0])}, ${fmt(C[1] - B[1])}), so ${N[3]} = (${g7add(A[0], C[0] - B[0])}, ${g7add(A[1], C[1] - B[1])}) = ${ptT(D)}` };
+  }
+};
+
+/* ---------- 7.3 Proving That a Quadrilateral Is a Parallelogram ---------- */
+const G7THM = ['Parallelogram Opposite Sides Converse', 'Parallelogram Opposite Angles Converse', 'Opposite Sides Parallel and Congruent Theorem', 'Parallelogram Diagonals Converse'];
+TEMPLATES.g73Theorem = (r) => {
+  const N = pickLetters(r, 4), P = g7para(6, 3.4, pick(r, [1.5, -1.3])), k = ri(r, 0, 3), lab = r() < 0.5;
+  let polys, why;
+  if (k === 0) { const a = ri(r, 9, 20), b = ri(r, 5, 14); polys = [{ pts: P, names: N, ...(lab ? { slab: [String(a), String(b), String(a), String(b)] } : { ticks: [1, 2, 1, 2] }) }]; why = 'Both pairs of opposite sides are congruent.'; }
+  else if (k === 1) { const a = ri(r, 55, 125); polys = [{ pts: P, names: N, ...(lab ? { alab: [`${a}°`, `${180 - a}°`, `${a}°`, `${180 - a}°`] } : { arcs: [1, 2, 1, 2] }) }]; why = 'Both pairs of opposite angles are congruent.'; }
+  else if (k === 2) { polys = [{ pts: P, names: N, par: [1, 0, 1, 0], ...(lab ? { slab: ['9', '', '9', ''] } : { ticks: [1, 0, 1, 0] }) }]; why = 'One pair of opposite sides is both parallel and congruent.'; }
+  else { const O = g7center2(P); polys = [{ pts: P, names: N }, { pts: [P[0], O], ticks: [1, 0] }, { pts: [O, P[2]], ticks: [1, 0] }, { pts: [P[1], O], ticks: [2, 0] }, { pts: [O, P[3]], ticks: [2, 0] }]; why = 'The diagonals bisect each other.'; }
+  return { topic: 'Which theorem proves it?', stem: 'State which theorem you can use to show that the quadrilateral is a parallelogram.', ...buildChoices(r, G7THM[k], G7THM.filter((_, i) => i !== k), () => null),
+    fr: FR.select('Theorem:', G7THM, G7THM[k]), draw: g7Fig(polys), size: [400, 260], solution: `${why} So it is a parallelogram by the ${G7THM[k]}.` };
+};
+// #7–14: values that make it a parallelogram
+TEMPLATES.g73FindX = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), P = g7para(6, 3.4, 1.5), kind = pick(r, ['sides', 'angles', 'diag', 'two']);
+    if (kind === 'two') {
+      const E1 = g6Eq(r, 2, 9, 4), E2 = g6Eq(r, 2, 9, 4); if (!E1 || !E2) continue;
+      const L2 = E2.L.replace(/x/g, 'y'), R2 = E2.R.replace(/x/g, 'y');
+      return { topic: 'Making a parallelogram', stem: 'Find the values of x and y that make the quadrilateral a parallelogram.', ...buildChoices(r, `x = ${E1.x}, y = ${E2.x}`, [`x = ${E2.x}, y = ${E1.x}`, `x = ${E1.x + 1}, y = ${E2.x}`, `x = ${E1.val}, y = ${E2.val}`].filter((c, i, A) => c !== `x = ${E1.x}, y = ${E2.x}` && A.indexOf(c) === i), (i) => `x = ${E1.x}, y = ${E2.x + i + 1}`),
+        fr: frNums([{ label: 'x =', val: E1.x }, { label: 'y =', val: E2.x }], `x = ${E1.x}, y = ${E2.x}`), draw: g7Fig([{ pts: P, names: N, slab: [E1.L, L2, E1.R, R2] }]), size: [400, 280],
+        solution: `A quadrilateral with both pairs of opposite sides congruent is a parallelogram.\n${E1.L} = ${E1.R}  →  x = ${E1.x}\n${L2} = ${R2}  →  y = ${E2.x}` };
+    }
+    const E = kind === 'angles' ? g6Eq(r, 2, 14, 40) : g6Eq(r, 2, 9, 3); if (!E || (kind === 'angles' && (E.val > 150 || E.val === 90))) continue;
+    let polys, why, texts;
+    if (kind === 'sides') { polys = [{ pts: P, names: N, slab: [E.L, '', E.R, ''], par: [1, 0, 1, 0] }]; why = `The marked sides are parallel. If they are also congruent, it is a parallelogram (Opposite Sides Parallel and Congruent Theorem):\n${E.L} = ${E.R}  →  x = ${E.x}`; }
+    else if (kind === 'angles') { polys = [{ pts: P, names: N, alab: [g7ang(E.L), `${180 - E.val}°`, g7ang(E.R), `${180 - E.val}°`] }]; why = `Opposite angles must be congruent (Parallelogram Opposite Angles Converse):\n${E.L} = ${E.R}  →  x = ${E.x}`; }
+    else { const O = g7center2(P); polys = [{ pts: P, names: N }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }]; texts = [{ p: VEC.add(VEC.mul(VEC.add(P[1], O), 0.5), [0.2, -0.45]), t: E.L }, { p: VEC.add(VEC.mul(VEC.add(P[3], O), 0.5), [-0.2, 0.45]), t: E.R }]; why = `The diagonals must bisect each other (Parallelogram Diagonals Converse):\n${E.L} = ${E.R}  →  x = ${E.x}`; }
+    return { topic: 'Making a parallelogram', stem: 'Find the value of x that makes the quadrilateral a parallelogram.', ...g6Choices(r, E.x), fr: FR.num('x =', E.x), draw: g7Fig(polys, { texts }), size: [420, 280], solution: why };
+  }
+};
+// #15–18: coordinates
+TEMPLATES.g73Coord = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), A = [ri(r, -6, 3), ri(r, -6, 3)], u = [ri(r, 2, 8), ri(r, -4, 4)], v = [ri(r, -4, 4), ri(r, 2, 8)];
+    if (u[0] * v[1] - u[1] * v[0] <= 0) continue;
+    const yes = r() < 0.6, B = VEC.add(A, u), D = VEC.add(A, v), C = yes ? VEC.add(B, v) : VEC.add(VEC.add(B, v), pick(r, [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1]]));
+    const sl = (p, q) => (q[0] === p[0] ? 'undefined' : fracT((q[1] - p[1]) / (q[0] - p[0]))), M1 = VEC.mul(VEC.add(A, C), 0.5), M2 = VEC.mul(VEC.add(B, D), 0.5);
+    const correct = yes ? 'Yes: the diagonals have the same midpoint, so they bisect each other' : 'No: the diagonals do not bisect each other';
+    return { topic: 'Parallelograms in the coordinate plane', stem: `Is the quadrilateral with vertices ${N[0]}${ptT(A)}, ${N[1]}${ptT(B)}, ${N[2]}${ptT(C)}, and ${N[3]}${ptT(D)} a parallelogram?`,
+      ...buildChoices(r, correct, [yes ? 'No: the diagonals do not bisect each other' : 'Yes: the diagonals have the same midpoint, so they bisect each other', yes ? 'No: the sides are not all congruent' : 'Yes: one pair of opposite sides is parallel', 'Yes: the diagonals are congruent'], () => null),
+      fr: FR.select('Is it a parallelogram?', ['Yes', 'No'], yes ? 'Yes' : 'No'),
+      solution: `Midpoint of ${SEG(N[0] + N[2])}: ${ptT(M1)}. Midpoint of ${SEG(N[1] + N[3])}: ${ptT(M2)}.\n${yes ? 'Same midpoint, so the diagonals bisect each other: it is a parallelogram (Parallelogram Diagonals Converse).' : 'Different midpoints, so the diagonals do not bisect each other: it is not a parallelogram.'}\n(Slopes: ${SEG(N[0] + N[1])} ${sl(A, B)}, ${SEG(N[3] + N[2])} ${sl(D, C)}; ${SEG(N[1] + N[2])} ${sl(B, C)}, ${SEG(N[0] + N[3])} ${sl(A, D)}.)` };
+  }
+};
+
+/* ---------- 7.4 Properties of Special Parallelograms ---------- */
+const G7ASN = [
+  ['In rhombus JKLM, ∠L ≅ ∠M', 'Sometimes', 'Consecutive angles of a rhombus are congruent only when it is a square.'],
+  ['In rhombus JKLM, ∠K ≅ ∠M', 'Always', 'Opposite angles of any parallelogram are congruent.'],
+  ['In rhombus JKLM, J̅M̅ ≅ K̅L̅', 'Always', 'All four sides of a rhombus are congruent.'],
+  ['In rhombus JKLM, J̅K̅ ≅ K̅L̅', 'Always', 'All four sides of a rhombus are congruent.'],
+  ['In rhombus JKLM, J̅L̅ ≅ K̅M̅', 'Sometimes', 'The diagonals of a rhombus are congruent only when it is a square.'],
+  ['In rhombus JKLM, ∠JKM ≅ ∠LKM', 'Always', 'Each diagonal of a rhombus bisects a pair of opposite angles.'],
+  ['In rhombus JKLM, J̅L̅ ⊥ K̅M̅', 'Always', 'The diagonals of a rhombus are perpendicular.'],
+  ['In rectangle WXYZ, ∠W ≅ ∠X', 'Always', 'All four angles of a rectangle are right angles.'],
+  ['In rectangle WXYZ, W̅X̅ ≅ Y̅Z̅', 'Always', 'Opposite sides of a parallelogram are congruent.'],
+  ['In rectangle WXYZ, W̅X̅ ≅ X̅Y̅', 'Sometimes', 'Consecutive sides are congruent only when the rectangle is a square.'],
+  ['In rectangle WXYZ, W̅Y̅ ≅ X̅Z̅', 'Always', 'The diagonals of a rectangle are congruent.'],
+  ['In rectangle WXYZ, W̅Y̅ ⊥ X̅Z̅', 'Sometimes', 'The diagonals of a rectangle are perpendicular only when it is a square.'],
+  ['In rectangle WXYZ, ∠WXZ ≅ ∠YXZ', 'Sometimes', 'A diagonal bisects the angles only when the rectangle is a square.'],
+  ['A square is ___ a rhombus.', 'Always', 'A square has four congruent sides.'],
+  ['A rectangle is ___ a square.', 'Sometimes', 'Only when its sides are all congruent.'],
+  ['A rectangle ___ has congruent diagonals.', 'Always', 'Rectangle Diagonals Theorem.'],
+  ['The diagonals of a square ___ bisect its angles.', 'Always', 'A square is a rhombus, and the diagonals of a rhombus bisect its angles.'],
+  ['A rhombus ___ has four congruent angles.', 'Sometimes', 'Only when the rhombus is a square.'],
+  ['A rectangle ___ has perpendicular diagonals.', 'Sometimes', 'Only when the rectangle is a square.'],
+  ['A trapezoid is ___ a parallelogram.', 'Never', 'A trapezoid has exactly one pair of parallel sides.'],
+  ['A kite is ___ a parallelogram.', 'Never', 'Opposite sides of a kite are not congruent.'],
+  ['A rhombus is ___ a rectangle.', 'Sometimes', 'Only when it has right angles (a square).'],
+  ['A square is ___ a rectangle.', 'Always', 'A square has four right angles.'],
+];
+TEMPLATES.g74Always = (r) => {
+  const [st, ans, why] = pick(r, G7ASN), blank = st.includes('___');
+  const stem = blank ? `Complete the statement with always, sometimes, or never.   ${st}` : `Decide whether the statement is always, sometimes, or never true.   ${st}`;
+  return { topic: 'Always, sometimes, or never', stem, ...buildChoices(r, ans, ['Always', 'Sometimes', 'Never'].filter((x) => x !== ans), () => null), fr: FR.select('Answer:', ['Always', 'Sometimes', 'Never'], ans), solution: `${ans}. ${why}` };
+};
+const G7PROPS = [
+  ['It is equiangular.', ['rectangle', 'square']], ['It is equiangular and equilateral.', ['square']], ['The diagonals are perpendicular.', ['rhombus', 'square']],
+  ['Opposite sides are congruent.', ['parallelogram', 'rectangle', 'rhombus', 'square']], ['The diagonals bisect each other.', ['parallelogram', 'rectangle', 'rhombus', 'square']],
+  ['The diagonals bisect opposite angles.', ['rhombus', 'square']], ['The diagonals are congruent.', ['rectangle', 'square']], ['All four sides are congruent.', ['rhombus', 'square']],
+  ['Consecutive angles are supplementary.', ['parallelogram', 'rectangle', 'rhombus', 'square']], ['It has four right angles.', ['rectangle', 'square']],
+];
+TEMPLATES.g74Which = (r) => {
+  const [p, ans] = pick(r, G7PROPS), T = (L) => L.join(', '), combos = [['parallelogram', 'rectangle', 'rhombus', 'square'], ['rectangle', 'square'], ['rhombus', 'square'], ['square'], ['rectangle'], ['rhombus']];
+  const correct = T(ans), opts = combos.map(T);
+  return { topic: 'Properties of special parallelograms', stem: `Name each quadrilateral (parallelogram, rectangle, rhombus, or square) for which the statement is always true.   ${p}`,
+    ...buildChoices(r, correct, opts.filter((x) => x !== correct), () => null), fr: FR.select('Always true for:', opts, correct),
+    solution: `${p} is always true for: ${correct}.` };
+};
+// #11–14 and #29–46: measures in rhombuses, rectangles, and squares
+TEMPLATES.g74Measure = (r) => {
+  const N = pickLetters(r, 5), V = N.slice(0, 4), E = N[4], kind = pick(r, ['rhombus', 'rhombus', 'rect', 'rect', 'square']);
+  if (kind === 'rhombus') {
+    const t = ri(r, 25, 65), d1 = ri(r, 4, 12), d2 = Math.round(d1 * Math.tan((t * Math.PI) / 180) * 10) / 10;
+    const q = Math.min(4, 3 * Math.tan((t * Math.PI) / 180)), p = q / Math.tan((t * Math.PI) / 180), P = [[-p, 0], [0, -q], [p, 0], [0, q]];
+    const qs = [[`m∠${V[3]}${V[0]}${V[2]}`, t, `A diagonal of a rhombus bisects the angle: m∠${V[3]}${V[0]}${V[2]} = m∠${V[1]}${V[0]}${V[2]} = ${t}°.`],
+      [`m∠${V[0]}${E}${V[1]}`, 90, 'The diagonals of a rhombus are perpendicular, so the angle is 90°.'],
+      [`m∠${V[0]}${V[1]}${V[3]}`, 90 - t, `In right △${V[0]}${E}${V[1]}, m∠${V[0]}${V[1]}${E} = 90° − ${t}° = ${90 - t}°.`],
+      [`m∠${V[0]}${V[3]}${V[2]}`, 180 - 2 * t, `m∠${V[3]}${V[0]}${V[1]} = 2(${t}°) = ${2 * t}°, and consecutive angles are supplementary: 180° − ${2 * t}° = ${180 - 2 * t}°.`],
+      [`${V[2]}${E}`, d1, `The diagonals bisect each other: ${V[2]}${E} = ${V[0]}${E} = ${d1}.`],
+      [`${V[1]}${V[3]}`, 2 * d2, `The diagonals bisect each other: ${V[1]}${V[3]} = 2(${d2}) = ${fmt(2 * d2)}.`]];
+    const [w, ans, why] = pick(r, qs), deg = w.startsWith('m∠');
+    return { topic: 'Measures in a rhombus', stem: `In rhombus ${V.join('')}, the diagonals intersect at ${E}. m∠${V[1]}${V[0]}${V[2]} = ${t}°, ${V[0]}${E} = ${d1}, and ${V[1]}${E} = ${d2}. Find ${w}.`,
+      ...g6Choices(r, ans, deg ? g7deg : (x) => fmt(x)), fr: FR.num(`${w} =`, ans, { suffix: deg ? '°' : '' }),
+      draw: g7Fig([{ pts: P, names: V, ticks: [1, 1, 1, 1] }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }], { texts: [{ p: [p * 0.16, -q * 0.14], t: E }] }), size: [400, 300], solution: why };
+  }
+  if (kind === 'rect') {
+    const t = ri(r, 20, 70), d = 2 * ri(r, 3, 12), tn = Math.tan((t * Math.PI) / 180), W = 5 * tn > 4 ? 4 / tn : 5, H = W * tn, P = [[0, 0], [W, 0], [W, H], [0, H]];
+    const qs = [[`m∠${V[0]}${V[2]}${V[1]}`, 90 - t, `∠${V[1]}${V[0]}${V[2]} and ∠${V[0]}${V[2]}${V[1]} are acute angles of right △${V[0]}${V[1]}${V[2]}: 90° − ${t}° = ${90 - t}°.`],
+      [`m∠${V[2]}${V[0]}${V[3]}`, 90 - t, `The angles of a rectangle are right angles: m∠${V[2]}${V[0]}${V[3]} = 90° − ${t}° = ${90 - t}°.`],
+      [`m∠${V[0]}${V[2]}${V[3]}`, t, `${SEG(V[0] + V[1])} ∥ ${SEG(V[3] + V[2])}, so alternate interior angles are congruent: ${t}°.`],
+      [`m∠${V[0]}${E}${V[1]}`, 180 - 2 * t, `The diagonals are congruent and bisect each other, so △${V[0]}${E}${V[1]} is isosceles with base angles ${t}°: 180° − 2(${t}°) = ${180 - 2 * t}°.`],
+      [`${V[1]}${V[3]}`, d, `The diagonals of a rectangle are congruent: ${V[1]}${V[3]} = ${V[0]}${V[2]} = ${d}.`],
+      [`${E}${V[3]}`, d / 2, `The diagonals are congruent and bisect each other: ${E}${V[3]} = ${d} ÷ 2 = ${d / 2}.`]];
+    const [w, ans, why] = pick(r, qs), deg = w.startsWith('m∠');
+    return { topic: 'Measures in a rectangle', stem: `The diagonals of rectangle ${V.join('')} intersect at ${E}. Given that m∠${V[1]}${V[0]}${V[2]} = ${t}° and ${V[0]}${V[2]} = ${d}, find ${w}.`,
+      ...g6Choices(r, ans, deg ? g7deg : (x) => fmt(x)), fr: FR.num(`${w} =`, ans, { suffix: deg ? '°' : '' }),
+      draw: g7Fig([{ pts: P, names: V, right: [1, 1, 1, 1] }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }], { texts: [{ p: [W / 2, H / 2 - 0.45], t: E }] }), size: [400, 300], solution: why };
+  }
+  const k = ri(r, 1, 9), P = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  const qs = [[`m∠${V[0]}${E}${V[1]}`, 90, 'The diagonals of a square are perpendicular.'], [`m∠${V[1]}${V[0]}${V[2]}`, 45, 'A diagonal of a square bisects a right angle: 45°.'],
+    [`${V[1]}${V[3]}`, 2 * k, `The diagonals are congruent and bisect each other: ${V[1]}${V[3]} = 2(${k}) = ${2 * k}.`], [`${V[1]}${E}`, k, `The diagonals are congruent and bisect each other, so all four halves equal ${k}.`]];
+  const [w, ans, why] = pick(r, qs), deg = w.startsWith('m∠');
+  return { topic: 'Measures in a square', stem: `The diagonals of square ${V.join('')} intersect at ${E}. Given that ${V[0]}${E} = ${k}, find ${w}.`, ...g6Choices(r, ans, deg ? g7deg : (x) => fmt(x)), fr: FR.num(`${w} =`, ans, { suffix: deg ? '°' : '' }),
+    draw: g7Fig([{ pts: P, names: V, right: [1, 1, 1, 1], ticks: [1, 1, 1, 1] }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }], { texts: [{ p: [2, 1.55], t: E }] }), size: [380, 320], solution: why };
+};
+// #23–26: rectangle diagonals
+TEMPLATES.g74RectDiag = (r) => {
+  const N = pickLetters(r, 4), E = g6Eq(r, 2, 9, 5); if (!E) return TEMPLATES.g74RectDiag(r);
+  return { topic: 'Diagonals of a rectangle', stem: `Find the lengths of the diagonals of rectangle ${N.join('')}.   ${N[0]}${N[2]} = ${E.L},  ${N[1]}${N[3]} = ${E.R}`, ...g6Choices(r, E.val), fr: FR.num('Each diagonal =', E.val),
+    solution: `The diagonals of a rectangle are congruent: ${E.L} = ${E.R}, so x = ${E.x}.\n${N[0]}${N[2]} = ${N[1]}${N[3]} = ${E.val}` };
+};
+// #53–58: rectangle, rhombus, or square from coordinates
+TEMPLATES.g74Coord = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), kind = pick(r, ['square', 'rect', 'rhombus', 'para']), A = [ri(r, -6, 2), ri(r, -6, 2)];
+    let u = [ri(r, 1, 4), ri(r, -3, 3)], v;
+    if (kind === 'square') v = [-u[1], u[0]];
+    else if (kind === 'rect') { const k = pick(r, [2, 3]); v = [-u[1] * k, u[0] * k]; }
+    else if (kind === 'rhombus') { v = [u[1], u[0]]; if (u[0] === u[1] || u[0] * v[1] - u[1] * v[0] <= 0 || u[0] * v[0] + u[1] * v[1] === 0) continue; }
+    else { v = [ri(r, -3, 3), ri(r, 2, 5)]; if (u[0] * v[1] - u[1] * v[0] <= 0 || u[0] * v[0] + u[1] * v[1] === 0 || u[0] ** 2 + u[1] ** 2 === v[0] ** 2 + v[1] ** 2) continue; }
+    if (u[0] * v[1] - u[1] * v[0] <= 0) continue;
+    const B = VEC.add(A, u), C = VEC.add(B, v), D = VEC.add(A, v), ans = { square: 'Rectangle, rhombus, and square', rect: 'Rectangle only', rhombus: 'Rhombus only', para: 'None of these (just a parallelogram)' }[kind];
+    const d1 = VEC.sub(C, A), d2 = VEC.sub(D, B), L1 = d1[0] ** 2 + d1[1] ** 2, L2 = d2[0] ** 2 + d2[1] ** 2, dot = d1[0] * d2[0] + d1[1] * d2[1];
+    const opts = ['Rectangle, rhombus, and square', 'Rectangle only', 'Rhombus only', 'None of these (just a parallelogram)'];
+    return { topic: 'Special parallelograms in the coordinate plane', stem: `Decide whether ▱${N.join('')} is a rectangle, a rhombus, or a square. Give all names that apply.   ${N[0]}${ptT(A)}, ${N[1]}${ptT(B)}, ${N[2]}${ptT(C)}, ${N[3]}${ptT(D)}`,
+      ...buildChoices(r, ans, opts.filter((x) => x !== ans), () => null), fr: FR.select('It is:', opts, ans),
+      solution: `Diagonal lengths: ${N[0]}${N[2]} = √${L1}, ${N[1]}${N[3]} = √${L2} → ${L1 === L2 ? 'congruent, so it is a rectangle' : 'not congruent, so it is not a rectangle'}.\nDiagonal slopes: ${d1[0] ? fracT(d1[1] / d1[0]) : 'undefined'} and ${d2[0] ? fracT(d2[1] / d2[0]) : 'undefined'} → ${dot === 0 ? 'perpendicular, so it is a rhombus' : 'not perpendicular, so it is not a rhombus'}.\n${ans}.` };
+  }
+};
+
+/* ---------- 7.5 Properties of Trapezoids and Kites ---------- */
+TEMPLATES.g75Coord = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), kind = pick(r, ['iso', 'trap', 'para', 'none']), dir = pick(r, [[1, 0], [0, 1], [1, 1], [1, -1], [2, 1]]), nrm = [-dir[1], dir[0]];
+    const A = [ri(r, -6, 0), ri(r, -6, 0)], a = ri(r, 3, 6), h = ri(r, 1, 3);
+    let B, C, D;
+    if (kind === 'iso') { const c = ri(r, 1, a - 1); B = VEC.add(A, VEC.mul(dir, a + c)); D = VEC.add(A, VEC.add(VEC.mul(dir, c), VEC.mul(nrm, h))); C = VEC.add(D, VEC.mul(dir, a - c)); if (a - c <= 0) continue; }
+    else if (kind === 'trap') { const s = ri(r, 0, 3), b = ri(r, 1, a + 2); B = VEC.add(A, VEC.mul(dir, a + 2)); D = VEC.add(A, VEC.add(VEC.mul(dir, s), VEC.mul(nrm, h))); C = VEC.add(D, VEC.mul(dir, b)); if (b === a + 2 || 2 * s + b === a + 2) continue; }
+    else if (kind === 'para') { const s = ri(r, -2, 2); B = VEC.add(A, VEC.mul(dir, a)); D = VEC.add(A, VEC.add(VEC.mul(dir, s), VEC.mul(nrm, h))); C = VEC.add(D, VEC.mul(dir, a)); }
+    else { B = VEC.add(A, VEC.mul(dir, a)); D = VEC.add(A, VEC.add(VEC.mul(dir, ri(r, 0, 2)), VEC.mul(nrm, h))); C = VEC.add(D, VEC.add(VEC.mul(dir, ri(r, 1, 3)), VEC.mul(nrm, pick(r, [1, -1])))); }
+    const P = [A, B, C, D], cr = (p, q) => p[0] * q[1] - p[1] * q[0], sides = [0, 1, 2, 3].map((i) => VEC.sub(P[(i + 1) % 4], P[i]));
+    const par1 = cr(sides[0], sides[2]) === 0, par2 = cr(sides[1], sides[3]) === 0, len = (v) => v[0] ** 2 + v[1] ** 2;
+    if (P.some((p, i) => P.some((q, j) => j > i && p[0] === q[0] && p[1] === q[1]))) continue;
+    const actual = par1 && par2 ? 'para' : par1 || par2 ? (len(par1 ? sides[1] : sides[0]) === len(par1 ? sides[3] : sides[2]) ? 'iso' : 'trap') : 'none';
+    const T = { iso: 'Isosceles trapezoid', trap: 'Trapezoid (not isosceles)', para: 'Parallelogram, not a trapezoid', none: 'Not a trapezoid (no parallel sides)' }, opts = Object.values(T);
+    const sl = (v) => (v[0] === 0 ? 'undefined' : fracT(v[1] / v[0]));
+    return { topic: 'Trapezoids in the coordinate plane', stem: `Decide whether the quadrilateral with vertices ${N[0]}${ptT(A)}, ${N[1]}${ptT(B)}, ${N[2]}${ptT(C)}, and ${N[3]}${ptT(D)} is a trapezoid. If it is, is it isosceles?`,
+      ...buildChoices(r, T[actual], opts.filter((x) => x !== T[actual]), () => null), fr: FR.select('It is:', opts, T[actual]),
+      solution: `Slopes: ${SEG(N[0] + N[1])} ${sl(sides[0])}, ${SEG(N[1] + N[2])} ${sl(sides[1])}, ${SEG(N[2] + N[3])} ${sl(sides[2])}, ${SEG(N[3] + N[0])} ${sl(sides[3])}.\n${actual === 'none' ? 'No pair of opposite sides is parallel.' : actual === 'para' ? 'Both pairs of opposite sides are parallel, so it is a parallelogram (a trapezoid has exactly one pair).' : `Exactly one pair of opposite sides is parallel, so it is a trapezoid. The legs have lengths √${len(par1 ? sides[1] : sides[0])} and √${len(par1 ? sides[3] : sides[2])}, so it is ${actual === 'iso' ? '' : 'not '}isosceles.`}` };
+  }
+};
+TEMPLATES.g75IsoAngles = (r) => {
+  const N = pickLetters(r, 4), a = ri(r, 45, 135); if (a === 90) return TEMPLATES.g75IsoAngles(r);
+  const w = 7, h = 3, c = h / Math.tan((a * Math.PI) / 180), P = [[0, 0], [w, 0], [w - c, h], [c, h]];
+  if (w - 2 * c < 1.2) return TEMPLATES.g75IsoAngles(r);
+  const k = ri(r, 1, 3), ans = k === 1 ? a : 180 - a;
+  return { topic: 'Angles of an isosceles trapezoid', stem: `Find m∠${N[k]} in isosceles trapezoid ${N.join('')}.`, ...g6Choices(r, ans, g7deg), fr: FR.num(`m∠${N[k]} =`, ans, { suffix: '°' }),
+    draw: g7Fig([{ pts: P, names: N, alab: [`${a}°`, '', '', ''], ticks: [0, 1, 0, 1], par: [1, 0, 1, 0] }]), size: [400, 240],
+    solution: k === 1 ? `Base angles of an isosceles trapezoid are congruent: m∠${N[1]} = m∠${N[0]} = ${a}°.` : `∠${N[k]} and ∠${N[k === 3 ? 0 : 1]} are consecutive angles between the parallel bases, so they are supplementary: 180° − ${a}° = ${ans}°.` };
+};
+TEMPLATES.g75Midseg = (r) => {
+  const N = pickLetters(r, 6), [A, B, C, D, M, Q] = N, b1 = ri(r, 8, 30), b2 = ri(r, 4, b1 - 2), mid = (b1 + b2) / 2, findMid = r() < 0.55;
+  const P = [[0, 0], [7, 0], [5.4, 3], [1.4, 3]], Mp = VEC.mul(VEC.add(P[0], P[3]), 0.5), Np = VEC.mul(VEC.add(P[1], P[2]), 0.5);
+  const polys = [{ group: 'g', pts: P, names: [A, B, C, D], slab: [findMid ? String(b1) : '', '', String(b2), ''], par: [1, 0, 1, 0] }, { group: 'g', pts: [Mp, Np], names: [M, Q], slab: [findMid ? '' : fmt(mid), ''] },
+    { pts: [P[0], Mp], ticks: [1, 0] }, { pts: [Mp, P[3]], ticks: [1, 0] }, { pts: [P[1], Np], ticks: [2, 0] }, { pts: [Np, P[2]], ticks: [2, 0] }];
+  const ans = findMid ? mid : b1, what = findMid ? `${M}${Q}` : `${A}${B}`;
+  return { topic: 'Midsegment of a trapezoid', stem: `Find ${what} in trapezoid ${A}${B}${C}${D}, where ${SEG(M + Q)} is the midsegment.`, ...g6Choices(r, ans, (x) => fmt(x)), fr: FR.num(`${what} =`, ans),
+    draw: g7Fig(polys), size: [420, 260],
+    solution: findMid ? `The midsegment is half the sum of the bases: ${M}${Q} = (${b1} + ${b2}) ÷ 2 = ${fmt(mid)}` : `${M}${Q} = (${A}${B} + ${D}${C}) ÷ 2, so ${fmt(mid)} = (${A}${B} + ${b2}) ÷ 2 → ${A}${B} = 2(${fmt(mid)}) − ${b2} = ${b1}` };
+};
+TEMPLATES.g75MidCoord = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), dir = pick(r, [[1, 0], [0, 1], [3, 4], [4, 3], [-3, 4]]), L = Math.hypot(...dir), nrm = [-dir[1], dir[0]];
+    const A = [ri(r, -6, 2), ri(r, -6, 2)], a = ri(r, 2, 4), b = ri(r, 1, a + 2), s = ri(r, -1, 2), h = L > 1 ? 1 : pick(r, [2, 3, 4]);
+    if (b === a) continue;
+    const B = VEC.add(A, VEC.mul(dir, a)), D = VEC.add(A, VEC.add(VEC.mul(dir, s), VEC.mul(nrm, h))), C = VEC.add(D, VEC.mul(dir, b));
+    if (![B, C, D].every((p) => p.every(Number.isInteger))) continue;
+    const ans = ((a + b) * L) / 2;
+    return { topic: 'Midsegment in the coordinate plane', stem: `Find the length of the midsegment of the trapezoid with vertices ${N[0]}${ptT(A)}, ${N[1]}${ptT(B)}, ${N[2]}${ptT(C)}, and ${N[3]}${ptT(D)}.`,
+      ...g6Choices(r, ans, (x) => fmt(x)), fr: FR.num('Midsegment length:', ans),
+      solution: `The bases are the parallel sides ${SEG(N[0] + N[1])} (length ${fmt(a * L)}) and ${SEG(N[3] + N[2])} (length ${fmt(b * L)}).\nMidsegment = (${fmt(a * L)} + ${fmt(b * L)}) ÷ 2 = ${fmt(ans)}` };
+  }
+};
+TEMPLATES.g75Kite = (r) => {
+  for (;;) {
+    const N = pickLetters(r, 4), top = ri(r, 50, 120), bot = ri(r, 40, 110), side = (360 - top - bot) / 2; if (!Number.isInteger(side) || side < 50 || side > 150) continue;
+    // kite: N0 top, N1 right, N2 bottom, N3 left; N0N1 = N0N3 and N2N1 = N2N3, so ∠N1 ≅ ∠N3
+    const h1 = 1.6 / Math.tan((top * Math.PI) / 360), h2 = 1.6 / Math.tan((bot * Math.PI) / 360); if (h1 + h2 > 7) continue;
+    const P = [[0, h1], [1.6, 0], [0, -h2], [-1.6, 0]];
+    const k = pick(r, [1, 2]), given = k === 1 ? [`${top}°`, '', `${bot}°`, ''] : [`${top}°`, `${side}°`, '', ''], ans = k === 1 ? side : bot, ask = k === 1 ? N[1] : N[2];
+    return { topic: 'Angles of a kite', stem: `Find m∠${ask} in kite ${N.join('')}.`, ...g6Choices(r, ans, g7deg), fr: FR.num(`m∠${ask} =`, ans, { suffix: '°' }),
+      draw: g7Fig([{ pts: P, names: N, alab: given, ticks: [1, 2, 2, 1] }]), size: [360, 340],
+      solution: k === 1 ? `In a kite, the angles between the non-congruent sides are congruent: ∠${N[1]} ≅ ∠${N[3]}.\n2(m∠${N[1]}) + ${top}° + ${bot}° = 360°  →  m∠${N[1]} = ${side}°` : `∠${N[3]} ≅ ∠${N[1]}, so m∠${N[3]} = ${side}°.\nm∠${N[2]} = 360° − ${top}° − 2(${side}°) = ${bot}°` };
+  }
+};
+TEMPLATES.g75Specific = (r) => {
+  const N = pickLetters(r, 4), kinds = ['Square', 'Rectangle', 'Rhombus', 'Parallelogram', 'Kite', 'Trapezoid', 'Isosceles trapezoid'], k = pick(r, kinds);
+  let poly;
+  if (k === 'Square') poly = { pts: [[0, 0], [4, 0], [4, 4], [0, 4]], right: [1, 1, 1, 1], ticks: [1, 1, 1, 1] };
+  else if (k === 'Rectangle') poly = { pts: [[0, 0], [6, 0], [6, 3.4], [0, 3.4]], right: [1, 1, 1, 1] };
+  else if (k === 'Rhombus') poly = { pts: [[0, 0], [4, 0], [6.2, 3.2], [2.2, 3.2]].map((p) => p), ticks: [1, 1, 1, 1] };
+  else if (k === 'Parallelogram') poly = { pts: g7para(6, 3.2, 1.6), ticks: [1, 2, 1, 2], par: [1, 2, 1, 2] };
+  else if (k === 'Kite') poly = { pts: [[0, 3], [1.8, 0.6], [0, -3], [-1.8, 0.6]], ticks: [1, 2, 2, 1] };
+  else if (k === 'Trapezoid') poly = { pts: [[0, 0], [7, 0], [5.6, 3], [0.8, 3]], par: [1, 0, 1, 0] };
+  else poly = { pts: [[0, 0], [7, 0], [5.4, 3], [1.6, 3]], par: [1, 0, 1, 0], ticks: [0, 1, 0, 1] };
+  if (k === 'Rhombus') { const s = 4, a = Math.PI / 3 + r() * 0.3; poly.pts = [[0, 0], [s, 0], [s + s * Math.cos(a), s * Math.sin(a)], [s * Math.cos(a), s * Math.sin(a)]]; }
+  const why = { Square: 'four congruent sides and four right angles', Rectangle: 'four right angles', Rhombus: 'four congruent sides', Parallelogram: 'both pairs of opposite sides parallel and congruent', Kite: 'two pairs of consecutive congruent sides, with opposite sides not congruent', Trapezoid: 'exactly one pair of parallel sides', 'Isosceles trapezoid': 'exactly one pair of parallel sides and congruent legs' }[k];
+  return { topic: 'Naming quadrilaterals', stem: 'Give the most specific name for the quadrilateral.', ...buildChoices(r, k, kinds.filter((x) => x !== k), () => null),
+    fr: FR.select('Most specific name:', kinds, k), draw: g7Fig([{ ...poly, names: N }]), size: [380, 300], solution: `The marks show ${why}, so it is a${/^[AEIOU]/.test(k) ? 'n' : ''} ${k.toLowerCase()}.` };
+};
+/* ==== GEOMETRY CH7 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -13354,6 +13793,12 @@ Object.assign(SETS, {
   'alg2-4-7': { subject: 'algebra2', title: '4.7 Transformations of Polynomial Functions', items: [['b47Describe', 4], ['b47Rule', 4], ['b47Transform', 3]] },
   'alg2-4-8': { subject: 'algebra2', title: '4.8 Analyzing Graphs of Polynomial Functions', items: [['b48Match', 3], ['b48Zeros', 3], ['b48LeastDeg', 3], ['b48EvenOdd', 3]] },
   'alg2-4-9': { subject: 'algebra2', title: '4.9 Modeling with Polynomial Functions', items: [['b49Cubic', 5], ['b49FiniteDiff', 5]] },
+  // ----- Geometry, Chapter 7: Quadrilaterals and Other Polygons -----
+  'geo-7-1': { subject: 'geometry', title: '7.1 Angles of Polygons', items: [['g71Sum', 2], ['g71Sides', 2], ['g71FindX', 4], ['g71Ext', 3], ['g71Regular', 2]] },
+  'geo-7-2': { subject: 'geometry', title: '7.2 Properties of Parallelograms', items: [['g72Vars', 3], ['g72Angle', 2], ['g72Diag', 3], ['g72Alg', 3], ['g72Coord', 2]] },
+  'geo-7-3': { subject: 'geometry', title: '7.3 Proving That a Quadrilateral Is a Parallelogram', items: [['g73Theorem', 4], ['g73FindX', 5], ['g73Coord', 3]] },
+  'geo-7-4': { subject: 'geometry', title: '7.4 Properties of Special Parallelograms', items: [['g74Always', 3], ['g74Which', 2], ['g74Measure', 4], ['g74RectDiag', 2], ['g74Coord', 2]] },
+  'geo-7-5': { subject: 'geometry', title: '7.5 Properties of Trapezoids and Kites', items: [['g75Coord', 2], ['g75IsoAngles', 2], ['g75Midseg', 3], ['g75MidCoord', 1], ['g75Kite', 2], ['g75Specific', 2]] },
 });
 QUESTION_TYPES.push(
   { id: 'a41SlopeInt', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'From slope and y-intercept', desc: 'Write y = mx + b (#1–6)' },
@@ -13485,8 +13930,36 @@ QUESTION_TYPES.push(
   { id: 'b48LeastDeg', subject: 'algebra2', section: '4.8 Analyzing Graphs of Polynomial Functions', label: 'Least possible degree', desc: 'From a graph (#31–34)' },
   { id: 'b48EvenOdd', subject: 'algebra2', section: '4.8 Analyzing Graphs of Polynomial Functions', label: 'Even, odd, or neither', desc: '#37–44' },
   { id: 'b49Cubic', subject: 'algebra2', section: '4.9 Modeling with Polynomial Functions', label: 'Cubic through given points', desc: '#1–4' },
-  { id: 'b49FiniteDiff', subject: 'algebra2', section: '4.9 Modeling with Polynomial Functions', label: 'Finite differences', desc: 'Degree from a table (#5–10)' }
+  { id: 'b49FiniteDiff', subject: 'algebra2', section: '4.9 Modeling with Polynomial Functions', label: 'Finite differences', desc: 'Degree from a table (#5–10)' },
+  { id: 'g71Sum', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Interior angle sum', desc: '#1–4' },
+  { id: 'g71Sides', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Number of sides from the sum', desc: 'Classify the polygon (#5–8)' },
+  { id: 'g71FindX', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Find x from interior angles', desc: '#9–14, 17–20' },
+  { id: 'g71Ext', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Find x from exterior angles', desc: '#21–24' },
+  { id: 'g71Regular', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Regular polygon angles', desc: 'Each interior and exterior angle (#25–28)' },
+  { id: 'g72Vars', subject: 'geometry', section: '7.2 Properties of Parallelograms', label: 'Variables in a parallelogram', desc: 'Sides and angles (#1–4)' },
+  { id: 'g72Angle', subject: 'geometry', section: '7.2 Properties of Parallelograms', label: 'Find an angle', desc: '#5–6' },
+  { id: 'g72Diag', subject: 'geometry', section: '7.2 Properties of Parallelograms', label: 'Sides, diagonals, and angles', desc: '#7–14' },
+  { id: 'g72Alg', subject: 'geometry', section: '7.2 Properties of Parallelograms', label: 'Algebra with angles and diagonals', desc: '#15–18' },
+  { id: 'g72Coord', subject: 'geometry', section: '7.2 Properties of Parallelograms', label: 'Coordinates', desc: 'Diagonal intersection or fourth vertex (#23–24)' },
+  { id: 'g73Theorem', subject: 'geometry', section: '7.3 Proving That a Quadrilateral Is a Parallelogram', label: 'Which theorem proves it?', desc: '#1–6' },
+  { id: 'g73FindX', subject: 'geometry', section: '7.3 Proving That a Quadrilateral Is a Parallelogram', label: 'Values that make a parallelogram', desc: '#7–14' },
+  { id: 'g73Coord', subject: 'geometry', section: '7.3 Proving That a Quadrilateral Is a Parallelogram', label: 'Is it a parallelogram? (coordinates)', desc: '#15–18' },
+  { id: 'g74Always', subject: 'geometry', section: '7.4 Properties of Special Parallelograms', label: 'Always, sometimes, or never', desc: '#1–6, 15–20, 61–66' },
+  { id: 'g74Which', subject: 'geometry', section: '7.4 Properties of Special Parallelograms', label: 'Which quadrilaterals have the property?', desc: '#47–52' },
+  { id: 'g74Measure', subject: 'geometry', section: '7.4 Properties of Special Parallelograms', label: 'Measures in rhombuses, rectangles, squares', desc: '#11–14, 29–46' },
+  { id: 'g74RectDiag', subject: 'geometry', section: '7.4 Properties of Special Parallelograms', label: 'Diagonals of a rectangle', desc: '#23–26' },
+  { id: 'g74Coord', subject: 'geometry', section: '7.4 Properties of Special Parallelograms', label: 'Rectangle, rhombus, or square? (coordinates)', desc: '#53–58' },
+  { id: 'g75Coord', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Is it a trapezoid? (coordinates)', desc: '#1–4' },
+  { id: 'g75IsoAngles', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Isosceles trapezoid angles', desc: '#5–6' },
+  { id: 'g75Midseg', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Trapezoid midsegment', desc: '#7–10' },
+  { id: 'g75MidCoord', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Midsegment from coordinates', desc: '#11–14' },
+  { id: 'g75Kite', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Kite angles', desc: '#15–18' },
+  { id: 'g75Specific', subject: 'geometry', section: '7.5 Properties of Trapezoids and Kites', label: 'Most specific name', desc: '#21–24' }
 );
+{ // keep each subject's question types together (stable)
+  const first = {}; QUESTION_TYPES.forEach((t, i) => { if (!(t.subject in first)) first[t.subject] = i; });
+  QUESTION_TYPES.sort((a, b) => first[a.subject] - first[b.subject]);
+}
 /* ==== ALGEBRA CATALOG END ==== */
 
 // an edited assignment keeps the key of the original link (id=), so students keep their saved work and questions
@@ -15075,7 +15548,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations' }, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations' }, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
