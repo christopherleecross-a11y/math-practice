@@ -111,7 +111,33 @@
   .shieldcard { max-width: 460px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 28px; text-align: center; }
   .shieldcard h2 { margin: 8px 0; font-size: 22px; }
   body.shielded .wrap { visibility: hidden; }
-  @media print { body { display: none !important; } }
+  @media print { body:not(.printing) { display: none !important; } }
+  /* teacher printouts */
+  .printout { background: #fff; color: #000; }
+  .pv { padding: 8px 4px 20px; }
+  .pv + .pv, .pkey { break-before: page; page-break-before: always; }
+  .phead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 4px; font-family: Georgia, "Times New Roman", serif; }
+  .phead h2 { margin: 0; font-size: 22px; }
+  .pfields { font-size: 15px; white-space: nowrap; }
+  .pdir { font-size: 13px; color: #444; margin: 4px 0 8px; font-family: Georgia, serif; }
+  .pq { break-inside: avoid; page-break-inside: avoid; padding: 10px 0 6px; border-bottom: 1px solid #ddd; display: grid; grid-template-columns: 34px 1fr; }
+  .pq .pn { font: 700 17px Georgia, serif; padding-top: 3px; }
+  .pq canvas { display: block; max-width: 100%; }
+  .pch { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 18px; margin-top: 6px; }
+  .pch.one { grid-template-columns: 1fr; }
+  .pch > div { display: flex; gap: 6px; align-items: flex-start; }
+  .pch b { font: 700 16px Georgia, serif; padding-top: 2px; min-width: 20px; }
+  .pblank { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 10px; font: 16px Georgia, serif; align-items: flex-end; }
+  .pblank span.line { display: inline-block; min-width: 170px; border-bottom: 1px solid #000; height: 22px; }
+  .pkey h2 { font: 700 20px Georgia, serif; margin: 0 0 8px; border-bottom: 2px solid #000; padding-bottom: 4px; }
+  .pkrow { display: grid; grid-template-columns: 34px 1fr; padding: 4px 0; border-bottom: 1px solid #eee; break-inside: avoid; font: 15px Georgia, serif; }
+  .pkrow .psol { color: #333; font-size: 13px; white-space: pre-wrap; margin-top: 2px; }
+  @media print {
+    body.printing { background: #fff; }
+    body.printing header, body.printing #tnav, body.printing .noprint { display: none !important; }
+    body.printing .wrap { max-width: none; padding: 0; }
+    @page { margin: 0.55in; }
+  }
   .fr { margin-top: 12px; }
   .frpart { font-weight: 700; font-size: 14px; color: var(--muted); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .5px; }
   .frrow { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; }
@@ -15614,6 +15640,16 @@ function customKeyFor(q) {
 }
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
 let CUSTOM_KEY = null;
+// a built assignment's link (from the teacher's list) → its key in SETS
+function registerCustomUrl(url) {
+  let q; try { q = new URL(url).searchParams; } catch { return null; }
+  const mix = q.get('mix'); if (!mix) return null;
+  const items = mix.split('_').map((p) => p.split('.')).filter(([id, n]) => TEMPLATES[id] && +n > 0).map(([id, n, f]) => [id, Math.min(20, Math.floor(+n)), f === 'fr' ? 'fr' : 'mc']);
+  if (!items.length) return null;
+  const key = customKeyFor(q);
+  if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1' };
+  return key;
+}
 (function loadCustom() {
   const mix = new URLSearchParams(location.search).get('mix');
   if (!mix) return;
@@ -17118,17 +17154,19 @@ function teacherNav(active) {
     nav = el('nav', { id: 'tnav', style: 'display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:12px' });
     app.before(nav);
   }
-  const go = (fn) => () => { const w = document.querySelector('.wrap'); if (w) w.style.maxWidth = ''; fn(); window.scrollTo(0, 0); };
+  const go = (fn) => () => { const w = document.querySelector('.wrap'); if (w) w.style.maxWidth = ''; document.body.classList.remove('printing'); fn(); window.scrollTo(0, 0); };
   const tabs = [
     ['build', 'Build an assignment', go(builder)],
     ['dash', 'Results dashboard', go(() => { DASH.title = ''; DASH.student = null; dashboard(); })],
     ['key', 'Look up an answer key', go(() => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); })],
+    ['print', 'Print', go(() => printScreen())],
   ];
   nav.innerHTML = '';
   tabs.forEach(([id, label, fn]) => nav.append(el('button', { type: 'button', onclick: fn, 'aria-current': id === active ? 'page' : 'false',
     style: `flex:1;min-width:150px;padding:9px 12px;font:600 15px system-ui,sans-serif;border-radius:8px;border:1px solid ${id === active ? 'var(--accent)' : 'transparent'};background:${id === active ? 'var(--accent)' : 'transparent'};color:${id === active ? '#fff' : 'var(--accent)'};cursor:pointer` }, label)));
 }
 function teacherMenu() {
+  if (params.has('print')) return printScreen(CUSTOM_KEY || (SETS[params.get('set')] ? params.get('set') : null));
   if (CUSTOM_KEY || SETS[params.get('set')]) { document.getElementById('title').textContent = 'Answer key'; return startScreen(true); }
   document.getElementById('title').textContent = 'Teacher tools';
   teacherNav('');
@@ -17138,7 +17176,121 @@ function teacherMenu() {
     el('p', {}, 'What would you like to do?'),
     el('button', { class: 'btn', onclick: builder }, 'Build an assignment'), ' ',
     el('button', { class: 'btn', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key')));
+    el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key'), ' ',
+    el('button', { class: 'btn secondary', onclick: () => printScreen() }, 'Print an assignment')));
+}
+
+/* ---------- printing (teacher only): paper copies in one or more versions, with an answer key ---------- */
+const PRINT = { key: null, versions: 1, format: 'as', space: 'some', key2: true, sols: false, nonce: 0 };
+function printQuestions(setKey, letter) {
+  const S = SETS[setKey], seedStr = `${CONFIG.SALT}|${setKey}|print|${letter}|${PRINT.nonce}`, r = mulberry32(cyrb53(seedStr));
+  let qs = [];
+  for (const [tpl, count, mode] of S.items) for (let i = 0; i < count; i++) {
+    const m = PRINT.format === 'mc' ? 'mc' : PRINT.format === 'fr' ? 'fr' : mode;
+    const q = applyMode(TEMPLATES[tpl](r), m); q.tpl = tpl; q.fmt = m; qs.push(q);
+  }
+  if (S.shuffle) qs = shuffle(r, qs);
+  return qs;
+}
+function printScreen(preKey) {
+  teacherNav('print');
+  document.getElementById('title').textContent = 'Print an assignment';
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '';
+  document.body.classList.add('printing');
+  if (preKey) PRINT.key = preKey;
+  app.innerHTML = '';
+  const pick = el('select', {}, el('option', { value: '' }, 'Loading…'));
+  const fill = (lib) => {
+    pick.innerHTML = ''; pick.append(el('option', { value: '' }, 'Choose an assignment…'));
+    if (PRINT.key && SETS[PRINT.key] && SETS[PRINT.key].custom && !lib.some((e) => e.key === PRINT.key)) pick.append(el('option', { value: PRINT.key }, SETS[PRINT.key].title + ' (built)'));
+    Object.entries(SUBJECTS).forEach(([sk, sname]) => {
+      const mine = lib.filter((e) => e.subject === sk);
+      if (mine.length) pick.append(el('optgroup', { label: `${sname} — assignments you built` }, ...mine.map((e) => el('option', { value: 'url:' + e.url }, e.title))));
+      const menu = Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden && !v.custom);
+      if (menu.length) pick.append(el('optgroup', { label: `${sname} — menu assignments` }, ...menu.map(([k, v]) => el('option', { value: k }, v.title))));
+    });
+    const cur = PRINT.key && [...pick.options].find((o) => o.value === PRINT.key || (o.value.startsWith('url:') && registerCustomUrl(o.value.slice(4)) === PRINT.key));
+    if (cur) pick.value = cur.value;
+  };
+  fill([]); builderLibrary().then(fill).catch(() => {});
+  const num = el('input', { type: 'number', min: '1', max: '8', value: String(PRINT.versions), style: 'width:80px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
+  const fmtSel = el('select', {}, el('option', { value: 'as' }, 'As assigned'), el('option', { value: 'mc' }, 'All multiple choice'), el('option', { value: 'fr' }, 'All free response (where available)'));
+  const spSel = el('select', {}, el('option', { value: 'none' }, 'None'), el('option', { value: 'some' }, 'Some (about 1 inch)'), el('option', { value: 'lots' }, 'Lots (about 2½ inches)'));
+  const keyIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' }), solIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
+  fmtSel.value = PRINT.format; spSel.value = PRINT.space; keyIn.checked = PRINT.key2; solIn.checked = PRINT.sols;
+  const out = el('div', { class: 'printout' }), msg = el('p', { class: 'small', style: 'margin:8px 0 0' });
+  const row = (lab, ctl, note) => [el('label', {}, lab), note ? el('div', { style: 'display:flex;gap:10px;align-items:center' }, ctl, el('span', { class: 'small' }, note)) : ctl];
+  const chk = (box, text) => el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:10px 0 0' }, box, el('span', {}, text));
+  const printBtn = el('button', { class: 'btn', type: 'button', onclick: () => window.print() }, '🖨 Print');
+  app.append(el('div', { class: 'card noprint' },
+    el('p', { class: 'small', style: 'margin:0' }, 'Pick an assignment and how you want it printed. Each version has its own numbers; the answer key for every version prints at the end on separate pages.'),
+    ...row('Assignment', pick), ...row('Number of versions', num, '1 = everyone gets the same paper. 2 or more = versions A, B, C… to hand out alternately.'),
+    ...row('Question format', fmtSel), ...row('Space for work under each question', spSel),
+    chk(keyIn, 'Include the answer key'), chk(solIn, 'Show worked solutions in the answer key'),
+    el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, printBtn,
+      el('button', { class: 'btn secondary', type: 'button', onclick: () => { PRINT.nonce++; draw(); } }, 'New numbers')), msg),
+    out);
+  function draw() {
+    out.innerHTML = '';
+    const v = pick.value; PRINT.key = v.startsWith('url:') ? registerCustomUrl(v.slice(4)) : v || null;
+    PRINT.versions = Math.max(1, Math.min(8, Math.floor(+num.value || 1))); PRINT.format = fmtSel.value; PRINT.space = spSel.value; PRINT.key2 = keyIn.checked; PRINT.sols = solIn.checked;
+    printBtn.disabled = !PRINT.key;
+    if (!PRINT.key || !SETS[PRINT.key]) { msg.textContent = 'Choose an assignment to see the printout.'; return; }
+    const S = SETS[PRINT.key], W = 690, letters = 'ABCDEFGH', keys = [];
+    let total = 0;
+    for (let k = 0; k < PRINT.versions; k++) {
+      const L = letters[k], qs = printQuestions(PRINT.key, PRINT.versions > 1 ? L : '-'); total = qs.length; keys.push([L, qs]);
+      const pv = el('div', { class: 'pv' }, el('div', { class: 'phead' }, el('div', {}, el('h2', {}, S.title), el('div', { class: 'small', style: 'color:#444' }, `${SUBJECTS[S.subject] || ''}${PRINT.versions > 1 ? ` · Version ${L}` : ''} · ${CONFIG.TEACHER_NAME}`)),
+        el('div', { class: 'pfields' }, 'Name ____________________   Date ________   Period ____')),
+        el('div', { class: 'pdir' }, 'Show your work. For multiple choice, circle the letter of the best answer.'));
+      qs.forEach((q, i) => {
+        const body = el('div', {});
+        body.append(textCanvas(q.stem, W - 40));
+        let fig = null, figW = 0;
+        if (q.draw) {
+          const graph = q.topic.startsWith('Graphs'), sz = q.size || (graph ? [620, 330] : [560, 300]), k2 = Math.min(1, (W - 60) / sz[0], (graph || sz[0] < 300 ? 380 : 320) / sz[0], 210 / sz[1]);
+          const cv = makeCanvas(sz[0], sz[1]); cv._stack = false; try { q.draw(cv); } catch {}
+          figW = Math.round(sz[0] * k2); cv.style.width = figW + 'px'; cv.style.maxWidth = '100%'; fig = cv;
+        }
+        const shortCh = q.mode !== 'fr' && q.choices && Math.max(...q.choices.map((c) => String(c).length)) <= 34;
+        if (fig && shortCh && figW <= 420) { // figure on the left, choices on the right
+          body.append(el('div', { style: 'display:flex;gap:18px;align-items:center' }, fig, el('div', { class: 'pch one', style: 'flex:1' }, ...q.choices.map((c, j) => el('div', {}, el('b', {}, LETTERS[j] + '.'), textCanvas(c, Math.max(160, W - 110 - figW), '16px Georgia, "Times New Roman", serif', 22))))));
+          if (PRINT.space !== 'none') body.append(el('div', { style: `height:${PRINT.space === 'lots' ? 180 : 24}px` }));
+          pv.append(el('div', { class: 'pq' }, el('div', { class: 'pn' }, `${i + 1}.`), body));
+          return;
+        }
+        if (fig) body.append(fig);
+        if (q.mode === 'fr') {
+          const bl = el('div', { class: 'pblank' });
+          (q.fr.fields || []).forEach((f) => {
+            if (f.kind === 'select') bl.append(f.options.join('').length > 50 ? el('div', { style: 'width:100%' }, el('div', {}, (f.label ? f.label + ' ' : '') + 'Circle one:'), ...f.options.map((o) => el('div', { style: 'margin-left:14px' }, '○  ' + o))) : el('span', {}, (f.label ? f.label + ' ' : '') + 'circle one:  ' + f.options.join('   /   ')));
+            else bl.append(el('span', {}, (f.label ? f.label + ' ' : '') + (f.prefix || '')), el('span', { class: 'line' }), f.suffix ? el('span', {}, f.suffix) : '');
+          });
+          if (!q.fr.fields || !q.fr.fields.length || q.proofQ) bl.append(el('div', { style: 'height:120px' }));
+          body.append(bl);
+        } else if (q.choices) {
+          const longest = Math.max(...q.choices.map((c) => String(c).length)), two = longest <= 26 && !q.choices.some((c) => String(c).includes('\n'));
+          const cw = two ? Math.floor((W - 90) / 2) : W - 70;
+          body.append(el('div', { class: 'pch' + (two ? '' : ' one') }, ...q.choices.map((c, j) => el('div', {}, el('b', {}, LETTERS[j] + '.'), textCanvas(c, cw, '16px Georgia, "Times New Roman", serif', 22)))));
+        }
+        if (PRINT.space !== 'none') body.append(el('div', { style: `height:${PRINT.space === 'lots' ? 220 : 72}px` }));
+        pv.append(el('div', { class: 'pq' }, el('div', { class: 'pn' }, `${i + 1}.`), body));
+      });
+      out.append(pv);
+    }
+    if (PRINT.key2) keys.forEach(([L, qs]) => {
+      const kd = el('div', { class: 'pkey' }, el('h2', {}, `Answer key — ${S.title}${PRINT.versions > 1 ? ` (Version ${L})` : ''}`));
+      qs.forEach((q, i) => {
+        const ans = q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}.  ${q.choices[q.answer]}`;
+        kd.append(el('div', { class: 'pkrow' }, el('div', { style: 'font-weight:700' }, `${i + 1}.`), el('div', {}, el('div', {}, ans), PRINT.sols && q.solution ? el('div', { class: 'psol' }, q.solution) : '')));
+      });
+      out.append(kd);
+    });
+    msg.textContent = `${PRINT.versions > 1 ? `${PRINT.versions} versions × ` : ''}${total} questions. Use your browser’s print dialog to choose a printer or “Save as PDF.”`;
+  }
+  [pick, fmtSel, spSel, keyIn, solIn].forEach((x) => x.addEventListener('change', draw));
+  num.addEventListener('input', draw);
+  draw();
 }
 
 /* ---------- the builder's list of assignments you made ---------- */
@@ -17465,7 +17617,7 @@ function builder() {
   const out = el('div', { class: 'card' },
     el('div', {}, 'Total questions: ', totalEl), msg,
     el('label', {}, 'Student link (post this in Google Classroom)'), linkIn, copyBtn,
-    el('p', { class: 'small', style: 'margin-top:14px' }, tryLink, ' · ', keyLink),
+    el('p', { class: 'small', style: 'margin-top:14px' }, tryLink, ' · ', keyLink, ' · ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); const k = linkIn.value && registerCustomUrl(linkIn.value); if (k) { printScreen(k); window.scrollTo(0, 0); } } }, 'Print it')),
     el('details', { style: 'margin-top:10px' }, el('summary', { class: 'small' }, 'Make it a permanent menu item (optional)'),
       el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut));
   app.append(out);
