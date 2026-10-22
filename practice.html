@@ -6264,7 +6264,7 @@ function identityPool() {
   const pool = [];
   TRIG_VERIFY.forEach(([l, rr]) => pool.push([l, rr]));
   TRIG_SIMPLIFY.forEach(([e, a]) => pool.push([e, a]));
-  TRIG_IDS.forEach(([e, a]) => pool.push([e, a]));
+  TRIG_IDS.forEach(([e, a, kind]) => { if (kind !== 'Cofunction°') pool.push([e, a]); }); // (degree forms are only for #1–4; keeping them out keeps 2.2's questions as they were)
   return pool.filter(([l, rr]) => (l + rr).length <= 44);
 }
 const ANGLES = [['π/6', Math.PI / 6], ['π/4', Math.PI / 4], ['π/3', Math.PI / 3], ['π/6', Math.PI / 6]];
@@ -16668,7 +16668,7 @@ function registerCustomUrl(url) {
   const items = mix.split('_').map((p) => p.split('.')).filter(([id, n]) => TEMPLATES[id] && +n > 0).map(([id, n, f]) => [id, Math.min(20, Math.floor(+n)), f === 'fr' ? 'fr' : 'mc']);
   if (!items.length) return null;
   const key = customKeyFor(q);
-  if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1' };
+  if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1', gen: q.get('g') === '2' ? 2 : undefined };
   return key;
 }
 (function loadCustom() {
@@ -16686,7 +16686,7 @@ function registerCustomUrl(url) {
   const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints, leaveLimit, redo };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
 })();
 
 /* ---------- question generation ---------- */
@@ -16714,8 +16714,11 @@ function generate(setKey, period, sid, attempt = 1) {
   const seedStr = `${CONFIG.SALT}|${setKey}|${who}` + (attempt > 1 ? `|a${attempt}` : '');
   const r = mulberry32(cyrb53(seedStr));
   let qs = [];
+  // gen 2: each question gets its own random numbers, so a change to one question type never changes the others
+  const gen = SETS[setKey].gen || 1, seen = {};
   for (const [tpl, count, mode] of SETS[setKey].items) for (let i = 0; i < count; i++) {
-    const q = applyMode(TEMPLATES[tpl](r), mode); q.tpl = tpl; q.fmt = mode; qs.push(q);
+    const n = (seen[tpl] = (seen[tpl] || 0) + 1), rr = gen >= 2 ? mulberry32(cyrb53(`${seedStr}|${tpl}#${n}`)) : r;
+    const q = applyMode(TEMPLATES[tpl](rr), mode); q.tpl = tpl; q.fmt = mode; qs.push(q);
   }
   if (SETS[setKey].shuffle) qs = shuffle(r, qs);
   return { qs, seedStr, version: cyrb53(seedStr).toString(36).slice(-6).toUpperCase() };
@@ -16753,7 +16756,45 @@ function cloudNote(k) {
   if (cloudQuiet || PREVIEW) return; // leaving the tab is counted locally and rides along with the next real save
   if (cloudRestoring || !CONFIG.SCRIPT_URL || !state || state.teacher || !String(k).startsWith(state.base) || /:cloudts$/.test(k)) return;
   try { localStorage.setItem(state.base + ':cloudts', String(Date.now())); } catch {}
-  clearTimeout(cloudTimer); cloudTimer = setTimeout(() => cloudFlush(false), 2500);
+  clearTimeout(cloudTimer); cloudTimer = setTimeout(() => cloudFlush(false), 4000);
+}
+// ---- merging saved work (the same rules run in the Apps Script): A wins, anything only B has is kept ----
+const pBlank = (a) => a === null || a === undefined || a === '' || (Array.isArray(a) && a.every((x) => String(x ?? '').trim() === ''));
+function pMergeSaved(A, B) {
+  if (!A) return B; if (!B) return A;
+  if ((A.sig || []).join('|') !== (B.sig || []).join('|')) return A;
+  if (B.submitted && !A.submitted) return B;
+  const out = JSON.parse(JSON.stringify(A)), n = Math.max((A.answers || []).length, (B.answers || []).length);
+  out.answers = []; let added = 0;
+  for (let i = 0; i < n; i++) {
+    const a = (A.answers || [])[i], b = (B.answers || [])[i];
+    if (pBlank(a) && !pBlank(b)) { out.answers[i] = b; added++; ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (B[f] && B[f][i] !== undefined) { out[f] = out[f] || {}; out[f][i] = B[f][i]; } }); }
+    else out.answers[i] = a === undefined ? null : a;
+  }
+  ['tries', 'status', 'history', 'hintUsed'].forEach((f) => { if (B[f]) Object.keys(B[f]).forEach((i) => { out[f] = out[f] || {}; if (out[f][i] === undefined) out[f][i] = B[f][i]; }); });
+  if (B.started && (!out.started || B.started < out.started)) out.started = B.started;
+  out.tabAways = Math.max(A.tabAways || 0, B.tabAways || 0);
+  out._added = added;
+  return out;
+}
+function pMergeData(inc, old) {
+  if (!old || !inc || inc.reset || old.reset || inc.curKey !== old.curKey) return null;
+  const sv = pMergeSaved(inc.saved, old.saved); if (!sv || !sv._added) return null;
+  delete sv._added;
+  const out = JSON.parse(JSON.stringify(inc)); out.saved = sv;
+  if (old.work) { out.work = out.work || {}; Object.keys(old.work).forEach((k) => { if (pBlank(out.work[k])) out.work[k] = old.work[k]; }); }
+  return out;
+}
+// put saved work from the Sheet onto this device
+function cloudApply(base, d, updated) {
+  cloudRestoring = true;
+  try {
+    if (d.meta) store.set(base + ':meta', d.meta);
+    if (d.curKey && d.saved) store.set(d.curKey, d.saved);
+    if (d.curKey && d.work) store.set(d.curKey + ':work', d.work);
+    if (d.curKey && d.draw) store.set(d.curKey + ':draw', d.draw);
+    if (updated) localStorage.setItem(base + ':cloudts', String(updated));
+  } finally { cloudRestoring = false; }
 }
 function cloudPayload() {
   const b = state.base;
@@ -16768,6 +16809,15 @@ async function cloudFlush(leaving) {
   try {
     const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(cloudPayload()), keepalive: !!leaving });
     const g = await res.json().catch(() => ({}));
+    if (g && g.merged && state && !state.teacher && !leaving) { // the Sheet had answers this device was missing: bring them in
+      const st = state; let d = null; try { d = JSON.parse(g.merged); } catch {}
+      const mine = store.get(st.key);
+      if (d && d.curKey === st.key && JSON.stringify(d.saved) !== JSON.stringify(mine)) {
+        cloudApply(st.base, d, g.updated);
+        if (state === st) { begin(st.setKey, st.period, st.name, false, 1, st.rid); setCloudStatus('Progress saved online ✓ (added answers saved from another Chromebook)'); return; }
+      }
+    }
+    if (g && !g.ok && !g.reset) { setCloudStatus('Progress saved on this device (trying the online save again…)'); cloudTimer = setTimeout(() => cloudFlush(false), 20000); return; }
     if (g && g.reset && state && !state.teacher) { // reset by the teacher while this tab was open: start over
       const st = state;
       if (await cloudRestore(st.base, true) && state === st) { begin(st.setKey, st.period, st.name, false, 1, st.rid); return; }
@@ -16783,14 +16833,33 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 async function cloudRestore(base, force = false) {
   if (!CONFIG.SCRIPT_URL || PREVIEW) return;
   try {
-    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 8000);
-    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'loadProgress', key: base }), signal: ctl.signal });
-    clearTimeout(timer);
-    const g = await res.json();
+    let g = null;
+    for (let tryN = 0; tryN < 3 && !g; tryN++) { // the Sheet can be slow when a whole class opens at once: wait, and try again
+      if (tryN) { app.innerHTML = '<div class="card">Loading your saved work… (the server is busy, trying again)</div>'; await new Promise((ok) => setTimeout(ok, 1500)); }
+      try {
+        const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), tryN ? 25000 : 15000);
+        const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'loadProgress', key: base }), signal: ctl.signal });
+        clearTimeout(timer);
+        if (!res.ok && res.status >= 500) continue;
+        let j = null; try { j = await res.json(); } catch {}
+        if (j && j.ok) g = j; else if (j && j.error && /lock|timed out|too many|Service/i.test(j.error)) continue; else break;
+      } catch (e) { /* timed out or offline: try again */ }
+    }
+    if (!g) throw new Error('offline');
     if (!g || !g.ok || !g.data) return;
     const localTs = +(store.get(base + ':cloudts') || 0);
     const d = JSON.parse(g.data);
-    if (!(g.updated > localTs) && !(force && d.reset)) return;
+    if (!(g.updated > localTs) && !(force && d.reset)) { // this device is newer: make sure it has everything the Sheet has
+      const local = { meta: store.get(base + ':meta'), curKey: d.curKey, saved: d.curKey ? store.get(d.curKey) : null, work: d.curKey ? store.get(d.curKey + ':work') : null };
+      const m = local.saved && pMergeData(local, d);
+      if (m) { cloudApply(base, m, 0); try { localStorage.setItem(base + ':cloudts', String(Date.now())); } catch {} setTimeout(() => { if (state && state.base === base && !state.teacher) cloudFlush(false); }, 3000); }
+      return;
+    }
+    if (!d.reset && d.curKey) { // the Sheet is newer, but keep answers only this device has
+      const local = { meta: store.get(base + ':meta'), curKey: d.curKey, saved: store.get(d.curKey), work: store.get(d.curKey + ':work') };
+      const m = local.saved && pMergeData(d, local);
+      if (m) { cloudApply(base, m, 0); try { localStorage.setItem(base + ':cloudts', String(Date.now())); } catch {} setTimeout(() => { if (state && state.base === base && !state.teacher) cloudFlush(false); }, 3000); return true; }
+    }
     cloudRestoring = true;
     try {
       if (d.reset) { // the teacher reset this assignment for this student: clear it on this Chromebook too
@@ -17079,8 +17148,13 @@ function remapSaved(key, saved, sig) {
   if (!old || old.join() === sig.join()) return;
   const used = new Set(), map = sig.map((g) => { const j = old.findIndex((o, k) => o === g && !used.has(k)); if (j >= 0) used.add(j); return j; });
   const byIdx = (obj) => { if (!obj) return obj; const out = {}; map.forEach((j, i) => { if (j >= 0 && obj[j] !== undefined) out[i] = obj[j]; }); return out; };
+  // work on questions that no longer exist is kept aside (not deleted), so it comes back if those questions return
+  const orph = { ...(saved.orphans || {}) };
+  old.forEach((g, j) => { if (!used.has(j) && saved.answers && saved.answers[j] != null) orph[g] = { a: saved.answers[j], ...Object.fromEntries(['tries', 'status', 'history', 'ai', 'hintUsed'].filter((f) => saved[f] && saved[f][j] !== undefined).map((f) => [f, saved[f][j]])) }; });
   saved.answers = map.map((j) => (j >= 0 && saved.answers ? saved.answers[j] ?? null : null));
   ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (saved[f]) saved[f] = byIdx(saved[f]); });
+  sig.forEach((g, i) => { const o = orph[g]; if (map[i] < 0 && o) { saved.answers[i] = o.a; ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (o[f] !== undefined) { saved[f] = saved[f] || {}; saved[f][i] = o[f]; } }); delete orph[g]; } });
+  const ok = Object.keys(orph).slice(-60); saved.orphans = Object.fromEntries(ok.map((g) => [g, orph[g]]));
   saved.sig = sig;
   const work = store.get(key + ':work'); if (work) store.set(key + ':work', byIdx(work));
   const dr = store.get(key + ':draw');
@@ -18437,7 +18511,7 @@ function builder() {
     if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
       retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
-      leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), note, t: Date.now() });
+      leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), gen: q.get('g') === '2' ? 2 : 1, note, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
@@ -18670,7 +18744,7 @@ function builder() {
     const title = titleIn.value.trim() || 'Custom Practice';
     changedNow = false;
     const prevLast = store.get(TK('builder:last')) || {};
-    const nextLast = { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, redo: redoSel.value, ...(editId ? { editId } : {}) };
+    const nextLast = { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
     const sig = draftSig(nextLast);
     if (sig === store.get(TK('builder:sentSig'))) nextLast.t = prevLast.t || 0;
     else if (opening) { // first look at what was already here: copy it only if it came from loading an assignment just now
@@ -18697,6 +18771,7 @@ function builder() {
     if (!lockIn.checked) q.set('lock', '0');
     if (sameIn.checked) q.set('same', '1');
     if (hintsIn.checked) q.set('hints', '1');
+    if (!editId || saved.gen === 2) q.set('g', '2');
     if (editId) q.set('id', editId);
     const url = location.origin + location.pathname + '?' + q.toString();
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1';
