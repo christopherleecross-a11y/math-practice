@@ -14029,7 +14029,7 @@ function a6parse(src) {
       if (t.s === 'frac' || t.s === 'dfrac') { const n = group(), d = group(); return { t: 'frac', n, d }; }
       if (t.s === 'sqrt') { let idx = null; if (peek() && peek().s === '[') { k++; idx = seq(']'); k++; } return { t: 'sqrt', idx, b: group() }; }
       if (t.s === 'left') { const o = toks[k++].s; const body = seq('right'); k++; const c = toks[k++].s; return { t: 'paren', o, c, b: body }; }
-      const map = { cdot: '·', times: '×', pi: 'π', pm: '±', le: '≤', ge: '≥', ne: '≠', approx: '≈', infty: '∞', ',': ' ', ';': ' ', quad: '  ' };
+      const map = { cdot: '·', times: '×', pi: 'π', pm: '±', le: '≤', ge: '≥', ne: '≠', approx: '≈', infty: '∞', ell: 'ℓ', ',': ' ', ';': ' ', quad: '  ' };
       return { t: 'ch', s: map[t.s] ?? t.s };
     }
     if (t.s === '{') { const s = seq('}'); k++; return { t: 'grp', b: s }; }
@@ -14442,7 +14442,7 @@ TEMPLATES.a61Base = (r) => {
 const a6rootSym = (n) => (n === 2 ? '√' : n === 3 ? '∛' : n === 4 ? '∜' : a6sup(n) + '√');
 const a6rootT = (n, inner) => a6rootSym(n) + (/^[0-9]+$|^[a-z]$/.test(inner) ? inner : `(${inner})`);
 const a6rootL = (n, inner) => (n === 2 ? `\\sqrt{${inner}}` : `\\sqrt[${n}]{${inner}}`);
-const a6fracSupT = (m, n) => `${a6sup(m)}⁄${a6sup(n).replace('⁻', '')}`;
+const a6fracSupT = (m, n) => `^(${m < 0 ? MINUS : ''}${Math.abs(m)}/${Math.abs(n)})`;
 // pieces of a typed answer: the radicands of every root, and whether a root sits in a denominator
 function a6roots(s) {
   const out = []; let i = 0;
@@ -14509,7 +14509,7 @@ function a6RadT(A, latex = false) {
   const rad = hasRad ? (latex ? a6rootL(A.idx, inner) : a6rootT(A.idx, inner)) : '';
   const up = ks(A.out, true), dn = ks(A.out, false);
   const cn = Math.abs(A.c[0]), lead = cn === 1 && (up || rad) ? '' : String(cn);
-  const num = lead + up + rad, den = (A.c[1] === 1 ? '' : String(A.c[1])) + dn, sg = A.c[0] < 0 ? (latex ? '-' : MINUS) : '';
+  const num = lead + up + (A.idx >= 5 && rad && !latex && (lead || up) ? '\u2009' : '') + rad, den = (A.c[1] === 1 ? '' : String(A.c[1])) + dn, sg = A.c[0] < 0 ? (latex ? '-' : MINUS) : '';
   if (!den) return sg + num;
   if (latex) return `${sg}\\frac{${num}}{${den}}`;
   return `${sg}${num}/${(A.c[1] !== 1 ? 1 : 0) + Object.values(A.out).filter((e) => e < 0).length > 1 ? `(${den})` : den}`;
@@ -15014,6 +15014,969 @@ TEMPLATES.a65Compound = (r) => {
     solution: `Use y = P(1 + r/n)ⁿᵗ with P = ${P}, r = ${rr}, and n = ${n} (${nm}).\ny = ${P}(1 + ${rr}/${n})^(${n}t) = ${correct.slice(4)}` };
 };
 /* ==== ALGEBRA 1 CH6 END ==== */
+/* ==== ALGEBRA 2 CH5 BEGIN ==== */
+/* ---------- Algebra 2 (Big Ideas Learning 2025), Chapter 5: Rational Exponents and Radical Functions ---------- */
+KEYROWS_P.dom = [['≤', '\\le '], ['≥', '\\ge '], ['<', '<'], ['>', '>'], ['a⁄b', '\\frac{#@}{#?}'], ['all real numbers', '\\text{all real numbers}']];
+KEYROWS_P.fn5 = [['√', '\\sqrt{#?}'], ['∛', '\\sqrt[3]{#?}'], ['ⁿ√', '\\sqrt[#?]{#?}'], ['xⁿ', '^{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['( )', '\\left(#?\\right)']];
+// list of real answers, each within tol (rounded answers), or "no solution"
+function b5listOk(raw, vals, tol = 1e-6) {
+  const w = pxWords(raw);
+  if (/nosolution|none|noreal/.test(w)) return !vals.length;
+  const got = cxList(a6pre(raw));
+  if (got === 'none') return !vals.length;
+  if (!got.length || got.some((g) => !g || Math.abs(g[1]) > 1e-9)) return false;
+  const close = (a, b) => Math.abs(a - b) <= tol * (tol >= 1e-3 ? 1 : Math.max(1, Math.abs(b)));
+  return got.every((g) => vals.some((v) => close(g[0], v))) && vals.every((v) => got.some((g) => close(g[0], v)));
+}
+const b5r2 = (v) => Math.round(v * 100) / 100;
+const b5list = (vals) => (vals.length ? vals.map((v) => { const p = fracParts(v); return p && p[1] <= 12 ? fracT(v) : fmt(v); }).join(', ') : 'No solution');
+const b5listL = (vals) => (vals.length ? vals.map((v) => fracL(v)).join(',') : '\\text{no solution}');
+const b5srt = (L) => [...new Set(L.map((v) => Math.round(v * 1e9) / 1e9))].sort((p, q) => p - q);
+const b5listQ = (r, vals, wrongs, extra = (i) => b5list(vals.map((v) => v + i + 1))) => buildChoices(r, b5list(vals), [...new Set(wrongs.map((L) => b5list(b5srt(L))))].filter((w) => w !== b5list(vals)), extra);
+// a number with at most one power or root (5^(3/4), ∜5, 7, 1/2)
+function b5oneOk(raw, val) {
+  raw = a6pre(raw); const s = a6flat(raw); if (s == null || !s) return false;
+  const n = (s.match(/\^/g) || []).length + (s.match(/sqrt|root/g) || []).length;
+  if (n > 1 || /[a-z]/i.test(s.replace(/sqrt|root\d*/g, ''))) return false;
+  return numOk(raw, val, 1e-9);
+}
+
+/* ----- 5.1 nth Roots and Rational Exponents ----- */
+TEMPLATES.b51NthRoot = (r) => TEMPLATES.a62NthRoot(r);
+TEMPLATES.b51Eval = (r) => (r() < 0.35 ? TEMPLATES.a62EvalRad(r) : TEMPLATES.a62EvalRat(r));
+TEMPLATES.b51Match = (r) => TEMPLATES.a62Rewrite(r);
+// #21–28: evaluate with technology, two decimals
+TEMPLATES.b51Calc = (r) => {
+  for (;;) {
+    const n = pick(r, [2, 3, 4, 5, 6, 7]), m = pick(r, [1, 1, 2, 3, 4, 5, -1, -2, -5]), a = ri(r, 2, 300) * (n % 2 && r() < 0.2 ? -1 : 1);
+    if (gcd(Math.abs(m), n) !== 1 || Math.abs(m) === n) continue;
+    const v = pxPow(a, m / n); if (!isFinite(v) || Math.abs(v) > 1e5) continue;
+    const ans = b5r2(v), form = m > 0 && r() < 0.4 ? 'rad' : 'rat';
+    const aL = a < 0 ? `\\left(${a}\\right)` : String(a);
+    const tex = form === 'rad' ? (m === 1 ? a6rootL(n, String(a)) : `\\left(${a6rootL(n, String(a))}\\right)^{${m}}`) : `${aL}^{${m < 0 ? '-' : ''}\\frac{${Math.abs(m)}}{${n}}}`;
+    const fig = a6tex(tex), A = fmt(ans);
+    const wr = [b5r2(pxPow(Math.abs(a), n / Math.abs(m)) > 1e7 ? a / n : pxPow(Math.abs(a), n / Math.abs(m))), b5r2((a * m) / n), b5r2(-v), b5r2(pxPow(a, -m / n))].map(fmt);
+    return { topic: 'Evaluating with technology', stem: 'Evaluate the expression using technology. Round your answer to two decimal places, if necessary.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, A, [...new Set(wr)].filter((w) => w !== A), (i) => fmt(b5r2(ans + 0.37 * (i + 1)))),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: '≈' }], key: [String(ans)], display: A, check: (x) => { const g = pxConst(a6pre(x[0])); return Math.abs(g - ans) < 0.0051 || Math.abs(g - v) < 1e-6; } },
+      solution: `${form === 'rad' ? `${a6rootSym(n)}a = a^(1/${n}), so this is ${fmt(a)}^(${m}/${n}).` : `Type ${fmt(a)}^(${m}/${n}) with parentheses around the exponent.`}\n≈ ${fmt(+v.toFixed(5))} ≈ ${A}` };
+  }
+};
+// #29–38: real solutions of a power equation
+TEMPLATES.b51Solve = (r) => {
+  for (;;) {
+    const n = pick(r, [3, 3, 4, 5, 6, 2, 4]), kind = ri(r, 0, 4), v = pick(r, ['x', 'x', 'x', 't', 'k']), exact = r() < 0.5;
+    const s = exact ? ri(r, 2, 6) : null;
+    let rhs = exact ? (n % 2 && r() < 0.35 ? -1 : 1) * s ** n : nz(r, -150, 300), a = 1, h = 0, c = 0, frac = false;
+    if (kind === 1) a = pick(r, [2, 3, 5, 7]);
+    if (kind === 2) h = nz(r, -10, 10);
+    if (kind === 3) c = nz(r, -40, 40);
+    if (kind === 4) { a = pick(r, [2, 3, 6]); frac = true; }
+    // equation: (a or 1/a) * (v + h)^n + c = R, with (v+h)^n = rhs
+    const k = frac ? 1 / a : a, R = k * rhs + c;
+    if (!Number.isInteger(R) || Math.abs(R) > 2000 || (!exact && Math.abs(rhs) < 2)) continue;
+    let roots;
+    if (rhs < 0 && n % 2 === 0) roots = [];
+    else { const t = Math.sign(rhs) * Math.abs(rhs) ** (1 / n); roots = n % 2 ? [t - h] : [t - h, -t - h]; if (!rhs) roots = [-h]; }
+    roots = roots.map((x) => (exact ? Math.round(x * 1e9) / 1e9 : b5r2(x))).sort((p, q) => p - q);
+    const base = h ? `\\left(${v}${h > 0 ? '+' : '-'}${Math.abs(h)}\\right)` : v;
+    const lhs = `${frac ? `\\frac{1}{${a}}` : a === 1 ? '' : a}${base}^{${n}}${c ? (c > 0 ? '+' : '-') + Math.abs(c) : ''}`;
+    const fig = a6tex(`${lhs}=${R}`);
+    const one = roots.length === 2 ? [roots[1]] : roots.length ? [b5r2(-roots[0])] : [0];
+    return { topic: 'Solving equations with nth roots', stem: 'Find the real solution(s) of the equation. Round your answer to two decimal places, if necessary.', draw: fig.draw, size: fig.size,
+      ...b5listQ(r, roots, [one, roots.length ? roots.map((x) => b5r2(x + 2 * h)) : [b5r2(Math.abs(rhs) ** (1 / n))], roots.length === 2 ? [] : [b5r2(Math.abs(rhs) ** (1 / n)), b5r2(-(Math.abs(rhs) ** (1 / n)))], [b5r2(R / n)]]),
+      fr: { fields: [{ kind: 'expr', keys: 'roots', label: `${v} =` }], key: [b5listL(roots)], display: b5list(roots), check: (x) => b5listOk(x[0], roots, exact ? 1e-6 : 0.0051) },
+      solution: `Isolate the power: ${h ? `(${v} ${h > 0 ? '+' : MINUS} ${Math.abs(h)})` : v}${a6sup(n)} = ${fmt(rhs)}\n${rhs < 0 && n % 2 === 0 ? `An even power is never negative, so there is no real solution.` : `Take the ${n}th root${n % 2 ? '' : ' (± because n is even)'}: ${h ? `${v} ${h > 0 ? '+' : MINUS} ${Math.abs(h)}` : v} = ${n % 2 ? '' : '±'}${a6rootSym(n)}${fmt(Math.abs(rhs))}${rhs < 0 ? ` = ${MINUS}${a6rootSym(n)}${-rhs}` : ''}${h ? `\n${v} = ${h > 0 ? MINUS : ''}${Math.abs(h)} ${n % 2 ? '+' : '±'} ${a6rootSym(n)}${fmt(Math.abs(rhs))}` : ''}`}\n${v} = ${b5list(roots)}` };
+  }
+};
+// #39–40: rational exponents in real life
+TEMPLATES.b51Word = (r) => {
+  if (r() < 0.5) {
+    const L = ri(r, 8, 40), h = pick(r, [2, 3, 4, 5, 2.5, 1.5]), Q = 3.367 * L * h ** 1.5, ans = b5r2(Q);
+    const fig = a6tex('Q=3.367\\ell h^{\\frac{3}{2}}');
+    return { topic: 'Rational exponents in real life', stem: `A weir is a dam built across a river to regulate the flow of water. The flow rate Q (in cubic feet per second) can be calculated using the formula below, where ℓ is the length (in feet) of the bottom of the spillway and h is the depth (in feet) of the water on the spillway. Find the flow rate of a weir with a spillway that is ${L} feet long and has a water depth of ${h} feet. Round to two decimal places.`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, `${fmt(ans)} ft³/sec`, [3.367 * L * h * 1.5, 3.367 * L * h ** (2 / 3), 3.367 * L * h ** 3].map((x) => `${fmt(b5r2(x))} ft³/sec`), (i) => `${fmt(b5r2(ans + 11 * (i + 1)))} ft³/sec`),
+      fr: { fields: [{ kind: 'number', label: 'Q ≈', suffix: ' ft³/sec' }], key: [String(ans)], display: `${fmt(ans)} ft³/sec`, check: (x) => Math.abs(parseNum(x[0]) - Q) < 0.0151 },
+      solution: `Q = 3.367(${L})(${h})^(3/2) ≈ 3.367(${L})(${fmt(+(h ** 1.5).toFixed(4))}) ≈ ${fmt(ans)} cubic feet per second` };
+  }
+  const item = pick(r, [['potatoes', 0.62, 0.749], ['oranges', 0.91, 1.28], ['ground beef', 2.251, 3.775], ['apples', 1.12, 1.47], ['coffee', 3.68, 4.89], ['milk', 2.79, 3.62]]), n = pick(r, [8, 10, 12, 5]);
+  const rate = Math.pow(item[2] / item[1], 1 / n) - 1, ans = Math.round(rate * 1000) / 10;
+  const fig = a6tex('r=\\left(\\frac{p_2}{p_1}\\right)^{\\frac{1}{n}}-1');
+  return { topic: 'Rational exponents in real life', stem: `When the average price of an item increases from p₁ to p₂ over a period of n years, the annual rate of inflation r (in decimal form) is given by the formula below. The price per pound of ${item[0]} increased from $${item[1].toFixed(3)} to $${item[2].toFixed(3)} over ${n} years. Find the rate of inflation as a percent, to the nearest tenth.`, draw: fig.draw, size: fig.size,
+    ...buildChoices(r, `${ans}%`, [Math.round(((item[2] / item[1] - 1) / n) * 1000) / 10, Math.round((item[2] / item[1] - 1) * 1000) / 10, Math.round((Math.pow(item[1] / item[2], 1 / n) - 1) * 1000) / 10].map((x) => `${fmt(x)}%`), (i) => `${fmt(ans + 0.4 * (i + 1))}%`),
+    fr: { fields: [{ kind: 'number', label: 'r ≈', suffix: '%' }], key: [String(ans)], display: `${ans}%`, check: (x) => Math.abs(parseNum(x[0]) - ans) < 0.051 },
+    solution: `r = (${item[2]}/${item[1]})^(1/${n}) − 1 ≈ ${fmt(+(Math.pow(item[2] / item[1], 1 / n)).toFixed(4))} − 1 ≈ ${rate.toFixed(4)} ≈ ${ans}%` };
+};
+
+/* ----- 5.2 Properties of Rational Exponents and Radicals ----- */
+// #1–10: one base, rational exponent properties
+TEMPLATES.b52Props = (r) => {
+  for (;;) {
+    const b = pick(r, [2, 3, 5, 6, 7, 9, 12, 14]), q = pick(r, [2, 3, 4, 5, 6, 8]), kind = ri(r, 0, 5);
+    let tex, e, why;
+    const F = (p, qq) => (qq === 1 ? String(p) : `${p < 0 ? '-' : ''}\\frac{${Math.abs(p)}}{${qq}}`);
+    if (kind === 0) { const m = ri(r, 2, 5); tex = `\\left(${b}^{${m}}\\right)^{\\frac{1}{${q}}}`; e = m / q; why = `Power of a power: multiply the exponents, ${m} · 1/${q}.`; }
+    else if (kind === 1) { tex = `\\frac{${b}}{${b}^{\\frac{1}{${q}}}}`; e = 1 - 1 / q; why = `Quotient of powers: subtract the exponents, 1 − 1/${q}.`; }
+    else if (kind === 2) { const p1 = nz(r, -5, 5), p2 = nz(r, -5, 5), k = pick(r, [-1, 2, 3, -2]); tex = `\\left(${b}^{${F(p1, q)}}\\cdot ${b}^{${F(p2, q)}}\\right)^{${k}}`; e = ((p1 + p2) * k) / q; why = `Add the exponents inside: (${p1} + ${p2 < 0 ? `(${fmt(p2)})` : p2})/${q} = ${fracT((p1 + p2) / q)}. Then multiply by ${fmt(k)}.`; }
+    else if (kind === 3) { const p1 = ri(r, 1, 9), p2 = ri(r, 1, 9), p3 = ri(r, 1, 9); tex = `\\frac{${b}^{${F(p1, q)}}\\cdot ${b}^{${F(p2, q)}}}{${b}^{${F(p3, q)}}}`; e = (p1 + p2 - p3) / q; why = `Add the exponents in the numerator, then subtract the denominator's: (${p1} + ${p2} − ${p3})/${q}.`; }
+    else if (kind === 4) { const m = ri(r, 1, 3), k = pick(r, [-1, -2, 2]); tex = `\\left(\\frac{${b}^{${q}}}{${b}^{${m}}}\\right)^{\\frac{${k}}{${q}}}`.replace(`\\frac{${k}}{${q}}`, k < 0 ? `-\\frac{${-k}}{${q}}` : `\\frac{${k}}{${q}}`); e = ((q - m) * k) / q; why = `Inside: ${b}^${q} / ${b}^${m} = ${b}^${q - m}. Then multiply the exponents: ${q - m} · ${fracT(k / q)}.`; }
+    else { const c = pick(r, [2, 3, 4]), d = pick(r, [2, 3, 5]); if (c === b) continue; const p = ri(r, 1, 3); const big = b * c; tex = `\\frac{${b}^{${F(p, q)}}\\cdot ${big * d}^{${F(p, q)}}}{${c * d}^{${F(p, q)}}}`; e = 2 * p / q; why = `All three powers have the exponent ${fracT(p / q)}, so combine the bases: (${b} · ${big * d} / ${c * d})^(${fracT(p / q)}) = ${b * b}^(${fracT(p / q)}) = ${b}^(${fracT(2 * p / q)}).`; }
+    const [en, ed] = Qr(Math.round(e * 120), 120); if (en === 0) continue;
+    const val = b ** (en / ed), intAns = ed === 1 && Math.abs(b ** en) <= 5000 && en > 0;
+    const ans = intAns ? String(b ** en) : en < 0 && ed === 1 && b ** -en <= 5000 ? `1/${b ** -en}` : (ed === 1 ? `${b}${a6sup(en)}` : `${b}${a6fracSupT(en, ed)}`);
+    const ansL = intAns ? String(b ** en) : en < 0 && ed === 1 && b ** -en <= 5000 ? `\\frac{1}{${b ** -en}}` : `${b}^{${ed === 1 ? en : `${en < 0 ? '-' : ''}\\frac{${Math.abs(en)}}{${ed}}`}}`;
+    const T = (p, qq) => { const [x, y] = Qr(p, qq); return y === 1 ? `${b}${a6sup(x)}` : `${b}${a6fracSupT(x, y)}`; };
+    const wr = [T(en + ed, ed), T(-en, ed), T(en, ed * 2), T(en * 2, ed)].filter((w) => w !== ans);
+    const fig = a6tex(tex);
+    return { topic: 'Properties of rational exponents', stem: 'Use the properties of rational exponents to simplify the expression.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, ans, wr, (i) => T(en + i + 2, ed)),
+      fr: { fields: [{ kind: 'expr', keys: 'rad', label: '' }], key: [ansL], display: ans + (en < 0 && ed !== 1 ? ` = 1/${b}${a6fracSupT(-en, ed)}` : ''), check: (x) => b5oneOk(x[0], val) || (en < 0 && (() => { const s = a6flat(x[0]); return s != null && /^\(?\(?1\)?\/\(?/.test(s) && (s.match(/\^|sqrt|root/g) || []).length === 1 && numOk(a6pre(x[0]), val, 1e-9); })()) },
+      solution: `${why}\n= ${ans}${en < 0 && ed !== 1 ? ` = 1/${b}${a6fracSupT(-en, ed)}` : ''}` };
+  }
+};
+// #11–18: products and quotients of radicals with the same index
+TEMPLATES.b52RadProd = (r) => {
+  for (;;) {
+    const n = pick(r, [2, 3, 3, 4, 5]), quot = r() < 0.4;
+    const k = ri(r, 2, n === 2 ? 9 : n === 3 ? 5 : 3), q = r() < 0.5 ? 1 : pick(r, [2, 3, 5, 6, 7]);
+    // product of two radicands = k^n · q   (or quotient)
+    const N = k ** n * q, divs = [...Array(N).keys()].map((i) => i + 1).filter((d) => N % d === 0 && d > 1 && d < N && a6hasPower(d, n) === false);
+    if (!divs.length) continue;
+    const a1 = pick(r, divs), a2 = N / a1;
+    let tex, A;
+    if (!quot) { tex = `${a6rootL(n, a1)}\\cdot ${a6rootL(n, a2)}`; A = a6Rad([k, 1], {}, q, {}, n); }
+    else if (r() < 0.6) { const top = N * a2, bot = a2; tex = `\\frac{${a6rootL(n, top)}}{${a6rootL(n, bot)}}`; A = a6Rad([k, 1], {}, q, {}, n); if (top > 5000) continue; }
+    else { if (q !== 1) continue; const bot = a1 * k ** n; tex = `\\frac{${a6rootL(n, a1)}}{${a6rootL(n, bot)}}`; A = a6Rad([1, k], {}, 1, {}, n); if (bot > 5000) continue; }
+    const correct = a6RadT(A), F = a6RadVal(A);
+    const wr = [a6RadT(a6Rad([k * k, 1], {}, q, {}, n)), q === 1 ? fmt(k * n) : a6RadT(a6Rad([1, 1], {}, N, {}, n)), a6RadT(a6Rad([k + 1, A.c[1]], {}, q, {}, n)), quot ? fmt(N) : a6RadT(a6Rad([k, 1], {}, q * 2, {}, n))];
+    const fig = a6tex(tex);
+    return { topic: 'Properties of radicals', stem: 'Use the properties of radicals to simplify the expression.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => a6RadT(a6Rad([k + i + 2, A.c[1]], {}, q, {}, n))),
+      fr: { fields: [{ kind: 'expr', keys: 'rad', label: '' }], key: [a6RadT(A, true)], display: correct, check: (x) => a6RadOk(x[0], F, []) },
+      solution: `${quot ? `ⁿ√a / ⁿ√b = ⁿ√(a/b)` : `ⁿ√a · ⁿ√b = ⁿ√(ab)`} with n = ${n}.\n= ${a6rootSym(n)}${quot && A.c[1] !== 1 ? `(1/${k ** n})` : N} = ${correct}` };
+  }
+};
+// simplest form of ⁿ√(num/den) for numbers: multiply to make the denominator a perfect nth power
+function b5radFrac(num, den, n) {
+  let m = 1; while (!Number.isInteger(Math.round((den * m) ** (1 / n) * 1e9) / 1e9) || Math.round((den * m) ** (1 / n)) ** n !== den * m) m++;
+  const B = Math.round((den * m) ** (1 / n)), [o, i] = a6extract(num * m, n), g = gcd(o, B);
+  return { A: a6Rad([o / g, B / g], {}, i, {}, n), m, B };
+}
+// #19–26: simplest form (numbers)
+TEMPLATES.b52Simplest = (r) => {
+  for (;;) {
+    const n = pick(r, [2, 3, 3, 4, 5]), kind = ri(r, 0, 2);
+    let tex, A, sol;
+    if (kind === 0) { const o = ri(r, 2, n === 2 ? 9 : 3), i = pick(r, [2, 3, 5, 6, 7, 9, 10].filter((x) => !a6hasPower(x, n))), N = o ** n * i; if (N > 5000) continue; tex = a6rootL(n, N); A = a6Rad([o, 1], {}, i, {}, n); sol = `${N} = ${o ** n} · ${i}, and ${o ** n} = ${o}${a6sup(n)}.\n${a6rootSym(n)}${N} = ${a6rootSym(n)}${o ** n} · ${a6rootSym(n)}${i} = ${a6RadT(A)}`; }
+    else {
+      const den = pick(r, [2, 3, 4, 5, 7, 8, 9, 25, 27]), num = pick(r, [1, 2, 3, 5, 7, 64, 16, 1296, 6, 10]);
+      if (gcd(num, den) !== 1 || a6extract(den, n)[1] === 1) continue;
+      const R = b5radFrac(num, den, n); A = R.A; if (num * R.m > 50000) continue;
+      tex = kind === 1 ? a6rootL(n, `\\frac{${num}}{${den}}`) : `\\frac{${a6rootL(n, num)}}{${a6rootL(n, den)}}`;
+      sol = `Multiply the numerator and denominator inside the root by ${R.m} so the denominator is a perfect ${n === 2 ? 'square' : n === 3 ? 'cube' : `${n}th power`}:\n${a6rootSym(n)}(${num * R.m}/${den * R.m}) = ${a6rootSym(n)}${num * R.m} / ${R.B}\n= ${a6RadT(A)}`;
+    }
+    if (A.q === 1 && A.c[1] === 1) continue;
+    const correct = a6RadT(A), F = a6RadVal(A);
+    const wr = [a6RadT({ ...A, c: [A.c[0], A.c[1] * 2] }), a6RadT({ ...A, c: [A.c[0] * 2, A.c[1]] }), a6RadT({ ...A, c: [A.c[1], A.c[0]] }), a6RadT({ ...A, q: A.q * 2 })];
+    const fig = a6tex(tex);
+    return { topic: 'Simplest form of radicals', stem: 'Write the expression in simplest form.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => a6RadT({ ...A, c: [A.c[0] + i + 1, A.c[1]] })),
+      fr: { fields: [{ kind: 'expr', keys: 'rad', label: '' }], key: [a6RadT(A, true)], display: correct, check: (x) => a6RadOk(x[0], F, []) }, solution: sol };
+  }
+};
+TEMPLATES.b52Conj = (r) => TEMPLATES.a63Conj(r);
+// #35–44: like radicals
+TEMPLATES.b52Like = (r) => {
+  for (;;) {
+    const n = pick(r, [2, 2, 3, 3, 4, 5, 6]), q = pick(r, [2, 3, 5, 6, 7, 10, 11, 14].filter((x) => !a6hasPower(x, n))), s1 = r() < 0.5 ? 1 : ri(r, 2, 3), s2 = ri(r, 1, n === 2 ? 5 : 3);
+    const c1 = ri(r, 1, 13), c2 = ri(r, 1, 19), minus = r() < 0.5, ratForm = r() < 0.3;
+    const N1 = q * s1 ** n, N2 = q * s2 ** n; if (N1 > 3000 || N2 > 3000 || (s1 === 1 && s2 === 1 && r() < 0.3)) continue;
+    const tot = c1 * s1 + (minus ? -1 : 1) * c2 * s2; if (!tot) continue;
+    const termL = (c, N) => (ratForm ? (c === 1 ? `${N}^{\\frac{1}{${n}}}` : `${c}\\left(${N}^{\\frac{1}{${n}}}\\right)`) : `${c === 1 ? '' : c}${a6rootL(n, N)}`);
+    const tex = `${termL(c1, N1)}${minus ? '-' : '+'}${termL(c2, N2)}`;
+    const A = a6Rad([tot, 1], {}, q, {}, n), val = tot * q ** (1 / n);
+    const correct = ratForm ? `${tot === 1 ? '' : tot === -1 ? MINUS : fmt(tot)}(${q}${a6fracSupT(1, n)})` : a6RadT(A);
+    const wr = [c1 + (minus ? -1 : 1) * c2, c1 * s1 * s1 + (minus ? -1 : 1) * c2 * s2, tot + (minus ? 2 : -2) * c2 * s2, c1 + c2].filter((t) => t !== tot && t).map((t) => (ratForm ? `${fmt(t)}(${q}${a6fracSupT(1, n)})` : a6RadT(a6Rad([t, 1], {}, q, {}, n))));
+    wr.push(ratForm ? `${fmt(tot)}(${q * 2}${a6fracSupT(1, n)})` : a6RadT(a6Rad([c1 + (minus ? -1 : 1) * c2, 1], {}, q * 2, {}, n)));
+    const fig = a6tex(tex);
+    return { topic: 'Adding and subtracting radicals', stem: 'Simplify the expression.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => (ratForm ? `${fmt(tot + i + 1)}(${q}${a6fracSupT(1, n)})` : a6RadT(a6Rad([tot + i + 1, 1], {}, q, {}, n)))),
+      fr: { fields: [{ kind: 'expr', keys: 'rad', label: '' }], key: [ratForm ? `${tot}\\left(${q}^{\\frac{1}{${n}}}\\right)` : a6RadT(A, true)], display: correct + (ratForm ? ` = ${a6RadT(A)}` : ''), check: (x) => b5likeOk(x[0], val, q, n) },
+      solution: `${s1 > 1 || s2 > 1 ? `First simplify: ${[[c1, N1, s1], [c2, N2, s2]].filter(([, , s]) => s > 1).map(([c, N, s]) => `${a6rootSym(n)}${N} = ${s}${a6rootSym(n)}${q}`).join(', ')}.\n` : ''}Like radicals have the same index and radicand, so add or subtract the coefficients:\n(${c1 * s1} ${minus ? MINUS : '+'} ${c2 * s2})${a6rootSym(n)}${q} = ${a6RadT(A)}` };
+  }
+};
+// one term c·ⁿ√q (or c·q^(1/n)) with that value
+function b5likeOk(raw, val, q, n) {
+  raw = a6pre(raw); const s = a6flat(raw); if (s == null) return false;
+  const roots = (s.match(/sqrt|root\d+/g) || []).length, pows = (s.match(/\^/g) || []).length;
+  if (roots + pows !== 1 || /[+]/.test(s.replace(/^\+/, '')) || /\d-/.test(s)) return false;
+  const m = /(?:sqrt|root\d+)\((\d+)\)/.exec(s) || /\(?(\d+)\)?\^/.exec(s); if (!m || +m[1] !== q) return false;
+  return numOk(raw, val, 1e-9);
+}
+// #45–50, 55–60: radicals with variables (assume positive)
+function b5varRad(r, n) {
+  for (;;) {
+    const vs = a6V(r, ri(r, 1, 3)), dv = r() < 0.4 ? a6V(r, 1)[0] : null; if (dv && vs.includes(dv)) continue;
+    const o = ri(r, 1, n === 2 ? 9 : n === 3 ? 5 : 3), i = r() < 0.5 ? 1 : pick(r, [2, 3, 5, 6, 7].filter((x) => !a6hasPower(x, n))), C = o ** n * i;
+    const numE = {}; vs.forEach((v) => { numE[v] = ri(r, 1, 3 * n + 1); });
+    const dE = dv ? ri(r, 1, 2 * n + 2) : 0, dC = dv && r() < 0.4 ? pick(r, [2, 3]) ** n : 1;
+    if (C * dC > 2000) continue;
+    // multiply inside by dv^(n − dE mod n) so the denominator is a perfect nth power
+    const extra = dv ? (n - (dE % n)) % n : 0, denOut = dv ? (dE + extra) / n : 0;
+    const out = {}, ins = {};
+    vs.forEach((v) => { const e = numE[v]; if (e >= n) out[v] = Math.floor(e / n); if (e % n) ins[v] = e % n; });
+    if (dv) { if (extra) ins[dv] = extra; out[dv] = -denOut; }
+    const dRoot = Math.round(dC ** (1 / n));
+    const A = a6Rad([o, dRoot], out, i, ins, n);
+    if (!Object.keys(A.inside).length && A.q === 1 && !dv) continue;
+    const vt = (k, e) => (e === 1 ? k : `${k}^{${e}}`);
+    const numL = `${C === 1 ? '' : C}${vs.map((v) => vt(v, numE[v])).join('')}`, denL = dv ? `${dC === 1 ? '' : dC}${vt(dv, dE)}` : '';
+    const tex = a6rootL(n, dv ? `\\frac{${numL}}{${denL}}` : numL);
+    const allV = [...vs, ...(dv ? [dv] : [])];
+    return { A, tex, vars: allV, numT: `${C === 1 ? '' : C}${vs.map((v) => v + (numE[v] === 1 ? '' : a6sup(numE[v]))).join('')}`, denT: dv ? `${dC === 1 ? '' : dC}${dv}${dE === 1 ? '' : a6sup(dE)}` : '', extra, dv };
+  }
+}
+TEMPLATES.b52Var = (r) => {
+  const n = pick(r, [2, 2, 3, 3, 4, 5]), V = b5varRad(r, n), A = V.A, correct = a6RadT(A), F = a6RadVal(A);
+  const flip = (k) => ({ ...A, out: { ...A.out, [k]: -(A.out[k] || 0) } });
+  const ks = Object.keys(A.out);
+  const wr = [ks.length ? a6RadT(flip(ks[0])) : a6RadT({ ...A, c: [A.c[0] * 2, A.c[1]] }), a6RadT({ ...A, c: [A.c[0] ** 2 > 99 ? A.c[0] + 1 : A.c[0] ** 2, A.c[1]] }), a6RadT({ ...A, inside: {} , q: A.q }), a6RadT({ ...A, idx: n === 2 ? 3 : 2 })];
+  const fig = a6tex(V.tex);
+  return { topic: 'Radicals with variables', stem: 'Write the expression in simplest form. Assume all variables are positive.', draw: fig.draw, size: fig.size,
+    ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => a6RadT({ ...A, c: [A.c[0] + i + 1, A.c[1]] })),
+    fr: { fields: [{ kind: 'expr', keys: 'rad', label: '' }], key: [a6RadT(A, true)], display: correct, check: (x) => a6RadOk(x[0], F, V.vars) },
+    solution: `${V.dv ? `Make the denominator a perfect ${n === 2 ? 'square' : n === 3 ? 'cube' : `${n}th power`}: multiply inside by ${V.dv}${V.extra > 1 ? a6sup(V.extra) : ''}/${V.dv}${V.extra > 1 ? a6sup(V.extra) : ''}${V.extra ? '' : ' (not needed)'}.\n` : ''}Take out every factor that is a perfect ${n === 2 ? 'square' : n === 3 ? 'cube' : `${n}th power`}.\n${a6rootSym(n)}(${V.numT}${V.dv ? `/${V.denT}` : ''}) = ${correct}` };
+};
+// #61–62: rational exponents with variables
+TEMPLATES.b52RatVar = (r) => {
+  for (;;) {
+    const [u, w] = a6V(r, 2), q1 = pick(r, [2, 3, 4]), q2 = pick(r, [2, 3, 4]);
+    const e = () => (ri(r, -7, 7) || 1);
+    const nu = e(), du = e(), nw = e(), dw = e(), c1 = ri(r, 2, 30), c2 = ri(r, 2, 60);
+    const eu = (nu - du) / q1, ew = (nw - dw) / q2; if (!eu && !ew) continue;
+    const g = gcd(c1, c2); const A = a6M(c1 / g, c2 / g, {}); A.v = {}; if (eu) A.v[u] = eu; if (ew) A.v[w] = ew;
+    const FL = (p, q) => { const [a, b] = Qr(p, q); return b === 1 ? String(a) : `${a < 0 ? '-' : ''}\\frac{${Math.abs(a)}}{${b}}`; };
+    const tex = `\\frac{${c1}${u}^{${FL(nu, q1)}}${w}^{${FL(nw, q2)}}}{${c2}${u}^{${FL(du, q1)}}${w}^{${FL(dw, q2)}}}`;
+    const ET = (k, x) => { const [a, b] = Qr(Math.round(Math.abs(x) * 12), 12); return k + (b === 1 ? (a === 1 ? '' : a6sup(a)) : a6fracSupT(a, b)); };
+    const ELt = (k, x) => { const [a, b] = Qr(Math.round(Math.abs(x) * 12), 12); return k + (b === 1 ? (a === 1 ? '' : `^{${a}}`) : `^{\\frac{${a}}{${b}}}`); };
+    const ups = Object.entries(A.v).filter(([, x]) => x > 0), dns = Object.entries(A.v).filter(([, x]) => x < 0);
+    const num = (A.n === 1 && ups.length ? '' : String(A.n)) + ups.map(([k, x]) => ET(k, x)).join(''), den = (A.d === 1 ? '' : String(A.d)) + dns.map(([k, x]) => ET(k, x)).join('');
+    const correct = den ? `${num || '1'}/${(A.d !== 1) + dns.length > 1 ? `(${den})` : den}` : num;
+    const numL = (A.n === 1 && ups.length ? '' : String(A.n)) + ups.map(([k, x]) => ELt(k, x)).join(''), denL = (A.d === 1 ? '' : String(A.d)) + dns.map(([k, x]) => ELt(k, x)).join('');
+    const key = den ? `\\frac{${numL || '1'}}{${denL}}` : numL;
+    const W2 = (M) => { const ups2 = Object.entries(M).filter(([, x]) => x > 0), dns2 = Object.entries(M).filter(([, x]) => x < 0); const nn = (A.n === 1 && ups2.length ? '' : String(A.n)) + ups2.map(([k, x]) => ET(k, x)).join(''), dd = (A.d === 1 ? '' : String(A.d)) + dns2.map(([k, x]) => ET(k, x)).join(''); return dd ? `${nn || '1'}/${(A.d !== 1) + dns2.length > 1 ? `(${dd})` : dd}` : nn; };
+    const wr = [W2(Object.fromEntries(Object.entries(A.v).map(([k, x]) => [k, -x]))), W2({ ...A.v, [u]: (nu + du) / q1 }), W2({ ...A.v, [w]: (nw * dw) / q2 || 1 })].filter((x) => x !== correct);
+    const fig = a6tex(tex);
+    return { topic: 'Rational exponents with variables', stem: 'Write the expression in simplest form. Assume all variables are positive.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)], (i) => W2({ ...A.v, [u]: (eu || 1) + (i + 1) / 2 })),
+      fr: { fields: [{ kind: 'expr', keys: 'expo', label: '' }], key: [key], display: correct, check: (x) => a6MonoOk(x[0], A) },
+      solution: `Divide the coefficients: ${c1}/${c2} = ${a6fracT(c1, c2)}.\nSubtract exponents: ${u}: ${fracT(nu / q1)} − ${du < 0 ? `(${fracT(du / q1)})` : fracT(du / q1)} = ${fracT(eu)}; ${w}: ${fracT(nw / q2)} − ${dw < 0 ? `(${fracT(dw / q2)})` : fracT(dw / q2)} = ${fracT(ew)}.\nMove negative exponents to the denominator: ${correct}` };
+  }
+};
+// #63–68: like radicals with variables
+TEMPLATES.b52LikeVar = (r) => {
+  for (;;) {
+    const n = pick(r, [2, 3, 3, 4]), v = a6V(r)[0], q = pick(r, [1, 1, 2, 3, 5]), e = pick(r, [1, 2, 3].filter((x) => gcd(x, n) === 1 && x < n));
+    const s1 = r() < 0.5 ? 1 : ri(r, 2, 3), k1 = ri(r, 0, 2), k2 = ri(r, 0, 2), c1 = ri(r, 1, 12), c2 = ri(r, 1, 12), minus = r() < 0.5;
+    // term1: c1·ⁿ√(s1ⁿ q v^(e + n·k1)) = c1 s1 v^k1 ⁿ√(q v^e); term2: c2 v^(k1 − k2)·ⁿ√(q v^(e + n·k2)) = c2 v^k1 ⁿ√(q v^e)
+    if (k2 > k1) continue;
+    const tot = c1 * s1 + (minus ? -1 : 1) * c2; if (!tot) continue;
+    const N1 = s1 ** n * q; if (N1 > 400) continue;
+    const vtL = (x) => (x === 0 ? '' : x === 1 ? v : `${v}^{${x}}`);
+    const tex = `${c1 === 1 ? '' : c1}${a6rootL(n, `${N1 === 1 ? '' : N1}${vtL(e + n * k1)}`)}${minus ? '-' : '+'}${c2 === 1 ? '' : c2}${vtL(k1 - k2)}${a6rootL(n, `${q === 1 ? '' : q}${vtL(e + n * k2)}`)}`;
+    const A = a6Rad([tot, 1], k1 ? { [v]: k1 } : {}, q, { [v]: e }, n), F = a6RadVal(A), correct = a6RadT(A);
+    const wr = [a6Rad([c1 + (minus ? -1 : 1) * c2, 1], A.out, q, A.inside, n), a6Rad([tot, 1], { [v]: k1 + 1 }, q, A.inside, n), a6Rad([-tot, 1], A.out, q, A.inside, n), a6Rad([tot, 1], A.out, q * 2, A.inside, n)].map((x) => a6RadT(x));
+    const fig = a6tex(tex);
+    return { topic: 'Adding and subtracting radicals', stem: 'Perform the indicated operation. Assume all variables are positive.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => a6RadT({ ...A, c: [tot + i + 1, 1] })),
+      fr: { fields: [{ kind: 'expr', keys: 'rad', label: '' }], key: [a6RadT(A, true)], display: correct, check: (x) => a6RadOk(x[0], F, [v]) },
+      solution: `Simplify each radical so both have ${a6rootT(n, `${q === 1 ? '' : q}${v}${e === 1 ? '' : a6sup(e)}`)}.\nThen combine the coefficients: (${c1 * s1} ${minus ? MINUS : '+'} ${c2})${k1 ? v + (k1 === 1 ? '' : a6sup(k1)) : ''}${a6rootT(n, `${q === 1 ? '' : q}${v}${e === 1 ? '' : a6sup(e)}`)} = ${correct}` };
+  }
+};
+
+/* ----- 5.3 Graphing Radical Functions ----- */
+// y = a·ⁿ√(b(x − h)) + k pieces
+function b5radFn(r, { n = pick(r, [2, 2, 3, 4, 5]), simple = false } = {}) {
+  const a = simple ? 1 : pick(r, [1, 1, -1, 2, -2, 3, 0.5]), b = simple ? 1 : pick(r, [1, 1, 1, -1, 2, 5]), h = ri(r, -6, 6), k = ri(r, -6, 6);
+  return { n, a, b, h, k };
+}
+function b5radL({ n, a, b, h, k }, name = 'f', v = 'x') {
+  const inner = b === 1 ? (h ? `${v}${h > 0 ? '-' : '+'}${Math.abs(h)}` : v) : b === -1 ? (h ? `-\\left(${v}${h > 0 ? '-' : '+'}${Math.abs(h)}\\right)` : `-${v}`) : h ? `${b}\\left(${v}${h > 0 ? '-' : '+'}${Math.abs(h)}\\right)` : `${b}${v}`;
+  const aL = a === 1 ? '' : a === -1 ? '-' : a === 0.5 ? '\\frac{1}{2}' : String(a);
+  return `${name}(${v})=${aL}${a6rootL(n, inner)}${k ? (k > 0 ? '+' : '-') + Math.abs(k) : ''}`;
+}
+const b5radF = ({ n, a, b, h, k }) => (x) => { const u = b * (x - h); if (n % 2 === 0 && u < 0) return NaN; return a * Math.sign(u) * Math.abs(u) ** (1 / n) + k; };
+// #1–10: domain and range
+TEMPLATES.b53Domain = (r) => {
+  const P = b5radFn(r), { n, a, b, h, k } = P, even = n % 2 === 0;
+  const D = !even ? 'all real numbers' : b > 0 ? `x ≥ ${fmt(h)}` : `x ≤ ${fmt(h)}`, R = !even ? 'all real numbers' : a > 0 ? `y ≥ ${fmt(k)}` : `y ≤ ${fmt(k)}`;
+  const DS = !even ? ALL : b > 0 ? [{ a: h, b: Infinity, ca: true, cb: false }] : [{ a: -Infinity, b: h, ca: false, cb: true }];
+  const RS = !even ? ALL : a > 0 ? [{ a: k, b: Infinity, ca: true, cb: false }] : [{ a: -Infinity, b: k, ca: false, cb: true }];
+  const fig = a6tex(b5radL(P));
+  const T = (d, rr) => `Domain: ${d}; range: ${rr}`;
+  const correct = T(D, R);
+  const wr = even ? [T(`x ≥ ${fmt(-h)}`, R), T(D, `y ≥ ${fmt(-k)}`), T(D, a > 0 ? `y ≤ ${fmt(k)}` : `y ≥ ${fmt(k)}`), T(`x ≥ ${fmt(k)}`, `y ≥ ${fmt(h)}`), T('all real numbers', 'all real numbers')]
+    : [T(`x ≥ ${fmt(h)}`, `y ≥ ${fmt(k)}`), T('all real numbers', `y ≥ ${fmt(k)}`), T(`x ≥ ${fmt(h)}`, 'all real numbers')];
+  return { topic: 'Domain and range of radical functions', stem: 'Find the domain and range of the function.', draw: fig.draw, size: fig.size,
+    ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => T(`x ≥ ${fmt(h + i + 1)}`, R)),
+    fr: { fields: [{ kind: 'expr', keys: 'dom', label: 'Domain:' }, { kind: 'expr', keys: 'dom', label: 'Range:' }], key: [!even ? '\\text{all real numbers}' : D.replace('≥', '\\ge ').replace('≤', '\\le ').replace(MINUS, '-'), !even ? '\\text{all real numbers}' : R.replace('≥', '\\ge ').replace('≤', '\\le ').replace(MINUS, '-')], display: correct,
+      check: (x) => setOk(x[0], DS) && setOk(x[1], RS), score: (x) => ((setOk(x[0], DS) ? 1 : 0) + (setOk(x[1], RS) ? 1 : 0)) / 2 },
+    solution: even ? `The index ${n} is even, so the radicand must be nonnegative: ${(() => { const xh = h ? `x ${h > 0 ? MINUS : '+'} ${Math.abs(h)}` : 'x'; return b === 1 ? xh : b === -1 ? (h ? `${MINUS}(${xh})` : `${MINUS}x`) : h ? `${fmt(b)}(${xh})` : `${fmt(b)}x`; })()} ≥ 0, so ${D}.\nThe radical is ≥ 0; ${a > 0 ? `a > 0, so y ≥ ${fmt(k)}` : `a < 0 flips it, so y ≤ ${fmt(k)}`}.` : `The index ${n} is odd, so any real number can go under the radical and the outputs take every real value.\nDomain: all real numbers; range: all real numbers.` };
+};
+// #11–16: match the function with its graph
+TEMPLATES.b53Match = (r) => {
+  const h = pick(r, [-3, 3, 0, -2, 2]), k = pick(r, [3, -3, 0, 2, -2]); if (!h && !k) return TEMPLATES.b53Match(r);
+  const L = (hh, kk) => `y = √(x${hh ? (hh > 0 ? ` ${MINUS} ${hh}` : ` + ${-hh}`) : ''})${kk ? (kk > 0 ? ` + ${kk}` : ` ${MINUS} ${-kk}`) : ''}`;
+  const correct = L(h, k), wr = [L(-h, k), L(h, -k), L(-h, -k), L(k, h)].filter((w) => w !== correct);
+  const plot = plotQ({ xr: [-6, 8], yr: [-5, 7], curves: [{ f: (x) => (x >= h ? Math.sqrt(x - h) + k : NaN) }], pts: [{ p: [h, k] }] });
+  return { topic: 'Graphs of radical functions', stem: 'Which function is shown in the graph?', draw: plot, size: [400, 340],
+    ...buildChoices(r, correct, [...new Set(wr)], (i) => L(h + i + 1, k)), fr: FR.select('y =', shuffle(r, [correct, ...[...new Set(wr)].slice(0, 3)]), correct),
+    solution: `The graph starts at (${fmt(h)}, ${fmt(k)}), so the graph of y = √x was translated ${h ? `${Math.abs(h)} unit${Math.abs(h) === 1 ? '' : 's'} ${h > 0 ? 'right' : 'left'}` : ''}${h && k ? ' and ' : ''}${k ? `${Math.abs(k)} unit${Math.abs(k) === 1 ? '' : 's'} ${k > 0 ? 'up' : 'down'}` : ''}.\n${correct}` };
+};
+// #17–24: describe the transformation of f(x) = ⁿ√x represented by g
+TEMPLATES.b53Transform = (r) => {
+  for (;;) {
+    const n = pick(r, [2, 2, 3, 3, 4, 5]), a = pick(r, [1, 1, -1, 2, 3, -2, 0.5]), hs = r() < 0.2 ? pick(r, [2, 4, -1]) : 1, h = ri(r, -6, 6), k = ri(r, -8, 8);
+    if (a === 1 && hs === 1 && !h && !k) continue;
+    const P = { n, a, b: hs, h, k };
+    const parts = [];
+    if (hs === -1) parts.push('a reflection in the y-axis'); else if (hs !== 1) parts.push(`a horizontal shrink by a factor of 1/${hs}`);
+    if (a < 0) parts.push('a reflection in the x-axis');
+    if (Math.abs(a) > 1) parts.push(`a vertical stretch by a factor of ${Math.abs(a)}`); else if (Math.abs(a) < 1) parts.push(`a vertical shrink by a factor of ${fracT(Math.abs(a))}`);
+    const tr = (hh, kk) => { const t = []; if (hh) t.push(`${Math.abs(hh)} unit${Math.abs(hh) === 1 ? '' : 's'} ${hh > 0 ? 'right' : 'left'}`); if (kk) t.push(`${Math.abs(kk)} unit${Math.abs(kk) === 1 ? '' : 's'} ${kk > 0 ? 'up' : 'down'}`); return t.length ? `a translation ${t.join(' and ')}` : ''; };
+    const D = (pp, hh, kk) => { const all = [...pp, tr(hh, kk)].filter(Boolean); if (!all.length) return 'No transformation'; const s = all.length > 1 ? all.slice(0, -1).join(', ') + ' and ' + all.slice(-1) : all[0]; return s[0].toUpperCase() + s.slice(1); };
+    const correct = D(parts, h, k);
+    const wr = [D(parts, -h, k), D(parts, h, -k), D(parts.map((p) => p.replace('x-axis', 'y-axis').replace('vertical', 'horizontal')), h, k), D(parts, -h, -k)].filter((w) => w !== correct);
+    const fig = a6tex([`f(x)=${a6rootL(n, 'x')}`, b5radL(P, 'g')]);
+    return { topic: 'Transformations of radical functions', stem: 'Describe the transformation of f represented by g.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)], (i) => D(parts, h + i + 1, k)), fr: FR.select('', shuffle(r, [correct, ...[...new Set(wr)].slice(0, 3)]), correct),
+      solution: `Compare g(x) = a·${a6rootSym(n)}(x − h) + k with f(x) = ${a6rootSym(n)}x: ${a !== 1 ? `a = ${fmt(a)}, ` : ''}h = ${fmt(h)}, k = ${fmt(k)}.\n${correct}.` };
+  }
+};
+// #33: radical function models
+TEMPLATES.b53Word = (r) => {
+  const x = pick(r, [16, 25, 36, 49, 64, 81, 100]), f = pick(r, [0.6, 0.38, 0.17, 0.9]), place = { 0.6: 'Mars', 0.38: 'Mercury', 0.17: 'the Moon', 0.9: 'Venus' }[f];
+  const E = 8 * Math.sqrt(x), M = f * E;
+  const fig = a6tex(['E(x)=8\\sqrt{x}', `M(x)=${f}\\cdot E(x)`]);
+  return { topic: 'Radical functions in real life', stem: `The functions below approximate the velocity (in feet per second) of an object dropped from a height of x feet right before it hits the ground on Earth (E) and on ${place} (M). What is the velocity of an object dropped from a height of ${x} feet right before it hits the ground on ${place}?`, draw: fig.draw, size: fig.size,
+    ...buildChoices(r, `${fmt(M)} ft/sec`, [`${fmt(E)} ft/sec`, `${fmt(f * 8 * x)} ft/sec`, `${fmt(8 * Math.sqrt(f * x))} ft/sec`], (i) => `${fmt(M + i + 1)} ft/sec`),
+    fr: FR.num('velocity =', M, { suffix: ' ft/sec' }), solution: `E(${x}) = 8√${x} = ${fmt(E)}\nM(${x}) = ${f} · ${fmt(E)} = ${fmt(M)} feet per second` };
+};
+
+/* ----- 5.4 Solving Radical Equations and Inequalities ----- */
+// #1–18: a√(bx + c) + d = e
+TEMPLATES.b54Solve = (r) => {
+  for (;;) {
+    const v = pick(r, ['x', 'y', 'm', 'p', 'c', 'r', 'a', 'q', 's']), b = pick(r, [1, 1, 2, 3, 4, 5]), a = pick(r, [1, 1, 2, 3, 4, 5]), d = r() < 0.6 ? nz(r, -12, 12) : 0;
+    const extr = r() < 0.15, s = extr ? -ri(r, 1, 6) : ri(r, 1, 9); // value of the square root
+    const c = ri(r, -12, 12), x = (s * s - c) / b; if (!Number.isInteger(x * 2)) continue;
+    const e = a * s + d, flip = r() < 0.3;
+    const inner = `${b === 1 ? '' : b}${v}${c ? (c > 0 ? '+' : '-') + Math.abs(c) : ''}`, lhs = `${a === 1 ? '' : a}\\sqrt{${inner}}${d ? (d > 0 ? '+' : '-') + Math.abs(d) : ''}`;
+    const fig = a6tex(flip ? `${e}=${lhs}` : `${lhs}=${e}`);
+    const sols = extr ? [] : [x];
+    return { topic: 'Solving radical equations', stem: 'Solve the equation. Check your solution.', draw: fig.draw, size: fig.size,
+      ...b5listQ(r, sols, [[x], [(s - c) / b], [((e - d) ** 2 - c) / b + 1], [(e * e - c) / b]].filter((L) => L.every((t) => Number.isInteger(t * 2)))),
+      fr: { fields: [{ kind: 'expr', keys: 'words', label: `${v} =` }], key: [b5listL(sols)], display: b5list(sols), check: (q) => b5listOk(q[0], sols) },
+      solution: `Isolate the radical: √(${inner.replace('-', ' − ').replace('+', ' + ')}) = ${fmt(s)}\n${extr ? `A principal square root is never negative, so there is no solution. (Squaring gives ${v} = ${fracT(x)}, but it does not check.)` : `Square both sides: ${inner.replace('-', ' − ').replace('+', ' + ')} = ${s * s}\n${v} = ${fracT(x)}\nCheck: it works.`}` };
+  }
+};
+// #23–30: two radicals
+TEMPLATES.b54TwoRad = (r) => {
+  for (;;) {
+    const v = pick(r, ['x', 'y', 'g', 'h', 'v', 'c', 'r']), idx = r() < 0.3 ? 3 : 2, x = ri(r, -4, 12), a1 = ri(r, 1, 8), a2 = ri(r, 1, 8); if (a1 === a2) continue;
+    const val = ri(r, idx === 3 ? -20 : 0, 30), c1 = val - a1 * x, c2 = val - a2 * x;
+    const bad = idx === 2 && r() < 0.2; // both radicands negative at the solution → no solution
+    const C1 = bad ? -ri(r, 1, 9) - a1 * x : c1, C2 = bad ? C1 + (a1 - a2) * x : c2;
+    const sols = bad ? [] : [x];
+    const R = (a, c) => `${a === 1 ? '' : a}${v}${c ? (c > 0 ? '+' : '-') + Math.abs(c) : ''}`;
+    const sub = r() < 0.3;
+    const fig = a6tex(sub ? `${a6rootL(idx, R(a1, C1))}-${a6rootL(idx, R(a2, C2))}=0` : `${a6rootL(idx, R(a1, C1))}=${a6rootL(idx, R(a2, C2))}`);
+    return { topic: 'Equations with two radicals', stem: 'Solve the equation. Check your solution.', draw: fig.draw, size: fig.size,
+      ...b5listQ(r, sols, [[x], [-x], [x + 1], [(C2 + C1) / (a1 + a2)]].filter((L) => L.every((t) => Number.isInteger(t)))),
+      fr: { fields: [{ kind: 'expr', keys: 'words', label: `${v} =` }], key: [b5listL(sols)], display: b5list(sols), check: (q) => b5listOk(q[0], sols) },
+      solution: `${idx === 2 ? 'Square' : 'Cube'} both sides: ${R(a1, C1)} = ${R(a2, C2)}\n${v} = ${fmt(x)}\n${bad ? `Check: the radicands are ${fmt(a1 * x + C1)} and ${fmt(a2 * x + C2)}, which are negative, so ${v} = ${fmt(x)} is extraneous. No solution.` : `Check: both sides equal ${idx === 2 ? '√' : '∛'}${fmt(a1 * x + C1)} ✓`}` };
+  }
+};
+// #31–38: cube roots
+TEMPLATES.b54Cube = (r) => {
+  for (;;) {
+    const v = pick(r, ['x', 'y', 'g', 'r', 's']), s = nz(r, -5, 5), a = pick(r, [1, 2, 8, 10, 3]), c = ri(r, -15, 15), x = (s ** 3 - c) / a; if (!Number.isInteger(x)) continue;
+    const inner = `${a === 1 ? '' : a}${v}${c ? (c > 0 ? '+' : '-') + Math.abs(c) : ''}`, flip = r() < 0.4;
+    const fig = a6tex(flip ? `${s}=${a6rootL(3, inner)}` : `${a6rootL(3, inner)}=${s}`);
+    return { topic: 'Equations with cube roots', stem: 'Solve the equation. Check your solution.', draw: fig.draw, size: fig.size,
+      ...b5listQ(r, [x], [[(s * s - c) / a], [(-(s ** 3) - c) / a], [(3 * s - c) / a], []].filter((L) => L.every((t) => Number.isInteger(t)))),
+      fr: { fields: [{ kind: 'expr', keys: 'words', label: `${v} =` }], key: [String(x)], display: fmt(x), check: (q) => b5listOk(q[0], [x]) },
+      solution: `Cube both sides: ${inner} = ${s ** 3}\n${v} = ${fmt(x)}\nCheck: ∛${fmt(a * x + c)} = ${s} ✓ (a cube root can be negative, so nothing is extraneous)` };
+  }
+};
+// √(ax + b) = px + q, built from two roots of the squared equation
+function b5sqrtLinear(r) {
+  for (;;) {
+    const r1 = ri(r, -6, 8), r2 = ri(r, -6, 8); if (r1 === r2) continue;
+    const p = pick(r, [1, 1, 1, 2, -1, -2]), q = ri(r, -6, 6);
+    // (px + q)² = ax + b must have roots r1, r2: p²x² + (2pq − a)x + q² − b = p²(x − r1)(x − r2)
+    const A2 = p * p, a = 2 * p * q + A2 * (r1 + r2), b = q * q - A2 * r1 * r2;
+    if (!a || Math.abs(a) > 30 || Math.abs(b) > 60) continue;
+    const ok = (x) => p * x + q >= 0 && a * x + b >= 0;
+    return { a, b, p, q, cands: [Math.min(r1, r2), Math.max(r1, r2)], sols: [r1, r2].filter(ok).sort((u, w) => u - w), ok };
+  }
+}
+// #41–44: which candidate is extraneous?
+TEMPLATES.b54Extraneous = (r) => {
+  const v = pick(r, ['x', 'y', 'p', 'g']), E = b5sqrtLinear(r), [c1, c2] = E.cands;
+  const L = `\\sqrt{${E.a === 1 ? '' : E.a === -1 ? '-' : E.a}${v}${E.b ? (E.b > 0 ? '+' : '-') + Math.abs(E.b) : ''}}=${E.p === 1 ? '' : E.p === -1 ? '-' : E.p}${v}${E.q ? (E.q > 0 ? '+' : '-') + Math.abs(E.q) : ''}`;
+  const fig = a6tex(`${L};\\quad ${v}=${c1},\\ ${v}=${c2}`);
+  const bad = E.cands.filter((x) => !E.ok(x));
+  const opt = (x) => `${v} = ${fmt(x)} is extraneous`, NEI = 'Neither is extraneous', BOTH = 'Both are extraneous';
+  const correct = bad.length === 2 ? BOTH : bad.length ? opt(bad[0]) : NEI, opts = [opt(c1), opt(c2), NEI, BOTH];
+  return { topic: 'Extraneous solutions', stem: 'Determine which solution, if any, is an extraneous solution.', draw: fig.draw, size: fig.size, choices: opts, answer: opts.indexOf(correct), fr: FR.select('', opts, correct),
+    solution: E.cands.map((x) => `${v} = ${fmt(x)}: left side √${fmt(E.a * x + E.b)}${E.a * x + E.b >= 0 ? ` = ${fmt(Math.sqrt(E.a * x + E.b))}` : ' (not real)'}, right side ${fmt(E.p * x + E.q)} ${E.ok(x) ? '✓' : '✗'}`).join('\n') + `\n${correct}.` };
+};
+// #45–54: equations that become quadratics
+TEMPLATES.b54Quad = (r) => {
+  const v = pick(r, ['x', 'y', 'a', 'q', 'm', 'b', 's']), E = b5sqrtLinear(r);
+  const rad = `${E.a === 1 ? '' : E.a === -1 ? '-' : E.a}${v}${E.b ? (E.b > 0 ? '+' : '-') + Math.abs(E.b) : ''}`, rhs = `${E.p === 1 ? '' : E.p === -1 ? '-' : E.p}${v}${E.q ? (E.q > 0 ? '+' : '-') + Math.abs(E.q) : ''}`;
+  const fig = a6tex(r() < 0.5 ? `\\sqrt{${rad}}=${rhs}` : `${rhs}=\\sqrt{${rad}}`);
+  return { topic: 'Radical equations with quadratics', stem: 'Solve the equation. Check your solution(s).', draw: fig.draw, size: fig.size,
+    ...b5listQ(r, E.sols, [E.cands, E.cands.filter((x) => !E.sols.includes(x)), [E.cands[0]], [E.cands[1]], []]),
+    fr: { fields: [{ kind: 'expr', keys: 'words', label: `${v} =` }], key: [b5listL(E.sols)], display: b5list(E.sols), check: (q) => b5listOk(q[0], E.sols) },
+    solution: `Square both sides and solve the quadratic: ${v} = ${fmt(E.cands[0])} or ${v} = ${fmt(E.cands[1])}.\nCheck each in the original equation:\n${E.cands.map((x) => `${v} = ${fmt(x)}: √${fmt(E.a * x + E.b)} ${E.ok(x) ? '=' : '≠'} ${fmt(E.p * x + E.q)} ${E.ok(x) ? '✓' : '✗ (extraneous)'}`).join('\n')}\nSolution: ${b5list(E.sols)}` };
+};
+// #19–20: radical models solved for the input
+TEMPLATES.b54Word = (r) => {
+  if (r() < 0.5) {
+    const t = pick(r, [2, 3, 4, 5, 6, 7, 8]), d = (4 * t) ** 2;
+    const fig = a6tex('t=\\frac{1}{4}\\sqrt{d}');
+    return { topic: 'Radical equations in real life', stem: `The function below represents the time t (in seconds) that it takes a BASE jumper to fall d feet. How far does a BASE jumper fall in ${t} seconds?`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, `${d} ft`, [`${4 * t} ft`, `${(t / 4) ** 2} ft`, `${16 * t} ft`, `${t * t} ft`].filter((w) => w !== `${d} ft`), (i) => `${d + 16 * (i + 1)} ft`),
+      fr: FR.num('d =', d, { suffix: ' ft' }), solution: `${t} = (1/4)√d\nMultiply by 4: √d = ${4 * t}\nSquare: d = ${d} feet` };
+  }
+  const s = pick(r, [2, 3, 4, 5, 6, 2.5, 1.5]), A = 6 * s * s;
+  const fig = a6tex('s=\\sqrt{\\frac{A}{6}}');
+  return { topic: 'Radical equations in real life', stem: `The edge length s of a cube with a surface area of A is given by the formula below. What is the surface area of a puzzle cube with an edge length of ${s} inches?`, draw: fig.draw, size: fig.size,
+    ...buildChoices(r, `${fmt(A)} in.²`, [`${fmt(s * s)} in.²`, `${fmt(6 * s)} in.²`, `${fmt(36 * s * s)} in.²`, `${fmt(s ** 3)} in.²`].filter((w) => w !== `${fmt(A)} in.²`), (i) => `${fmt(A + 6 * (i + 1))} in.²`),
+    fr: FR.num('A =', A, { suffix: ' in.²' }), solution: `${s} = √(A/6)\nSquare both sides: ${fmt(s * s)} = A/6\nA = ${fmt(A)} square inches` };
+};
+
+/* ----- 5.5 Performing Function Operations ----- */
+// f and g as c·x^(p/q) power functions
+const b5pw = (c, p, q) => ({ c, p, q });
+const b5pwF = (P) => (x) => P.c * pxPow(x, P.p / P.q);
+function b5pwL(P, v = 'x', radical = false) {
+  const cL = P.c === 1 ? '' : P.c === -1 ? '-' : String(P.c);
+  if (P.q === 1) return `${cL}${v}${P.p === 1 ? '' : `^{${P.p}}`}`;
+  if (radical && P.p === 1) return `${cL}${a6rootL(P.q, v)}`;
+  return `${cL}${v}^{\\frac{${P.p}}{${P.q}}}`;
+}
+function b5pwT(P, v = 'x') {
+  const c = P.c === 1 ? '' : P.c === -1 ? MINUS : fmt(P.c), [p, q] = Qr(P.p, P.q);
+  return q === 1 ? `${c}${p === 0 ? (c ? '' : '1') : v + (p === 1 ? '' : a6sup(p))}` : `${c}${v}${p < 0 ? '⁻' : ''}${a6fracSupT(Math.abs(p), q)}`;
+}
+const b5pwKey = (P, v = 'x') => { const [p, q] = Qr(P.p, P.q); return `${P.c === 1 ? '' : P.c === -1 ? '-' : P.c}${p === 0 ? '' : `${v}^{${q === 1 ? p : `\\frac{${p}}{${q}}`}}`}` || '1'; };
+// #1–4: (f + g)(x), (f − g)(x) with like terms, and a value
+TEMPLATES.b55AddSub = (r) => {
+  for (;;) {
+    const n = pick(r, [2, 3, 4, 3]), inner = pick(r, ['x', '2x', '3x']), c1 = nz(r, -12, 12), c2 = nz(r, -20, 20), plus = r() < 0.5, poly = r() < 0.35;
+    if (c1 + (plus ? c2 : -c2) === 0) continue;
+    if (poly) {
+      const f = b4rand(r, ri(r, 1, 3), 3, 9), g = b4rand(r, ri(r, 1, 2), 2, 9), x0 = nz(r, -3, 3);
+      const res = plus ? b4add(f, g) : b4add(f, b4neg(g)); const val = b4ev(res, x0);
+      const fig = a6tex([`f(x)=${b4L(f)}`, `g(x)=${b4L(g)}`]), op = plus ? '+' : MINUS;
+      const correct = `(f ${op} g)(x) = ${b4T(res)}; (f ${op} g)(${fmt(x0)}) = ${fmt(val)}`;
+      const alt = plus ? b4add(f, b4neg(g)) : b4add(f, g);
+      const wr = [`(f ${op} g)(x) = ${b4T(alt)}; (f ${op} g)(${fmt(x0)}) = ${fmt(b4ev(alt, x0))}`, `(f ${op} g)(x) = ${b4T(res)}; (f ${op} g)(${fmt(x0)}) = ${fmt(-val)}`, `(f ${op} g)(x) = ${b4T(res.map((c, i) => (i === res.length - 1 ? c + 1 : c)))}; (f ${op} g)(${fmt(x0)}) = ${fmt(val + 1)}`];
+      return { topic: 'Adding and subtracting functions', stem: `Find (f ${op} g)(x). Then evaluate (f ${op} g)(${fmt(x0)}). (The domain is all real numbers.)`, draw: fig.draw, size: fig.size,
+        ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => `(f ${op} g)(x) = ${b4T(res)}; (f ${op} g)(${fmt(x0)}) = ${fmt(val + i + 2)}`),
+        fr: { fields: [{ kind: 'expr', keys: 'poly', label: `(f ${op} g)(x) =` }, { kind: 'expr', keys: 'num', label: `(f ${op} g)(${fmt(x0)}) =` }], key: [b4L(res), String(val)], display: correct,
+          check: (q) => b4StdOk(q[0], res) && numOk(q[1], val), score: (q) => ((b4StdOk(q[0], res) ? 1 : 0) + (numOk(q[1], val) ? 1 : 0)) / 2 },
+        solution: `Combine like terms: (f ${op} g)(x) = (${b4T(f)}) ${op} (${b4T(g)}) = ${b4T(res)}\n(f ${op} g)(${fmt(x0)}) = ${fmt(val)}` };
+    }
+    const k = inner === 'x' ? 1 : +inner[0], x0 = n % 2 ? pick(r, [-4, 4, 1, -1, 32, -32].filter((t) => Number.isInteger(Math.round(Math.cbrt(k * t) * 1e9) / 1e9) || n !== 3)) : n === 2 ? pick(r, [4, 9, 16, 25]) : 16;
+    const tot = c1 + (plus ? c2 : -c2), rv = pxPow(k * x0, 1 / n), val = tot * rv; if (!isFinite(val) || Math.abs(val - Math.round(val)) > 1e-9) continue;
+    const fig = a6tex([`f(x)=${c1 === 1 ? '' : c1 === -1 ? '-' : c1}${a6rootL(n, inner)}`, `g(x)=${c2 === 1 ? '' : c2 === -1 ? '-' : c2}${a6rootL(n, inner)}`]), op = plus ? '+' : MINUS;
+    const R = (t) => `${t === 1 ? '' : t === -1 ? MINUS : fmt(t)}${a6rootT(n, inner)}`;
+    const dom = n % 2 ? 'all real numbers' : 'x ≥ 0';
+    const correct = `${R(tot)}; domain ${dom}; value ${fmt(Math.round(val))}`;
+    const alt = c1 + (plus ? -c2 : c2);
+    const wr = [`${R(alt)}; domain ${dom}; value ${fmt(Math.round(alt * rv))}`, `${R(tot)}; domain ${n % 2 ? 'x ≥ 0' : 'all real numbers'}; value ${fmt(Math.round(val))}`, `${R(tot)}; domain ${dom}; value ${fmt(Math.round(-val))}`];
+    return { topic: 'Adding and subtracting functions', stem: `Find (f ${op} g)(x) and state its domain. Then evaluate (f ${op} g)(${fmt(x0)}).`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => `${R(tot + i + 1)}; domain ${dom}; value ${fmt(Math.round((tot + i + 1) * rv))}`),
+      fr: { fields: [{ kind: 'expr', keys: 'rad', label: `(f ${op} g)(x) =` }, { kind: 'expr', keys: 'dom', label: 'Domain:' }, { kind: 'expr', keys: 'num', label: `(f ${op} g)(${fmt(x0)}) =` }],
+        key: [`${tot}${a6rootL(n, inner)}`, n % 2 ? '\\text{all real numbers}' : 'x\\ge 0', String(Math.round(val))], display: correct,
+        check: (q) => b5addOk(q, n, inner, tot, val), score: (q) => b5addScore(q, n, inner, tot, val) },
+      solution: `Like radicals: (f ${op} g)(x) = (${fmt(c1)} ${op} ${fmt(c2).replace(MINUS, '(' + MINUS) + (c2 < 0 ? ')' : '')})${a6rootT(n, inner)} = ${R(tot)}\nDomain: ${n % 2 ? 'odd index, so all real numbers' : 'even index, so x ≥ 0'} (the same as f and g).\n(f ${op} g)(${fmt(x0)}) = ${fmt(tot)} · ${a6rootSym(n)}${fmt(k * x0)} = ${fmt(Math.round(val))}` };
+  }
+};
+function b5addScore(q, n, inner, tot, val) {
+  const k = inner === 'x' ? 1 : +inner[0], F = (env) => tot * pxPow(k * env.x, 1 / n);
+  const e = (() => { const s = a6flat(a6pre(q[0])); const f = pxParse(a6pre(q[0]), ['x'], ''); if (!f || s == null || (s.match(/sqrt|root/g) || []).length !== 1) return false; return [0.7, 1.9, 3.2].every((x) => Math.abs(f({ x }) - F({ x })) < 1e-7); })();
+  const D = n % 2 ? ALL : [{ a: 0, b: Infinity, ca: true, cb: false }];
+  return ((e ? 1 : 0) + (setOk(q[1], D) ? 1 : 0) + (numOk(q[2], val) ? 1 : 0)) / 3;
+}
+const b5addOk = (...a) => b5addScore(...a) === 1;
+// #5–10: (fg)(x) or (f/g)(x) for power functions, domain, and a value
+TEMPLATES.b55MulDiv = (r) => {
+  for (;;) {
+    const fq = pick(r, [1, 1, 2, 3, 4]), gq = pick(r, [2, 3, 2, 3, 1]), f = b5pw(nz(r, -9, 12), ri(r, 1, 4), fq), g = b5pw(nz(r, -14, 9), ri(r, 1, gq === 1 ? 3 : gq + 4), gq);
+    if (gcd(f.p, f.q) !== 1 || gcd(g.p, g.q) !== 1) continue;
+    const div = r() < 0.5, H = div ? b5pw(f.c / g.c, f.p * g.q - g.p * f.q, f.q * g.q) : b5pw(f.c * g.c, f.p * g.q + g.p * f.q, f.q * g.q);
+    if (!Number.isInteger(H.c * 2) && div) continue;
+    const [hp, hq] = Qr(H.p, H.q); H.p = hp; H.q = hq; if (hp <= 0 || (f.q === 1 && g.q === 1)) continue;
+    const evenRoot = (P) => P.q % 2 === 0;
+    // domain: x ≥ 0 if any even root; x ≠ 0 / x > 0 for division
+    const nonneg = evenRoot(f) || evenRoot(g);
+    const dom = div ? (nonneg ? 'x > 0' : 'x ≠ 0') : nonneg ? 'x ≥ 0' : 'all real numbers';
+    const D = div ? (nonneg ? [{ a: 0, b: Infinity, ca: false, cb: false }] : [{ a: -Infinity, b: 0, ca: false, cb: false }, { a: 0, b: Infinity, ca: false, cb: false }]) : nonneg ? [{ a: 0, b: Infinity, ca: true, cb: false }] : ALL;
+    const xs = [4, 9, 16, 8, 27, 64, -8, -27, -1, 1].filter((x) => (!nonneg || x > 0)), x0 = pick(r, xs), val = b5pwF(H)(x0);
+    if (!isFinite(val) || Math.abs(val) > 1e6 || !fracParts(val) || fracParts(val)[1] > 64) continue;
+    const name = div ? '(f/g)' : '(fg)', radF = r() < 0.5;
+    const fig = a6tex([`f(x)=${b5pwL(f, 'x', radF)}`, `g(x)=${b5pwL(g, 'x', radF)}`]);
+    const correct = `${name}(x) = ${b5pwT(H)}; domain ${dom}; ${name}(${fmt(x0)}) = ${fracT(val)}`;
+    const alt = div ? b5pw(f.c / g.c, f.p * g.q + g.p * f.q, f.q * g.q) : b5pw(f.c * g.c, f.p * g.p, f.q * g.q);
+    const wr = [`${name}(x) = ${b5pwT(alt)}; domain ${dom}; ${name}(${fmt(x0)}) = ${fracT(b5pwF(alt)(x0))}`, `${name}(x) = ${b5pwT(H)}; domain ${div ? 'all real numbers' : nonneg ? 'all real numbers' : 'x ≥ 0'}; ${name}(${fmt(x0)}) = ${fracT(val)}`, `${name}(x) = ${b5pwT(H)}; domain ${dom}; ${name}(${fmt(x0)}) = ${fracT(-val)}`];
+    return { topic: 'Multiplying and dividing functions', stem: `Find ${name}(x) and state its domain. Then evaluate ${name}(${fmt(x0)}).`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct && !/NaN/.test(w)), (i) => `${name}(x) = ${b5pwT(H)}; domain ${dom}; ${name}(${fmt(x0)}) = ${fracT(val + i + 1)}`),
+      fr: { fields: [{ kind: 'expr', keys: 'fn5', label: `${name}(x) =` }, { kind: 'expr', keys: 'dom', label: 'Domain:' }, { kind: 'expr', keys: 'num', label: `${name}(${fmt(x0)}) =` }],
+        key: [b5pwKey(H), div ? (nonneg ? 'x>0' : 'x\\ne 0') : nonneg ? 'x\\ge 0' : '\\text{all real numbers}', fracL(val)], display: correct,
+        check: (q) => b5mdScore(q, H, D, val) === 1, score: (q) => b5mdScore(q, H, D, val) },
+      solution: `${div ? 'Quotient of powers: subtract' : 'Product of powers: add'} the exponents: ${fracT(f.p / f.q)} ${div ? MINUS : '+'} ${fracT(g.p / g.q)} = ${fracT(H.p / H.q)}; coefficients ${fmt(f.c)} ${div ? '÷' : '·'} ${fmt(g.c)} = ${fracT(H.c)}.\n${name}(x) = ${b5pwT(H)}\nDomain: ${nonneg ? 'an even root needs x ≥ 0' : 'odd roots allow every x'}${div ? `, and g(x) ≠ 0 so x ≠ 0` : ''}: ${dom}.\n${name}(${fmt(x0)}) = ${fracT(val)}` };
+  }
+};
+function b5mdScore(q, H, D, val) {
+  const f = pxParse(a6pre(q[0]), ['x'], ''), F = b5pwF(H);
+  const e = !!f && [0.6, 1.7, 2.9, 4.4].every((x) => Math.abs(f({ x }) - F(x)) < 1e-7 * Math.max(1, Math.abs(F(x))));
+  return ((e ? 1 : 0) + (setOk(q[1], D) ? 1 : 0) + (numOk(a6pre(q[2]), val, 1e-9) ? 1 : 0)) / 3;
+}
+// #11–14: evaluate combinations with technology
+TEMPLATES.b55Calc = (r) => {
+  for (;;) {
+    const f = b5pw(nz(r, -7, 7), ri(r, 1, 5), pick(r, [1, 2, 3, 4])), g = b5pw(nz(r, -30, 50), ri(r, 1, 3), pick(r, [2, 3, 4])), x0 = pick(r, [5, 3, 7, 2, 6]);
+    if (gcd(f.p, f.q) !== 1 || gcd(g.p, g.q) !== 1) continue;
+    const op = pick(r, ['+', '−', '·', '/']), a = b5pwF(f)(x0), b = b5pwF(g)(x0), v = op === '+' ? a + b : op === '−' ? a - b : op === '·' ? a * b : a / b, ans = b5r2(v);
+    if (Math.abs(v) > 1e6) continue;
+    const name = op === '·' ? '(fg)' : op === '/' ? '(f/g)' : `(f ${op} g)`;
+    const fig = a6tex([`f(x)=${b5pwL(f)}`, `g(x)=${b5pwL(g)}`]);
+    const wr = [a + b, a - b, a * b, a / b, b - a].map(b5r2).filter((w) => Math.abs(w - ans) > 0.001).map(fmt);
+    return { topic: 'Evaluating function operations', stem: `Use technology to evaluate ${name}(${x0}). Round your answer to two decimal places.`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, fmt(ans), [...new Set(wr)], (i) => fmt(b5r2(ans + 1.3 * (i + 1)))),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: `${name}(${x0}) ≈` }], key: [String(ans)], display: fmt(ans), check: (q) => Math.abs(pxConst(q[0]) - ans) < 0.0051 },
+      solution: `f(${x0}) ≈ ${fmt(+a.toFixed(4))} and g(${x0}) ≈ ${fmt(+b.toFixed(4))}\n${name}(${x0}) = f(${x0}) ${op} g(${x0}) ≈ ${fmt(ans)}` };
+  }
+};
+// #15–16: domain of a product or quotient
+TEMPLATES.b55Domain = (r) => {
+  const a = ri(r, 1, 6), kind = ri(r, 0, 2);
+  let fig, D, correct, wr, why;
+  if (kind === 0) { fig = a6tex(['f(x)=x^{3}', `g(x)=x^{2}-${a * a}`, '\\left(\\frac{f}{g}\\right)(x)']); correct = `All real numbers except x = ±${a}`; wr = [`All real numbers except x = ${a}`, 'All real numbers', `x ≥ ${a}`]; why = `g(x) = 0 when x² = ${a * a}, so x = ±${a}. Both values are excluded.`; }
+  else if (kind === 1) { fig = a6tex(['f(x)=x^{\\frac{1}{2}}', 'g(x)=x^{\\frac{3}{2}}', '(fg)(x)']); correct = 'x ≥ 0'; wr = ['All real numbers', 'x > 0', `x ≥ ${a}`]; why = 'f and g are only defined for x ≥ 0, so fg is too, even though fg simplifies to x².'; }
+  else { fig = a6tex([`f(x)=\\sqrt{x-${a}}`, 'g(x)=x', '\\left(\\frac{f}{g}\\right)(x)']); correct = `x ≥ ${a}`; wr = ['x ≠ 0', `x > ${a}`, 'All real numbers']; why = `f needs x − ${a} ≥ 0, so x ≥ ${a}; g(x) = 0 only at x = 0, which is already excluded.`; }
+  return { topic: 'Domains of combined functions', stem: 'What is the domain of the combined function?', draw: fig.draw, size: fig.size, ...buildChoices(r, correct, wr, () => null), fr: FR.select('Domain:', shuffle(r, [correct, ...wr]), correct), solution: `The domain is every x in the domains of both f and g${kind === 0 || kind === 2 ? ' where g(x) ≠ 0' : ''}.\n${why}` };
+};
+// #17: adding two models
+TEMPLATES.b55Word = (r) => {
+  const F = [+(ri(r, 5, 20) / 1000).toFixed(4), -ri(r, 50, 200) / 1000, ri(r, 50, 120) / 100, ri(r, 600, 800) / 10], M = [+(ri(r, 5, 15) / 1000).toFixed(4), -ri(r, 40, 120) / 1000, ri(r, 30, 90) / 100, ri(r, 700, 900) / 10];
+  const S = F.map((c, i) => +(c + M[i]).toFixed(4));
+  const T = (co) => co.map((c, i) => [c, 3 - i]).filter(([c]) => c).map(([c, p], i) => `${i ? (c < 0 ? ` ${MINUS} ` : ' + ') : c < 0 ? MINUS : ''}${Math.abs(c)}${p ? 't' + (p > 1 ? a6sup(p) : '') : ''}`).join('');
+  const L = (co) => co.map((c, i) => [c, 3 - i]).filter(([c]) => c).map(([c, p], i) => `${i ? (c < 0 ? '-' : '+') : c < 0 ? '-' : ''}${Math.abs(c)}${p ? 't' + (p > 1 ? `^{${p}}` : '') : ''}`).join('');
+  const fig = a6tex([`F(t)=${L(F)}`, `M(t)=${L(M)}`]);
+  const correct = `(F + M)(t) = ${T(S)}`, wr = [`(F + M)(t) = ${T(F.map((c, i) => +(c - M[i]).toFixed(4)))}`, `(F + M)(t) = ${T(S.map((c, i) => (i === 3 ? +(c / 2).toFixed(4) : c)))}`, `(F + M)(t) = ${T([S[0], S[1], S[2], +(F[3] * M[3] / 100).toFixed(2)])}`];
+  return { topic: 'Function operations in real life', stem: 'Over a period of years, the numbers (in millions) of female and male employees over the age of 16 can be modeled by F(t) and M(t), where t is the number of years since 2010. Find (F + M)(t). What does it represent?', draw: fig.draw, size: fig.size,
+    ...buildChoices(r, correct, wr, () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'poly', label: '(F + M)(t) =' }], key: [L(S)], display: `${correct} — the total number of employees (in millions) t years after 2010`, check: (x) => pxEquiv(String(x[0]).replace(/t/g, 'x'), (t) => S[0] * t ** 3 + S[1] * t * t + S[2] * t + S[3], { lo: 0, hi: 10 }) },
+    solution: `Add the like terms:\n(F + M)(t) = ${T(S)}\nIt is the total number of employees over 16 (in millions), male and female, t years after 2010.` };
+};
+
+/* ----- 5.6 Composition of Functions ----- */
+// simple functions for composing: linear, quadratic, square root
+function b5fn(r, kind) {
+  if (kind === 'lin') { const m = nz(r, -6, 6), b = ri(r, -9, 9); return { f: (x) => m * x + b, T: (u) => `${m === 1 ? '' : m === -1 ? MINUS : fmt(m)}${u}${b ? (b > 0 ? ` + ${b}` : ` ${MINUS} ${-b}`) : ''}`, L: (u) => `${m === 1 ? '' : m === -1 ? '-' : m}${u}${b ? (b > 0 ? '+' : '-') + Math.abs(b) : ''}`, co: [m, b], kind }; }
+  if (kind === 'quad') { const a = pick(r, [1, 1, 2, 3, -1]), c = ri(r, -9, 9); return { f: (x) => a * x * x + c, T: (u) => `${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}${u.length > 1 ? `(${u})` : u}²${c ? (c > 0 ? ` + ${c}` : ` ${MINUS} ${-c}`) : ''}`, L: (u) => `${a === 1 ? '' : a === -1 ? '-' : a}${u.length > 1 ? `\\left(${u}\\right)` : u}^{2}${c ? (c > 0 ? '+' : '-') + Math.abs(c) : ''}`, co: [a, 0, c], kind }; }
+  const h = ri(r, -9, 9); return { f: (x) => (x + h >= 0 ? Math.sqrt(x + h) : NaN), T: (u) => `√(${u}${h ? (h > 0 ? ` + ${h}` : ` ${MINUS} ${-h}`) : ''})`, L: (u) => `\\sqrt{${u}${h ? (h > 0 ? '+' : '-') + Math.abs(h) : ''}}`, h, kind };
+}
+// #1–4: f(g(x)), g(f(x)), f(f(x))
+TEMPLATES.b56Compose = (r) => {
+  for (;;) {
+    const fk = pick(r, ['lin', 'quad', 'lin', 'sqrt']), gk = pick(r, ['lin', 'lin', 'sqrt', 'quad']); if ((fk === 'sqrt' && gk === 'sqrt') || (fk === 'quad' && gk === 'sqrt')) continue;
+    const f = b5fn(r, fk), g = b5fn(r, gk), which = pick(r, ['fg', 'gf', 'ff']); if (which === 'ff' && fk === 'sqrt') continue; if (which === 'gf' && (gk === 'sqrt' && fk !== 'lin')) continue;
+    const [A, B] = which === 'fg' ? [f, g] : which === 'gf' ? [g, f] : [f, f], name = which === 'fg' ? 'f(g(x))' : which === 'gf' ? 'g(f(x))' : 'f(f(x))';
+    const H = (x) => A.f(B.f(x));
+    // expanded form when both are polynomials
+    let disp, key;
+    if (A.kind !== 'sqrt' && B.kind !== 'sqrt') { const inner = B.kind === 'lin' ? B.co : [B.co[0], 0, B.co[2]]; let co = [0]; const outer = A.kind === 'lin' ? A.co : [A.co[0], 0, A.co[2]]; for (const c of outer) co = b4add(pMul(co, inner), [c]); co = b4trim(co); disp = b4T(co); key = b4L(co); }
+    else if (A.kind === 'sqrt') { const inner = b4add(B.kind === 'lin' ? B.co : [B.co[0], 0, B.co[2]], [A.h]); disp = `√(${b4T(inner)})`; key = `\\sqrt{${b4L(inner)}}`; }
+    else { disp = A.T(B.T('x')); key = A.L(B.L('x')); }
+    if (disp.length > 60) continue;
+    const swap = (x) => B.f(A.f(x));
+    const fig = a6tex([`f(x)=${f.L('x')}`, `g(x)=${g.L('x')}`]);
+    // domain
+    const dom = A.kind !== 'sqrt' && B.kind !== 'sqrt' ? 'all real numbers' : null;
+    const wrongText = (F) => { if (A.kind !== 'sqrt' && B.kind !== 'sqrt') { const co = b4fit(F, 4); return co ? b4T(co) : null; } return null; };
+    const wr = [wrongText(swap), wrongText((x) => A.f(x) * B.f(x)), wrongText((x) => A.f(x) + B.f(x)), A.kind === 'sqrt' || B.kind === 'sqrt' ? B.T(A.T('x')) : null, A.kind === 'sqrt' ? A.T(`${B.T('x')} + 1`) : null].filter(Boolean);
+    const defN = [...Array(61)].filter((_, j) => isFinite(H(-20 + (80 * (j + 0.37)) / 61))).length; if (defN < 8) continue;
+    const chk = (x) => { const s = String(x[0]).replace(/^\s*[a-z]\(.*?\)\s*=\s*/i, ''); return pxEquiv(s, H, { lo: -20, hi: 60, need: 6 }); };
+    return { topic: 'Composition of functions', stem: `Find ${name}.${dom ? '' : ' (Use x-values where it is defined.)'}`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, disp, [...new Set(wr)].filter((w) => w !== disp), (i) => (A.kind !== 'sqrt' && B.kind !== 'sqrt' ? b4T(b4fit((x) => H(x) + i + 1, 4)) : `${disp} + ${i + 1}`)),
+      fr: { fields: [{ kind: 'expr', keys: 'fn5', label: `${name} =` }], key: [key], display: disp, check: chk },
+      solution: `Substitute ${which === 'fg' ? 'g(x)' : which === 'gf' ? 'f(x)' : 'f(x)'} for x in ${which === 'gf' ? 'g' : 'f'}:\n${name} = ${A.T(`(${B.T('x')})`).replace('((', '(').replace('))', ')')}\n= ${disp}` };
+  }
+};
+// #5–8: evaluate a composition
+TEMPLATES.b56Value = (r) => {
+  for (;;) {
+    const h = ri(r, -3, 9), m = nz(r, -4, 4), b = ri(r, -9, 9), a = pick(r, [1, 2, 3]), c = ri(r, -6, 6);
+    const F = (x) => (x + h >= 0 ? Math.sqrt(x + h) : NaN), G = (x) => m * x + b, Hh = (x) => a * x * x + c;
+    const fns = { f: F, g: G, h: Hh }, order = pick(r, [['f', 'g'], ['g', 'f'], ['g', 'h'], ['h', 'g'], ['f', 'h']]), x0 = ri(r, -4, 6);
+    const inner = fns[order[1]](x0), v = fns[order[0]](inner);
+    if (!isFinite(v) || !Number.isInteger(v) || Math.abs(v) > 500) continue;
+    const fig = a6tex([`f(x)=\\sqrt{x${h ? (h > 0 ? '+' : '-') + Math.abs(h) : ''}}`, `g(x)=${m === 1 ? '' : m === -1 ? '-' : m}x${b ? (b > 0 ? '+' : '-') + Math.abs(b) : ''}`, `h(x)=${a === 1 ? '' : a}x^{2}${c ? (c > 0 ? '+' : '-') + Math.abs(c) : ''}`]);
+    const name = `${order[0]}(${order[1]}(${fmt(x0)}))`, wrong = fns[order[1]](fns[order[0]](x0));
+    return { topic: 'Evaluating compositions', stem: `Find ${name}.`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, fmt(v), [wrong, inner, fns[order[0]](x0), v + 2].filter((w) => isFinite(w) && w !== v).map(fmt), (i) => fmt(v + i + 3)),
+      fr: FR.num(`${name} =`, v), solution: `Work from the inside out.\n${order[1]}(${fmt(x0)}) = ${fmt(inner)}\n${order[0]}(${fmt(inner)}) = ${fmt(v)}` };
+  }
+};
+// piecewise-linear function through integer points on 0..4
+function b5pwLin(r) { const ys = [...Array(5)].map(() => ri(r, 0, 4)); return { ys, f: (x) => { if (x < 0 || x > 4) return NaN; const i = Math.min(3, Math.floor(x)); return ys[i] + (ys[i + 1] - ys[i]) * (x - i); } }; }
+// #9–10: compositions from graphs
+TEMPLATES.b56Graph = (r) => {
+  const f = b5pwLin(r), g = b5pwLin(r), which = pick(r, ['fg', 'gf', 'ff', 'gg']), x0 = ri(r, 0, 4);
+  const A = which[0] === 'f' ? f : g, B = which[1] === 'f' ? f : g, inner = B.ys[x0], v = A.ys[inner];
+  const plot = plotQ({ xr: [-1, 5], yr: [-1, 5], curves: [{ f: f.f, color: '#1f5fa8' }, { f: g.f, color: '#c0392b' }], pts: [...f.ys.map((y, x) => ({ p: [x, y] }))] });
+  const name = `${which[0]}(${which[1]}(${x0}))`;
+  return { topic: 'Compositions from graphs', stem: `The blue graph is y = f(x) and the red graph is y = g(x). Find ${name}.`, draw: plot, size: [380, 380],
+    ...buildChoices(r, String(v), [inner, A.ys[x0], B.ys[A.ys[x0]], v + 1, v - 1].filter((w) => w !== v && w >= 0).map(String), (i) => String(v + i + 2)),
+    fr: FR.num(`${name} =`, v), solution: `Read ${which[1]}(${x0}) from the ${which[1] === 'f' ? 'blue' : 'red'} graph: ${inner}.\nThen ${which[0]}(${inner}) from the ${which[0] === 'f' ? 'blue' : 'red'} graph: ${v}.\n${name} = ${v}` };
+};
+// #11–14: compositions from tables
+TEMPLATES.b56Table = (r) => {
+  for (;;) {
+    const fx = [-4, -2, 0, 2, 4, 6], gx = [-6, -4, -2, 0, 2, 4];
+    const fy = fx.map(() => pick(r, [-6, -4, -2, 0, 2, 4, 6])), gy = gx.map(() => pick(r, fx));
+    const which = pick(r, ['fg', 'gf']);
+    const F = (x) => { const i = fx.indexOf(x); return i < 0 ? NaN : fy[i]; }, G = (x) => { const i = gx.indexOf(x); return i < 0 ? NaN : gy[i]; };
+    const x0 = pick(r, which === 'fg' ? gx : fx), inner = which === 'fg' ? G(x0) : F(x0), v = which === 'fg' ? F(inner) : G(inner);
+    if (!isFinite(v)) continue;
+    const fig = a6table([['x', ...fx.map(fmt)], ['f(x)', ...fy.map(fmt)], ['x', ...gx.map(fmt)], ['g(x)', ...gy.map(fmt)]], { cw: 58 });
+    const name = which === 'fg' ? `f(g(${fmt(x0)}))` : `g(f(${fmt(x0)}))`;
+    return { topic: 'Compositions from tables', stem: `Use the tables to find ${name}.`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, fmt(v), [inner, which === 'fg' ? G(F(x0)) : F(G(x0)), v + 2].filter((w) => isFinite(w) && w !== v).map(fmt), (i) => fmt(v + 2 * i + 4)),
+      fr: FR.num(`${name} =`, v), solution: `${which === 'fg' ? 'g' : 'f'}(${fmt(x0)}) = ${fmt(inner)} (from the ${which === 'fg' ? 'g' : 'f'} table)\n${which === 'fg' ? 'f' : 'g'}(${fmt(inner)}) = ${fmt(v)} (from the ${which === 'fg' ? 'f' : 'g'} table)` };
+  }
+};
+// #17–18: compositions in real life
+TEMPLATES.b56Word = (r) => {
+  if (r() < 0.5) {
+    const price = pick(r, [2.75, 3.15, 3.49, 2.89]), mpg = pick(r, [0.04, 0.05, 0.025, 0.03]), m = pick(r, [100, 200, 250, 300, 400]);
+    const k = +(price * mpg).toFixed(5), v = +(k * m).toFixed(2);
+    const fig = a6tex([`C(g)=${price}g`, `g(m)=${mpg}m`]);
+    return { topic: 'Composition in real life', stem: `C(g) is the cost (in dollars) of g gallons of gasoline, and g(m) approximates the number of gallons a vehicle uses to travel m miles. Find C(g(${m})) and explain what it represents.`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, `$${v.toFixed(2)}, the cost of the gas for ${m} miles`, [`$${(price * m).toFixed(2)}, the cost of the gas for ${m} miles`, `$${(mpg * m).toFixed(2)}, the gallons used for ${m} miles`, `$${(price + mpg * m).toFixed(2)}, the cost of the gas for ${m} miles`], () => null),
+      fr: FR.num(`C(g(${m})) = $`, v), solution: `C(g(m)) = ${price}(${mpg}m) = ${k}m: the cost is $${k} per mile.\nC(g(${m})) = ${k}(${m}) = $${v.toFixed(2)}, the cost of the gasoline used to travel ${m} miles.` };
+  }
+  const rate = pick(r, [0.03, 0.029, 0.031]), sp = pick(r, [60, 50, 40, 80]), t = pick(r, [0.5, 1, 1.5, 2]), v = +(rate * sp * t + 1).toFixed(3);
+  const fig = a6tex([`p(d)=${rate}d+1`, `d(t)=${sp}t`]);
+  return { topic: 'Composition in real life', stem: `p(d) approximates the pressure (in atmospheres) at a depth of d feet below sea level, and d(t) is the depth (in feet) of a diver t minutes after beginning a descent. Evaluate p(d(${t})) and explain what it represents.`, draw: fig.draw, size: fig.size,
+    ...buildChoices(r, `${fmt(v)} atm, the pressure on the diver after ${t} min`, [`${fmt(rate * t + 1)} atm, the pressure on the diver after ${t} min`, `${fmt(sp * t)} atm, the depth after ${t} min`, `${fmt(+(rate * sp * t).toFixed(3))} atm, the pressure on the diver after ${t} min`], () => null),
+    fr: { fields: [{ kind: 'number', label: `p(d(${t})) =`, suffix: ' atm' }], key: [String(v)], display: `${fmt(v)} atmospheres`, check: (x) => Math.abs(parseNum(x[0]) - v) < 0.0011 },
+    solution: `p(d(t)) = ${rate}(${sp}t) + 1 = ${fmt(+(rate * sp).toFixed(3))}t + 1\np(d(${t})) = ${fmt(v)} atmospheres: the pressure on the diver ${t} minute${t === 1 ? '' : 's'} into the descent.` };
+};
+// #19: ordered pairs
+TEMPLATES.b56Pairs = (r) => {
+  for (;;) {
+    const gx = shuffle(r, [-10, -3, 0, 5, 8, 2, -7]).slice(0, 5).sort((p, q) => p - q), fdom = shuffle(r, [-12, -4, 1, 2, 6, 3, -9, 7]).slice(0, 5).sort((p, q) => p - q);
+    const fy = fdom.map(() => ri(r, -12, 12)), gy = gx.map(() => (r() < 0.8 ? pick(r, fdom) : ri(r, -12, 12)));
+    const pairs = gx.map((x, i) => { const j = fdom.indexOf(gy[i]); return j < 0 ? null : [x, fy[j]]; }).filter(Boolean);
+    if (pairs.length < 2 || pairs.length > 4) continue;
+    const P = (L) => L.map(([x, y]) => `(${fmt(x)}, ${fmt(y)})`).join(', ');
+    const correct = P(pairs), wr = [P(gx.map((x, i) => [x, gy[i]]).slice(0, pairs.length)), P(pairs.map(([x, y]) => [y, x])), P(fdom.map((x, i) => [x, fy[i]]).slice(0, pairs.length))].filter((w) => w !== correct);
+    return { topic: 'Composition from ordered pairs', stem: `Functions f and g consist only of the ordered pairs shown. Find the ordered pairs for y = f(g(x)).\nf: ${P(fdom.map((x, i) => [x, fy[i]]))}\ng: ${P(gx.map((x, i) => [x, gy[i]]))}`,
+      ...buildChoices(r, correct, [...new Set(wr)], (i) => P(pairs.map(([x, y]) => [x, y + i + 1]))), fr: FR.select('', shuffle(r, [correct, ...[...new Set(wr)].slice(0, 3)]), correct),
+      solution: `For each x in g, find g(x); keep it only if g(x) is an input of f.\n${gx.map((x, i) => `g(${fmt(x)}) = ${fmt(gy[i])} → ${fdom.includes(gy[i]) ? `f(${fmt(gy[i])}) = ${fmt(fy[fdom.indexOf(gy[i])])}` : 'not in the domain of f'}`).join('\n')}\nf(g(x)): ${correct}` };
+  }
+};
+
+/* ----- 5.7 Inverse of a Function ----- */
+// #1–8: input(s) when the output is −3
+TEMPLATES.b57Inputs = (r) => {
+  for (;;) {
+    const kind = ri(r, 0, 3), out = -3;
+    let tex, sols, why;
+    if (kind === 0) { const m = pick(r, [3, -7, 2, -4, 5, 0.5, -2 / 3, 1 / 3]), b = ri(r, -9, 9); const x = (out - b) / m; if (!fracParts(x) || fracParts(x)[1] > 6) continue; tex = `f(x)=${a6aL(m)}x${b ? (b > 0 ? '+' : '-') + Math.abs(b) : ''}`; sols = [x]; why = `${b ? `y ${b > 0 ? MINUS : '+'} ${Math.abs(b)}` : 'y'} = ${fracT(m).includes('/') ? `(${fracT(m)})` : fracT(m)}x, so x = (${b ? `y ${b > 0 ? MINUS : '+'} ${Math.abs(b)}` : 'y'}) ÷ ${fracT(m).includes('/') ? `(${fracT(m)})` : fracT(m)}; with y = −3, x = ${fracT(x)}`; }
+    else { const n = kind === 1 ? pick(r, [3, 4]) : kind === 2 ? 2 : 3, a = pick(r, [1, 2, 3, -1]), h = r() < 0.5 ? 0 : nz(r, -6, 6), s = ri(r, 1, 3), sg = n % 2 ? pick(r, [1, -1]) : 1, k = out - a * sg * s ** n;
+      if (Math.abs(k) > 30) continue;
+      tex = `f(x)=${a === 1 ? '' : a === -1 ? '-' : a}${h ? `\\left(x${h > 0 ? '-' : '+'}${Math.abs(h)}\\right)` : 'x'}^{${n}}${k ? (k > 0 ? '+' : '-') + Math.abs(k) : ''}`;
+      sols = n % 2 ? [sg * s + h] : [h - s, h + s]; why = `${a === -1 ? MINUS : a !== 1 ? `${fmt(a)}` : ''}${h ? `(x ${h > 0 ? MINUS : '+'} ${Math.abs(h)})` : 'x'}${a6sup(n)} = ${fmt(out - k)}, so ${h ? `x ${h > 0 ? MINUS : '+'} ${Math.abs(h)}` : 'x'} = ${n % 2 ? '' : '±'}${fmt(s * sg)}`; }
+    sols.sort((p, q) => p - q);
+    const fig = a6tex(tex);
+    return { topic: 'Solving y = f(x) for x', stem: 'Solve y = f(x) for x. Then find the input(s) when the output is −3.', draw: fig.draw, size: fig.size,
+      ...b5listQ(r, sols, [sols.map((x) => -x), [sols[sols.length - 1]], sols.map((x) => x + 1)].filter((L) => L.length)),
+      fr: { fields: [{ kind: 'expr', keys: 'roots', label: 'x =' }], key: [b5listL(sols)], display: b5list(sols).replace(/(\d+)\/(\d+)/, '$1/$2'), check: (q) => b5listOk(q[0], sols) },
+      solution: `Set the output equal to −3 and solve: ${why}.\nx = ${sols.map(fracT).join(', ')}` };
+  }
+};
+// #9–16: inverse of a linear function
+TEMPLATES.b57Linear = (r) => {
+  for (;;) {
+    const m = pick(r, [6, -3, -2, 6, 0.5, -0.5, 1 / 3, 2 / 3, -4 / 5, 3, 4, 2]), b = r() < 0.2 ? 0 : pick(r, [5, -3, 4, -1, 1 / 3, -1 / 3, 1 / 5, 7, -2]);
+    const im = 1 / m, ib = -b / m; const p = fracParts(im), q = fracParts(ib); if (!p || !q || p[1] > 12 || q[1] > 30) continue;
+    const L = (mm, bb) => `${a6aL(mm)}x${bb ? (bb > 0 ? '+' : '-') + (fracParts(Math.abs(bb))[1] === 1 ? Math.abs(bb) : `\\frac{${fracParts(Math.abs(bb))[0]}}{${fracParts(Math.abs(bb))[1]}}`) : ''}`;
+    const T = (mm, bb) => `${mm === 1 ? '' : mm === -1 ? MINUS : fracT(mm).includes('/') ? `(${fracT(mm)})` : fracT(mm)}x${bb ? (bb > 0 ? ` + ${fracT(bb)}` : ` ${MINUS} ${fracT(-bb)}`) : ''}`;
+    const fig = a6tex(`f(x)=${L(m, b)}`), correct = `f⁻¹(x) = ${T(im, ib)}`;
+    const wr = [`f⁻¹(x) = ${T(im, -b)}`, `f⁻¹(x) = ${T(-m, b)}`, `f⁻¹(x) = ${T(im, b / m)}`, `f⁻¹(x) = ${T(m, -b)}`].filter((w) => w !== correct);
+    return { topic: 'Inverses of linear functions', stem: 'Find the inverse of the function.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)], (i) => `f⁻¹(x) = ${T(im, ib + i + 1)}`),
+      fr: { fields: [{ kind: 'expr', keys: 'fn5', label: 'f⁻¹(x) =' }], key: [L(im, ib)], display: correct, check: (x) => pxEquiv(String(x[0]).replace(/^\s*f\^\{?-1\}?\(x\)\s*=/, ''), (t) => im * t + ib) },
+      solution: `Replace f(x) with y: y = ${T(m, b)}\nSwitch x and y: x = ${T(m, b).replace(/x/, 'y')}\nSolve for y: y = ${T(im, ib)}\n${correct}` };
+  }
+};
+TEMPLATES.b57Table = (r) => TEMPLATES.p10Table(r);
+TEMPLATES.b57Verify = (r) => TEMPLATES.p10Verify(r);
+// #19–24, 29–40: inverses of power and radical functions
+TEMPLATES.b57Power = (r) => {
+  for (;;) {
+    const kind = pick(r, ['quad', 'cube', 'sqrt', 'cbrt']), a = pick(r, [1, 1, 2, 3, -1, -2, 4, 9]), h = ri(r, -6, 6), k = ri(r, -8, 8);
+    const hx = h ? `\\left(x${h > 0 ? '-' : '+'}${Math.abs(h)}\\right)` : 'x', hxT = h ? `(x ${h > 0 ? MINUS : '+'} ${Math.abs(h)})` : 'x', kL = k ? (k > 0 ? '+' : '-') + Math.abs(k) : '', kT = k ? (k > 0 ? ` + ${k}` : ` ${MINUS} ${-k}`) : '';
+    const aL = a === 1 ? '' : a === -1 ? '-' : String(a);
+    const xk = k ? `x${k > 0 ? '-' : '+'}${Math.abs(k)}` : 'x', xkT = k ? `x ${k > 0 ? MINUS : '+'} ${Math.abs(k)}` : 'x';
+    const na = Math.abs(a), xkN = a < 0 ? (k ? `${fmt(k)} ${MINUS} x` : `${MINUS}x`) : xkT, xkNL = a < 0 ? (k ? `${k}-x` : '-x') : xk;
+    const XK = k ? `(x ${k > 0 ? MINUS : '+'} ${Math.abs(k)})` : 'x';
+    const YH = h ? `(y ${h > 0 ? MINUS : '+'} ${Math.abs(h)})` : 'y';
+    const hT = h ? (h > 0 ? ` + ${h}` : ` ${MINUS} ${-h}`) : '';
+    let tex, inv, invL, invT, dom, why, F;
+    if (kind === 'quad') { if (a < 0) continue; const right = r() < 0.6; tex = `f(x)=${aL}${hx}^{2}${kL},\\ x${right ? '\\ge' : '\\le'} ${h}`; const s = right ? 1 : -1; inv = (x) => h + s * Math.sqrt((x - k) / a); F = (x) => a * (x - h) ** 2 + k;
+      invL = `${h || ''}${s > 0 ? (h ? '+' : '') : '-'}\\sqrt{${na === 1 ? xkNL : `\\frac{${xkNL}}{${na}}`}}`; invT = `${h ? fmt(h) : ''}${s > 0 ? (h ? ' + ' : '') : (h ? ` ${MINUS} ` : MINUS)}√(${a === 1 ? xkT : `(${xkT})/${a}`.replace('(x)/', 'x/')})`; dom = a > 0 ? [k, Infinity] : [-Infinity, k]; why = `Switch x and y: x = ${a === 1 ? '' : fmt(a)}${YH}²${kT}. Solve: y = ${h ? `${h} ` : ''}${s > 0 ? '+' : MINUS} √(${XK}/${fmt(a)}) — the sign matches the restriction x ${right ? '≥' : '≤'} ${h}.`; }
+    else if (kind === 'cube') { tex = `f(x)=${aL}${hx}^{3}${kL}`; inv = (x) => h + Math.cbrt((x - k) / a); F = (x) => a * (x - h) ** 3 + k;
+      invL = `${a6rootL(3, a === 1 ? xk : `\\frac{${xk}}{${a}}`)}${h ? (h > 0 ? '+' : '-') + Math.abs(h) : ''}`; invT = `∛(${na === 1 ? xkN : `(${xkN})/${na}`.replace('(x)/', 'x/')})${hT}`; dom = [-Infinity, Infinity]; why = `Switch x and y: x = ${a === 1 ? '' : fmt(a)}${YH}³${kT}. Subtract ${fmt(k)}, divide by ${fmt(a)}, and take the cube root${h ? `; then ${h > 0 ? 'add' : 'subtract'} ${Math.abs(h)}` : ''}.`; }
+    else if (kind === 'sqrt') { if (a < 0) continue; tex = `f(x)=${aL}\\sqrt{${h ? `x${h > 0 ? '-' : '+'}${Math.abs(h)}` : 'x'}}${kL}`; inv = (x) => ((x - k) / a) ** 2 + h; F = (x) => a * Math.sqrt(x - h) + k;
+      invL = `\\left(${na === 1 ? xkNL : `\\frac{${xkNL}}{${na}}`}\\right)^{2}${h ? (h > 0 ? '+' : '-') + Math.abs(h) : ''},\\ x\\ge ${k}`; invT = `(${na === 1 ? xkN : `(${xkN})/${na}`.replace('(x)/', 'x/')})²${hT}, x ≥ ${fmt(k)}`; dom = [k, Infinity]; why = `Switch x and y and solve: x = ${a === 1 ? '' : fmt(a)}√${YH}${kT} → y = (${XK}/${fmt(a)})²${hT}. The range of f is y ≥ ${fmt(k)}, so the inverse has domain x ≥ ${fmt(k)}.`; }
+    else { tex = `f(x)=${aL}${a6rootL(3, h ? `x${h > 0 ? '-' : '+'}${Math.abs(h)}` : 'x')}${kL}`; inv = (x) => ((x - k) / a) ** 3 + h; F = (x) => a * Math.cbrt(x - h) + k;
+      invL = `\\left(${na === 1 ? xkNL : `\\frac{${xkNL}}{${na}}`}\\right)^{3}${h ? (h > 0 ? '+' : '-') + Math.abs(h) : ''}`; invT = `(${na === 1 ? xkN : `(${xkN})/${na}`.replace('(x)/', 'x/')})³${hT}`; dom = [-Infinity, Infinity]; why = `Switch x and y: x = ${a === 1 ? '' : fmt(a)}∛${YH}${kT}. Isolate the cube root and cube both sides${h ? `; then ${h > 0 ? 'add' : 'subtract'} ${Math.abs(h)}` : ''}.`; }
+    invT = invT.replace(/^\+ /, '').replace(/^0/, '');
+    const correct = `f⁻¹(x) = ${invT}`;
+    const lo = isFinite(dom[0]) ? dom[0] + 0.1 : -6, hi = isFinite(dom[1]) ? dom[1] - 0.1 : 8;
+    const swapK = k ? invT.split(xkT).join(`x ${k > 0 ? '+' : MINUS} ${Math.abs(k)}`) : null;
+    const noH = h ? (kind === 'quad' ? invT.replace(/^[−-]?\d+ ([+−]) /, (m0, sg) => (sg === MINUS ? MINUS : '')) : invT.replace(hT, '')) : null;
+    const flipBranch = kind === 'quad' ? (invT.includes(`+ √`) ? invT.replace('+ √', `${MINUS} √`) : invT.includes(`${MINUS} √`) ? invT.replace(`${MINUS} √`, '+ √') : invT.startsWith(MINUS) ? invT.slice(1) : MINUS + invT) : null;
+    const origT = { quad: `${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}${hxT}²${kT}`, cube: `${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}${hxT}³${kT}`, sqrt: `${a === 1 ? '' : fmt(a)}√${h ? hxT : 'x'}${kT}`, cbrt: `${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}∛${h ? hxT : 'x'}${kT}` }[kind];
+    const wrongs = [swapK, noH, flipBranch, origT];
+    const wr = wrongs.filter((w) => w && w !== invT).map((w) => `f⁻¹(x) = ${w}`);
+    const fig = a6tex(tex);
+    const chk = (x) => { const s = String(x[0]).replace(/,.*$/, '').replace(/^\s*f\^\{?-1\}?\(x\)\s*=/, ''); return pxEquiv(s, inv, { lo, hi, need: 8 }); };
+    if ([0.37, 1.3, 2.9].some((t) => Math.abs(F(inv(lo + (hi - lo) * t / 3)) - (lo + (hi - lo) * t / 3)) > 1e-6)) continue;
+    return { topic: 'Inverses of nonlinear functions', stem: 'Find the inverse of the function.', draw: fig.draw, size: fig.size,
+      ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => `f⁻¹(x) = ${invT.replace(/(, x ≥.*)?$/, (m) => ` + ${i + 1}` + m)}`),
+      fr: { fields: [{ kind: 'expr', keys: 'fn5', label: 'f⁻¹(x) =' }], key: [invL], display: correct, check: chk },
+      solution: `${why}\n${correct}` };
+  }
+};
+// #47–48: inverse functions in real life
+TEMPLATES.b57Word = (r) => {
+  if (r() < 0.5) {
+    const k = pick(r, [1.34, 1.2, 1.5]), s = pick(r, [7.5, 8, 9, 6.5, 10]), x = (s / k) ** 2, ans = Math.round(x * 10) / 10;
+    const fig = a6tex(`f(x)=${k}\\sqrt{x}`);
+    return { topic: 'Inverse functions in real life', stem: `The maximum hull speed (in knots) of a boat with a displacement hull can be approximated by the function below, where x is the waterline length (in feet). Find and interpret f⁻¹(${s}). Round to the nearest tenth.`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, `${ans} ft: the waterline length of a boat with a hull speed of ${s} knots`, [`${fmt(Math.round(k * Math.sqrt(s) * 10) / 10)} knots: the hull speed of a boat that is ${s} feet long`, `${fmt(Math.round((s / k) * 10) / 10)} ft: the waterline length of a boat with a hull speed of ${s} knots`, `${fmt(Math.round(s * s * k * 10) / 10)} ft: the waterline length of a boat with a hull speed of ${s} knots`], () => null),
+      fr: { fields: [{ kind: 'number', label: `f⁻¹(${s}) ≈`, suffix: ' ft' }], key: [String(ans)], display: `${ans} ft`, check: (q) => Math.abs(parseNum(q[0]) - ans) < 0.051 },
+      solution: `Solve y = ${k}√x for x: x = (y/${k})², so f⁻¹(x) = (x/${k})².\nf⁻¹(${s}) = (${s}/${k})² ≈ ${ans}: a boat with a maximum hull speed of ${s} knots has a waterline length of about ${ans} feet.` };
+  }
+  const m = pick(r, [3 / 8, 1 / 2, 3 / 4, 5 / 8]), b = pick(r, [5, 2, 4, 6]), y = pick(r, [19, 10, 16, 25, 13]), x = (y + b) / m; if (!Number.isInteger(x * 10)) return TEMPLATES.b57Word(r);
+  const fig = a6tex(`r(x)=${a6aL(m)}x-${b}`);
+  return { topic: 'Inverse functions in real life', stem: `The resistance (in pounds) of an elastic exercise band can be modeled by the function below, where x is the total length (in inches) of the stretched band. Find and interpret r⁻¹(${y}).`, draw: fig.draw, size: fig.size,
+    ...buildChoices(r, `${fmt(x)} in.: the length of the band when the resistance is ${y} pounds`, [`${fmt(m * y - b)} lb: the resistance when the band is ${y} inches long`, `${fmt((y - b) / m)} in.: the length of the band when the resistance is ${y} pounds`, `${fmt(y / m)} in.: the length of the band when the resistance is ${y} pounds`], () => null),
+    fr: FR.num(`r⁻¹(${y}) =`, x, { suffix: ' in.' }), solution: `r⁻¹(x) = (x + ${b})/${fracT(m)}\nr⁻¹(${y}) = (${y} + ${b})/${fracT(m)} = ${fmt(x)}: the band is stretched to ${fmt(x)} inches when the resistance is ${y} pounds.` };
+};
+// #53: f⁻¹(value) from a table
+TEMPLATES.b57FromTable = (r) => {
+  for (;;) {
+    const xs = [-2, -1, 0, 1, 2, 3], ys = shuffle(r, [-1, -2, 1, 4, 7, 10, 0, 5, -4]).slice(0, 6); if (new Set(ys).size !== 6) continue;
+    const j = ri(r, 0, 5), t = ys[j], fig = a6table([['x', ...xs.map(fmt)], ['f(x)', ...ys.map(fmt)]]);
+    return { topic: 'Inverse from a table', stem: `Use the table to find f⁻¹(${fmt(t)}).`, draw: fig.draw, size: fig.size,
+      ...buildChoices(r, fmt(xs[j]), [ys[xs.indexOf(t)], -xs[j], xs[(j + 1) % 6]].filter((w) => w !== undefined && w !== xs[j]).map(fmt), (i) => fmt(xs[j] + i + 4)),
+      fr: FR.num(`f⁻¹(${fmt(t)}) =`, xs[j]), solution: `f⁻¹(${fmt(t)}) is the input x with f(x) = ${fmt(t)}. The table shows f(${fmt(xs[j])}) = ${fmt(t)}, so f⁻¹(${fmt(t)}) = ${fmt(xs[j])}.` };
+  }
+};
+/* ==== ALGEBRA 2 CH5 END ==== */
+/* ==== GRAPH SKETCH BEGIN ==== */
+/* ---------- graph sketching: students place key points on a grid; the graph of that family is drawn through them ---------- */
+// families: points (in order of the roles) → the function they determine, or null
+const SKETCH = {
+  line: { roles: ['a point on the line', 'another point on the line'], short: ['', ''], fit: ([[x1, y1], [x2, y2]]) => (x1 === x2 ? null : (x) => y1 + ((y2 - y1) / (x2 - x1)) * (x - x1)) },
+  abs: { roles: ['the vertex', 'another point'], short: ['V', ''], fit: ([[h, k], [x, y]]) => (x === h ? null : (t) => k + ((y - k) / Math.abs(x - h)) * Math.abs(t - h)) },
+  quad: { roles: ['the vertex', 'another point'], short: ['V', ''], fit: ([[h, k], [x, y]]) => (x === h ? null : (t) => k + ((y - k) / (x - h) ** 2) * (t - h) ** 2) },
+  sqrt: { roles: ['the starting point', 'another point'], short: ['S', ''], fit: ([[h, k], [x, y]]) => { if (x === h) return null; const s = Math.sign(x - h), a = (y - k) / Math.sqrt(Math.abs(x - h)); return (t) => (s * (t - h) >= 0 ? k + a * Math.sqrt(s * (t - h)) : NaN); } },
+  cbrt: { roles: ['the center point', 'another point'], short: ['C', ''], fit: ([[h, k], [x, y]]) => (x === h ? null : (t) => k + ((y - k) / Math.cbrt(x - h)) * Math.cbrt(t - h)) },
+  exp: { roles: ['a point on the asymptote', 'a point on the graph', 'another point on the graph'], short: ['A', '', ''], asym: true,
+    fit: ([[, k], [x1, y1], [x2, y2]]) => { if (x1 === x2 || y1 === k || y2 === k || Math.sign(y1 - k) !== Math.sign(y2 - k)) return null; const b = ((y2 - k) / (y1 - k)) ** (1 / (x2 - x1)); if (Math.abs(b - 1) < 1e-9) return null; const a = (y1 - k) / b ** x1; return (t) => a * b ** t + k; } },
+};
+const skParse = (v) => String(v || '').split(';').filter(Boolean).map((p) => p.split(',').map(Number)).filter((p) => p.length === 2 && p.every(isFinite));
+const skText = (pts) => pts.map(([x, y]) => `(${fmt(x)}, ${fmt(y)})`).join(', ');
+// does the sketch match the target function T on the window?
+function skMatch(family, pts, T, win) {
+  const F = SKETCH[family]; if (!F || pts.length !== F.roles.length) return false;
+  const S = F.fit(pts); if (!S) return false;
+  if (F.asym && Math.abs(pts[0][1] - (win.asym ?? NaN)) > 1e-9) return false;
+  const [x0, x1] = win.xr, [y0, y1] = win.yr; let n = 0;
+  for (let j = 0; j <= 80; j++) {
+    const x = x0 + ((x1 - x0) * j) / 80, t = T(x), s = S(x);
+    if (!isFinite(t) && !isFinite(s)) continue;
+    if (isFinite(t) !== isFinite(s)) { if (win.edge != null && Math.abs(x - win.edge) < 0.3) continue; return false; }
+    if (t < y0 - 6 || t > y1 + 6) continue;
+    if (Math.abs(t - s) > 0.02 * (1 + Math.abs(t))) return false;
+    n++;
+  }
+  return n >= 5;
+}
+// the free-response part of a sketch question
+function skFR({ family, target, keyPts, win, display }) {
+  const F = SKETCH[family], key = keyPts.map((p) => p.join(',')).join(';');
+  return { fields: [{ kind: 'graph', family, win, label: '' }], key: [key], display: display || skText(keyPts),
+    check: (v) => skMatch(family, skParse(v[0]), target, win), answered: (a) => Array.isArray(a) && skParse(a[0]).length === F.roles.length };
+}
+function skTransform(cv, win) {
+  const W = cv._w, H = cv._h, [x0, x1] = win.xr, [y0, y1] = win.yr, m = 26, sc = Math.min((W - 2 * m) / (x1 - x0), (H - 2 * m) / (y1 - y0));
+  const ox = (W - sc * (x1 - x0)) / 2, oy = (H - sc * (y1 - y0)) / 2;
+  return { X: (x) => ox + (x - x0) * sc, Y: (y) => oy + (y1 - y) * sc, ix: (px) => x0 + (px - ox) / sc, iy: (py) => y1 - (py - oy) / sc };
+}
+// draw a sketch: student's points and curve, and (optionally) the correct graph underneath
+function skDraw(cv, f, pts, overlay) {
+  const F = SKETCH[f.family], S = pts.length === F.roles.length ? F.fit(pts) : null, T = skTransform(cv, f.win);
+  const curves = [];
+  if (overlay) curves.push({ f: overlay, color: '#7fbf7f' });
+  if (S) curves.push({ f: S, color: '#1f5fa8' });
+  drawPlot(cv, { xr: f.win.xr, yr: f.win.yr, curves });
+  const c = cv._ctx;
+  const dashH = (y, color) => { c.save(); c.strokeStyle = color; c.lineWidth = 1.8; c.setLineDash([7, 6]); c.beginPath(); c.moveTo(T.X(f.win.xr[0]), T.Y(y)); c.lineTo(T.X(f.win.xr[1]), T.Y(y)); c.stroke(); c.restore(); };
+  if (overlay && F.asym && f.win.asym != null) dashH(f.win.asym, '#7fbf7f');
+  if (F.asym && pts.length) dashH(pts[0][1], '#c0392b');
+  pts.forEach(([x, y], j) => {
+    c.beginPath(); c.arc(T.X(x), T.Y(y), 5.5, 0, 2 * Math.PI); c.fillStyle = F.asym && j === 0 ? '#c0392b' : '#1f5fa8'; c.fill();
+    c.fillStyle = '#1d1d1b'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'bottom';
+    c.fillText(`(${fmt(x)}, ${fmt(y)})`, T.X(x) + 7, T.Y(y) - 4);
+  });
+}
+// the interactive grid
+function graphInput(q, i, f, k, vals, reveal, save) {
+  const F = SKETCH[f.family], size = Math.min(380, Math.max(260, contentWidth() - 20));
+  const cv = makeCanvas(size, size); cv.style.touchAction = 'none'; cv.style.cursor = reveal ? 'default' : 'crosshair'; cv.style.border = '1px solid var(--line)'; cv.style.borderRadius = '8px'; cv.style.background = '#fff';
+  let pts = skParse(vals[k]);
+  const msg = el('div', { class: 'small', style: 'margin:4px 0' });
+  const showKey = reveal && !state.teacher;
+  const redraw = () => {
+    skDraw(cv, f, pts, showKey && !q.fr.check([vals[k]]) ? q.fr._target || null : null);
+    msg.textContent = reveal ? (state.teacher ? 'Correct graph.' : q.fr.check([vals[k]]) ? '' : 'Your graph is blue; the correct graph is light green.') : pts.length < F.roles.length ? `Click to place ${F.roles[pts.length]}.${pts.length ? ' Drag a point to move it.' : ''}` : 'Drag a point to move it, or use Undo.';
+  };
+  const commit = () => { vals[k] = pts.map((p) => p.join(',')).join(';'); save(); redraw(); };
+  if (!reveal) {
+    let drag = -1, moved = false;
+    const at = (e) => { const r = cv.getBoundingClientRect(), T = skTransform(cv, f.win); const px = ((e.clientX - r.left) * cv._w) / r.width, py = ((e.clientY - r.top) * cv._h) / r.height; return [Math.round(T.ix(px)), Math.round(T.iy(py)), px, py, T]; };
+    const inWin = (x, y) => x >= f.win.xr[0] && x <= f.win.xr[1] && y >= f.win.yr[0] && y <= f.win.yr[1];
+    cv.addEventListener('pointerdown', (e) => {
+      const [x, y, px, py, T] = at(e); moved = false;
+      drag = pts.findIndex(([a, b]) => Math.hypot(T.X(a) - px, T.Y(b) - py) < 14);
+      if (drag >= 0) { try { cv.setPointerCapture(e.pointerId); } catch {} return; }
+      if (pts.length < F.roles.length && inWin(x, y)) { pts.push([x, y]); commit(); }
+    });
+    cv.addEventListener('pointermove', (e) => { if (drag < 0) return; const [x, y] = at(e); if (inWin(x, y) && (x !== pts[drag][0] || y !== pts[drag][1])) { pts[drag] = [x, y]; moved = true; redraw(); } });
+    const end = () => { if (drag >= 0 && moved) commit(); drag = -1; };
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  }
+  redraw();
+  const btns = reveal ? '' : el('div', { style: 'display:flex;gap:8px;margin-top:6px' },
+    el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:5px 12px;font-size:14px', onclick: () => { pts.pop(); commit(); } }, 'Undo'),
+    el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:5px 12px;font-size:14px', onclick: () => { pts = []; commit(); } }, 'Clear'));
+  return el('div', { class: 'sketch', style: 'margin-top:6px' }, el('div', { class: 'small', style: 'margin-bottom:4px' }, `Place ${F.roles.join(', then ')}. Points snap to the grid.`), cv, msg, btns);
+}
+// a sketch question: q.sketch keeps it free response in every format
+function skQ({ topic, stem, family, target, keyPts, win, display, solution, draw, size }) {
+  const fr = skFR({ family, target, keyPts, win, display }); fr._target = target;
+  return { topic, stem, sketch: true, fr, choices: null, answer: -1, solution, draw, size };
+}
+const skLinT = (m, b) => lineText(m, b);
+function skWin(pts) { // a square window (at most 16 × 16) around the important points, with the axes when they fit
+  const rng = (vs) => { const lo0 = Math.min(...vs) - 2, hi0 = Math.max(...vs) + 2; let lo = Math.min(lo0, -1), hi = Math.max(hi0, 1); if (hi - lo > 16) { lo = lo0; hi = hi0; } return [lo, hi]; };
+  let xr = rng(pts.map((p) => p[0])), yr = rng(pts.map((p) => p[1]));
+  const size = Math.max(10, xr[1] - xr[0], yr[1] - yr[0]); if (size > 16) return null;
+  const grow = ([lo, hi]) => { const extra = size - (hi - lo), a = Math.floor(extra / 2); let L = lo - a, H = hi + (extra - a); if (L > 0 && L - (extra - a) <= -1) { /* keep the axis */ } return [L, H]; };
+  xr = grow(xr); yr = grow(yr);
+  return { xr, yr };
+}
+const skOk = (W, pts) => !!W && pts.every(([x, y]) => x >= W.xr[0] + 1 && x <= W.xr[1] - 1 && y >= W.yr[0] + 1 && y <= W.yr[1] - 1);
+
+/* ----- sketch templates ----- */
+// lines (Algebra I, Pre-Calculus)
+TEMPLATES.skLine = (r) => {
+  for (;;) {
+    const den = pick(r, [1, 1, 2, 3]), num = nz(r, -4, 4), m = num / den, b = ri(r, -5, 5);
+    if (den > 1 && gcd(Math.abs(num), den) !== 1) continue;
+    const form = ri(r, 0, 2), p1 = [0, b], p2 = [den, b + num];
+    const W = skWin([p1, p2]); if (!skOk(W, [p1, p2])) continue;
+    let eq;
+    if (form === 0) eq = `y = ${skLinT(m, b)}`;
+    else if (form === 1) { const x1 = nz(r, -3, 3) * den, y1 = m * x1 + b; if (!skOk(W, [[x1, y1]])) continue; const mT = den > 1 ? `(${fracT(m)})` : m === 1 ? '' : m === -1 ? MINUS : fmt(m); eq = `${y1 ? `y ${y1 < 0 ? '+' : MINUS} ${Math.abs(y1)}` : 'y'} = ${mT}(x ${x1 < 0 ? '+' : MINUS} ${Math.abs(x1)})`; }
+    else { const A = -num, B = den, C = b * den, g = gcd(gcd(Math.abs(A), B), Math.abs(C)) || 1; eq = `${lin(A / g, 0).replace(/ \+ 0$/, '')} ${B / g > 0 ? '+' : MINUS} ${Math.abs(B / g) === 1 ? '' : Math.abs(B / g)}y = ${fmt(C / g)}`; }
+    return skQ({ topic: 'Graphing lines', stem: `Graph the equation by placing two points on the line.\n${eq}`, family: 'line', target: (x) => m * x + b, keyPts: [p1, p2], win: W,
+      display: `The line through ${skText([p1, p2])} (slope ${fracT(m)}, y-intercept ${b})`,
+      solution: `${form === 0 ? `Slope ${fracT(m)}, y-intercept ${fmt(b)}.` : `Rewrite in slope-intercept form: ${skLinT(m, b)}.`}\nStart at (0, ${fmt(b)}); move ${Math.abs(num)} ${num > 0 ? 'up' : 'down'} and ${den} right to (${den}, ${fmt(b + num)}).` });
+  }
+};
+// exponential functions (Algebra I 6.4)
+TEMPLATES.skExp = (r) => {
+  for (;;) {
+    const b = pick(r, [2, 3, 4, 0.5, 1 / 3, 0.25]), a = pick(r, [1, 1, 2, 3, -1, -2, 0.5]), k = r() < 0.45 ? 0 : nz(r, -4, 4), h = r() < 0.2 ? nz(r, -2, 2) : 0;
+    const T = (x) => a * b ** (x - h) + k;
+    const cand = [-2, -1, 0, 1, 2].map((d) => [h + d, T(h + d)]).filter(([, y]) => Number.isInteger(Math.round(y * 1e9) / 1e9) && Math.abs(y - k) <= 9).map(([x, y]) => [x, Math.round(y)]);
+    if (cand.length < 2) continue;
+    const p1 = cand.find(([x]) => x === h) || cand[0], p2 = cand.find(([x]) => x !== p1[0] && Math.abs(x - p1[0]) === 1) || cand.find(([x]) => x !== p1[0]);
+    const W = skWin([p1, p2, [p1[0], k]]); if (!skOk(W, [p1, p2]) || k <= W.yr[0] || k >= W.yr[1]) continue;
+    W.asym = k;
+    const bL = (() => { const p = fracParts(b); return p[1] === 1 ? String(b) : `\\left(\\frac{${p[0]}}{${p[1]}}\\right)`; })();
+    const fig = a6tex(`f(x)=${a6aL(a)}${a === 1 || a === -1 ? (fracParts(b)[1] === 1 ? b : bL) : `\\left(${fracParts(b)[1] === 1 ? b : `\\frac{${fracParts(b)[0]}}{${fracParts(b)[1]}}`}\\right)`}^{${h ? `x${h > 0 ? '-' : '+'}${Math.abs(h)}` : 'x'}}${k ? (k > 0 ? '+' : '-') + Math.abs(k) : ''}`);
+    return skQ({ topic: 'Graphing exponential functions', stem: 'Graph the function. Place a point on its asymptote, then two points on the graph.', family: 'exp', target: T, keyPts: [[p1[0], k], p1, p2], win: W, draw: fig.draw, size: fig.size,
+      display: `Asymptote y = ${fmt(k)}; through ${skText([p1, p2])}`,
+      solution: `The asymptote is y = ${fmt(k)}${k ? ` (the graph of ${fmt(a)}·${fracT(b)}ˣ is translated ${Math.abs(k)} ${k > 0 ? 'up' : 'down'})` : ''}.\nMake a table: ${cand.map(([x, y]) => `f(${fmt(x)}) = ${fmt(y)}`).join(', ')}.\nThe graph ${a * (b > 1 ? 1 : -1) > 0 ? 'increases' : 'decreases'} and approaches y = ${fmt(k)} ${b > 1 ? 'on the left' : 'on the right'}.` });
+  }
+};
+// square root and cube root functions (Algebra II 5.3)
+TEMPLATES.skRadical = (r) => {
+  for (;;) {
+    const cube = r() < 0.4, a = pick(r, [1, 1, 2, -1, -2, 3, 0.5]), s = cube ? 1 : r() < 0.2 ? -1 : 1, h = ri(r, -5, 5), k = ri(r, -5, 5);
+    const d = cube ? pick(r, [1, 8, -1]) : pick(r, [1, 4, 9]);
+    const T = cube ? (x) => a * Math.cbrt(x - h) + k : (x) => (s * (x - h) >= 0 ? a * Math.sqrt(s * (x - h)) + k : NaN);
+    const p2x = h + (cube ? d : s * d), p2y = T(p2x); if (!Number.isInteger(p2y)) continue;
+    const p1 = [h, k], p2 = [p2x, p2y];
+    const W = skWin([p1, p2]); if (!skOk(W, [p1, p2])) continue;
+    W.edge = cube ? null : h;
+    const inner = s < 0 ? (h ? `-\\left(x${h > 0 ? '-' : '+'}${Math.abs(h)}\\right)` : '-x') : h ? `x${h > 0 ? '-' : '+'}${Math.abs(h)}` : 'x';
+    const fig = a6tex(`${pick(r, ['f', 'g', 'h'])}(x)=${a === 0.5 ? '\\frac{1}{2}' : a6aL(a)}${a6rootL(cube ? 3 : 2, inner)}${k ? (k > 0 ? '+' : '-') + Math.abs(k) : ''}`);
+    return skQ({ topic: 'Graphing radical functions', stem: `Graph the function. Place ${cube ? 'the center point (where the graph changes direction of bending)' : 'the starting point (endpoint)'}, then one more point.`, family: cube ? 'cbrt' : 'sqrt', target: T, keyPts: [p1, p2], win: W, draw: fig.draw, size: fig.size,
+      display: `${cube ? 'Center' : 'Starting point'} (${fmt(h)}, ${fmt(k)}); through (${fmt(p2x)}, ${fmt(p2y)})`,
+      solution: `The graph of ${cube ? '∛x' : '√x'} has its ${cube ? 'center' : 'starting point'} at (0, 0). Here it moves to (${fmt(h)}, ${fmt(k)}).\n${cube ? '' : s < 0 ? 'The graph is reflected in the y-axis, so it goes to the left.\n' : ''}${a !== 1 ? `a = ${fmt(a)}: ${a < 0 ? 'reflect in the x-axis' : ''}${Math.abs(a) !== 1 ? `${a < 0 ? ' and ' : ''}${Math.abs(a) > 1 ? 'stretch' : 'shrink'} vertically by ${fmt(Math.abs(a))}` : ''}.\n` : ''}Another point: x = ${fmt(p2x)} gives y = ${fmt(p2y)}.` });
+  }
+};
+// transformations of parent functions (Pre-Calculus P.8)
+TEMPLATES.skParent = (r) => {
+  for (;;) {
+    const fam = pick(r, ['quad', 'abs', 'sqrt', 'cbrt']), a = pick(r, [1, 1, -1, 2, -2, 0.5]), h = ri(r, -5, 5), k = ri(r, -5, 5);
+    const T = fam === 'quad' ? (x) => a * (x - h) ** 2 + k : fam === 'abs' ? (x) => a * Math.abs(x - h) + k : fam === 'sqrt' ? (x) => (x >= h ? a * Math.sqrt(x - h) + k : NaN) : (x) => a * Math.cbrt(x - h) + k;
+    const dx = fam === 'sqrt' ? pick(r, [1, 4]) : fam === 'cbrt' ? pick(r, [1, 8]) : pick(r, [1, 2]), p2 = [h + dx, T(h + dx)];
+    if (!Number.isInteger(p2[1])) continue;
+    const p1 = [h, k], W = skWin([p1, p2]); if (!skOk(W, [p1, p2])) continue;
+    if (fam === 'sqrt') W.edge = h;
+    const xh = h ? `x${h > 0 ? '-' : '+'}${Math.abs(h)}` : 'x', aL = a === 0.5 ? '\\frac{1}{2}' : a6aL(a), kL = k ? (k > 0 ? '+' : '-') + Math.abs(k) : '';
+    const body = fam === 'quad' ? (h ? `\\left(${xh}\\right)^{2}` : 'x^{2}') : fam === 'abs' ? `\\left|${xh}\\right|` : fam === 'sqrt' ? `\\sqrt{${xh}}` : `\\sqrt[3]{${xh}}`;
+    const fig = a6tex(`g(x)=${aL}${body}${kL}`);
+    const keyName = { quad: 'vertex', abs: 'vertex', sqrt: 'starting point', cbrt: 'center point' }[fam];
+    return skQ({ topic: 'Sketching transformations', stem: `Sketch the graph of g. Place the ${keyName}, then one more point.`, family: fam, target: T, keyPts: [p1, p2], win: W, draw: fig.draw, size: fig.size,
+      display: `${keyName[0].toUpperCase() + keyName.slice(1)} (${fmt(h)}, ${fmt(k)}); through (${fmt(p2[0])}, ${fmt(p2[1])})`,
+      solution: `Parent function: ${{ quad: 'f(x) = x²', abs: 'f(x) = |x|', sqrt: 'f(x) = √x', cbrt: 'f(x) = ∛x' }[fam]}, with its ${keyName} at (0, 0).\n${h ? `Shift ${Math.abs(h)} ${h > 0 ? 'right' : 'left'}. ` : ''}${k ? `Shift ${Math.abs(k)} ${k > 0 ? 'up' : 'down'}. ` : ''}${a < 0 ? 'Reflect in the x-axis. ' : ''}${Math.abs(a) !== 1 ? `Vertical ${Math.abs(a) > 1 ? 'stretch' : 'shrink'} by ${fmt(Math.abs(a))}.` : ''}\nThe ${keyName} is (${fmt(h)}, ${fmt(k)}); x = ${fmt(p2[0])} gives y = ${fmt(p2[1])}.` });
+  }
+};
+TEMPLATES.a41Sketch = (r) => TEMPLATES.skLine(r);
+TEMPLATES.p4Sketch = (r) => TEMPLATES.skLine(r);
+TEMPLATES.a64Sketch = (r) => TEMPLATES.skExp(r);
+TEMPLATES.b53Sketch = (r) => TEMPLATES.skRadical(r);
+TEMPLATES.p8Sketch = (r) => TEMPLATES.skParent(r);
+/* ==== GRAPH SKETCH END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -15093,6 +16056,7 @@ const QUESTION_TYPES = [
   { id: 'p4ParPerpTest', subject: 'precalc',  section: 'P.4 Linear Equations in Two Variables', label: 'Parallel or perpendicular?', desc: '(#65–72)' },
   { id: 'p4ParPerpLines', subject: 'precalc',  section: 'P.4 Linear Equations in Two Variables', label: 'Parallel and perpendicular lines', desc: 'Through a point (#73–80)' },
   { id: 'p4InterceptForm', subject: 'precalc',  section: 'P.4 Linear Equations in Two Variables', label: 'Intercept form', desc: 'General form from intercepts (#81–84)' },
+  { id: 'p4Sketch', subject: 'precalc',  section: 'P.4 Linear Equations in Two Variables', sketch: true, label: 'Sketch a line', desc: 'Students place two points on a grid' },
   { id: 'p5IsFunction', subject: 'precalc',  section: 'P.5 Functions', label: 'Is it a function?', desc: 'Pairs, tables, equations (#7–20)' },
   { id: 'p5Evaluate', subject: 'precalc',  section: 'P.5 Functions', label: 'Evaluating functions', desc: 'Including f(x + h) and piecewise (#21–30)' },
   { id: 'p5Table', subject: 'precalc',  section: 'P.5 Functions', label: 'Completing a table', desc: '(#31–34)' },
@@ -15112,6 +16076,7 @@ const QUESTION_TYPES = [
   { id: 'p8FromGraph', subject: 'precalc',  section: 'P.8 Transformations of Functions', label: 'Equations from graphs', desc: '(#13–20, 53)' },
   { id: 'p8Describe', subject: 'precalc',  section: 'P.8 Transformations of Functions', label: 'Describing transformations', desc: '(#21–44)' },
   { id: 'p8FromDesc', subject: 'precalc',  section: 'P.8 Transformations of Functions', label: 'Equations from descriptions', desc: '(#45–52)' },
+  { id: 'p8Sketch', subject: 'precalc',  section: 'P.8 Transformations of Functions', sketch: true, label: 'Sketch a transformation', desc: 'Place the vertex/starting point and one more point on a grid (#13–30)' },
   { id: 'p9Arith', subject: 'precalc',  section: 'P.9 Combinations of Functions: Composite Functions', label: 'Arithmetic combinations', desc: 'f + g, f − g, fg, f/g and domain (#7–14)' },
   { id: 'p9Evaluate', subject: 'precalc',  section: 'P.9 Combinations of Functions: Composite Functions', label: 'Evaluating combinations', desc: '(#15–22)' },
   { id: 'p9Compose', subject: 'precalc',  section: 'P.9 Combinations of Functions: Composite Functions', label: 'Composition', desc: 'f ∘ g, g ∘ f, g ∘ g (#27–30)' },
@@ -15351,7 +16316,7 @@ Object.assign(SETS, {
   'alg1-6-1': { subject: 'algebra1', title: '6.1 Properties of Exponents', items: [['a61Eval', 2], ['a61ZeroNeg', 3], ['a61ProdQuot', 2], ['a61PowProd', 2], ['a61Mixed', 2], ['a61Sci', 2], ['a61Word', 1], ['a61PowerOfProd', 1]] },
   'alg1-6-2': { subject: 'algebra1', title: '6.2 Radicals and Rational Exponents', items: [['a62Rewrite', 2], ['a62NthRoot', 2], ['a62EvalRad', 2], ['a62EvalRat', 4], ['a62Cube', 1], ['a62Word', 1]] },
   'alg1-6-3': { subject: 'algebra1', title: '6.3 Properties of Radicals', items: [['a63IsSimple', 1], ['a63Sqrt', 3], ['a63Quot', 2], ['a63Cbrt', 2], ['a63FormOne', 1], ['a63Rational', 2], ['a63Conj', 2]] },
-  'alg1-6-4': { subject: 'algebra1', title: '6.4 Exponential Functions', items: [['a64IsExp', 2], ['a64Table', 2], ['a64Eval', 3], ['a64Props', 3], ['a64Compare', 1], ['a64Situation', 1]] },
+  'alg1-6-4': { subject: 'algebra1', title: '6.4 Exponential Functions', items: [['a64IsExp', 2], ['a64Table', 2], ['a64Eval', 3], ['a64Props', 3], ['a64Compare', 1], ['a64Situation', 1], ['a64Sketch', 2]] },
   'alg1-6-5': { subject: 'algebra1', title: '6.5 Exponential Growth and Decay', items: [['a65Identify', 2], ['a65Write', 2], ['a65Model', 1], ['a65Table', 2], ['a65Rate', 2], ['a65Rewrite', 2], ['a65Compound', 2]] },
   // ----- Algebra II, Chapter 3: Quadratic Equations and Complex Numbers -----
   'alg2-3-1': { subject: 'algebra2', title: '3.1 Factoring ax² + bx + c', items: [['b31GCF', 2], ['b31Factor', 4], ['b31Solve', 3], ['b31Intercepts', 1], ['b31Word', 2]] },
@@ -15371,6 +16336,14 @@ Object.assign(SETS, {
   'alg2-4-7': { subject: 'algebra2', title: '4.7 Transformations of Polynomial Functions', items: [['b47Describe', 4], ['b47Rule', 4], ['b47Transform', 3]] },
   'alg2-4-8': { subject: 'algebra2', title: '4.8 Analyzing Graphs of Polynomial Functions', items: [['b48Match', 3], ['b48Zeros', 3], ['b48LeastDeg', 3], ['b48EvenOdd', 3]] },
   'alg2-4-9': { subject: 'algebra2', title: '4.9 Modeling with Polynomial Functions', items: [['b49Cubic', 5], ['b49FiniteDiff', 5]] },
+  // ----- Algebra II, Chapter 5: Rational Exponents and Radical Functions -----
+  'alg2-5-1': { subject: 'algebra2', title: '5.1 nth Roots and Rational Exponents', items: [['b51NthRoot', 2], ['b51Eval', 3], ['b51Match', 2], ['b51Calc', 2], ['b51Solve', 3], ['b51Word', 1]] },
+  'alg2-5-2': { subject: 'algebra2', title: '5.2 Properties of Rational Exponents and Radicals', items: [['b52Props', 2], ['b52RadProd', 2], ['b52Simplest', 2], ['b52Conj', 1], ['b52Like', 2], ['b52Var', 2], ['b52RatVar', 1], ['b52LikeVar', 1]] },
+  'alg2-5-3': { subject: 'algebra2', title: '5.3 Graphing Radical Functions', items: [['b53Domain', 3], ['b53Match', 2], ['b53Transform', 3], ['b53Sketch', 3], ['b53Word', 1]] },
+  'alg2-5-4': { subject: 'algebra2', title: '5.4 Solving Radical Equations and Inequalities', items: [['b54Solve', 4], ['b54TwoRad', 2], ['b54Cube', 2], ['b54Extraneous', 1], ['b54Quad', 2], ['b54Word', 1]] },
+  'alg2-5-5': { subject: 'algebra2', title: '5.5 Performing Function Operations', items: [['b55AddSub', 3], ['b55MulDiv', 4], ['b55Calc', 2], ['b55Domain', 1], ['b55Word', 1]] },
+  'alg2-5-6': { subject: 'algebra2', title: '5.6 Composition of Functions', items: [['b56Compose', 3], ['b56Value', 3], ['b56Graph', 2], ['b56Table', 2], ['b56Word', 1], ['b56Pairs', 1]] },
+  'alg2-5-7': { subject: 'algebra2', title: '5.7 Inverse of a Function', items: [['b57Inputs', 2], ['b57Linear', 3], ['b57Table', 1], ['b57Power', 4], ['b57Verify', 1], ['b57Word', 1], ['b57FromTable', 1]] },
   // ----- Geometry, Chapter 7: Quadrilaterals and Other Polygons -----
   'geo-7-1': { subject: 'geometry', title: '7.1 Angles of Polygons', items: [['g71Sum', 2], ['g71Sides', 2], ['g71FindX', 4], ['g71Ext', 3], ['g71Regular', 2]] },
   'geo-7-2': { subject: 'geometry', title: '7.2 Properties of Parallelograms', items: [['g72Vars', 3], ['g72Angle', 2], ['g72Diag', 3], ['g72Alg', 3], ['g72Coord', 2]] },
@@ -15398,6 +16371,7 @@ QUESTION_TYPES.push(
   { id: 'a41FuncVals', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'Linear function from values', desc: 'Like f(0) = 2, f(2) = 4 (#17–22)' },
   { id: 'a41Table', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'From a table or mapping', desc: '#23–24' },
   { id: 'a41Word', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'Word problems', desc: 'Constant-rate models (#27–28)' },
+  { id: 'a41Sketch', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', sketch: true, label: 'Graph a line (sketch)', desc: 'Students place two points on a grid' },
   { id: 'a42PointSlope', subject: 'algebra1', section: '4.2 Writing Equations in Point-Slope Form', label: 'Point-slope form', desc: 'Point and slope (#1–8)' },
   { id: 'a42Graph', subject: 'algebra1', section: '4.2 Writing Equations in Point-Slope Form', label: 'From a graph', desc: 'Two marked points (#9–12)' },
   { id: 'a42TwoPts', subject: 'algebra1', section: '4.2 Writing Equations in Point-Slope Form', label: 'Through two points', desc: 'Slope-intercept form (#13–18)' },
@@ -15471,6 +16445,7 @@ QUESTION_TYPES.push(
   { id: 'a64Props', subject: 'algebra1', section: '6.4 Exponential Functions', label: 'y-intercept, asymptote, range', desc: '#17–28' },
   { id: 'a64Compare', subject: 'algebra1', section: '6.4 Exponential Functions', label: 'Compare graphs', desc: 'Find a, k, or h (#29–32)' },
   { id: 'a64Situation', subject: 'algebra1', section: '6.4 Exponential Functions', label: 'Linear or exponential situation', desc: '#34' },
+  { id: 'a64Sketch', subject: 'algebra1', section: '6.4 Exponential Functions', sketch: true, label: 'Graph exponential functions (sketch)', desc: 'Place the asymptote and two points on a grid (#17–24)' },
   { id: 'a65Identify', subject: 'algebra1', section: '6.5 Exponential Growth and Decay', label: 'Initial amount and rate', desc: 'Then evaluate (#1–8, 15–22)' },
   { id: 'a65Write', subject: 'algebra1', section: '6.5 Exponential Growth and Decay', label: 'Write a model', desc: '#9–12, 23–26' },
   { id: 'a65Model', subject: 'algebra1', section: '6.5 Exponential Growth and Decay', label: 'Predict with a model', desc: '#13–14, 28, 59' },
@@ -15557,6 +16532,49 @@ QUESTION_TYPES.push(
   { id: 'b48EvenOdd', subject: 'algebra2', section: '4.8 Analyzing Graphs of Polynomial Functions', label: 'Even, odd, or neither', desc: '#37–44' },
   { id: 'b49Cubic', subject: 'algebra2', section: '4.9 Modeling with Polynomial Functions', label: 'Cubic through given points', desc: '#1–4' },
   { id: 'b49FiniteDiff', subject: 'algebra2', section: '4.9 Modeling with Polynomial Functions', label: 'Finite differences', desc: 'Degree from a table (#5–10)' },
+  { id: 'b51NthRoot', subject: 'algebra2', section: '5.1 nth Roots and Rational Exponents', label: 'Real nth roots', desc: '#1–6' },
+  { id: 'b51Eval', subject: 'algebra2', section: '5.1 nth Roots and Rational Exponents', label: 'Evaluate without technology', desc: '#7–14' },
+  { id: 'b51Match', subject: 'algebra2', section: '5.1 nth Roots and Rational Exponents', label: 'Radical ↔ rational exponent form', desc: '#17–20' },
+  { id: 'b51Calc', subject: 'algebra2', section: '5.1 nth Roots and Rational Exponents', label: 'Evaluate with technology', desc: 'Round to two decimals (#21–28)' },
+  { id: 'b51Solve', subject: 'algebra2', section: '5.1 nth Roots and Rational Exponents', label: 'Solve power equations', desc: '#29–38' },
+  { id: 'b51Word', subject: 'algebra2', section: '5.1 nth Roots and Rational Exponents', label: 'Word problems', desc: 'Inflation rate, weir flow (#39–40)' },
+  { id: 'b52Props', subject: 'algebra2', section: '5.2 Properties of Rational Exponents and Radicals', label: 'Properties of rational exponents', desc: '#1–10' },
+  { id: 'b52RadProd', subject: 'algebra2', section: '5.2 Properties of Rational Exponents and Radicals', label: 'Products and quotients of radicals', desc: '#11–18' },
+  { id: 'b52Simplest', subject: 'algebra2', section: '5.2 Properties of Rational Exponents and Radicals', label: 'Simplest form (numbers)', desc: '#19–26' },
+  { id: 'b52Conj', subject: 'algebra2', section: '5.2 Properties of Rational Exponents and Radicals', label: 'Rationalize with conjugates', desc: '#27–34' },
+  { id: 'b52Like', subject: 'algebra2', section: '5.2 Properties of Rational Exponents and Radicals', label: 'Like radicals', desc: '#35–44' },
+  { id: 'b52Var', subject: 'algebra2', section: '5.2 Properties of Rational Exponents and Radicals', label: 'Radicals with variables', desc: '#45–50, 55–60' },
+  { id: 'b52RatVar', subject: 'algebra2', section: '5.2 Properties of Rational Exponents and Radicals', label: 'Rational exponents with variables', desc: '#61–62' },
+  { id: 'b52LikeVar', subject: 'algebra2', section: '5.2 Properties of Rational Exponents and Radicals', label: 'Like radicals with variables', desc: '#63–68' },
+  { id: 'b53Domain', subject: 'algebra2', section: '5.3 Graphing Radical Functions', label: 'Domain and range', desc: '#1–10' },
+  { id: 'b53Match', subject: 'algebra2', section: '5.3 Graphing Radical Functions', label: 'Match the graph', desc: '#11–16' },
+  { id: 'b53Transform', subject: 'algebra2', section: '5.3 Graphing Radical Functions', label: 'Describe the transformation', desc: '#17–24' },
+  { id: 'b53Word', subject: 'algebra2', section: '5.3 Graphing Radical Functions', label: 'Word problems', desc: '#33' },
+  { id: 'b53Sketch', subject: 'algebra2', section: '5.3 Graphing Radical Functions', sketch: true, label: 'Graph radical functions (sketch)', desc: 'Place the starting/center point and one more point on a grid (#1–10, 17–24)' },
+  { id: 'b54Solve', subject: 'algebra2', section: '5.4 Solving Radical Equations and Inequalities', label: 'Solve radical equations', desc: 'One radical (#1–18)' },
+  { id: 'b54TwoRad', subject: 'algebra2', section: '5.4 Solving Radical Equations and Inequalities', label: 'Two radicals', desc: '#23–30' },
+  { id: 'b54Cube', subject: 'algebra2', section: '5.4 Solving Radical Equations and Inequalities', label: 'Cube roots', desc: '#31–38' },
+  { id: 'b54Extraneous', subject: 'algebra2', section: '5.4 Solving Radical Equations and Inequalities', label: 'Which is extraneous?', desc: '#41–44' },
+  { id: 'b54Quad', subject: 'algebra2', section: '5.4 Solving Radical Equations and Inequalities', label: 'Leading to quadratics', desc: '#45–54' },
+  { id: 'b54Word', subject: 'algebra2', section: '5.4 Solving Radical Equations and Inequalities', label: 'Word problems', desc: '#19–20' },
+  { id: 'b55AddSub', subject: 'algebra2', section: '5.5 Performing Function Operations', label: 'f + g and f − g', desc: 'With domain and a value (#1–4)' },
+  { id: 'b55MulDiv', subject: 'algebra2', section: '5.5 Performing Function Operations', label: 'fg and f/g', desc: 'With domain and a value (#5–10)' },
+  { id: 'b55Calc', subject: 'algebra2', section: '5.5 Performing Function Operations', label: 'Evaluate with technology', desc: '#11–14' },
+  { id: 'b55Domain', subject: 'algebra2', section: '5.5 Performing Function Operations', label: 'Domain of a combination', desc: '#15–16' },
+  { id: 'b55Word', subject: 'algebra2', section: '5.5 Performing Function Operations', label: 'Word problem', desc: '#17' },
+  { id: 'b56Compose', subject: 'algebra2', section: '5.6 Composition of Functions', label: 'Find a composition', desc: 'f(g(x)), g(f(x)), f(f(x)) (#1–4)' },
+  { id: 'b56Value', subject: 'algebra2', section: '5.6 Composition of Functions', label: 'Evaluate a composition', desc: '#5–8' },
+  { id: 'b56Graph', subject: 'algebra2', section: '5.6 Composition of Functions', label: 'From graphs', desc: '#9–10' },
+  { id: 'b56Table', subject: 'algebra2', section: '5.6 Composition of Functions', label: 'From tables', desc: '#11–14' },
+  { id: 'b56Word', subject: 'algebra2', section: '5.6 Composition of Functions', label: 'Word problems', desc: '#17–18' },
+  { id: 'b56Pairs', subject: 'algebra2', section: '5.6 Composition of Functions', label: 'From ordered pairs', desc: '#19' },
+  { id: 'b57Inputs', subject: 'algebra2', section: '5.7 Inverse of a Function', label: 'Input for a given output', desc: '#1–8' },
+  { id: 'b57Linear', subject: 'algebra2', section: '5.7 Inverse of a Function', label: 'Inverse of a linear function', desc: '#9–16' },
+  { id: 'b57Table', subject: 'algebra2', section: '5.7 Inverse of a Function', label: 'Inverse from a table', desc: '#17–18' },
+  { id: 'b57Power', subject: 'algebra2', section: '5.7 Inverse of a Function', label: 'Inverses of power and radical functions', desc: '#19–24, 29–40' },
+  { id: 'b57Verify', subject: 'algebra2', section: '5.7 Inverse of a Function', label: 'Are they inverses?', desc: '#43–46' },
+  { id: 'b57Word', subject: 'algebra2', section: '5.7 Inverse of a Function', label: 'Word problems', desc: '#47–48' },
+  { id: 'b57FromTable', subject: 'algebra2', section: '5.7 Inverse of a Function', label: 'f⁻¹ from a table', desc: '#53' },
   { id: 'g71Sum', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Interior angle sum', desc: '#1–4' },
   { id: 'g71Sides', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Number of sides from the sum', desc: 'Classify the polygon (#5–8)' },
   { id: 'g71FindX', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Find x from interior angles', desc: '#9–14, 17–20' },
@@ -15671,7 +16689,7 @@ function registerCustomUrl(url) {
 /* ---------- question generation ---------- */
 function applyMode(q, mode) {
   if (q.twoPart) { q.mode = 'fr'; q.fr = mode === 'fr' ? q.twoPart.fr : q.twoPart.mc; return q; } // Part A + Part B
-  if (q.proofQ) { q.mode = 'fr'; return q; } // proofs are always written out
+  if (q.proofQ || q.sketch) { q.mode = 'fr'; return q; } // proofs are always written out; sketches are drawn on a grid
   if (mode === 'fr' && q.fr) { q.mode = 'fr'; if (q.frStem) q.stem = q.frStem; if (q._frSolution) q.solution = q._frSolution; }
   else q.mode = 'mc';
   return q;
@@ -16380,6 +17398,7 @@ function frArea(q, i) {
   };
   q.fr.fields.forEach((f, k) => {
     if (f.kind === 'proof') { wrap.append(proofEditor(q, i, vals, reveal, save)); controls[k] = { set disabled(_) {}, set placeholder(_) {} }; return; }
+    if (f.kind === 'graph') { wrap.append(graphInput(q, i, f, k, vals, reveal, save)); controls[k] = { set disabled(_) {}, set placeholder(_) {} }; return; }
     if (!row || f.part) {
       if (f.part) wrap.append(el('div', { class: 'frpart' }, f.part));
       row = el('div', { class: 'frrow' }); wrap.append(row);
@@ -16573,6 +17592,10 @@ function prevTry(i, W) {
   const correct = q.mode === 'fr' ? (q.proofQ ? '' : q.fr.display) : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`;
   box.append(el('div', { class: 'small prevans' }, 'Your answer: ', el('strong', { class: 'prevwrong' }, String(h.answer || '').trim() || '(no answer)')));
   if (correct) box.append(el('div', { class: 'small prevans' }, 'Correct answer: ', el('strong', { class: 'prevright' }, String(correct).replace(/(.)\u0305/g, '$1'))));
+  if (q.sketch) { // their graph (blue) over the correct one (green)
+    const pts = [...String(h.answer || '').replace(/−/g, '-').matchAll(/\((-?[\d.]+),\s*(-?[\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
+    const g = makeCanvas(300, 300); try { skDraw(g, q.fr.fields[0], pts, q.fr._target); g.style.width = '260px'; box.append(g); } catch {}
+  }
   box.append(el('div', { class: 'sol' }, q.solution));
   return box;
 }
@@ -16638,6 +17661,7 @@ function answerText(q, a) {
   if (!Array.isArray(a) || !isAnswered(q, a)) return '(no answer)';
   if (q.twoPart) return a[0] + (a[0] !== 'Not possible' ? `;  △${normLetters(a[1])} ≅ △${normLetters(a[2])}` : '');
   if (q.proofQ) return '\n' + proofLines(a[0]).map((s, k) => (k ? '   = ' : '   ') + (/[\\{}]/.test(s) ? latexToText(s) : s)).join('\n');
+  if (q.fr.fields.length === 1 && q.fr.fields[0].kind === 'graph') { const P = skParse(a && a[0]); return P.length ? `points ${skText(P)}` : '—'; }
   return q.fr.fields.map((f, k) => `${f.label ? f.label + ' ' : ''}${f.prefix || ''}${((f.kind === 'number' || f.kind === 'expr') && /[\\{}]/.test(a[k] || '') ? latexToText(a[k]) : a[k]) || '—'}${f.suffix || ''}`).join(',  ');
 }
 function exportWork(pts) {
@@ -17263,6 +18287,7 @@ function printScreen(preKey) {
         if (q.mode === 'fr') {
           const bl = el('div', { class: 'pblank' });
           (q.fr.fields || []).forEach((f) => {
+            if (f.kind === 'graph') { const g = makeCanvas(300, 300); drawPlot(g, { xr: f.win.xr, yr: f.win.yr, curves: [] }); g.style.width = '230px'; bl.append(g); return; }
             if (f.kind === 'select') bl.append(f.options.join('').length > 50 ? el('div', { style: 'width:100%' }, el('div', {}, (f.label ? f.label + ' ' : '') + 'Circle one:'), ...f.options.map((o) => el('div', { style: 'margin-left:14px' }, '○  ' + o))) : el('span', {}, (f.label ? f.label + ' ' : '') + 'circle one:  ' + f.options.join('   /   ')));
             else bl.append(el('span', {}, (f.label ? f.label + ' ' : '') + (f.prefix || '')), el('span', { class: 'line' }), f.suffix ? el('span', {}, f.suffix) : '');
           });
@@ -17282,7 +18307,7 @@ function printScreen(preKey) {
       const kd = el('div', { class: 'pkey' }, el('h2', {}, `Answer key — ${S.title}${PRINT.versions > 1 ? ` (Version ${L})` : ''}`));
       qs.forEach((q, i) => {
         const ans = q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}.  ${q.choices[q.answer]}`;
-        kd.append(el('div', { class: 'pkrow' }, el('div', { style: 'font-weight:700' }, `${i + 1}.`), el('div', {}, el('div', {}, ans), PRINT.sols && q.solution ? el('div', { class: 'psol' }, q.solution) : '')));
+        kd.append(el('div', { class: 'pkrow' }, el('div', { style: 'font-weight:700' }, `${i + 1}.`), el('div', {}, el('div', {}, ans), q.sketch ? (() => { const g = makeCanvas(300, 300); skDraw(g, q.fr.fields[0], skParse(q.fr.key[0]), null); g.style.width = '170px'; return g; })() : '', PRINT.sols && q.solution ? el('div', { class: 'psol' }, q.solution) : '')));
       });
       out.append(kd);
     });
@@ -17523,7 +18548,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' }, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' }, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
@@ -17592,7 +18617,7 @@ function builder() {
     showSplit();
     secBody.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' },
       num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc)),
-      t.writtenOnly ? el('span', { class: 'small', style: 'padding:7px 8px' }, 'Written proof') : fmtSel, prevBtn, hideBtn, t.writtenOnly ? '' : split), prevBox);
+      t.writtenOnly || t.sketch ? el('span', { class: 'small', style: 'padding:7px 8px' }, t.sketch ? 'Graph on a grid' : 'Written proof') : fmtSel, prevBtn, hideBtn, t.writtenOnly || t.sketch ? '' : split), prevBox);
     prevBtn._fmt = fmtSel;
   });
   Object.entries(secs).forEach(([sec, S]) => { S.box.open = openSaved[sec] ?? S.ids.some((id) => counts[id] > 0); });
@@ -17630,7 +18655,7 @@ function builder() {
   function update() {
     const items = [];
     QUESTION_TYPES.filter((t) => counts[t.id] > 0).forEach((t) => {
-      const n = counts[t.id], f = t.writtenOnly ? 'mc' : formats[t.id];
+      const n = counts[t.id], f = t.writtenOnly || t.sketch ? 'mc' : formats[t.id];
       if (f === 'both') { // multiple-choice ones first, then free response
         const fr = Math.min(n, frCounts[t.id] || 0);
         if (n - fr > 0) items.push([t.id, n - fr, 'mc']);
@@ -17693,7 +18718,7 @@ function previewQuestion(q) {
       f.part ? el('span', { class: 'frpart', style: 'margin:6px 8px 0 0' }, f.part) : '',
       f.label ? el('span', { class: 'frlabel' }, frLab(f.label)) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '',
       f.kind === 'choice' ? el('span', { class: 'small' }, f.options.map((o, j) => `${LETTERS[j]}. ${o}`).join('   ')) :
-      f.kind === 'select' ? el('select', { disabled: 'disabled' }, el('option', {}, 'Choose…')) : f.kind === 'proof' ? el('span', { class: 'small' }, 'Students type the proof one line at a time; each line is checked, then the AI grades it.') : el('input', { disabled: 'disabled', class: f.kind === 'number' ? 'num' : 'let' }),
+      f.kind === 'select' ? el('select', { disabled: 'disabled' }, el('option', {}, 'Choose…')) : f.kind === 'graph' ? el('span', { class: 'small' }, `Students place ${SKETCH[f.family].roles.join(', then ')} on a grid; the graph is drawn through them.`) : f.kind === 'proof' ? el('span', { class: 'small' }, 'Students type the proof one line at a time; each line is checked, then the AI grades it.') : el('input', { disabled: 'disabled', class: f.kind === 'number' ? 'num' : 'let' }),
       f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''))),
       el('div', { class: 'small', style: 'margin-top:6px' }, 'Correct answer: ', el('strong', {}, q.fr.display.replace(/(.)\u0305/g, '$1')))), el('div', { class: 'sol' }, q.solution));
     return box;
