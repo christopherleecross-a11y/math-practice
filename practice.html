@@ -5931,6 +5931,8 @@ const TRIG_IDS = [
   ['sec^2 X - 1', 'tan^2 X', 'Pythagorean'], ['csc^2 X - 1', 'cot^2 X', 'Pythagorean'], ['1 - sin^2 X', 'cos^2 X', 'Pythagorean'], ['1 - cos^2 X', 'sin^2 X', 'Pythagorean'],
   ['sin(pi/2 - X)', 'cos X', 'Cofunction'], ['cos(pi/2 - X)', 'sin X', 'Cofunction'], ['tan(pi/2 - X)', 'cot X', 'Cofunction'],
   ['cot(pi/2 - X)', 'tan X', 'Cofunction'], ['sec(pi/2 - X)', 'csc X', 'Cofunction'], ['csc(pi/2 - X)', 'sec X', 'Cofunction'],
+  ['sin(90° - X)', 'cos X', 'Cofunction°'], ['cos(90° - X)', 'sin X', 'Cofunction°'], ['tan(90° - X)', 'cot X', 'Cofunction°'],
+  ['cot(90° - X)', 'tan X', 'Cofunction°'], ['sec(90° - X)', 'csc X', 'Cofunction°'], ['csc(90° - X)', 'sec X', 'Cofunction°'],
   ['sin(-X)', '-sin X', 'Even/Odd'], ['cos(-X)', 'cos X', 'Even/Odd'], ['tan(-X)', '-tan X', 'Even/Odd'],
   ['csc(-X)', '-csc X', 'Even/Odd'], ['sec(-X)', 'sec X', 'Even/Odd'], ['cot(-X)', '-cot X', 'Even/Odd'],
 ];
@@ -5939,10 +5941,11 @@ const ID_WHY = {
   Quotient: 'This is a quotient identity.',
   Pythagorean: 'This comes from the Pythagorean identities: sin²u + cos²u = 1, 1 + tan²u = sec²u, and 1 + cot²u = csc²u.',
   Cofunction: 'This is a cofunction identity: a function of (π/2 − u) equals its cofunction of u.',
+  'Cofunction°': 'This is a cofunction identity in degrees: a function of (90° − u) equals its cofunction of u (90° is the same angle as π/2).',
   'Even/Odd': 'Cosine and secant are even functions; sine, cosecant, tangent, and cotangent are odd, so f(−u) = −f(u).',
 };
 TEMPLATES.trigIdentityFill = (r) => {
-  const [given, ans, kind] = pick(r, TRIG_IDS), v = pick(r, TRIG_VARS);
+  const [given, ans, kind] = pick(r, TRIG_IDS), v = kind === 'Cofunction°' ? pick(r, ['θ', 'θ', 'x', 'β', 'α']) : pick(r, TRIG_VARS);
   const givenFns = (given.match(/sin|cos|tan|csc|sec|cot/g) || []);
   const extra = kind === 'Even/Odd' ? [flipSign(ans)] : kind === 'Pythagorean' && ans !== '1' ? [swapFns(ans, RECIP)] : [];
   return {
