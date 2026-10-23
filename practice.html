@@ -329,6 +329,7 @@ const SETS = {
   'precalc-2-5':   { subject: 'precalc',  title: '2.5 Multiple-Angle and Product-to-Sum Formulas', items: [['trigMultiAngleSolve', 3], ['trigDoubleRewrite', 2], ['trigDoubleValues', 2], ['trigPowerReduce', 2], ['trigHalfExact', 2], ['trigHalfValues', 2], ['trigProdToSum', 2], ['trigSumToProd', 2]] },
   'precalc-3-1':   { subject: 'precalc',  title: '3.1 Law of Sines', items: [['triSinesAAS', 4], ['triSinesSSA', 4], ['triAmbiguousB', 2], ['triAreaSAS', 3], ['triSinesWord', 2]] },
   'precalc-3-2':   { subject: 'precalc',  title: '3.2 Law of Cosines', items: [['triCosSSS', 3], ['triCosSAS', 3], ['triParallelogram', 2], ['triWhichLaw', 2], ['triHeron', 3], ['triCosWord', 2]] },
+  'precalc-3-3':   { subject: 'precalc',  title: '3.3 Vectors in the Plane', items: [['v33Equiv', 1], ['v33Component', 2], ['v33Ops', 2], ['v33ScalarMag', 1], ['v33Unit', 2], ['v33Scale', 1], ['v33LinComb', 1], ['v33Direction', 2], ['v33FromMag', 2], ['v33Sketch', 2], ['v33Velocity', 1]], gen: 2 },
   'precalc-3-4':   { subject: 'precalc',  title: '3.4 Vectors and Dot Products', items: [['vecDot', 2], ['vecDotProps', 3], ['vecMagnitude', 2], ['vecAngle', 3], ['vecTriangle', 1], ['vecDotFromAngle', 2]] },
   'precalc-4-1':   { subject: 'precalc',  title: '4.1 Complex Numbers', items: [['cxEqual', 1], ['cxAddSub', 2], ['cxMultiply', 2], ['cxConjugate', 2], ['cxDivide', 3], ['cxSqrtNeg', 2], ['cxQuadratic', 3]] },
   'precalc-4-2':   { subject: 'precalc',  title: '4.2 Complex Solutions of Equations', items: [['cxNumSolutions', 1], ['cxDiscriminant', 2], ['cxSolveQuad', 3], ['cxQuartic', 2], ['cxLinearFactors', 4], ['cxGivenZero', 3]] },
@@ -15808,6 +15809,7 @@ const SKETCH = {
   quad: { roles: ['the vertex', 'another point'], short: ['V', ''], fit: ([[h, k], [x, y]]) => (x === h ? null : (t) => k + ((y - k) / (x - h) ** 2) * (t - h) ** 2) },
   sqrt: { roles: ['the starting point', 'another point'], short: ['S', ''], fit: ([[h, k], [x, y]]) => { if (x === h) return null; const s = Math.sign(x - h), a = (y - k) / Math.sqrt(Math.abs(x - h)); return (t) => (s * (t - h) >= 0 ? k + a * Math.sqrt(s * (t - h)) : NaN); } },
   cbrt: { roles: ['the center point', 'another point'], short: ['C', ''], fit: ([[h, k], [x, y]]) => (x === h ? null : (t) => k + ((y - k) / Math.cbrt(x - h)) * Math.cbrt(t - h)) },
+  vec: { roles: ['the initial point', 'the terminal point'], short: ['', ''], vec: true, fit: ([p, q]) => (p[0] === q[0] && p[1] === q[1] ? null : () => NaN) },
   exp: { roles: ['a point on the asymptote', 'a point on the graph', 'another point on the graph'], short: ['A', '', ''], asym: true,
     fit: ([[, k], [x1, y1], [x2, y2]]) => { if (x1 === x2 || y1 === k || y2 === k || Math.sign(y1 - k) !== Math.sign(y2 - k)) return null; const b = ((y2 - k) / (y1 - k)) ** (1 / (x2 - x1)); if (Math.abs(b - 1) < 1e-9) return null; const a = (y1 - k) / b ** x1; return (t) => a * b ** t + k; } },
 };
@@ -15815,6 +15817,7 @@ const skParse = (v) => String(v || '').split(';').filter(Boolean).map((p) => p.s
 const skText = (pts) => pts.map(([x, y]) => `(${fmt(x)}, ${fmt(y)})`).join(', ');
 // does the sketch match the target function T on the window?
 function skMatch(family, pts, T, win) {
+  if (family === 'vec') return pts.length === 2 && Math.abs(pts[1][0] - pts[0][0] - win.vec[0]) < 1e-9 && Math.abs(pts[1][1] - pts[0][1] - win.vec[1]) < 1e-9 && (!win.fromOrigin || (pts[0][0] === 0 && pts[0][1] === 0));
   const F = SKETCH[family]; if (!F || pts.length !== F.roles.length) return false;
   const S = F.fit(pts); if (!S) return false;
   if (F.asym && Math.abs(pts[0][1] - (win.asym ?? NaN)) > 1e-9) return false;
@@ -15841,7 +15844,23 @@ function skTransform(cv, win) {
   return { X: (x) => ox + (x - x0) * sc, Y: (y) => oy + (y1 - y) * sc, ix: (px) => x0 + (px - ox) / sc, iy: (py) => y1 - (py - oy) / sc };
 }
 // draw a sketch: student's points and curve, and (optionally) the correct graph underneath
+// an arrow on a plot (math coordinates)
+function skArrow(cv, win, p, q, color, width = 2.6, label = '') {
+  const T = skTransform(cv, win), c = cv._ctx, x1 = T.X(p[0]), y1 = T.Y(p[1]), x2 = T.X(q[0]), y2 = T.Y(q[1]), a = Math.atan2(y2 - y1, x2 - x1), L = Math.hypot(x2 - x1, y2 - y1), h = Math.min(13, L * 0.45);
+  c.save(); c.strokeStyle = color; c.fillStyle = color; c.lineWidth = width; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2 - h * 0.8 * Math.cos(a), y2 - h * 0.8 * Math.sin(a)); c.stroke();
+  c.beginPath(); c.moveTo(x2, y2); c.lineTo(x2 - h * Math.cos(a - 0.4), y2 - h * Math.sin(a - 0.4)); c.lineTo(x2 - h * Math.cos(a + 0.4), y2 - h * Math.sin(a + 0.4)); c.closePath(); c.fill();
+  if (label) { c.font = 'italic bold 15px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(label, (x1 + x2) / 2 - 12 * Math.sin(a), (y1 + y2) / 2 + 12 * Math.cos(a)); }
+  c.restore();
+}
 function skDraw(cv, f, pts, overlay) {
+  if (f.family === 'vec') {
+    drawPlot(cv, { xr: f.win.xr, yr: f.win.yr, curves: [] });
+    if (overlay) { const st = pts.length ? pts[0] : (f.win.fromOrigin ? [0, 0] : overlay[0]); skArrow(cv, f.win, st, [st[0] + f.win.vec[0], st[1] + f.win.vec[1]], '#7fbf7f', 3); }
+    if (pts.length === 2) skArrow(cv, f.win, pts[0], pts[1], '#1f5fa8');
+    const T0 = skTransform(cv, f.win), c0 = cv._ctx;
+    pts.forEach(([x, y], j) => { c0.beginPath(); c0.arc(T0.X(x), T0.Y(y), 5, 0, 2 * Math.PI); c0.fillStyle = j ? '#1f5fa8' : '#c0392b'; c0.fill(); c0.fillStyle = '#1d1d1b'; c0.font = '12px system-ui, sans-serif'; c0.textAlign = 'left'; c0.textBaseline = 'bottom'; c0.fillText(`(${fmt(x)}, ${fmt(y)})`, T0.X(x) + 7, T0.Y(y) - 4); });
+    return;
+  }
   const F = SKETCH[f.family], S = pts.length === F.roles.length ? F.fit(pts) : null, T = skTransform(cv, f.win);
   const curves = [];
   if (overlay) curves.push({ f: overlay, color: '#7fbf7f' });
@@ -15865,7 +15884,7 @@ function graphInput(q, i, f, k, vals, reveal, save) {
   const msg = el('div', { class: 'small', style: 'margin:4px 0' });
   const showKey = reveal && !state.teacher;
   const redraw = () => {
-    skDraw(cv, f, pts, showKey && !q.fr.check([vals[k]]) ? q.fr._target || null : null);
+    skDraw(cv, f, pts, showKey && !q.fr.check([vals[k]]) ? (f.family === 'vec' ? skParse(q.fr.key[0]) : q.fr._target || null) : null);
     msg.textContent = reveal ? (state.teacher ? 'Correct graph.' : q.fr.check([vals[k]]) ? '' : 'Your graph is blue; the correct graph is light green.') : pts.length < F.roles.length ? `Click to place ${F.roles[pts.length]}.${pts.length ? ' Drag a point to move it.' : ''}` : 'Drag a point to move it, or use Undo.';
   };
   const commit = () => { vals[k] = pts.map((p) => p.join(',')).join(';'); save(); redraw(); };
@@ -15980,6 +15999,219 @@ TEMPLATES.a64Sketch = (r) => TEMPLATES.skExp(r);
 TEMPLATES.b53Sketch = (r) => TEMPLATES.skRadical(r);
 TEMPLATES.p8Sketch = (r) => TEMPLATES.skParent(r);
 /* ==== GRAPH SKETCH END ==== */
+/* ==== PRECALC 3.3 BEGIN ==== */
+/* ---------- 3.3 Vectors in the Plane ---------- */
+const v3sq = (x) => (x < 0 ? `(${fmt(x)})²` : `${fmt(x)}²`), v3pp = (x) => (x < 0 ? `(${fmt(x)})` : fmt(x));
+const v3pt = ([x, y]) => `(${fmt(x)}, ${fmt(y)})`;
+const v3sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const v3P = (r, lim = 9) => [ri(r, -lim, lim), ri(r, -lim, lim)];
+// exact √n text/latex/value
+const v3mag = (n2) => { const e = sqrtE(n2); return { t: e.text, l: e.latex, v: Math.sqrt(n2) }; };
+// an exact number a·√m / d (from a value that is a fraction times a square root)
+function v3exact(v) {
+  if (Math.abs(v) < 1e-12) return { t: '0', l: '0', v: 0 };
+  const p = fracParts(v); if (p && p[1] <= 200) return { t: fracT(v), l: fracL(v), v };
+  const q = fracParts(v * v); if (q && q[1] <= 2000) { const e = exactRatio(v < 0 ? -1 : 1, q[0], q[1]); return { t: e.text, l: e.latex, v }; }
+  return { t: fmt(v), l: String(Math.round(v * 100) / 100), v };
+}
+const v3vecT = (a, b) => `⟨${a.t}, ${b.t}⟩`, v3vecL = (a, b) => `\\left\\langle ${a.l},${b.l}\\right\\rangle`;
+const v3vecOk = (raw, vec, tol = 1e-6) => vecEq(parseVecAns(raw), vec, tol);
+const v3numOk = (raw, n, tol = 1e-6) => numEqv(parseVecAns(raw), n, tol);
+// a plot window around points
+function v3win(pts) { const W = skWin(pts.length > 1 ? pts : [...pts, [0, 0]]); return W || { xr: [-8, 8], yr: [-8, 8] }; }
+const v3arrows = (win, arrows) => (cv) => { drawPlot(cv, { xr: win.xr, yr: win.yr, curves: [], pts: arrows.flatMap((a) => (a.marks || []).map((p) => ({ p, label: v3pt(p) }))) }); arrows.forEach((a) => skArrow(cv, win, a.p, a.q, a.color || '#1f5fa8', 2.6, a.label || '')); };
+
+// #7–12: equivalent vectors?
+TEMPLATES.v33Equiv = (r) => {
+  for (;;) {
+    const P1 = v3P(r, 8), c = randVec(r, -7, 7), same = r() < 0.5;
+    const d = same ? c : (r() < 0.5 ? [c[0], c[1] + nz(r, -2, 2)] : [c[1], c[0]]);
+    if (!same && d[0] === c[0] && d[1] === c[1]) continue;
+    const P2 = v3P(r, 8), Q1 = [P1[0] + c[0], P1[1] + c[1]], Q2 = [P2[0] + d[0], P2[1] + d[1]];
+    if ([Q1, Q2].some(([x, y]) => Math.abs(x) > 14 || Math.abs(y) > 14)) continue;
+    const correct = same ? 'Yes, they are equivalent' : 'No, they are not equivalent', opts = ['Yes, they are equivalent', 'No, they are not equivalent'];
+    return { topic: 'Equivalent vectors', stem: `Determine whether u and v are equivalent.\nu: initial point ${v3pt(P1)}, terminal point ${v3pt(Q1)}\nv: initial point ${v3pt(P2)}, terminal point ${v3pt(Q2)}`,
+      choices: opts, answer: opts.indexOf(correct), fr: FR.select('', opts, correct),
+      solution: `u = ${v3pt(Q1)} − ${v3pt(P1)} = ${vecA(c)}\nv = ${v3pt(Q2)} − ${v3pt(P2)} = ${vecA(d)}\nEquivalent vectors have the same magnitude and direction, which means the same component form. ${same ? 'They match, so u and v are equivalent.' : 'They are different, so u and v are not equivalent.'}` };
+  }
+};
+// #13–22: component form and magnitude
+TEMPLATES.v33Component = (r) => {
+  const graph = r() < 0.4, P = graph ? v3P(r, 4) : v3P(r, 18), v = graph ? randVec(r, -6, 6) : randVec(r, -16, 16), Q = [P[0] + v[0], P[1] + v[1]], m = v3mag(norm2(v));
+  const win = v3win([P, Q]);
+  const correct = `${vecA(v)}, ‖v‖ = ${m.t}`;
+  const wr = [`${vecA(v3sub(P, Q))}, ‖v‖ = ${m.t}`, `${vecA([P[0] + Q[0], P[1] + Q[1]])}, ‖v‖ = ${v3mag(norm2([P[0] + Q[0], P[1] + Q[1]])).t}`, `${vecA(v)}, ‖v‖ = ${fmt(Math.abs(v[0]) + Math.abs(v[1]))}`, `${vecA([v[1], v[0]])}, ‖v‖ = ${m.t}`];
+  return { topic: 'Component form and magnitude', stem: graph ? 'Find the component form and magnitude of the vector v shown.' : `Find the component form and magnitude of the vector v with initial point ${v3pt(P)} and terminal point ${v3pt(Q)}.`,
+    ...(graph ? { draw: v3arrows(win, [{ p: P, q: Q, label: 'v', marks: [P, Q] }]), size: [360, 360] } : {}),
+    ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => `${vecA([v[0] + i + 1, v[1]])}, ‖v‖ = ${m.t}`),
+    fr: { fields: [{ kind: 'expr', keys: 'vector', label: 'v =' }, { kind: 'expr', keys: 'num', label: '‖v‖ =' }], key: [vecL(v), m.l], display: correct,
+      check: (x) => v3vecOk(x[0], v) && v3numOk(x[1], m.v), score: (x) => (v3vecOk(x[0], v) ? 0.5 : 0) + (v3numOk(x[1], m.v) ? 0.5 : 0) },
+    solution: `v = terminal − initial = ⟨${fmt(Q[0])} − ${P[0] < 0 ? `(${fmt(P[0])})` : fmt(P[0])}, ${fmt(Q[1])} − ${P[1] < 0 ? `(${fmt(P[1])})` : fmt(P[1])}⟩ = ${vecA(v)}\n‖v‖ = √(${v[0] < 0 ? `(${fmt(v[0])})` : fmt(v[0])}² + ${v[1] < 0 ? `(${fmt(v[1])})` : fmt(v[1])}²) = √${norm2(v)} = ${m.t}` };
+};
+// #29–34: u + v, u − v, 2u − 3v
+TEMPLATES.v33Ops = (r) => {
+  const u = randVec(r, -7, 7), v = randVec(r, -7, 7), which = ri(r, 0, 2), a = which === 2 ? pick(r, [2, 3, -2, 4]) : 1, b = which === 0 ? 1 : which === 1 ? -1 : pick(r, [-3, 2, -2, 3]);
+  const res = [a * u[0] + b * v[0], a * u[1] + b * v[1]];
+  const name = which === 0 ? 'u + v' : which === 1 ? 'u − v' : `${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}u ${b < 0 ? MINUS : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}v`;
+  const wr = [[a * u[0] - b * v[0], a * u[1] - b * v[1]], [u[0] + v[0], u[1] + v[1]], [a * u[0] + b * v[1], a * u[1] + b * v[0]], [res[0], -res[1]]].map(vecA);
+  return { topic: 'Vector operations', stem: `Find ${name}.   u = ${vecA(u)},   v = ${vecA(v)}`,
+    ...buildChoices(r, vecA(res), [...new Set(wr)].filter((w) => w !== vecA(res)), (i) => vecA([res[0] + i + 1, res[1]])),
+    fr: { fields: [{ kind: 'expr', keys: 'vector', label: `${name} =` }], key: [vecL(res)], display: vecA(res), check: (x) => v3vecOk(x[0], res) },
+    solution: `Work component by component:\n${name} = ⟨${fmt(a)}${v3pp(u[0]).startsWith('(') ? v3pp(u[0]) : `(${fmt(u[0])})`} ${b < 0 ? MINUS : '+'} ${fmt(Math.abs(b))}(${fmt(v[0])}), ${fmt(a)}(${fmt(u[1])}) ${b < 0 ? MINUS : '+'} ${fmt(Math.abs(b))}(${fmt(v[1])})⟩ = ${vecA(res)}` };
+};
+// #35–38: magnitude of a scalar multiple
+TEMPLATES.v33ScalarMag = (r) => {
+  const u = randVec(r, -6, 6), k = pick(r, [5, 4, -3, 2, -2, 3]) * (r() < 0.25 ? 0.25 : 1) * (r() < 0.2 ? 3 : 1), n2 = norm2(u), m = v3exact(Math.abs(k) * Math.sqrt(n2));
+  const kt = fracT(k), wr = [v3exact(k * Math.sqrt(n2)).t, v3exact(Math.abs(k) * n2).t, v3exact(Math.sqrt(n2)).t, v3exact(Math.abs(k) * (Math.abs(u[0]) + Math.abs(u[1]))).t];
+  return { topic: 'Magnitude of a scalar multiple', stem: `Find ‖${kt.includes('/') ? `(${kt})` : kt}u‖, where u = ${vecA(u)}.`,
+    ...buildChoices(r, m.t, [...new Set(wr)].filter((w) => w !== m.t), (i) => v3exact(m.v + i + 1).t),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: '' }], key: [m.l], display: m.t, check: (x) => v3numOk(x[0], m.v) },
+    solution: `‖cu‖ = |c| · ‖u‖. ‖u‖ = √${n2}${Number.isInteger(Math.sqrt(n2)) ? ` = ${Math.sqrt(n2)}` : ''}, so ‖${kt}u‖ = ${fracT(Math.abs(k))} · ${v3mag(n2).t} = ${m.t}` };
+};
+// #39–44: unit vector in the direction of v
+TEMPLATES.v33Unit = (r) => {
+  const v = randVec(r, -12, 12), n = Math.sqrt(norm2(v)), a = v3exact(v[0] / n), b = v3exact(v[1] / n), res = [v[0] / n, v[1] / n];
+  const correct = v3vecT(a, b), sw = v3vecT(b, a), m = v3mag(norm2(v));
+  const wr = [sw, v3vecT(v3exact(-res[0]), v3exact(-res[1])), `⟨${fracT(v[0] / norm2(v))}, ${fracT(v[1] / norm2(v))}⟩`, vecA(v)];
+  return { topic: 'Unit vectors', stem: `Find a unit vector u in the direction of v = ${showV(r, v)}.`,
+    ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => v3vecT(v3exact(res[0] * (i + 2)), b)),
+    fr: { fields: [{ kind: 'expr', keys: 'vector', label: 'u =' }], key: [v3vecL(a, b)], display: correct, check: (x) => v3vecOk(x[0], res) },
+    solution: `‖v‖ = √(${v3sq(v[0])} + ${v3sq(v[1])}) = ${m.t}\nu = v/‖v‖ = (1/${m.t})${vecA(v)} = ${correct}\nCheck: ‖u‖ = 1 ✓` };
+};
+// #45–48: vector with a given magnitude in the direction of u
+TEMPLATES.v33Scale = (r) => {
+  const u = randVec(r, -12, 12), k = pick(r, [10, 3, 9, 8, 5, 6, 2]), n = Math.sqrt(norm2(u)), res = [(k * u[0]) / n, (k * u[1]) / n];
+  const a = v3exact(res[0]), b = v3exact(res[1]), correct = v3vecT(a, b);
+  const wr = [vecA([k * u[0], k * u[1]]), v3vecT(v3exact(u[0] / n), v3exact(u[1] / n)), v3vecT(b, a), v3vecT(v3exact(-res[0]), v3exact(-res[1]))];
+  return { topic: 'Vector with a given magnitude', stem: `Find the vector v with magnitude ‖v‖ = ${k} and the same direction as u = ${vecA(u)}.`,
+    ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => v3vecT(v3exact(res[0] + i + 1), b)),
+    fr: { fields: [{ kind: 'expr', keys: 'vector', label: 'v =' }], key: [v3vecL(a, b)], display: correct, check: (x) => v3vecOk(x[0], res) },
+    solution: `Unit vector in u's direction: u/‖u‖ = ${vecA(u)}/${v3mag(norm2(u)).t}\nv = ${k} · u/‖u‖ = ${correct}` };
+};
+// #49–52: linear combination of i and j
+TEMPLATES.v33LinComb = (r) => {
+  const P = v3P(r, 8), v = randVec(r, -10, 10), Q = [P[0] + v[0], P[1] + v[1]];
+  const wr = [vecIJ(v3sub(P, Q)), vecIJ([v[1], v[0]]), vecIJ([P[0] + Q[0], P[1] + Q[1]]), vecIJ(Q)].filter((w) => w !== vecIJ(v));
+  return { topic: 'Linear combinations of i and j', stem: `Write the vector with initial point ${v3pt(P)} and terminal point ${v3pt(Q)} as a linear combination of the standard unit vectors i and j.`,
+    ...buildChoices(r, vecIJ(v), [...new Set(wr)], (i) => vecIJ([v[0] + i + 1, v[1]])),
+    fr: { fields: [{ kind: 'expr', keys: 'vector', label: 'v =' }], key: [vecIJ(v).replace(/−/g, '-')], display: vecIJ(v), check: (x) => /[ij]/.test(String(x[0])) && v3vecOk(x[0], v) },
+    solution: `v = ${v3pt(Q)} − ${v3pt(P)} = ${vecA(v)} = ${vecIJ(v)}` };
+};
+// #53–58: operations with u = ai + bj and w = ci + dj
+TEMPLATES.v33OpsIJ = (r) => {
+  const u = randVec(r, -4, 4), w = randVec(r, -4, 4), F = pick(r, [[1.5, 0, '(3/2)u'], [0, 0.75, '(3/4)w'], [1, 2, 'u + 2w'], [-1, 1, '−u + w'], [1, -2, 'u − 2w'], [1.5, 0.5, '(1/2)(3u + w)'], [2, -1, '2u − w']]);
+  const [a, b, name] = F, res = [a * u[0] + b * w[0], a * u[1] + b * w[1]];
+  const wr = [[a * u[0] - b * w[0], a * u[1] - b * w[1]], [u[0] + w[0], u[1] + w[1]], [res[1], res[0]], [-res[0], res[1]]].map(vecA);
+  return { topic: 'Vector operations', stem: `Find the component form of v = ${name}, where u = ${vecIJ(u)} and w = ${vecIJ(w)}.`,
+    ...buildChoices(r, vecA(res), [...new Set(wr)].filter((x) => x !== vecA(res)), (i) => vecA([res[0] + i + 1, res[1]])),
+    fr: { fields: [{ kind: 'expr', keys: 'vector', label: 'v =' }], key: [vecL(res.map((t) => fracL(t)))], display: vecA(res), check: (x) => v3vecOk(x[0], res) },
+    solution: `u = ${vecA(u)}, w = ${vecA(w)}\nv = ${name} = ${vecA(res)}` };
+};
+const v3ang = (v) => { let t = (Math.atan2(v[1], v[0]) * 180) / Math.PI; if (t < 0) t += 360; return t; };
+// #59–62: magnitude and direction angle
+TEMPLATES.v33Direction = (r) => {
+  for (;;) {
+    const polar = r() < 0.35;
+    let v, txt, mag, magT, magL;
+    if (polar) { const R = ri(r, 2, 9), th = pick(r, [30, 45, 60, 120, 135, 150, 210, 225, 240, 300, 315, 330]); v = [R * Math.cos((th * Math.PI) / 180), R * Math.sin((th * Math.PI) / 180)]; txt = `v = ${R}(cos ${th}°i + sin ${th}°j)`; mag = R; magT = String(R); magL = String(R); }
+    else { v = randVec(r, -9, 9); if (!v[0] || !v[1]) continue; txt = `v = ${vecIJ(v)}`; const m = v3mag(norm2(v)); mag = m.v; magT = m.t; magL = m.l; }
+    const th = v3ang(v), exact = Math.abs(th - Math.round(th)) < 1e-6, thR = exact ? Math.round(th) : Math.round(th * 10) / 10;
+    const correct = `‖v‖ = ${magT}; θ ≈ ${fmt(thR)}°`.replace('≈', exact ? '=' : '≈');
+    const ref = (Math.atan(Math.abs(v[1] / (v[0] || 1e-9))) * 180) / Math.PI;
+    const wr = [Math.round(ref * 10) / 10, Math.round((180 - th + 360) % 360 * 10) / 10, Math.round((th + 180) % 360 * 10) / 10, Math.round((360 - th) % 360 * 10) / 10].filter((t) => Math.abs(t - thR) > 0.05).map((t) => `‖v‖ = ${magT}; θ ${exact ? '=' : '≈'} ${fmt(t)}°`);
+    if (wr.length < 2) continue;
+    return { topic: 'Direction angle', stem: `Find the magnitude and direction angle of the vector.   ${txt}${exact ? '' : '   (Round the angle to the nearest tenth of a degree.)'}`,
+      ...buildChoices(r, correct, [...new Set(wr)], (i) => `‖v‖ = ${magT}; θ ≈ ${fmt(thR + 5 * (i + 1))}°`),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: '‖v‖ =' }, { kind: 'number', label: 'θ ≈', suffix: '°' }], key: [magL, String(thR)], display: correct,
+        check: (x) => v3numOk(x[0], mag) && Math.abs(parseNum(x[1]) - th) < 0.06, score: (x) => (v3numOk(x[0], mag) ? 0.5 : 0) + (Math.abs(parseNum(x[1]) - th) < 0.06 ? 0.5 : 0) },
+      solution: `${polar ? `v is already in the form ‖v‖(cos θ i + sin θ j), so ‖v‖ = ${magT} and θ = ${fmt(thR)}°.` : `‖v‖ = √(${v3sq(v[0])} + ${v3sq(v[1])}) = ${magT}\ntan θ = ${fmt(v[1])}/${fmt(v[0])}. The vector is in Quadrant ${v[0] > 0 && v[1] >= 0 ? 'I' : v[0] <= 0 && v[1] > 0 ? 'II' : v[0] < 0 && v[1] <= 0 ? 'III' : 'IV'}, so θ ${exact ? '=' : '≈'} ${fmt(thR)}°.`}` };
+  }
+};
+// #63–68: component form from magnitude and angle
+TEMPLATES.v33FromMag = (r) => {
+  const dirKind = r() < 0.3;
+  let mag, magT, th, v, why;
+  if (dirKind) { const d = pick(r, [[3, 4], [1, 3], [1, 1], [-5, 12], [2, -1], [-1, 2]]); const n = Math.sqrt(norm2(d)); const M = pick(r, [[3, '3'], [2, '2'], [5, '5'], [10, '10']]); mag = M[0]; magT = M[1]; v = [(mag * d[0]) / n, (mag * d[1]) / n]; th = null; why = `A unit vector in the direction ${vecIJ(d)} is ${vecA(d)}/${v3mag(norm2(d)).t}. Multiply by ${magT}.`;
+    var dirText = `v in the direction ${vecIJ(d)}`; }
+  else { const M = pick(r, [[3, '3'], [4 * Math.sqrt(3), '4√3'], [3.5, '7/2'], [2 * Math.sqrt(3), '2√3'], [6, '6'], [8, '8'], [5, '5']]); mag = M[0]; magT = M[1]; th = pick(r, [0, 90, 150, 45, 30, 60, 120, 135, 180, 210, 225, 240, 270, 300, 315, 330]); v = [mag * Math.cos((th * Math.PI) / 180), mag * Math.sin((th * Math.PI) / 180)]; why = `v = ‖v‖⟨cos θ, sin θ⟩ = ${magT}⟨cos ${th}°, sin ${th}°⟩`; }
+  v = v.map((t) => (Math.abs(t) < 1e-12 ? 0 : t));
+  const a = v3exact(v[0]), b = v3exact(v[1]), correct = v3vecT(a, b);
+  const wr = [v3vecT(b, a), v3vecT(v3exact(-v[0]), b), v3vecT(a, v3exact(-v[1])), v3vecT(v3exact(v[0] / mag), v3exact(v[1] / mag))];
+  return { topic: 'Component form from magnitude and direction', stem: `Find the component form of v given its magnitude and the angle it makes with the positive x-axis.   ‖v‖ = ${magT},   ${dirKind ? dirText : `θ = ${th}°`}`,
+    ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => v3vecT(v3exact(v[0] + i + 1), b)),
+    fr: { fields: [{ kind: 'expr', keys: 'vector', label: 'v =' }], key: [v3vecL(a, b)], display: correct, check: (x) => v3vecOk(x[0], v) },
+    solution: `${why}\n= ${correct}` };
+};
+// #69–70: sum of two vectors given magnitudes and direction angles
+TEMPLATES.v33SumAngles = (r) => {
+  const mu = pick(r, [4, 20, 6, 10, 8]), mv = pick(r, [4, 50, 5, 12, 6]), tu = pick(r, [60, 45, 30, 120, 135]), tv = pick(r, [90, 180, 0, 270, 60, 210]);
+  const c = (m, t) => [m * Math.cos((t * Math.PI) / 180), m * Math.sin((t * Math.PI) / 180)].map((x) => (Math.abs(x) < 1e-12 ? 0 : x));
+  const U = c(mu, tu), V = c(mv, tv), S = [U[0] + V[0], U[1] + V[1]];
+  const ex = (x) => { const e = v3exact(x); return /√|\//.test(e.t) || Number.isInteger(x) ? e : { t: fmt(x), l: String(Math.round(x * 100) / 100), v: x }; };
+  // exact parts: write each sum as p + q√k when it mixes a whole number and a radical
+  const sumT = (a, b) => { const A = v3exact(a), B = v3exact(b); if (!a) return B; if (!b) return A; if (Math.abs(a + b) < 1e-9) return v3exact(0); if (!/√/.test(A.t) || !/√/.test(B.t) ? false : true) { const E = v3exact(a + b); if (/√|^[−\d\/]+$/.test(E.t) && !/\./.test(E.t)) return E; } if (!/√/.test(A.t) && !/√/.test(B.t)) return v3exact(a + b); const [n, rd] = /√/.test(A.t) ? [B, A] : [A, B]; return { t: `${n.t} ${rd.t.startsWith(MINUS) ? MINUS : '+'} ${rd.t.replace(MINUS, '')}`, l: `${n.l}${rd.l.startsWith('-') ? '' : '+'}${rd.l}`, v: a + b }; };
+  const X = sumT(U[0], V[0]), Y = sumT(U[1], V[1]), correct = `⟨${X.t}, ${Y.t}⟩`;
+  const wr = [`⟨${Y.t}, ${X.t}⟩`, `⟨${sumT(U[0], -V[0]).t}, ${sumT(U[1], -V[1]).t}⟩`, `⟨${fmt(mu + mv)}, ${fmt(0)}⟩`, `⟨${ex(U[0]).t}, ${ex(U[1]).t}⟩`].filter((w) => w !== correct);
+  return { topic: 'Sum of vectors from angles', stem: `Find the component form of the sum of u and v with direction angles θᵤ and θᵥ.   ‖u‖ = ${mu}, θᵤ = ${tu}°;   ‖v‖ = ${mv}, θᵥ = ${tv}°`,
+    ...buildChoices(r, correct, [...new Set(wr)], (i) => `⟨${X.t}, ${fmt(Y.v + i + 1)}⟩`),
+    fr: { fields: [{ kind: 'expr', keys: 'vector', label: 'u + v =' }], key: [`\\left\\langle ${X.l},${Y.l}\\right\\rangle`], display: correct, check: (x) => v3vecOk(x[0], S, 0.006) },
+    solution: `u = ${mu}⟨cos ${tu}°, sin ${tu}°⟩ = ⟨${v3exact(U[0]).t}, ${v3exact(U[1]).t}⟩\nv = ${mv}⟨cos ${tv}°, sin ${tv}°⟩ = ⟨${v3exact(V[0]).t}, ${v3exact(V[1]).t}⟩\nu + v = ${correct}` };
+};
+// #71–72: angle between vectors with the Law of Cosines
+TEMPLATES.v33LawCos = (r) => {
+  for (;;) {
+    const v = randVec(r, -4, 4), w = randVec(r, -4, 4), d = v3sub(v, w); if (!norm2(d) || v[0] * w[1] === v[1] * w[0]) continue;
+    const a2 = norm2(v), b2 = norm2(w), c2 = norm2(d), cosA = (a2 + b2 - c2) / (2 * Math.sqrt(a2 * b2)), A = (Math.acos(Math.max(-1, Math.min(1, cosA))) * 180) / Math.PI;
+    const exact = Math.abs(A - Math.round(A)) < 1e-6, AR = exact ? Math.round(A) : Math.round(A * 10) / 10;
+    const wr = [180 - AR, Math.round(((Math.acos(Math.max(-1, Math.min(1, (a2 + b2 - c2) / (2 * (a2 + b2) / 2)))) * 180) / Math.PI) * 10) / 10, Math.round((90 - AR / 2) * 10) / 10, AR + 10].filter((t) => Math.abs(t - AR) > 0.05).map((t) => `${fmt(t)}°`);
+    return { topic: 'Angle between vectors (Law of Cosines)', stem: `Use the Law of Cosines to find the angle α between the vectors. (Assume 0° ≤ α ≤ 180°.)${exact ? '' : ' Round to the nearest tenth of a degree.'}   v = ${vecIJ(v)},   w = ${vecIJ(w)}`,
+      ...buildChoices(r, `${fmt(AR)}°`, [...new Set(wr)], (i) => `${fmt(AR + 3 * (i + 1))}°`),
+      fr: { fields: [{ kind: 'number', label: 'α ≈', suffix: '°' }], key: [String(AR)], display: `${fmt(AR)}°`, check: (x) => Math.abs(parseNum(x[0]) - A) < 0.06 },
+      solution: `The vectors v, w, and v − w = ${vecA(d)} form a triangle with sides ‖v‖ = ${v3mag(a2).t}, ‖w‖ = ${v3mag(b2).t}, ‖v − w‖ = ${v3mag(c2).t}.\ncos α = (‖v‖² + ‖w‖² − ‖v − w‖²)/(2‖v‖‖w‖) = (${a2} + ${b2} − ${c2})/(2 · ${v3mag(a2).t} · ${v3mag(b2).t})\nα ${exact ? '=' : '≈'} ${fmt(AR)}°` };
+  }
+};
+// #73–74: angle between two forces from the resultant
+TEMPLATES.v33Resultant = (r) => {
+  for (;;) {
+    const F1 = pick(r, [45, 30, 50, 3000, 120, 80]), F2 = pick(r, [60, 40, 25, 1000, 100, 90]), th = ri(r, 15, 120);
+    const R = Math.round(Math.sqrt(F1 * F1 + F2 * F2 + 2 * F1 * F2 * Math.cos((th * Math.PI) / 180)) / (F1 > 500 ? 50 : 1)) * (F1 > 500 ? 50 : 1);
+    const c = (R * R - F1 * F1 - F2 * F2) / (2 * F1 * F2); if (Math.abs(c) >= 1) continue;
+    const A = (Math.acos(c) * 180) / Math.PI, AR = Math.round(A * 10) / 10;
+    const wrong1 = Math.round((Math.acos(Math.max(-1, Math.min(1, (F1 * F1 + F2 * F2 - R * R) / (2 * F1 * F2)))) * 180) / Math.PI * 10) / 10;
+    return { topic: 'Resultant force', stem: `Find the angle between two forces of ${F1} pounds and ${F2} pounds whose resultant has a magnitude of ${R} pounds. Round to the nearest tenth of a degree. (Hint: write force 1 along the positive x-axis and force 2 at an angle θ.)`,
+      ...buildChoices(r, `${fmt(AR)}°`, [wrong1, Math.round((180 - A) * 10) / 10 === wrong1 ? AR + 12 : Math.round((90 - A / 2) * 10) / 10, Math.round(A * 0.5 * 10) / 10].filter((t) => Math.abs(t - AR) > 0.05).map((t) => `${fmt(t)}°`), (i) => `${fmt(AR + 4 * (i + 1))}°`),
+      fr: { fields: [{ kind: 'number', label: 'θ ≈', suffix: '°' }], key: [String(AR)], display: `${fmt(AR)}°`, check: (x) => Math.abs(parseNum(x[0]) - A) < 0.06 },
+      solution: `F₁ = ${F1}i and F₂ = ${F2}(cos θ i + sin θ j).\n‖F₁ + F₂‖² = ${F1}² + ${F2}² + 2(${F1})(${F2})cos θ = ${R}²\ncos θ = (${R}² − ${F1}² − ${F2}²)/(2 · ${F1} · ${F2}) ≈ ${c.toFixed(4)}\nθ ≈ ${fmt(AR)}°` };
+  }
+};
+// #75–76: components of a velocity
+TEMPLATES.v33Velocity = (r) => {
+  const c = pick(r, [['A bee is flying', 22, 'feet per second', 'above'], ['A pitcher threw a pitch', 105, 'miles per hour', 'below'], ['A plane takes off', 180, 'miles per hour', 'above'], ['A ball is kicked', 60, 'feet per second', 'above'], ['A skier moves downhill', 35, 'feet per second', 'below']]);
+  const ang = c[1] === 105 ? 3.5 : pick(r, [6, 12, 25, 30, 40, 8, 15]), s = c[3] === 'above' ? 1 : -1;
+  const H = b5r2(c[1] * Math.cos((ang * Math.PI) / 180)), V = b5r2(s * c[1] * Math.sin((ang * Math.PI) / 180));
+  const correct = `horizontal ≈ ${fmt(H)}, vertical ≈ ${fmt(V)}`;
+  const wr = [`horizontal ≈ ${fmt(Math.abs(V))}, vertical ≈ ${fmt(s * H)}`, `horizontal ≈ ${fmt(H)}, vertical ≈ ${fmt(-V)}`, `horizontal ≈ ${fmt(b5r2(c[1] * Math.cos(ang)))}, vertical ≈ ${fmt(b5r2(s * c[1] * Math.sin(ang)))}`];
+  return { topic: 'Velocity components', stem: `${c[0]} with a velocity of ${c[1]} ${c[2]} at an angle of ${ang}° ${c[3]} the horizontal. Find the horizontal and vertical components of the velocity (in ${c[2]}). Round to two decimal places.`,
+    ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => `horizontal ≈ ${fmt(H + i + 1)}, vertical ≈ ${fmt(V)}`),
+    fr: { fields: [{ kind: 'number', label: 'Horizontal ≈' }, { kind: 'number', label: 'Vertical ≈' }], key: [String(H), String(V)], display: correct,
+      check: (x) => Math.abs(parseNum(x[0]) - H) < 0.0151 && Math.abs(parseNum(x[1]) - V) < 0.0151, score: (x) => (Math.abs(parseNum(x[0]) - H) < 0.0151 ? 0.5 : 0) + (Math.abs(parseNum(x[1]) - V) < 0.0151 ? 0.5 : 0) },
+    solution: `v = ${c[1]}(cos θ i + sin θ j) with θ = ${s < 0 ? MINUS : ''}${ang}°\nHorizontal: ${c[1]} cos ${ang}° ≈ ${fmt(H)}\nVertical: ${c[1]} sin(${s < 0 ? MINUS : ''}${ang}°) ≈ ${fmt(V)}` };
+};
+// #23–28, 53–58: sketch a vector or a vector operation on the grid
+TEMPLATES.v33Sketch = (r) => {
+  for (;;) {
+    const u = randVec(r, -4, 4), v = randVec(r, -4, 4), F = pick(r, [[0, -1, '−v'], [0, 2, '2v'], [1, 1, 'u + v'], [1, -1, 'u − v'], [1, 2, 'u + 2v'], [-0.5, 1, 'v − (1/2)u'], [1.5, 0, '(3/2)u'], [1, 0, 'u']]);
+    const [a, b, name] = F, res = [a * u[0] + b * v[0], a * u[1] + b * v[1]];
+    if (!Number.isInteger(res[0]) || !Number.isInteger(res[1]) || (!res[0] && !res[1]) || Math.abs(res[0]) > 7 || Math.abs(res[1]) > 7) continue;
+    const win = { xr: [-8, 8], yr: [-8, 8], vec: res }, fromO = r() < 0.5; win.fromOrigin = fromO;
+    const fig = v3arrows({ xr: [-6, 6], yr: [-6, 6] }, [{ p: [0, 0], q: u, label: 'u', color: '#c0392b' }, { p: [0, 0], q: v, label: 'v', color: '#2f7a32' }]);
+    const fr = skFR({ family: 'vec', target: null, keyPts: [[0, 0], res], win, display: `${name} = ${vecA(res)}${fromO ? ', drawn from the origin' : ' (any initial point)'}` });
+    return { topic: 'Sketching vectors', sketch: true, stem: `Use the figure (u = ${vecA(u)}, v = ${vecA(v)}) to sketch the vector ${name}${fromO ? ' with its initial point at the origin' : ''}. Place the initial point, then the terminal point.`,
+      draw: fig, size: [300, 300], fr, choices: null, answer: -1,
+      solution: `${name} = ${vecA(res)}${a && b ? ` (${a === 1 ? '' : fracT(a)}u ${b < 0 ? MINUS : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}v, component by component)` : ''}.\nFrom ${fromO ? 'the origin' : 'any initial point'}, move ${Math.abs(res[0])} ${res[0] >= 0 ? 'right' : 'left'} and ${Math.abs(res[1])} ${res[1] >= 0 ? 'up' : 'down'} to the terminal point.` };
+  }
+};
+/* ==== PRECALC 3.3 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -16187,6 +16419,21 @@ const QUESTION_TYPES = [
   { id: 'triWhichLaw', subject: 'precalc',  section: '3.2 Law of Cosines', label: 'Sines or Cosines?', desc: 'Pick the law, then find the first missing part (#31–36)' },
   { id: 'triHeron', subject: 'precalc',  section: '3.2 Law of Cosines', label: "Heron's Area Formula", desc: 'Area from three sides (#37–44)' },
   { id: 'triCosWord', subject: 'precalc',  section: '3.2 Law of Cosines', label: 'Word problems', desc: 'Marsh/lake length, ships, baseball diamond, land parcels (#45 and like it)' },
+  { id: 'v33Equiv', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Equivalent vectors?', desc: '#7–12' },
+  { id: 'v33Component', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Component form and magnitude', desc: 'From points or a graph (#13–22)' },
+  { id: 'v33Ops', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'u + v, u − v, 2u − 3v', desc: '#29–34' },
+  { id: 'v33ScalarMag', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Magnitude of a scalar multiple', desc: '#35–38' },
+  { id: 'v33Unit', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Unit vector', desc: '#39–44' },
+  { id: 'v33Scale', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Vector with a given magnitude', desc: '#45–48' },
+  { id: 'v33LinComb', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Linear combination of i and j', desc: '#49–52' },
+  { id: 'v33OpsIJ', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Operations with i and j', desc: '#53–58' },
+  { id: 'v33Direction', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Magnitude and direction angle', desc: '#59–62' },
+  { id: 'v33FromMag', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Component form from magnitude and angle', desc: '#63–68' },
+  { id: 'v33SumAngles', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Sum from magnitudes and angles', desc: '#69–70' },
+  { id: 'v33LawCos', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Angle between vectors (Law of Cosines)', desc: '#71–72' },
+  { id: 'v33Resultant', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Resultant force', desc: '#73–74' },
+  { id: 'v33Velocity', subject: 'precalc',  section: '3.3 Vectors in the Plane', label: 'Velocity components', desc: '#75–76' },
+  { id: 'v33Sketch', subject: 'precalc',  section: '3.3 Vectors in the Plane', sketch: true, label: 'Sketch a vector (sketch)', desc: 'Students draw the vector on a grid (#23–28, 53–58)' },
   { id: 'vecDot', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Dot product', desc: 'Find u · v (#5–10)' },
   { id: 'vecDotProps', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Dot product properties', desc: 'Like (u · v)v or ‖w‖ − 1; scalar or vector? (#11–22)' },
   { id: 'vecMagnitude', subject: 'precalc',  section: '3.4 Vectors and Dot Products', label: 'Magnitude', desc: 'Use the dot product to find ‖u‖ (#23–28)' },
@@ -17671,7 +17918,7 @@ function prevTry(i, W) {
   if (correct) box.append(el('div', { class: 'small prevans' }, 'Correct answer: ', el('strong', { class: 'prevright' }, String(correct).replace(/(.)\u0305/g, '$1'))));
   if (q.sketch) { // their graph (blue) over the correct one (green)
     const pts = [...String(h.answer || '').replace(/−/g, '-').matchAll(/\((-?[\d.]+),\s*(-?[\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
-    const g = makeCanvas(300, 300); try { skDraw(g, q.fr.fields[0], pts, q.fr._target); g.style.width = '260px'; box.append(g); } catch {}
+    const g = makeCanvas(300, 300); try { skDraw(g, q.fr.fields[0], pts, q.fr.fields[0].family === 'vec' ? skParse(q.fr.key[0]) : q.fr._target); g.style.width = '260px'; box.append(g); } catch {}
   }
   box.append(el('div', { class: 'sol' }, q.solution));
   return box;
