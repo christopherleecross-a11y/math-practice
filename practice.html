@@ -346,10 +346,10 @@ const SETS = {
   'precalc-6-3':   { subject: 'precalc',  title: '6.3 Ellipses', items: [['c3Match', 2], ['c3Origin', 3], ['c3Std', 3], ['c3Props', 3], ['c3Ecc', 2], ['c3Apply', 1], ['c3Sketch', 3]] },
   'precalc-6-4':   { subject: 'precalc',  title: '6.4 Hyperbolas', items: [['c4Match', 2], ['c4Std', 3], ['c4Props', 3], ['c4Asym', 3], ['c4Classify', 3], ['c4Sketch', 3]] },
   'precalc-6-5':   { subject: 'precalc',  title: '6.5 Rotation of Conics', items: [['r5Point', 3], ['r5Angle', 3], ['r5Rotate', 4], ['r5Classify', 2], ['r5Match', 2]] },
-  'precalc-6-6':   { subject: 'precalc',  title: '6.6 Parametric Equations', items: [['p6Table', 2], ['p6Orient', 2], ['p6Elim', 7], ['p6Find', 3]] },
-  'precalc-6-7':   { subject: 'precalc',  title: '6.7 Polar Coordinates', items: [['q7Rep', 2], ['q7ToRect', 2], ['q7ToPolar', 2], ['q7RectToPolar', 3], ['q7PolarToRect', 3], ['q7Describe', 2]] },
-  'precalc-6-8':   { subject: 'precalc',  title: '6.8 Graphs of Polar Equations', items: [['s8Type', 3], ['s8Match', 2], ['s8Sym', 3], ['s8MaxZero', 3], ['s8Rose', 3]] },
-  'precalc-6-9':   { subject: 'precalc',  title: '6.9 Polar Equations of Conics', items: [['c9Ecc', 2], ['c9Identify', 4], ['c9Match', 2], ['c9Write', 3], ['c9Vertex', 3]] },
+  'precalc-6-6':   { subject: 'precalc',  title: '6.6 Parametric Equations', items: [['p6Table', 2], ['p6Orient', 2], ['p6Elim', 7], ['p6Find', 3], ['p6Sketch', 3]] },
+  'precalc-6-7':   { subject: 'precalc',  title: '6.7 Polar Coordinates', items: [['q7Rep', 2], ['q7ToRect', 2], ['q7ToPolar', 2], ['q7RectToPolar', 3], ['q7PolarToRect', 3], ['q7Describe', 2], ['q7PlotRep', 2], ['q7PlotRect', 2], ['q7PlotDeg', 2]] },
+  'precalc-6-8':   { subject: 'precalc',  title: '6.8 Graphs of Polar Equations', items: [['s8Type', 3], ['s8Match', 2], ['s8Sym', 3], ['s8MaxZero', 3], ['s8Rose', 3], ['s8LimSketch', 3], ['s8RoseSketch', 2], ['s8LimSketchDeg', 2], ['s8RoseSketchDeg', 1]] },
+  'precalc-6-9':   { subject: 'precalc',  title: '6.9 Polar Equations of Conics', items: [['c9Ecc', 2], ['c9Identify', 4], ['c9Match', 2], ['c9Write', 3], ['c9Vertex', 3], ['c9Sketch', 3], ['c9SketchDeg', 2]] },
   // ----- ACT Prep -----
   'act-mix':       { subject: 'act',      title: 'ACT Geometry Mix',          items: [['extAngleAlgebra', 1], ['extAngleRatio', 1], ['classifyTriangle', 2], ['dilation', 2], ['composite', 2], ['trigGraph', 2]] },
 };
@@ -878,8 +878,18 @@ function drawPlot(cv, o) {
   const X = (x) => ox + (x - x0) * sc, Y = (y) => oy + (y1 - y) * sc;
   ctx.clearRect(0, 0, W, H);
   ctx.strokeStyle = '#e4e1d9'; ctx.lineWidth = 1;
+  if (o.polar) { // polar grid: circles r = 1, 2, … and rays every 15° (darker every 30°), labeled every 30°
+    const R = Math.min(x1, -x0, y1, -y0);
+    ctx.save(); ctx.beginPath(); ctx.rect(X(x0), Y(y1), X(x1) - X(x0), Y(y0) - Y(y1)); ctx.clip();
+    for (let k = 1; k <= R; k++) { ctx.beginPath(); ctx.arc(X(0), Y(0), k * sc, 0, 2 * Math.PI); ctx.stroke(); }
+    for (let d = 0; d < 360; d += 15) { ctx.strokeStyle = d % 30 ? '#efede7' : '#e4e1d9'; ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(R * Math.cos(d * Math.PI / 180)), Y(R * Math.sin(d * Math.PI / 180))); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = '#8a867c'; ctx.font = '11px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let d = 30; d < 360; d += 30) if (d % 90) ctx.fillText(o.polarDeg ? `${d}°` : radT(d), X((R - 0.45) * Math.cos(d * Math.PI / 180)), Y((R - 0.45) * Math.sin(d * Math.PI / 180)));
+  } else {
   for (let k = Math.ceil(x0 / step) * step; k <= x1; k += step) { ctx.beginPath(); ctx.moveTo(X(k), Y(y0)); ctx.lineTo(X(k), Y(y1)); ctx.stroke(); }
   for (let k = Math.ceil(y0 / step) * step; k <= y1; k += step) { ctx.beginPath(); ctx.moveTo(X(x0), Y(k)); ctx.lineTo(X(x1), Y(k)); ctx.stroke(); }
+  }
   ctx.strokeStyle = '#1d1d1b'; ctx.lineWidth = 1.5;
   if (y0 <= 0 && y1 >= 0) { ctx.beginPath(); ctx.moveTo(X(x0), Y(0)); ctx.lineTo(X(x1), Y(0)); ctx.stroke(); }
   if (x0 <= 0 && x1 >= 0) { ctx.beginPath(); ctx.moveTo(X(0), Y(y0)); ctx.lineTo(X(0), Y(y1)); ctx.stroke(); }
@@ -5371,7 +5381,7 @@ TEMPLATES.q7Rep = (r) => {
   return {
     topic: 'Multiple polar representations', stem: `The point ${polT(R, d)} is given in polar coordinates. Find another polar representation of the point with ${cond}.`,
     ...buildChoices(r, correct, [...new Set(wrongs)], (i) => polT(want[0], want[1] + 360 * (i + 1))),
-    fr: { fields: [{ kind: 'expr', keys: 'ppt', label: '(r, θ) =' }], key: [polL(...want)], display: correct, check: (v) => polOk(v[0], ...want) },
+    fr: { fields: [{ kind: 'expr', keys: 'ppt', label: '(r, θ) =' }], key: [polL(...want)], display: correct, check: (v) => polOk(v[0], ...want) }, _meta: { R, d },
     solution: `(r, θ) is the same point as (r, θ + 2nπ) and as (−r, θ + π + 2nπ).\n${k === 1 ? `Change the sign of r and add or subtract π: ` : `Add or subtract 2π${R < 0 ? ' (after changing −r to r and adding π)' : ''}: `}${correct}`,
   };
 };
@@ -5394,7 +5404,7 @@ TEMPLATES.q7ToRect = (r) => {
   return {
     topic: 'Polar to rectangular coordinates', stem: `Convert the polar coordinates to rectangular coordinates.   ${polT(R, d)}`,
     ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(x + i + 1, y)),
-    fr: { fields: [{ kind: 'expr', keys: 'ppt', label: '(x, y) =' }], key: [`\\left(${exactL(x)},${exactL(y)}\\right)`], display: correct, check: (v) => ptsOk(v[0], [[x, y]]) },
+    fr: { fields: [{ kind: 'expr', keys: 'ppt', label: '(x, y) =' }], key: [`\\left(${exactL(x)},${exactL(y)}\\right)`], display: correct, check: (v) => ptsOk(v[0], [[x, y]]) }, _meta: { R, d },
     solution: `x = r cos θ = ${exactT(R)} cos(${d === 0 ? '0' : radT(d)}) = ${exactT(x)};  y = r sin θ = ${exactT(R)} sin(${d === 0 ? '0' : radT(d)}) = ${exactT(y)}`,
   };
 };
@@ -15855,9 +15865,37 @@ SKETCH.hyper = { roles: ['the center', 'a vertex', 'an endpoint of the conjugate
     else return null;
     S.mk = k; return S;
   } };
+// polar grids: snap to whole-number r and θ in steps of π/12; label points as (r, θ)
+const skNear = (p, q) => Math.abs(p[0] - q[0]) < 1e-6 && Math.abs(p[1] - q[1]) < 1e-6;
+const skClean = (v) => (Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v) : Math.round(v * 1e9) / 1e9);
+const skPolarSnap = (x, y) => { const r = Math.round(Math.hypot(x, y)); if (!r) return [0, 0]; const t = Math.round(Math.atan2(y, x) / (Math.PI / 12)) * (Math.PI / 12); return [skClean(r * Math.cos(t)), skClean(r * Math.sin(t))]; };
+const skPolarLab = ([x, y]) => { const r = Math.round(Math.hypot(x, y)); if (!r) return '(0, θ)'; let d = Math.round((Math.atan2(y, x) * 180) / Math.PI / 15) * 15; if (d < 0) d += 360; return polT(r, d); };
+const skPolarLabDeg = ([x, y]) => { const r = Math.round(Math.hypot(x, y)); if (!r) return '(0, θ)'; let d = Math.round((Math.atan2(y, x) * 180) / Math.PI / 15) * 15; if (d < 0) d += 360; return `(${r}, ${d}°)`; };
+const skPolarWin = (L, deg = false) => ({ xr: [-L, L], yr: [-L, L], polar: true, deg, snap: skPolarSnap, ptLabel: deg ? skPolarLabDeg : skPolarLab });
+const skPolarFn = (rf) => { const S = () => NaN; S.param = (t) => { const r = rf(t); return isFinite(r) && Math.abs(r) < 40 ? [r * Math.cos(t), r * Math.sin(t)] : [NaN, NaN]; }; return S; };
+// r = a + b cos θ + c sin θ (circles and limaçons) from the points at θ = 0, π/2, π, 3π/2
+SKETCH.plim = { roles: ['the point for θ = 0', 'the point for θ = π/2', 'the point for θ = π', 'the point for θ = 3π/2'], short: ['0', 'π/2', 'π', '3π/2'],
+  fit: ([p0, p1, p2, p3]) => { if (Math.abs(p0[1]) > 1e-9 || Math.abs(p1[0]) > 1e-9 || Math.abs(p2[1]) > 1e-9 || Math.abs(p3[0]) > 1e-9) return null; const r0 = p0[0], r1 = p1[1], r2 = -p2[0], r3 = -p3[1], a = (r0 + r2) / 2;
+    if (Math.abs(a - (r1 + r3) / 2) > 1e-9) return null; const b = (r0 - r2) / 2, c = (r1 - r3) / 2, S = skPolarFn((t) => a + b * Math.cos(t) + c * Math.sin(t)); S.coef = [a, b, c]; return S; },
+  match: (pts, T) => { if (pts.length !== 4) return false; const S = SKETCH.plim.fit(pts); return !!S && S.coef.every((v, i) => Math.abs(v - T.coef[i]) < 1e-9); } };
+SKETCH.plimDeg = { ...SKETCH.plim, roles: ['the point for θ = 0°', 'the point for θ = 90°', 'the point for θ = 180°', 'the point for θ = 270°'], match: (pts, T) => SKETCH.plim.match(pts, T) };
+// rose curves r = a cos(n(θ − φ)) from the tip of one petal
+for (const n of [2, 3, 4, 5]) SKETCH['rose' + n] = { roles: ['the tip of one petal'], short: [''],
+  fit: ([[x, y]]) => { const a = Math.hypot(x, y); if (!a) return null; const ph = Math.atan2(y, x); return skPolarFn((t) => a * Math.cos(n * (t - ph))); },
+  match: (pts, T, win) => pts.length === 1 && win.tips.some((q) => skNear(pts[0], q)) };
+// a conic with a focus at the pole: the vertex nearest the pole and an endpoint of the latus rectum
+SKETCH.pconic = { roles: ['the vertex closest to the pole', 'an endpoint of the latus rectum (on the graph, perpendicular to the axis at the pole)'], short: ['V', 'L'],
+  fit: ([V, L]) => { const s = Math.hypot(...V), l = Math.hypot(...L); if (!s || !l || Math.abs(V[0] * L[0] + V[1] * L[1]) > 1e-6 || l <= s + 1e-9) return null; const e = l / s - 1, ph = Math.atan2(V[1], V[0]);
+    return skPolarFn((t) => { const den = 1 + e * Math.cos(t - ph); return Math.abs(den) < 1e-3 ? NaN : l / den; }); },
+  match: (pts, T, win) => pts.length === 2 && skNear(pts[0], win.vtx) && win.lat.some((q) => skNear(pts[1], q)) };
+// plane curves from parametric equations: the points in order of t (the arrows show the orientation)
+const skSpline = (P) => (u) => { const i = Math.max(0, Math.min(P.length - 2, Math.floor(u))), t = u - i, p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+  const c = (k) => 0.5 * (2 * p1[k] + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t * t + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t * t * t); return [c(0), c(1)]; };
+for (const n of [4, 5]) SKETCH['path' + n] = { roles: ['the point for the first value', 'the point for the second value', 'the point for the third value', 'the point for the fourth value', 'the point for the fifth value'].slice(0, n), short: Array(n).fill(''), path: true,
+  fit: () => null, match: (pts, T, win) => pts.length === n && pts.every((p, i) => skNear(p, win.path[i])) };
 const skStyle = (v) => (String(v || '').split('|')[1] || '');
 const skParse = (v) => String(v || '').split('|')[0].split(';').filter(Boolean).map((p) => p.split(',').map(Number)).filter((p) => p.length === 2 && p.every(isFinite));
-const skText = (pts) => pts.map(([x, y]) => `(${fmt(x)}, ${fmt(y)})`).join(', ');
+const skText = (pts) => pts.map(([x, y]) => `(${fmt(Math.round(x * 100) / 100)}, ${fmt(Math.round(y * 100) / 100)})`).join(', ');
 // does the sketch match the target function T on the window?
 function skMatch(family, pts, T, win, style) {
   if (family === 'ineq') { // win.ineq = [A, B, C, op] for Ax + By op C
@@ -15875,6 +15913,7 @@ function skMatch(family, pts, T, win, style) {
     const same = (S, f) => { if (!S) return false; let n = 0; for (let j = 0; j <= 40; j++) { const x = win.xr[0] + ((win.xr[1] - win.xr[0]) * j) / 40, a = S(x), b = f(x); if (isFinite(a) !== isFinite(b)) return false; if (!isFinite(b)) continue; if (Math.abs(a - b) > 1e-6 * (1 + Math.abs(b))) return false; n++; } return n >= 3; };
     return same(b1.fit(pts.slice(0, n1)), T[0]) && same(b2.fit(pts.slice(n1)), T[1]);
   }
+  if (SKETCH[family] && SKETCH[family].match) return SKETCH[family].match(pts, T, win);
   if (family === 'pt') { const tl = (win.tol || 0) + 1e-9; return pts.length === 1 && Math.abs(pts[0][0] - win.pt[0]) <= tl && Math.abs(pts[0][1] - win.pt[1]) <= tl; }
   if (family === 'exp' && win.loose) { // base e: points to the nearest grid point
     if (pts.length !== 3 || Math.abs(pts[0][1] - win.asym) > 1e-9 || pts[1][0] === pts[2][0]) return false;
@@ -15939,7 +15978,7 @@ function skHalfPlane(cv, win, p1, p2, p3, fill, line, dashed) {
 }
 function skDraw(cv, f, pts, overlay, style) {
   if (f.family === 'pt') {
-    drawPlot(cv, { xr: f.win.xr, yr: f.win.yr, curves: [], axisNames: f.win.axisNames });
+    drawPlot(cv, { xr: f.win.xr, yr: f.win.yr, curves: [], axisNames: f.win.axisNames, polar: f.win.polar, polarDeg: f.win.deg });
     const T0 = skTransform(cv, f.win), c0 = cv._ctx, dot = ([x, y], col, lab) => { c0.beginPath(); c0.arc(T0.X(x), T0.Y(y), 6, 0, 2 * Math.PI); c0.fillStyle = col; c0.fill(); if (lab) { c0.fillStyle = '#1d1d1b'; c0.font = '12px system-ui, sans-serif'; c0.textAlign = 'left'; c0.textBaseline = 'bottom'; c0.fillText(lab, T0.X(x) + 7, T0.Y(y) - 4); } };
     if (overlay) dot(f.win.pt, '#7fbf7f', '');
     pts.forEach((p) => dot(p, '#1f5fa8', f.win.ptLabel ? f.win.ptLabel(p) : `(${fmt(p[0])}, ${fmt(p[1])})`));
@@ -15974,14 +16013,23 @@ function skDraw(cv, f, pts, overlay, style) {
   }
   const F = SKETCH[f.family], S = pts.length === F.roles.length ? F.fit(pts) : null, T = skTransform(cv, f.win);
   const curves = [];
-  if (overlay) curves.push({ f: overlay, color: '#7fbf7f' });
+  const cur = (g, color) => (g.param ? { param: [g.param, ...(g.range || [0, 2 * Math.PI])], color } : { f: g, color });
+  if (overlay) curves.push(cur(overlay, '#7fbf7f'));
   if (overlay && F.mirror) curves.push({ f: (x) => 2 * f.win.mirrorK - overlay(x), color: '#7fbf7f' });
-  if (S) curves.push({ f: S, color: '#1f5fa8' });
+  if (S) curves.push(cur(S, '#1f5fa8'));
   if (S && F.mirror) curves.push({ f: (x) => 2 * (S.mk ?? pts[0][1]) - S(x), color: '#1f5fa8' });
   const asl = (A, color) => { if (A) for (const m of [A.m, -A.m]) curves.unshift({ f: (x) => A.k + m * (x - A.h), color, dash: true }); };
   if (overlay && overlay.asl) asl(overlay.asl, '#b9dcb9'); if (S && S.asl) asl(S.asl, '#9db8dc');
-  drawPlot(cv, { xr: f.win.xr, yr: f.win.yr, curves });
+  drawPlot(cv, { xr: f.win.xr, yr: f.win.yr, curves, polar: f.win.polar, polarDeg: f.win.deg });
   const c = cv._ctx;
+  if (F.path && pts.length > 1) { // a smooth curve through the points in order, with arrowheads showing the orientation
+    const g = skSpline(pts), c1 = cv._ctx, T1 = skTransform(cv, f.win); c1.save(); c1.strokeStyle = '#1f5fa8'; c1.lineWidth = 2.4; c1.beginPath();
+    for (let j = 0; j <= 60 * (pts.length - 1); j++) { const [x, y] = g(j / 60); if (j) c1.lineTo(T1.X(x), T1.Y(y)); else c1.moveTo(T1.X(x), T1.Y(y)); } c1.stroke(); c1.restore();
+    c1.save(); c1.fillStyle = '#1f5fa8';
+    for (let j = 0; j < pts.length - 1; j++) { const [ax, ay] = g(j + 0.5), [bx, by] = g(j + 0.56), X2 = T1.X(bx), Y2 = T1.Y(by), an = Math.atan2(Y2 - T1.Y(ay), X2 - T1.X(ax)), hh = 12;
+      c1.beginPath(); c1.moveTo(X2, Y2); c1.lineTo(X2 - hh * Math.cos(an - 0.42), Y2 - hh * Math.sin(an - 0.42)); c1.lineTo(X2 - hh * Math.cos(an + 0.42), Y2 - hh * Math.sin(an + 0.42)); c1.closePath(); c1.fill(); }
+    c1.restore();
+  }
   const dashH = (y, color) => { c.save(); c.strokeStyle = color; c.lineWidth = 1.8; c.setLineDash([7, 6]); c.beginPath(); c.moveTo(T.X(f.win.xr[0]), T.Y(y)); c.lineTo(T.X(f.win.xr[1]), T.Y(y)); c.stroke(); c.restore(); };
   if (overlay && F.asym && f.win.asym != null) dashH(f.win.asym, '#7fbf7f');
   if (F.asym && pts.length) dashH(pts[0][1], '#c0392b');
@@ -15991,7 +16039,7 @@ function skDraw(cv, f, pts, overlay, style) {
   pts.forEach(([x, y], j) => {
     c.beginPath(); c.arc(T.X(x), T.Y(y), 5.5, 0, 2 * Math.PI); c.fillStyle = (F.asym || F.vasym) && j === 0 ? '#c0392b' : '#1f5fa8'; c.fill();
     c.fillStyle = '#1d1d1b'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'bottom';
-    c.fillText(`(${fmt(x)}, ${fmt(y)})`, T.X(x) + 7, T.Y(y) - 4);
+    c.fillText(f.win.ptLabel ? f.win.ptLabel([x, y]) : `(${fmt(x)}, ${fmt(y)})`, T.X(x) + 7, T.Y(y) - 4);
   });
 }
 // the interactive grid
@@ -16011,7 +16059,7 @@ function graphInput(q, i, f, k, vals, reveal, save) {
   const styleBtns = F.style ? [['Solid line', 'solid'], ['Dashed line', 'dashed']].map(([t, v]) => [el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:5px 12px;font-size:14px', onclick: () => { if (!reveal) { style = v; commit(); } } }, t), v]) : null;
   if (!reveal) {
     let drag = -1, moved = false;
-    const at = (e) => { const r = cv.getBoundingClientRect(), T = skTransform(cv, f.win); const px = ((e.clientX - r.left) * cv._w) / r.width, py = ((e.clientY - r.top) * cv._h) / r.height; return [Math.round(T.ix(px)), Math.round(T.iy(py)), px, py, T]; };
+    const at = (e) => { const r = cv.getBoundingClientRect(), T = skTransform(cv, f.win); const px = ((e.clientX - r.left) * cv._w) / r.width, py = ((e.clientY - r.top) * cv._h) / r.height; const [sx, sy] = f.win.snap ? f.win.snap(T.ix(px), T.iy(py)) : [Math.round(T.ix(px)), Math.round(T.iy(py))]; return [sx, sy, px, py, T]; };
     const inWin = (x, y) => x >= f.win.xr[0] && x <= f.win.xr[1] && y >= f.win.yr[0] && y <= f.win.yr[1];
     cv.addEventListener('pointerdown', (e) => {
       const [x, y, px, py, T] = at(e); moved = false;
@@ -16027,7 +16075,7 @@ function graphInput(q, i, f, k, vals, reveal, save) {
   const btns = reveal ? (styleBtns ? el('div', { style: 'display:flex;gap:8px;margin-top:6px' }, ...styleBtns.map(([b]) => { b.disabled = true; return b; })) : '') : el('div', { style: 'display:flex;gap:8px;margin-top:6px;flex-wrap:wrap' }, ...(styleBtns ? styleBtns.map(([b]) => b) : []),
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:5px 12px;font-size:14px', onclick: () => { pts.pop(); commit(); } }, 'Undo'),
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:5px 12px;font-size:14px', onclick: () => { pts = []; commit(); } }, 'Clear'));
-  return el('div', { class: 'sketch', style: 'margin-top:6px' }, el('div', { class: 'small', style: 'margin-bottom:4px' }, `Place ${F.roles.join(', then ')}. Points snap to the grid.`), cv, msg, btns);
+  return el('div', { class: 'sketch', style: 'margin-top:6px' }, el('div', { class: 'small', style: 'margin-bottom:4px' }, `Place ${F.roles.join(', then ')}. Points snap to the ${f.win.polar ? `polar grid (whole-number r, θ in steps of ${f.win.deg ? '15°' : 'π/12'})` : 'grid'}.`), cv, msg, btns);
 }
 // a sketch question: q.sketch keeps it free response in every format
 function skQ({ topic, stem, family, target, keyPts, win, display, solution, draw, size }) {
@@ -16482,6 +16530,108 @@ TEMPLATES.c4Sketch = (r) => {
     return { topic: q.topic, sketch: true, stem: `${q.stem.split('   ')[0].replace('of the hyperbola.', 'of the hyperbola, and sketch it: place the center, a vertex, then an endpoint of the conjugate axis (b units from the center).')}   ${q.stem.split('   ').slice(1).join('   ')}`, fr, choices: null, answer: -1,
       solution: `${q.solution}\nSketch: from the center ${ptT([h, k])}, the vertices are ${a} unit${a === 1 ? '' : 's'} ${hor ? 'left and right' : 'up and down'}, and the conjugate axis goes ${b} unit${b === 1 ? '' : 's'} ${hor ? 'up and down' : 'left and right'}. Draw the ${2 * (hor ? a : b)} by ${2 * (hor ? b : a)} rectangle; its diagonals are the asymptotes. Each branch starts at a vertex and approaches the asymptotes.` };
   }
+};
+// Pre-Calculus 6.6: sketch a plane curve (plot the points in order of t)
+TEMPLATES.p6Sketch = (r) => {
+  for (;;) {
+    const kind = pick(r, ['par', 'par', 'side', 'line', 'circle', 'ellipse']);
+    let X, Y, xT, yT, ts, par = 't', range, n = 5;
+    if (kind === 'par') { const c = ri(r, -3, 3), d = ri(r, -4, 2), s = pick(r, [1, -1]); X = (t) => t + c; Y = (t) => s * t * t + d; xT = lnSumT([[1, null, 't'], [c, null, '']]); yT = `${s < 0 ? MINUS : ''}t²${d ? ` ${d > 0 ? '+' : MINUS} ${Math.abs(d)}` : ''}`; ts = [-2, -1, 0, 1, 2]; range = [-2.6, 2.6]; }
+    else if (kind === 'side') { const c = ri(r, -3, 3), d = ri(r, -3, 2); X = (t) => t * t + d; Y = (t) => t + c; xT = `t²${d ? ` ${d > 0 ? '+' : MINUS} ${Math.abs(d)}` : ''}`; yT = lnSumT([[1, null, 't'], [c, null, '']]); ts = [-2, -1, 0, 1, 2]; range = [-2.6, 2.6]; }
+    else if (kind === 'line') { const a = pick(r, [1, 2, -1, 3]), b = ri(r, -3, 3), c = pick(r, [1, -1, 2, -2]), d = ri(r, -3, 3); X = (t) => a * t + b; Y = (t) => c * t + d; xT = lnSumT([[a, null, 't'], [b, null, '']]); yT = lnSumT([[c, null, 't'], [d, null, '']]); ts = [-2, -1, 0, 1, 2]; range = [-2.6, 2.6]; }
+    else { const a = ri(r, 2, 6), b = kind === 'circle' ? a : ri(r, 2, 6), sw = r() < 0.35; if (kind === 'ellipse' && a === b) continue; par = 'θ'; n = 4;
+      X = sw ? (t) => a * Math.sin(t) : (t) => a * Math.cos(t); Y = sw ? (t) => b * Math.cos(t) : (t) => b * Math.sin(t); xT = `${a} ${sw ? 'sin' : 'cos'} θ`; yT = `${b} ${sw ? 'cos' : 'sin'} θ`; ts = [0, Math.PI / 2, Math.PI, 1.5 * Math.PI]; range = [0, 2 * Math.PI]; }
+    const P = ts.map((t) => [skClean(X(t)), skClean(Y(t))]), W = skWin(P); if (!W || !skOk(W, P)) continue;
+    W.path = P;
+    const T = () => NaN; T.param = (t) => [X(t), Y(t)]; T.range = range;
+    const tl = (t) => (par === 'θ' ? (t ? radT((t * 180) / Math.PI) : '0') : fmt(t)), vals = ts.map(tl).join(', ');
+    const fr = skFR({ family: 'path' + n, target: T, keyPts: P, win: W, display: `In order: ${skText(P)}` }); fr._target = T;
+    const shape = { par: 'a parabola that opens ' + (Y(1) > Y(0) ? 'up' : 'down'), side: 'a parabola that opens to the right', line: 'a line', circle: 'a circle', ellipse: 'an ellipse' }[kind];
+    return { topic: 'Sketching plane curves', sketch: true, stem: `Sketch the curve represented by the parametric equations, and show its orientation: plot the points for ${par} = ${vals}, in that order.   x = ${xT},   y = ${yT}`, fr, choices: null, answer: -1,
+      solution: `Make a table: ${ts.map((t, i) => `${par} = ${tl(t)}: (${fmt(P[i][0])}, ${fmt(P[i][1])})`).join('; ')}.\nPlot the points in order of increasing ${par}; the arrows show the orientation. The curve is ${shape}${kind === 'circle' || kind === 'ellipse' ? `, traced ${X(0.1) * Y(0.2) - X(0.2) * Y(0.1) > 0 ? 'counterclockwise' : 'clockwise'}` : ''}.` };
+  }
+};
+// Pre-Calculus 6.7: plot a point given in polar coordinates
+function q7Plot(r, make, lead) {
+  for (;;) {
+    const q = make(r); if (!q._meta) continue;
+    const { R, d } = q._meta, pt = [skClean(R * Math.cos((d * Math.PI) / 180)), skClean(R * Math.sin((d * Math.PI) / 180))];
+    const win = { ...skPolarWin(Math.max(4, Math.abs(R) + 1)), pt }, R0 = q.fr;
+    const gOk = (v) => skMatch('pt', skParse(v[0]), null, win);
+    const fr = { fields: [{ kind: 'graph', family: 'pt', win, label: '' }, ...R0.fields], key: [`${pt[0]},${pt[1]}`, ...R0.key], display: `Point ${skPolarLab(pt)}; ${R0.display}`,
+      check: (v) => gOk(v) && R0.check(v.slice(1)), score: (v) => (gOk(v) ? 0.5 : 0) + (R0.check(v.slice(1)) ? 0.5 : 0), answered: (v) => Array.isArray(v) && skParse(v[0]).length === 1 && String(v[1] || '').trim() !== '' };
+    fr._target = 'pt';
+    return { topic: q.topic, sketch: true, stem: `Plot the point ${polT(R, d)} on the polar grid. ${lead(q)}`, fr, choices: null, answer: -1,
+      solution: `${R < 0 ? `r is negative, so go |r| = ${Math.abs(R)} unit${Math.abs(R) === 1 ? '' : 's'} in the opposite direction of θ (θ + π). ` : `Turn to θ = ${d === 0 ? '0' : radT(d)} and go out ${R} unit${R === 1 ? '' : 's'}. `}The point is the same as ${skPolarLab(pt)}.\n${q.solution}` };
+  }
+}
+TEMPLATES.q7PlotRep = (r) => q7Plot(r, TEMPLATES.q7Rep, (q) => q.stem.replace(/^The point .* is given in polar coordinates\. /, 'Then f').replace(/^Then f(F|f)/, 'Then f'));
+TEMPLATES.q7PlotRect = (r) => q7Plot(r, TEMPLATES.q7ToRect, () => 'Then convert it to rectangular coordinates.');
+// Pre-Calculus 6.8: sketch a circle or limaçon from r at θ = 0, π/2, π, 3π/2
+function s8Lim(r, deg) {
+  for (;;) {
+    const C = polCurve(r, pick(r, ['lim', 'lim', 'lim', 'circle'])), f = C.f, rs = [0, 0.5, 1, 1.5].map((k) => skClean(f(k * Math.PI)));
+    if (rs.some((v) => !Number.isInteger(v) || Math.abs(v) > 8)) continue;
+    const a = (rs[0] + rs[2]) / 2, b = (rs[0] - rs[2]) / 2, c = (rs[1] - rs[3]) / 2, keyPts = [[rs[0], 0], [0, rs[1]], [-rs[2], 0], [0, -rs[3]]];
+    let L = 0; for (let t = 0; t < 6.3; t += 0.05) L = Math.max(L, Math.abs(f(t))); L = Math.max(4, Math.ceil(L) + 1);
+    const win = skPolarWin(L, deg), T = skPolarFn((t) => a + b * Math.cos(t) + c * Math.sin(t)); T.coef = [a, b, c];
+    const fr = skFRplus({ family: deg ? 'plimDeg' : 'plim', target: T, keyPts, win, display: `r = ${rs.map(fmt).join(', ')} at θ = ${deg ? '0°, 90°, 180°, 270°' : '0, π/2, π, 3π/2'}`, more: { fields: [{ kind: 'select', label: 'The graph is a', options: PTYPES }], key: [C.type], check: (v) => v[0] === C.type } });
+    fr._target = T;
+    return { topic: 'Sketching polar graphs', sketch: true, stem: `Sketch the graph of the polar equation: find r at θ = ${deg ? '0°, 90°, 180°, and 270°' : '0, π/2, π, and 3π/2'} and plot those four points in that order (the graph is drawn through them). Then identify the graph.   ${C.text}`, fr, choices: null, answer: -1,
+      solution: `${[0, 1, 2, 3].map((k) => `θ = ${(deg ? ['0°', '90°', '180°', '270°'] : ['0', 'π/2', 'π', '3π/2'])[k]}: r = ${fmt(rs[k])}`).join(';  ')}.\n${rs.some((v) => v < 0) ? 'A negative r is plotted in the opposite direction.\n' : ''}${C.b !== undefined ? `This is a limaçon with a = ${C.a}, b = ${C.b}: ${C.a === C.b ? 'a/b = 1, a cardioid' : C.a < C.b ? 'a/b < 1, a limaçon with an inner loop' : C.a < 2 * C.b ? '1 < a/b < 2, a dimpled limaçon' : 'a/b ≥ 2, a convex limaçon'}.` : 'This is a circle.'}` };
+  }
+};
+// Pre-Calculus 6.8: sketch a rose curve from the tip of one petal
+TEMPLATES.s8LimSketch = (r) => s8Lim(r, false);
+TEMPLATES.s8LimSketchDeg = (r) => s8Lim(r, true);
+function s8Rose(r, deg) {
+  for (;;) {
+    const C = polCurve(r, 'rose'); if (Math.abs(C.a) > 8) continue;
+    const tips = [];
+    for (let k = 0; k < 2 * C.n; k++) { const t = C.fn === 'cos' ? (k * Math.PI) / C.n : (Math.PI / 2 + k * Math.PI) / C.n, rr = C.f(t), p = [skClean(rr * Math.cos(t)), skClean(rr * Math.sin(t))]; if (!tips.some((q) => skNear(p, q))) tips.push(p); }
+    if (tips.some(([x, y]) => { const d = (Math.atan2(y, x) * 180) / Math.PI; return Math.abs(d / 15 - Math.round(d / 15)) > 1e-6; })) continue;
+    const L = Math.abs(C.a) + 1, win = { ...skPolarWin(L, deg), tips }, T = skPolarFn(C.f);
+    const fr = skFRplus({ family: 'rose' + C.n, target: T, keyPts: [tips[0]], win, display: `${C.petals} petals of length ${Math.abs(C.a)}; a tip at ${win.ptLabel(tips[0])}`, more: { fields: [{ kind: 'number', label: 'Number of petals:' }], key: [String(C.petals)], check: (v) => numOk(v[0], C.petals) } });
+    fr._target = T;
+    return { topic: 'Sketching rose curves', sketch: true, stem: `Sketch the rose curve: place the tip of one of its petals (the rest of the rose is drawn from it). Then give the number of petals.   ${C.text}`, fr, choices: null, answer: -1,
+      solution: `r = a ${C.fn} nθ with n = ${C.n} (${C.n % 2 ? 'odd: n petals' : 'even: 2n petals'}), so there are ${C.petals} petals, each |a| = ${Math.abs(C.a)} unit${Math.abs(C.a) === 1 ? '' : 's'} long.\nThe tips are at ${tips.map(win.ptLabel).join(', ')}.` };
+  }
+};
+TEMPLATES.s8RoseSketch = (r) => s8Rose(r, false);
+TEMPLATES.s8RoseSketchDeg = (r) => s8Rose(r, true);
+// Pre-Calculus 6.9: identify and sketch a conic with a focus at the pole
+function c9Sk(r, deg) {
+  for (;;) {
+    const [type, ea, eb, l0] = pick(r, [['Parabola', 1, 1, 2], ['Parabola', 1, 1, 4], ['Parabola', 1, 1, 6], ['Ellipse', 1, 2, 3], ['Ellipse', 1, 3, 4], ['Ellipse', 1, 4, 5], ['Ellipse', 1, 5, 6], ['Hyperbola', 2, 1, 3], ['Hyperbola', 2, 1, 6], ['Hyperbola', 3, 1, 4], ['Hyperbola', 3, 2, 5]]);
+    const fn = pick(r, ['cos', 'sin']), sg = pick(r, [1, -1]), e = ea / eb, Fn = fn === 'cos' ? Math.cos : Math.sin;
+    const C = { type, e, eT: fracT(e), p: l0 / e, fn, s: sg, text: `r = ${l0 * eb}/(${eb} ${sg > 0 ? '+' : MINUS} ${ea === 1 ? '' : ea + ' '}${fn} θ)`, f: (t) => l0 / (1 + sg * e * Fn(t)) };
+    const th0 = C.fn === 'cos' ? (C.s > 0 ? 0 : 180) : C.s > 0 ? 90 : 270, near = C.f((th0 * Math.PI) / 180), l = C.e * C.p;
+    if (!Number.isInteger(skClean(near)) || !Number.isInteger(skClean(l))) continue;
+    const u = [Math.cos((th0 * Math.PI) / 180), Math.sin((th0 * Math.PI) / 180)].map(skClean), w = [-u[1], u[0]];
+    const vtx = u.map((c) => skClean(c * near)), lat = [w.map((c) => skClean(c * l)), w.map((c) => skClean(-c * l))];
+    const far = C.type === 'Ellipse' ? C.f(((th0 + 180) * Math.PI) / 180) : 0, L = Math.max(4, Math.ceil(Math.max(l, near, C.type === 'Ellipse' ? far : 0)) + 1); if (L > 9) continue;
+    const win = { ...skPolarWin(L, deg), vtx, lat }, T = skPolarFn(C.f);
+    const fr = skFRplus({ family: 'pconic', target: T, keyPts: [vtx, lat[0]], win, display: `${C.type}, e = ${C.eT}; vertex ${win.ptLabel(vtx)}; latus rectum endpoints ${lat.map(win.ptLabel).join(' and ')}`,
+      more: { fields: [{ kind: 'select', label: 'Conic:', options: CTYPES3 }, { kind: 'expr', keys: 'num', label: 'Eccentricity e =' }], key: [C.type, fracL(C.e)], check: (v) => v[0] === C.type && exact3Ok(v[1], C.e) } });
+    fr._target = T;
+    const thT = (d) => (deg ? `${d % 360}°` : d ? radT(d % 360) : '0');
+    return { topic: 'Sketching polar conics', sketch: true, stem: `Identify the conic and find its eccentricity. Then sketch it: place the vertex closest to the pole, then an endpoint of the latus rectum (the point on the graph at θ = ${thT(th0 + 90)} or ${thT(th0 + 270)}).   ${C.text}`, fr, choices: null, answer: -1,
+      solution: `Divide so the denominator starts with 1: e = ${C.eT}, so it is ${C.type === 'Ellipse' ? 'an ellipse (e < 1)' : C.type === 'Parabola' ? 'a parabola (e = 1)' : 'a hyperbola (e > 1)'}.\nVertex closest to the pole: θ = ${thT(th0)}, r = ${fmt(skClean(near))}.\nLatus rectum: θ = ${thT(th0 + 90)} and ${thT(th0 + 270)}, r = ep = ${fmt(skClean(l))}.${C.type === 'Ellipse' ? `\nThe other vertex: θ = ${thT(th0 + 180)}, r = ${fmt(Math.round(far * 100) / 100)}.` : ''}` };
+  }
+};
+TEMPLATES.c9Sketch = (r) => c9Sk(r, false);
+TEMPLATES.c9SketchDeg = (r) => c9Sk(r, true);
+// Pre-Calculus 6.7 (degrees): plot (r, θ°), then convert to rectangular coordinates
+TEMPLATES.q7PlotDeg = (r) => {
+  const R = ri(r, 1, 6) * pick(r, [1, 1, -1]), d = pick(r, [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330, -30, -45, -60, -120, -150, 390, 420]);
+  const sn = (v) => (Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v) : v), x = sn(R * Math.cos((d * Math.PI) / 180)), y = sn(R * Math.sin((d * Math.PI) / 180)), pt = [skClean(x), skClean(y)];
+  const win = { ...skPolarWin(Math.max(4, Math.abs(R) + 1), true), pt }, gOk = (v) => skMatch('pt', skParse(v[0]), null, win);
+  const fr = { fields: [{ kind: 'graph', family: 'pt', win, label: '' }, { kind: 'expr', keys: 'ppt', label: '(x, y) =' }], key: [`${pt[0]},${pt[1]}`, `\\left(${exactL(x)},${exactL(y)}\\right)`], display: `Point ${skPolarLabDeg(pt)}; (${exactT(x)}, ${exactT(y)})`,
+    check: (v) => gOk(v) && ptsOk(v[1], [[x, y]]), score: (v) => (gOk(v) ? 0.5 : 0) + (ptsOk(v[1], [[x, y]]) ? 0.5 : 0), answered: (v) => Array.isArray(v) && skParse(v[0]).length === 1 && String(v[1] || '').trim() !== '' };
+  fr._target = 'pt';
+  const dT = `${d < 0 ? MINUS : ''}${Math.abs(d)}°`;
+  return { topic: 'Polar to rectangular coordinates', sketch: true, stem: `Plot the point (${exactT(R)}, ${dT}) on the polar grid. Then convert it to rectangular coordinates.`, fr, choices: null, answer: -1,
+    solution: `${R < 0 ? `r is negative, so go |r| = ${Math.abs(R)} unit${Math.abs(R) === 1 ? '' : 's'} in the opposite direction of ${dT} (add 180°). ` : `Turn to ${dT} and go out ${R} unit${R === 1 ? '' : 's'}. `}The point is the same as ${skPolarLabDeg(pt)}.\nx = r cos θ = ${exactT(R)} cos ${dT} = ${exactT(x)};  y = r sin θ = ${exactT(R)} sin ${dT} = ${exactT(y)}` };
 };
 TEMPLATES.a41Sketch = (r) => TEMPLATES.skLine(r);
 TEMPLATES.p4Sketch = (r) => TEMPLATES.skLine(r);
@@ -17110,22 +17260,32 @@ const QUESTION_TYPES = [
   { id: 'p6Orient', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Orientation of a curve', desc: '(#7–12)' },
   { id: 'p6Elim', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Eliminating the parameter', desc: 'Rectangular equation and domain (#13–36)' },
   { id: 'p6Find', subject: 'precalc',  section: '6.6 Parametric Equations', label: 'Finding parametric equations', desc: 'Line, circle, ellipse' },
+  { id: 'p6Sketch', subject: 'precalc',  section: '6.6 Parametric Equations', sketch: true, label: 'Sketch a plane curve (students graph)', desc: 'Plot points in order of t to show the orientation' },
   { id: 'q7Rep', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Multiple polar representations', desc: '(r, θ) with given conditions' },
   { id: 'q7ToRect', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Polar to rectangular coordinates', desc: 'Points' },
   { id: 'q7ToPolar', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Rectangular to polar coordinates', desc: 'Points, r > 0 and 0 ≤ θ < 2π' },
   { id: 'q7RectToPolar', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Rectangular equation to polar form', desc: '' },
   { id: 'q7PolarToRect', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Polar equation to rectangular form', desc: '(#79–92)' },
   { id: 'q7Describe', subject: 'precalc',  section: '6.7 Polar Coordinates', label: 'Describing a polar graph', desc: '(#93–100)' },
+  { id: 'q7PlotRep', subject: 'precalc',  section: '6.7 Polar Coordinates', sketch: true, label: 'Plot a polar point, then another representation (students plot)', desc: 'On a polar grid' },
+  { id: 'q7PlotRect', subject: 'precalc',  section: '6.7 Polar Coordinates', sketch: true, label: 'Plot a polar point, then rectangular coordinates (students plot)', desc: 'On a polar grid' },
+  { id: 'q7PlotDeg', subject: 'precalc',  section: '6.7 Polar Coordinates', sketch: true, label: 'Plot a polar point in degrees, then rectangular coordinates (students plot)', desc: 'Polar grid in degrees' },
   { id: 's8Type', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Identifying polar graphs', desc: 'Circle, limaçon, cardioid, rose, lemniscate (#5–10)' },
   { id: 's8Match', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Matching polar graphs', desc: '' },
   { id: 's8Sym', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Testing for symmetry', desc: 'Polar axis, θ = π/2, pole (#11–16)' },
   { id: 's8MaxZero', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Maximum |r| and zeros', desc: '(#17–20)' },
   { id: 's8Rose', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', label: 'Rose curves', desc: 'Number and length of petals' },
+  { id: 's8LimSketch', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', sketch: true, label: 'Sketch a circle or limaçon (students graph)', desc: 'Plot r at θ = 0, π/2, π, 3π/2 on a polar grid' },
+  { id: 's8RoseSketch', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', sketch: true, label: 'Sketch a rose curve (students graph)', desc: 'Place a petal tip on a polar grid' },
+  { id: 's8LimSketchDeg', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', sketch: true, label: 'Sketch a circle or limaçon, degrees (students graph)', desc: 'r at θ = 0°, 90°, 180°, 270° on a polar grid in degrees' },
+  { id: 's8RoseSketchDeg', subject: 'precalc',  section: '6.8 Graphs of Polar Equations', sketch: true, label: 'Sketch a rose curve, degrees (students graph)', desc: 'Polar grid in degrees' },
   { id: 'c9Ecc', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Eccentricity and type', desc: 'r = 2e/(1 + e cos θ) for given e (#5–8)' },
   { id: 'c9Identify', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Identifying a conic', desc: 'Type and eccentricity (#13–24)' },
   { id: 'c9Match', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Matching polar conics', desc: '(#9–12)' },
   { id: 'c9Write', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Polar equation from e and directrix', desc: '' },
   { id: 'c9Vertex', subject: 'precalc',  section: '6.9 Polar Equations of Conics', label: 'Polar equation from vertices', desc: '' },
+  { id: 'c9Sketch', subject: 'precalc',  section: '6.9 Polar Equations of Conics', sketch: true, label: 'Identify and sketch a polar conic (students graph)', desc: 'Vertex and latus rectum point on a polar grid' },
+  { id: 'c9SketchDeg', subject: 'precalc',  section: '6.9 Polar Equations of Conics', sketch: true, label: 'Identify and sketch a polar conic, degrees (students graph)', desc: 'Polar grid in degrees' },
 ];
 /* ==== ALGEBRA CATALOG BEGIN ==== */
 /* ---------- Algebra I and Algebra II (Mr. Spencer's classes): menu assignments and builder catalog ---------- */
