@@ -241,6 +241,7 @@ const TEACHERS = {
 // "Try it as a student" from the builder: no Google sign-in, and nothing is saved to the gradebook
 const PREVIEW = new URLSearchParams(location.search).has('preview');
 const TEACHER_ID = (() => { const t = (new URLSearchParams(location.search).get('t') || '').toLowerCase(); return TEACHERS[t] ? t : ''; })();
+const BASE_TEACHER_NAME = CONFIG.TEACHER_NAME; // the main teacher (before a t= teacher's settings replace it)
 if (TEACHER_ID) Object.assign(CONFIG, TEACHERS[TEACHER_ID]);
 CONFIG.SUBJECTS = CONFIG.SUBJECTS || ['geometry', 'precalc', 'act', 'algebra1', 'algebra2'];
 // this-device settings (sign-in, dashboard password, builder) are kept separately for each teacher
@@ -19272,6 +19273,7 @@ function teacherNav(active) {
     style: `flex:1;min-width:150px;padding:9px 12px;font:600 15px system-ui,sans-serif;border-radius:8px;border:1px solid ${id === active ? 'var(--accent)' : 'transparent'};background:${id === active ? 'var(--accent)' : 'transparent'};color:${id === active ? '#fff' : 'var(--accent)'};cursor:pointer` }, label)));
 }
 function teacherMenu() {
+  if (params.has('copy')) { const c = params.get('copy'); params.delete('copy'); if (copyIntoBuilder(c)) return builder(); }
   if (params.has('print')) return printScreen(CUSTOM_KEY || (SETS[params.get('set')] ? params.get('set') : null));
   if (CUSTOM_KEY || SETS[params.get('set')]) { document.getElementById('title').textContent = 'Answer key'; return startScreen(true); }
   document.getElementById('title').textContent = 'Teacher tools';
@@ -19567,7 +19569,8 @@ function builder() {
         el('p', { class: 'small', style: 'margin:14px 0 6px' }, 'Or paste its student link:'),
         el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, editIn, el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: loadEdit }, 'Load link')), editMsg);
   const syncCard = el('div', { class: 'card', style: 'display:none;border-left:4px solid var(--accent, #1f5fa8)' });
-  app.append(syncCard, editCard);
+  const copyCard = saved.copied && !saved.editId ? el('div', { class: 'card', style: 'border-left:4px solid var(--accent, #1f5fa8)' }, el('strong', {}, `Your copy of “${saved.title || 'Custom Practice'}”`), el('p', { class: 'small', style: 'margin-bottom:0' }, saved.note)) : '';
+  app.append(syncCard, copyCard, editCard);
   const showSync = () => {
     syncCard.innerHTML = ''; syncCard.style.display = 'none';
     const st = LIB_STATUS.state;
@@ -19721,12 +19724,19 @@ function builder() {
     catch { linkIn.select(); copyBtn.textContent = 'Press Ctrl+C to copy'; }
     setTimeout(() => (copyBtn.textContent = 'Copy link'), 1800);
   } }, 'Copy link');
+  const shareQ = el('input', { type: 'text', readonly: 'readonly', style: 'font-size:14px' }), shareA = el('input', { type: 'text', readonly: 'readonly', style: 'font-size:14px' });
+  const copyOf = (inp, label) => { const b = el('button', { class: 'btn secondary', type: 'button', onclick: async () => { if (!inp.value) return; remember(); try { await navigator.clipboard.writeText(inp.value); b.textContent = 'Copied!'; } catch { inp.select(); b.textContent = 'Press Ctrl+C to copy'; } setTimeout(() => (b.textContent = label), 1800); } }, label); return b; };
+  const shareBox = el('details', { style: 'margin-top:10px' }, el('summary', {}, 'Share with a principal or another teacher'),
+    el('p', { class: 'small' }, 'These links open a view-only page: the questions (one sample version), the settings, and a “Try it as a student” button. Nothing they do is saved or sent to your gradebook. Another teacher can also make their own copy from it (with their teacher PIN).'),
+    el('label', {}, 'With the answer key and solutions'), shareA, copyOf(shareA, 'Copy link with answers'),
+    el('label', { style: 'margin-top:10px' }, 'Questions only (no answers)'), shareQ, copyOf(shareQ, 'Copy questions-only link'),
+    el('p', { class: 'small' }, 'Don’t post these in Google Classroom. A student who adds “view” to their own link gets nothing; the share links have a code made from your settings.'));
   const out = el('div', { class: 'card' },
     el('div', {}, 'Total questions: ', totalEl), msg,
     el('label', {}, 'Student link (post this in Google Classroom)'), linkIn, copyBtn,
     el('p', { class: 'small', style: 'margin-top:14px' }, tryLink, ' · ', keyLink, ' · ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); const k = linkIn.value && registerCustomUrl(linkIn.value); if (k) { printScreen(k); window.scrollTo(0, 0); } } }, 'Print it')),
     el('details', { style: 'margin-top:10px' }, el('summary', { class: 'small' }, 'Make it a permanent menu item (optional)'),
-      el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut));
+      el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut), shareBox);
   app.append(out);
   [titleIn, subjSel, orderSel, retriesIn, attemptsIn, leaveIn].forEach((x) => x.addEventListener('input', update));
   lockIn.addEventListener('change', update);
@@ -19760,7 +19770,7 @@ function builder() {
       if (!draftBlank(nextLast) || !draftBlank(prevLast)) queueDraft(nextLast);
     }
     store.set(TK('builder:last'), nextLast);
-    if (!total) { linkIn.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
+    if (!total) { linkIn.value = ''; shareQ.value = ''; shareA.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
     if (TEACHER_ID) q.set('t', TEACHER_ID);
@@ -19779,7 +19789,7 @@ function builder() {
     if (!editId || saved.gen === 2) q.set('g', '2');
     if (editId) q.set('id', editId);
     const url = location.origin + location.pathname + '?' + q.toString();
-    linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1';
+    linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1'; shareA.value = shareLink(url, true); shareQ.value = shareLink(url, false);
     if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
     codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
@@ -19787,7 +19797,7 @@ function builder() {
   update(); opening = false;
 }
 
-function previewQuestion(q) {
+function previewQuestion(q, showAns = true) {
   const W = contentWidth() - 20;
   const box = el('div', { class: 'q', style: 'margin:6px 0 12px' });
   box.append(textCanvas(q.stem, W));
@@ -19803,13 +19813,77 @@ function previewQuestion(q) {
       f.kind === 'choice' ? el('span', { class: 'small' }, f.options.map((o, j) => `${LETTERS[j]}. ${o}`).join('   ')) :
       f.kind === 'select' ? el('select', { disabled: 'disabled' }, el('option', {}, 'Choose…')) : f.kind === 'graph' ? el('span', { class: 'small' }, `Students place ${SKETCH[f.family].roles.join(', then ')} on a grid; the graph is drawn through them.`) : f.kind === 'proof' ? el('span', { class: 'small' }, 'Students type the proof one line at a time; each line is checked, then the AI grades it.') : el('input', { disabled: 'disabled', class: f.kind === 'number' ? 'num' : 'let' }),
       f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''))),
-      el('div', { class: 'small', style: 'margin-top:6px' }, 'Correct answer: ', el('strong', {}, q.fr.display.replace(/(.)\u0305/g, '$1')))), el('div', { class: 'sol' }, q.solution));
+      showAns ? el('div', { class: 'small', style: 'margin-top:6px' }, 'Correct answer: ', el('strong', {}, q.fr.display.replace(/(.)\u0305/g, '$1'))) : ''), showAns ? el('div', { class: 'sol' }, q.solution) : '');
     return box;
   }
   const ch = el('div', { class: 'choices' });
-  q.choices.forEach((c, j) => ch.append(el('div', { class: 'choice' + (j === q.answer ? ' right' : '') }, el('span', { class: 'letter' }, LETTERS[j]), textCanvas(c, Math.min(W - 70, 500), '17px Georgia, "Times New Roman", serif', 24))));
-  box.append(ch, el('div', { class: 'sol' }, q.solution));
+  q.choices.forEach((c, j) => ch.append(el('div', { class: 'choice' + (showAns && j === q.answer ? ' right' : '') }, el('span', { class: 'letter' }, LETTERS[j]), textCanvas(c, Math.min(W - 70, 500), '17px Georgia, "Times New Roman", serif', 24))));
+  box.append(ch, showAns ? el('div', { class: 'sol' }, q.solution) : '');
   return box;
+}
+
+/* ---------- sharing an assignment with a principal or another teacher ---------- */
+// a share link is the student link plus view=<code> (and ans=1 to include the answers). The code is made from the
+// assignment and your SALT, so a student can't turn their own link into an answer key by adding view=1.
+const viewCode = (q, ans) => cyrb53(`${CONFIG.SALT}|view|${q.get('mix') || q.get('set') || ''}|${q.get('title') || ''}|${ans ? 'ans' : 'q'}`).toString(36);
+function shareLink(studentUrl, ans) {
+  const u = new URL(studentUrl); ['preview', 'teacher', 'view', 'ans', 'print'].forEach((k) => u.searchParams.delete(k));
+  if (ans) u.searchParams.set('ans', '1');
+  u.searchParams.set('view', viewCode(u.searchParams, ans));
+  return u.toString();
+}
+const viewOk = () => params.has('view') && (CUSTOM_KEY || SETS[params.get('set')]) && params.get('view') === viewCode(params, params.get('ans') === '1');
+function viewScreen() {
+  const setKey = CUSTOM_KEY || params.get('set'), S = SETS[setKey], ans = params.get('ans') === '1';
+  document.getElementById('title').textContent = S.title;
+  document.getElementById('subtitle').textContent = `${SUBJECTS[S.subject] || ''} · shared by ${CONFIG.TEACHER_NAME} (view only)`;
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '';
+  const total = S.items.reduce((s, [, n]) => s + n, 0), name = (id) => (QUESTION_TYPES.find((t) => t.id === id) || {}).label || id;
+  const studentUrl = (() => { const u = new URL(location.href); ['view', 'ans'].forEach((k) => u.searchParams.delete(k)); return u.toString(); })();
+  const yes = (b) => (b ? 'yes' : 'no'), att = setting(setKey, 'attempts'), ret = setting(setKey, 'retries'), leave = setting(setKey, 'leaveLimit');
+  let showAns = ans, sample = 1;
+  const list = el('div');
+  const draw = () => {
+    list.innerHTML = '';
+    const { qs } = generate(setKey, 'view', `sample${sample}`);
+    qs.forEach((q, i) => list.append(el('div', { class: 'card' }, el('div', { style: 'font-weight:700;margin-bottom:4px' }, `Question ${i + 1}`, el('span', { class: 'small', style: 'font-weight:400;float:right' }, q.topic)), previewQuestion(q, showAns))));
+  };
+  const ansBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { showAns = !showAns; ansBtn.textContent = showAns ? 'Hide answers' : 'Show answers'; draw(); } }, 'Hide answers');
+  const who = el('select', {}, el('option', { value: '' }, BASE_TEACHER_NAME), ...Object.entries(TEACHERS).map(([k, v]) => el('option', { value: k }, v.TEACHER_NAME || k)));
+  who.value = TEACHER_ID;
+  app.innerHTML = '';
+  app.append(el('div', { class: 'card' },
+    el('p', { style: 'margin-top:0' }, `This is a view-only copy of an assignment. Nothing you do here is saved or sent to ${CONFIG.TEACHER_NAME}’s gradebook.`),
+    el('p', { class: 'small' }, `${total} question${total === 1 ? '' : 's'}: `, S.items.map(([id, n, m]) => `${name(id)} (${n}${m === 'fr' ? ', free response' : ''})`).join('; '), '.'),
+    el('p', { class: 'small' }, `Every student gets ${setting(setKey, 'same') ? 'the same version' : 'their own version with different numbers'}${S.shuffle ? ', in a mixed-up order' : ''}. `,
+      `Tries per question: ${ret + 1}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
+    el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+      el('button', { class: 'btn secondary', type: 'button', onclick: () => { sample++; draw(); } }, 'Show another version'),
+      ans ? ansBtn : '',
+      el('a', { class: 'btn secondary', href: studentUrl + '&preview=1', target: '_blank', rel: 'noopener', style: 'text-decoration:none' }, 'Try it as a student'))),
+    list,
+    el('div', { class: 'card' }, el('strong', {}, 'Teachers: use this assignment with your own classes'),
+      el('p', { class: 'small' }, 'This makes your own copy in your teacher tools, with your own link and gradebook. You’ll need your teacher PIN.'),
+      el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, el('label', { class: 'small' }, 'I am '), who,
+        el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: () => { const u = new URL(location.origin + location.pathname); if (who.value) u.searchParams.set('t', who.value); u.searchParams.set('teacher', '1'); u.searchParams.set('copy', studentUrl); location.href = u.toString(); } }, 'Make my own copy'))));
+  draw();
+}
+// opened from a shared assignment's "Make my own copy": load it into this teacher's builder as a NEW assignment
+function copyIntoBuilder(link) {
+  let q; try { q = new URL(link).searchParams; } catch { return false; }
+  const set = SETS[q.get('set')], mix = q.get('mix');
+  const items = mix ? mix.split('_').map((x) => x.split('.')) : set ? set.items.map(([id, n, m]) => [id, n, m === 'fr' ? 'fr' : 'mc']) : null;
+  if (!items) return false;
+  const c = {}, f = {}, frc = {};
+  items.forEach(([id, n, m]) => { if (!TEMPLATES[id] || !(+n > 0)) return; n = Math.floor(+n); const prev = f[id]; c[id] = (c[id] || 0) + n;
+    if (m === 'fr') { frc[id] = (frc[id] || 0) + n; f[id] = prev && prev !== 'fr' ? 'both' : 'fr'; } else f[id] = prev && prev !== 'mc' ? 'both' : 'mc'; });
+  Object.keys(f).forEach((id) => { if (f[id] !== 'both') delete frc[id]; });
+  const g = (k, d) => (q.has(k) ? q.get(k) : d);
+  store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, title: g('title', set ? set.title : ''), subject: SUBJECTS[g('subject', set ? set.subject : '')] ? g('subject', set ? set.subject : '') : Object.keys(SUBJECTS)[0],
+    order: g('order', set && set.shuffle ? 'mixed' : '') === 'mixed' ? 'mixed' : 'grouped', retries: +g('retries', set ? set.retries || 0 : 0) || 0, attempts: +g('attempts', set ? set.attempts || 1 : 1) || 1,
+    lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
+    note: 'This is a copy of a shared assignment. Check the title and settings, then copy your own student link below.', t: Date.now() });
+  return true;
 }
 
 /* ---------- entry ---------- */
@@ -19822,6 +19896,7 @@ function previewQuestion(q) {
       el('p', {}, el('code', {}, String(cyrb53(params.get('makehash')))))));
     return;
   }
+  if (viewOk()) return viewScreen();
   if (params.has('teacher')) {
     document.getElementById('title').textContent = 'Teacher tools';
     const pin = el('input', { type: 'password', placeholder: 'Teacher PIN' });
