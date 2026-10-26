@@ -17765,7 +17765,7 @@ function cloudNote(k) {
 }
 // ---- merging saved work (the same rules run in the Apps Script): A wins, anything only B has is kept ----
 const pBlank = (a) => a === null || a === undefined || a === '' || (Array.isArray(a) && a.every((x) => String(x ?? '').trim() === ''));
-function pMergeSaved(A, B) {
+function pMergeSaved(A, B, strict = false) { // strict: never refill an answer this device cleared for a retry
   if (!A) return B; if (!B) return A;
   if ((A.sig || []).join('|') !== (B.sig || []).join('|')) return A;
   if (B.submitted && !A.submitted) return B;
@@ -17773,7 +17773,9 @@ function pMergeSaved(A, B) {
   out.answers = []; let added = 0;
   for (let i = 0; i < n; i++) {
     const a = (A.answers || [])[i], b = (B.answers || [])[i];
-    if (pBlank(a) && !pBlank(b)) { out.answers[i] = b; added++; ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (B[f] && B[f][i] !== undefined) { out[f] = out[f] || {}; out[f][i] = B[f][i]; } }); }
+    // a retry clears the answer and makes a new version of the question: an answer saved for an older version doesn't belong
+    const sameVersion = ((A.tries || {})[i] || 0) === ((B.tries || {})[i] || 0) && !(A.status || {})[i] && !(strict && ((A.tries || {})[i] || 0) > 0);
+    if (pBlank(a) && !pBlank(b) && sameVersion) { out.answers[i] = b; added++; ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (B[f] && B[f][i] !== undefined) { out[f] = out[f] || {}; out[f][i] = B[f][i]; } }); }
     else out.answers[i] = a === undefined ? null : a;
   }
   ['tries', 'status', 'history', 'hintUsed'].forEach((f) => { if (B[f]) Object.keys(B[f]).forEach((i) => { out[f] = out[f] || {}; if (out[f][i] === undefined) out[f][i] = B[f][i]; }); });
@@ -17782,9 +17784,9 @@ function pMergeSaved(A, B) {
   out._added = added;
   return out;
 }
-function pMergeData(inc, old) {
+function pMergeData(inc, old, strict = false) {
   if (!old || !inc || inc.reset || old.reset || inc.curKey !== old.curKey) return null;
-  const sv = pMergeSaved(inc.saved, old.saved); if (!sv || !sv._added) return null;
+  const sv = pMergeSaved(inc.saved, old.saved, strict); if (!sv || !sv._added) return null;
   delete sv._added;
   const out = JSON.parse(JSON.stringify(inc)); out.saved = sv;
   if (old.work) { out.work = out.work || {}; Object.keys(old.work).forEach((k) => { if (pBlank(out.work[k])) out.work[k] = old.work[k]; }); }
@@ -17816,10 +17818,13 @@ async function cloudFlush(leaving) {
     const g = await res.json().catch(() => ({}));
     if (g && g.merged && state && !state.teacher && !leaving) { // the Sheet had answers this device was missing: bring them in
       const st = state; let d = null; try { d = JSON.parse(g.merged); } catch {}
-      const mine = store.get(st.key);
-      if (d && d.curKey === st.key && JSON.stringify(d.saved) !== JSON.stringify(mine)) {
-        cloudApply(st.base, d, g.updated);
-        if (state === st) { begin(st.setKey, st.period, st.name, false, 1, st.rid); setCloudStatus('Progress saved online ✓ (added answers saved from another Chromebook)'); return; }
+      if (d && d.curKey === st.key && state === st) {
+        saveState(); // what the student has right now, including anything typed while this save was on its way
+        const now = store.get(st.key), m = pMergeSaved(now, d.saved, true);
+        if (m && m._added) {
+          delete m._added; cloudApply(st.base, { ...d, saved: m, meta: store.get(st.base + ':meta'), work: store.get(st.key + ':work') || d.work, draw: store.get(st.key + ':draw') || d.draw }, 0);
+          begin(st.setKey, st.period, st.name, false, 1, st.rid, true); setCloudStatus('Progress saved online ✓ (added answers saved from another Chromebook)'); cloudNote(st.key); return;
+        }
       }
     }
     if (g && !g.ok && !g.reset) { setCloudStatus('Progress saved on this device (trying the online save again…)'); cloudTimer = setTimeout(() => cloudFlush(false), 20000); return; }
@@ -17856,7 +17861,7 @@ async function cloudRestore(base, force = false) {
     const d = JSON.parse(g.data);
     if (!(g.updated > localTs) && !(force && d.reset)) { // this device is newer: make sure it has everything the Sheet has
       const local = { meta: store.get(base + ':meta'), curKey: d.curKey, saved: d.curKey ? store.get(d.curKey) : null, work: d.curKey ? store.get(d.curKey + ':work') : null };
-      const m = local.saved && pMergeData(local, d);
+      const m = local.saved && pMergeData(local, d, true);
       if (m) { cloudApply(base, m, 0); try { localStorage.setItem(base + ':cloudts', String(Date.now())); } catch {} setTimeout(() => { if (state && state.base === base && !state.teacher) cloudFlush(false); }, 3000); }
       return;
     }
@@ -18092,13 +18097,13 @@ function startScreen(teacher = false) {
   app.append(card);
 }
 
-async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = null) {
+async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = null, noCloud = false) {
   if (!mathReady) { app.innerHTML = '<div class="card">Loading…</div>'; await mathLoading; }
   document.getElementById('title').textContent = SETS[setKey].title;
   document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period` + (PREVIEW ? ' · preview, not saved' : '');
   const sid = sidOf(name, rid);
   const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${sid}`;
-  if (!teacher && CONFIG.SCRIPT_URL) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
+  if (!teacher && CONFIG.SCRIPT_URL && !noCloud) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
   // nothing saved under this sign-in yet: pick up work saved earlier under the student's typed name
   // (before the class list or Google sign-in was working), on this Chromebook or online
   if (!teacher && !PREVIEW && rid && !store.get(base + ':meta') && !store.get(base)) await adoptProgress(base, `practice:${CONFIG.SALT}:${setKey}:${period}:${norm(name)}`);
