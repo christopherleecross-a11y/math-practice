@@ -19904,14 +19904,29 @@ function copyIntoBuilder(link) {
   if (viewOk()) return viewScreen();
   if (params.has('teacher')) {
     document.getElementById('title').textContent = 'Teacher tools';
-    const pin = el('input', { type: 'password', placeholder: 'Teacher PIN' });
+    const pin = el('input', { type: 'password', placeholder: CONFIG.SCRIPT_URL ? 'PIN or dashboard password' : 'Teacher PIN', autocomplete: 'off' });
     const err = el('div', { class: 'err' });
-    app.append(el('div', { class: 'card' }, el('label', {}, 'Teacher PIN'), pin,
-      el('button', { class: 'btn', onclick: () => {
-        if (!CONFIG.TEACHER_PIN_HASH) err.textContent = 'No teacher PIN is set up yet. Open this page with &makehash=YOUR-PIN added to the address to make one.';
-        else if (String(cyrb53(pin.value)) === CONFIG.TEACHER_PIN_HASH) teacherMenu(); else err.textContent = 'Wrong PIN.';
-      } }, 'Continue'), err));
-    pin.addEventListener('keydown', (e) => { if (e.key === 'Enter') app.querySelector('.btn').click(); });
+    let busy = false;
+    // the PIN is checked here; the dashboard password is checked by your Apps Script (it never appears in this page),
+    // then remembered on this computer so the Results dashboard and assignment syncing open without asking again
+    const go = async () => {
+      if (busy) return;
+      const v = pin.value; err.textContent = '';
+      if (CONFIG.TEACHER_PIN_HASH && String(cyrb53(v)) === CONFIG.TEACHER_PIN_HASH) return teacherMenu();
+      if (!CONFIG.SCRIPT_URL || !v) { err.textContent = CONFIG.TEACHER_PIN_HASH ? 'Wrong PIN.' : 'No teacher PIN is set up yet. Open this page with &makehash=YOUR-PIN added to the address to make one.'; return; }
+      busy = true; btn.textContent = 'Checking…';
+      try {
+        const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'assignments', password: v }) });
+        const j = await res.json().catch(() => ({}));
+        if (j && j.ok) { dashPw.set(v); return teacherMenu(); }
+        err.textContent = j && j.locked ? 'Too many wrong tries. Wait 15 minutes, or use your PIN.' : 'That isn’t your PIN or your dashboard password.';
+      } catch { err.textContent = 'Couldn’t reach your Sheet to check the password (no internet?). Your PIN still works.'; }
+      finally { busy = false; btn.textContent = 'Continue'; pin.value = ''; pin.focus(); }
+    };
+    const btn = el('button', { class: 'btn', onclick: go }, 'Continue');
+    app.append(el('div', { class: 'card' }, el('label', {}, CONFIG.SCRIPT_URL ? 'Teacher PIN or Results dashboard password' : 'Teacher PIN'), pin, btn, err,
+      CONFIG.SCRIPT_URL ? el('p', { class: 'small', style: 'margin-bottom:0' }, 'Your dashboard password also opens the Results dashboard and syncs your assignments on this computer. On a student’s Chromebook, use your PIN.') : ''));
+    pin.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
     return;
   }
   startScreen(false);
