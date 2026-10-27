@@ -229,7 +229,7 @@ const CONFIG = {
 const TEACHERS = {
   spencer: {
     TEACHER_NAME: 'Mr. Spencer',
-    SUBJECTS: ['algebra1', 'algebra2', 'geometry', 'precalc'],
+    SUBJECTS: ['algebra1', 'algebra2'],
     PERIODS: ['1st', '2nd', '3rd', '4th', '6th', '7th', '8th'],
     SALT: 'spencer-fall-2026',
     SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxjKMy-XuQt8LR0Cd5ILEGk_lverjHGze1ob4_k-HAro1tV7wGVznySDxaQrToUfwoH/exec', // his first deployment ("Anyone")
@@ -12343,7 +12343,7 @@ function b4StdOk(raw, co, v = 'x') {
   const s0 = String(raw || '').replace(/\\left|\\right/g, '').replace(/^\s*[a-z]\s*\(\s*[a-z]\s*\)\s*=/i, '').replace(/^\s*[a-z]\s*=/i, '');
   if (!pxEquiv(s0, (x) => b4ev(co, x), { v, lo: -3, hi: 3 })) return false;
   let t = pxPlain(s0); if (t == null) return false;
-  t = t.replace(/\s+/g, '').replace(/\^\((\d+)\)/g, '^$1').replace(/\(\((\d+)\)\/\((\d+)\)\)/g, '$1/$2');
+  t = t.replace(/\s+/g, '').replace(/\^\((\d+)\)/g, '^$1').replace(/\(\((\d+)\)\/\((\d+)\)\)/g, '$1/$2').replace(/\((\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)\)/g, '$1/$2');
   if (/[()]/.test(t)) return false;
   const terms = t.replace(/(?!^)(?<![\^*\/])[+-]/g, (m) => '|' + m).split('|').filter(Boolean), seen = new Set();
   for (const term of terms) {
@@ -15978,6 +15978,7 @@ function skHalfPlane(cv, win, p1, p2, p3, fill, line, dashed) {
   c.strokeStyle = line; c.lineWidth = 2.6; if (dashed) c.setLineDash([9, 7]); c.beginPath(); c.moveTo(T.X(a[0]), T.Y(a[1])); c.lineTo(T.X(b[0]), T.Y(b[1])); c.stroke(); c.restore();
 }
 function skDraw(cv, f, pts, overlay, style) {
+  if (SKETCH[f.family].draw) return SKETCH[f.family].draw(cv, f, pts, overlay, style); // a family that draws itself (box-and-whisker plots)
   if (f.family === 'pt') {
     drawPlot(cv, { xr: f.win.xr, yr: f.win.yr, curves: [], axisNames: f.win.axisNames, polar: f.win.polar, polarDeg: f.win.deg });
     const T0 = skTransform(cv, f.win), c0 = cv._ctx, dot = ([x, y], col, lab) => { c0.beginPath(); c0.arc(T0.X(x), T0.Y(y), 6, 0, 2 * Math.PI); c0.fillStyle = col; c0.fill(); if (lab) { c0.fillStyle = '#1d1d1b'; c0.font = '12px system-ui, sans-serif'; c0.textAlign = 'left'; c0.textBaseline = 'bottom'; c0.fillText(lab, T0.X(x) + 7, T0.Y(y) - 4); } };
@@ -16046,7 +16047,7 @@ function skDraw(cv, f, pts, overlay, style) {
 // the interactive grid
 function graphInput(q, i, f, k, vals, reveal, save) {
   const F = SKETCH[f.family], size = Math.min(380, Math.max(260, contentWidth() - 20));
-  const cv = makeCanvas(size, size); cv.style.touchAction = 'none'; cv.style.cursor = reveal ? 'default' : 'crosshair'; cv.style.border = '1px solid var(--line)'; cv.style.borderRadius = '8px'; cv.style.background = '#fff';
+  const cv = makeCanvas(size, f.win.hFrac ? Math.round(size * f.win.hFrac) : size); cv.style.touchAction = 'none'; cv.style.cursor = reveal ? 'default' : 'crosshair'; cv.style.border = '1px solid var(--line)'; cv.style.borderRadius = '8px'; cv.style.background = '#fff';
   let pts = skParse(vals[k]), style = skStyle(vals[k]);
   const msg = el('div', { class: 'small', style: 'margin:4px 0' });
   const showKey = reveal && !state.teacher;
@@ -16935,6 +16936,967 @@ TEMPLATES.v33Sketch = (r) => {
   }
 };
 /* ==== PRECALC 3.3 END ==== */
+/* ==== ALGEBRA 1 CH7 BEGIN ==== */
+/* ---------- Algebra 1 (Big Ideas Learning 2025), Chapter 7: Polynomials ---------- */
+// ----- polynomials in two variables: terms [c, i, j] = c·u^i·w^j -----
+const a7MT2 = (c, i, j, u, w, latex = false) => {
+  const ac = Math.abs(c), vars = (i ? u + (i > 1 ? (latex ? `^{${i}}` : b3sup(i)) : '') : '') + (j ? w + (j > 1 ? (latex ? `^{${j}}` : b3sup(j)) : '') : '');
+  const num = !vars ? (latex ? fracL(ac) : fracT(ac)) : ac === 1 ? '' : latex ? fracL(ac) : b3cf(ac);
+  return num + vars;
+};
+function a7PT2(T, u, w, latex = false) {
+  const parts = [];
+  for (const [c, i, j] of T) {
+    if (!c) continue; const body = a7MT2(c, i, j, u, w, latex);
+    parts.push(parts.length ? (c < 0 ? (latex ? '-' : ` ${MINUS} `) : latex ? '+' : ' + ') + body : (c < 0 ? (latex ? '-' : MINUS) : '') + body);
+  }
+  return parts.join('') || '0';
+}
+// combine like terms and sort: highest power of u first
+function a7norm2(T) {
+  const m = new Map();
+  for (const [c, i, j] of T) { const k = i + ',' + j; m.set(k, (m.get(k) || 0) + c); }
+  return [...m.entries()].map(([k, c]) => [Math.round(c * 1e9) / 1e9, ...k.split(',').map(Number)]).filter(([c]) => Math.abs(c) > 1e-12).sort((A, B) => B[1] + B[2] - (A[1] + A[2]) || B[1] - A[1]);
+}
+const a7mul2 = (P, Q) => a7norm2(P.flatMap(([a, i, j]) => Q.map(([b, k, l]) => [a * b, i + k, j + l])));
+const a7neg2 = (P) => P.map(([c, i, j]) => [-c, i, j]);
+const a7ev2 = (T, x, y) => T.reduce((s, [c, i, j]) => s + c * x ** i * y ** j, 0);
+// the answer is this polynomial written as a sum of terms (no parentheses, like terms combined)
+function a7Std2Ok(raw, T, u, w) {
+  const s0 = String(raw || '').replace(/\\left|\\right/g, '').replace(/^\s*[a-z]\s*=/i, '');
+  const f = pxParse(s0, [u, w], ''); if (!f) return false;
+  for (const [x, y] of [[1.3, -0.7], [-2.1, 0.4], [0.6, 1.9], [2.7, 2.2], [-1.4, -1.8]]) { const want = a7ev2(T, x, y), got = f({ [u]: x, [w]: y }); if (!isFinite(got) || Math.abs(got - want) > 1e-6 * (1 + Math.abs(want))) return false; }
+  let t = pxPlain(s0); if (t == null) return false;
+  t = t.replace(/\s+/g, '').replace(/\^\((\d+)\)/g, '^$1').replace(/\(\((\d+)\)\/\((\d+)\)\)/g, '$1/$2');
+  if (/[()]/.test(t)) return false;
+  const terms = t.replace(/(?!^)(?<![\^*\/])[+-]/g, (m) => '|' + m).split('|').filter(Boolean), seen = new Set();
+  for (const term of terms) {
+    const e = { [u]: 0, [w]: 0 }; let ok = true;
+    term.replace(/([a-z])(?:\^(\d+))?/gi, (_, L, p) => { L = L.toLowerCase(); if (!(L in e)) ok = false; else e[L] += p ? +p : 1; return ''; });
+    if (!ok) return false; const k = e[u] + ',' + e[w]; if (seen.has(k)) return false; seen.add(k);
+  }
+  return true;
+}
+function a7polyQ2(r, { stem, res, u, w, wrong, topic, solution }) {
+  const correct = a7PT2(res, u, w), cands = [...new Set(wrong.map((W) => a7PT2(a7norm2(W), u, w)))].filter((x) => x !== correct && !a7Std2Ok(x, res, u, w));
+  return {
+    topic, stem, ...buildChoices(r, correct, cands, (i) => a7PT2(res.map(([c, a, b], k) => [k === res.length - 1 ? c + i + 1 : c, a, b]), u, w)),
+    frStem: stem.replace(/\.\s{3}/, '. Write the answer as a sum of terms, like terms combined.   '),
+    fr: { fields: [{ kind: 'expr', keys: 'poly', label: '' }], key: [a7PT2(res, u, w, true)], display: correct, check: (x) => a7Std2Ok(x[0], res, u, w) }, solution,
+  };
+}
+const a7V = (r) => pick(r, ['x', 'x', 'x', 'y', 'n', 'k', 'b', 'p', 'w', 'z', 'g', 'm', 'd', 'r', 't', 's', 'a', 'h']);
+const a7VP = (r) => pick(r, [['s', 't'], ['a', 'b'], ['c', 'd'], ['x', 'y'], ['m', 'n'], ['p', 'q']]);
+// a binomial with an optional fraction or decimal: [a, b] = a·v + b
+const a7lin = (r, { frac = 0 } = {}) => (r() < frac ? [1, pick(r, [0.5, -0.5, 0.25, -0.75, 1.5, -2.5, 0.4, -0.6])] : [pick(r, [1, 1, 1, 2, 3, 4, 5, -1, -2]), nz(r, -9, 9)]);
+const a7B = (k, v) => `(${b4T(k, v)})`;
+const a7sumQ = (r, sub) => {
+  const v = a7V(r), dec = r() < 0.2, frac = !dec && r() < 0.15;
+  const mk = () => { const n = ri(r, 1, 3), co = b4rand(r, n, ri(r, 2, Math.min(3, n + 1)), 9); if (dec) return co.map((c) => (c ? c + pick(r, [0, 0.5, -0.5, 0.25]) : 0)); if (frac) return co.map((c, i) => (c && i === 1 ? c / 2 : c)); return co; };
+  const p = mk(), q = mk(), res = b4add(p, sub ? b4neg(q) : q); if (res.every((c) => !c)) return a7sumQ(r, sub);
+  const show = (co) => (r() < 0.3 ? b4TT(shuffle(r, b4terms(co)), v) : b4T(co, v));
+  const firstOnly = b4add(p, q.map((c, i) => (i === q.findIndex((t) => t) ? -c : c)));
+  return b4polyQ(r, { stem: `Find the ${sub ? 'difference' : 'sum'}.   (${show(p)}) ${sub ? MINUS : '+'} (${show(q)})`, res, v, topic: sub ? 'Subtracting polynomials' : 'Adding polynomials',
+    wrong: sub ? [b4add(p, q), firstOnly, b4flipOne(r, res)] : [b4add(p, b4neg(q)), b4flipOne(r, res), b4flipOne(r, res)],
+    solution: sub ? `Add the opposite: change the sign of every term in the second polynomial.\n(${b4T(p, v)}) + (${b4T(b4neg(q), v)})\nCombine like terms: ${b4T(res, v)}` : `Group like terms (same power of ${v}) and add their coefficients.\n${b4T(res, v)}` });
+};
+
+// ---------- 7.1 Adding and Subtracting Polynomials ----------
+// #1–8: degree of a monomial
+TEMPLATES.a71Degree = (r) => {
+  const pool = shuffle(r, ['x', 'y', 'k', 'n', 'r', 's', 't', 'z', 'q', 'm', 'g', 'w']), nv = pick(r, [0, 1, 1, 2, 2, 3]);
+  const cT = pick(r, [String(ri(r, 2, 25)), `${MINUS}${ri(r, 2, 9)}`, `${MINUS}1.75`, '0.5', `${MINUS}4/9`, '√7', '']);
+  const ex = pool.slice(0, nv).map((v) => [v, ri(r, 1, 9)]);
+  if (!nv && (!cT || cT === '√7')) return TEMPLATES.a71Degree(r);
+  const deg = ex.reduce((s, [, e]) => s + e, 0);
+  const txt = (cT || '') + ex.map(([v, e]) => v + (e > 1 ? b3sup(e) : '')).join('');
+  const w = [ex.length ? Math.max(...ex.map(([, e]) => e)) : 1, ex.length ? ex[0][1] : 1, deg + 1, ex.length, ex.reduce((s, [, e]) => s * e, 1)];
+  return { topic: 'Degree of a monomial', stem: `Find the degree of the monomial.   ${txt}`,
+    ...buildChoices(r, String(deg), [...new Set(w.map(String))].filter((x) => x !== String(deg)), (i) => String(deg + i + 2)),
+    fr: { fields: [{ kind: 'number', label: 'Degree:' }], key: [String(deg)], display: String(deg), check: (v) => numOk(v[0], deg) },
+    solution: nv ? `Add the exponents of the variables: ${ex.map(([v, e]) => `${e} (${v})`).join(' + ')} = ${deg}. The degree is ${deg}.` : `A nonzero constant has no variable, so its degree is 0.` };
+};
+const A7KIND = ['monomial', 'binomial', 'trinomial', 'polynomial with 4 terms'];
+// #9–16: standard form, degree, leading coefficient, classify by number of terms
+TEMPLATES.a71Classify = (r) => {
+  const v = a7V(r), nt = pick(r, [1, 2, 2, 3, 3, 3]), n = ri(r, Math.max(nt - 1, 1), 8);
+  const co = b4rand(r, n, nt, 9), T = b4terms(co); if (T.length !== nt) return TEMPLATES.a71Classify(r);
+  const shown = nt > 1 ? shuffle(r, T) : T; if (nt > 1 && shown.every((t, i) => t[1] === T[i][1])) shown.reverse();
+  const kind = A7KIND[nt - 1], lead = co[0];
+  const T2 = (s, d, l, k) => `${s}; degree ${d}; leading coefficient ${fracT(l)}; ${k}`, correct = T2(b4T(co, v), n, lead, kind);
+  const wrong = [T2(b4T(co, v), n, shown[0][0], kind), T2(b4T(co, v), shown[0][1], lead, kind), T2(b4T(co, v), n, lead, A7KIND[(nt) % 3]), T2(b4TT(shown, v), n, lead, kind)];
+  return { topic: 'Classifying polynomials', stem: `Write the polynomial in standard form. Identify the degree and leading coefficient. Then classify it by the number of terms.   ${b4TT(shown, v)}`,
+    ...buildChoices(r, correct, [...new Set(wrong)].filter((x) => x !== correct), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'poly', label: 'Standard form:' }, { kind: 'number', label: 'Degree:' }, { kind: 'expr', keys: 'num', label: 'Leading coefficient:' }, { kind: 'select', label: 'It is a', options: A7KIND }],
+      key: [b4L(co, v), String(n), fracL(lead), kind], display: correct,
+      check: (x) => b4StdOk(x[0], co, v) && numOk(x[1], n) && numOk(x[2], lead) && x[3] === kind,
+      score: (x) => ((b4StdOk(x[0], co, v) ? 1 : 0) + (numOk(x[1], n) ? 1 : 0) + (numOk(x[2], lead) ? 1 : 0) + (x[3] === kind ? 1 : 0)) / 4 },
+    solution: `Standard form lists the terms from the greatest exponent to the least: ${b4T(co, v)}.\nThe greatest exponent is ${n}, so the degree is ${n}; the leading coefficient is ${fracT(lead)}.\nIt has ${nt} term${nt > 1 ? 's' : ''}, so it is a ${kind}.` };
+};
+// #19–26: sums;  #27–34: differences
+TEMPLATES.a71Sum = (r) => a7sumQ(r, false);
+TEMPLATES.a71Diff = (r) => a7sumQ(r, true);
+// #39–42: two variables
+TEMPLATES.a71TwoVar = (r) => {
+  const [u, w] = a7VP(r), sub = r() < 0.5, mk = () => a7norm2([[pick(r, [1, 1, 2, -1, 3, -4]), 2, 0], [nz(r, -9, 9), 1, 1], [r() < 0.8 ? nz(r, -8, 8) : 0, 0, 2]].filter(([c]) => c));
+  const P = mk(), Q = mk(), res = a7norm2([...P, ...(sub ? a7neg2(Q) : Q)]); if (!res.length) return TEMPLATES.a71TwoVar(r);
+  return a7polyQ2(r, { stem: `Find the ${sub ? 'difference' : 'sum'}.   (${a7PT2(P, u, w)}) ${sub ? MINUS : '+'} (${a7PT2(Q, u, w)})`, res, u, w, topic: sub ? 'Subtracting polynomials' : 'Adding polynomials',
+    wrong: [[...P, ...(sub ? Q : a7neg2(Q))], [...P, ...Q.map(([c, i, j], k) => (k ? [c, i, j] : [sub ? c : -c, i, j]))], res.map(([c, i, j], k) => (k === 1 ? [-c, i, j] : [c, i, j]))],
+    solution: `Like terms have the same variables raised to the same powers (${u}², ${u}${w}, ${w}²).${sub ? ' Subtracting changes the sign of every term in the second polynomial.' : ''}\n${a7PT2(res, u, w)}` });
+};
+// #37–38, 43: word problems
+TEMPLATES.a71Word = (r) => {
+  const kind = pick(r, ['cost', 'members', 'rocket']);
+  if (kind === 'rocket') {
+    const h0 = ri(r, 3, 12), v1 = pick(r, [50, 55, 60, 65, 70]), v2 = v1 - pick(r, [5, 10, 15]), res = [v1 - v2, h0];
+    return b4polyQ(r, { stem: `A water rocket is launched from a height of ${h0} feet with an initial velocity of ${v1} feet per second. At the same time, a second rocket is launched from the ground at ${v2} feet per second. Their heights (in feet) after t seconds are −16t² + ${v1}t + ${h0} and −16t² + ${v2}t. Write a polynomial for the distance between the rockets after t seconds.`, res, v: 't', topic: 'Polynomial word problems',
+      wrong: [[-32, v1 + v2, h0], [v1 - v2, -h0], [v1 + v2, h0]], solution: `Subtract the heights: (−16t² + ${v1}t + ${h0}) − (−16t² + ${v2}t) = ${b4T(res, 't')}.` });
+  }
+  if (kind === 'members') {
+    const a = ri(r, 100, 180), b = ri(r, 8, 15), c = ri(r, 40, 70), d = ri(r, 3, 7), res = [b + d, a + c];
+    return b4polyQ(r, { stem: `The number of individual memberships at a fitness center in m months is ${a} + ${b}m. The number of family memberships is ${c} + ${d}m. Write a polynomial for the total number of memberships.`, res, v: 'm', topic: 'Polynomial word problems',
+      wrong: [[b - d, a - c], [b + d, a - c], [b * d, a + c]], solution: `Add: (${a} + ${b}m) + (${c} + ${d}m) = ${b4T(res, 'm')}.` });
+  }
+  const a = ri(r, 2, 6), b = ri(r, 3, 6), c = b + ri(r, 2, 5), d = ri(r, 4, 9), res = [c - b, d - a];
+  return b4polyQ(r, { stem: `The cost (in dollars) of making b bracelets is ${a} + ${b}b. The cost (in dollars) of making b necklaces is ${c}b + ${d}. Write a polynomial for how much more it costs to make b necklaces than b bracelets.`, res, v: 'b', topic: 'Polynomial word problems',
+    wrong: [[b - c, a - d], [c + b, d + a], [c - b, d + a]], solution: `Subtract the bracelet cost from the necklace cost: (${c}b + ${d}) − (${a} + ${b}b) = ${b4T(res, 'b')}.` });
+};
+
+// ---------- 7.2 Multiplying Polynomials ----------
+// #1–4: monomial times polynomial
+TEMPLATES.a72Mono = (r) => {
+  const v = a7V(r), m = ri(r, 1, 4), A = [nz(r, -9, 9), ...Array(m).fill(0)], B = b4rand(r, ri(r, 1, 4), 3, 12), res = pMul(A, B);
+  const right = r() < 0.3;
+  return b4polyQ(r, { stem: `Find the product.   ${right ? `(${b4T(B, v)})(${b4T(A, v)})` : `${b4T(A, v)}(${b4T(B, v)})`}`, res, v, topic: 'Multiplying a monomial and a polynomial',
+    wrong: [b4flipOne(r, res), pMul([A[0], ...Array(m - 1).fill(0)], B), res.map((c, i) => (i === res.length - 1 ? c / (A[0] || 1) * 1 : c))],
+    solution: `Distribute ${b4T(A, v)} to each term, multiplying coefficients and adding exponents.\n${b4T(res, v)}` });
+};
+// #5–24: binomial times binomial (Distributive Property, table, FOIL)
+TEMPLATES.a72Binom = (r) => {
+  const v = a7V(r), A = a7lin(r, { frac: 0.2 }), B = a7lin(r, { frac: A[0] === 1 && !Number.isInteger(A[1]) ? 0.6 : 0.1 }), res = pMul(A, B);
+  const sw = r() < 0.2 && Number.isInteger(A[1]) && A[1] > 0, sh = (k) => (sw && k === A ? `(${fmt(k[1])} ${k[0] < 0 ? MINUS : '+'} ${Math.abs(k[0]) === 1 ? '' : Math.abs(k[0])}${v})` : a7B(k, v));
+  return b4polyQ(r, { stem: `Find the product.   ${sh(A)}${a7B(B, v)}`, res, v, topic: 'Multiplying binomials',
+    wrong: [[A[0] * B[0], 0, A[1] * B[1]], [A[0] * B[0], A[0] * B[1] - A[1] * B[0], A[1] * B[1]], b4flipOne(r, res), [A[0] * B[0], res[1], -A[1] * B[1]]],
+    solution: `FOIL: First ${b4T([A[0] * B[0], 0, 0], v)}, Outer ${b4T([A[0] * B[1], 0], v)}, Inner ${b4T([A[1] * B[0], 0], v)}, Last ${fracT(A[1] * B[1])}.\nCombine like terms: ${b4T(res, v)}` });
+};
+// #31–38: binomial times trinomial
+TEMPLATES.a72Trinom = (r) => {
+  const v = a7V(r), A = [pick(r, [1, 1, 2, 3, -1]), nz(r, -6, 6)], B = b4rand(r, 2, 3, 9), res = pMul(A, B), sw = r() < 0.4;
+  return b4polyQ(r, { stem: `Find the product.   ${sw ? `(${b4T(B, v)})(${b4T(A, v)})` : `(${b4T(A, v)})(${b4T(B, v)})`}`, res, v, topic: 'Multiplying a binomial and a trinomial',
+    wrong: [b4flipOne(r, res), b4add(pMul([A[0], 0], B), [A[1] * B[2]]), b4flipOne(r, res)],
+    solution: `Distribute each term of (${b4T(A, v)}) to each term of (${b4T(B, v)}):\n${b4T(pMul([A[0], 0], B), v)} and ${b4T(pMul([A[1]], B), v)}\nCombine like terms: ${b4T(res, v)}` });
+};
+// #27–30: area of a figure
+TEMPLATES.a72Area = (r) => {
+  const v = pick(r, ['x', 'x', 'p', 'n']), tri = r() < 0.35, A = [1, nz(r, -3, 7)];
+  const B = tri ? [2, 2 * nz(r, -5, 5)] : [pick(r, [1, 2, 3]), nz(r, -9, 9)];
+  const res = tri ? pMul(A, B).map((c) => c / 2) : pMul(A, B);
+  if ([A, B].some((k) => k[0] * 4 + k[1] <= 0)) return TEMPLATES.a72Area(r);
+  return b4polyQ(r, { stem: tri ? `A right triangle has legs of length (${b4T(A, v)}) and (${b4T(B, v)}). Write a polynomial that represents its area.` : `A rectangle has length (${b4T(B, v)}) and width (${b4T(A, v)}). Write a polynomial that represents its area.`, res, v, topic: 'Area polynomials',
+    wrong: tri ? [pMul(A, B), b4add(A, B).map((c) => c), b4flipOne(r, res)] : [b4add(A, B).map((c) => 2 * c), [A[0] * B[0], 0, A[1] * B[1]], b4flipOne(r, res)],
+    solution: tri ? `Area = ½ · base · height = ½(${b4T(A, v)})(${b4T(B, v)}) = ½(${b4T(pMul(A, B), v)}) = ${b4T(res, v)}` : `Area = length · width = (${b4T(B, v)})(${b4T(A, v)}) = ${b4T(res, v)}` });
+};
+// #45–54: (f + g)(x), (f − g)(x), (fg)(x)
+TEMPLATES.a72FuncOps = (r) => {
+  const op = pick(r, ['+', '−', '·', '·']);
+  const f = op === '·' ? (r() < 0.6 ? [1, nz(r, -5, 5)] : [pick(r, [2, 0.5]), nz(r, -4, 4)]) : b4rand(r, 2, ri(r, 2, 3), 6);
+  const g = op === '·' ? (r() < 0.5 ? b4rand(r, 2, ri(r, 2, 3), 6) : [pick(r, [1, 2]), nz(r, -5, 5)]) : b4rand(r, ri(r, 1, 2), ri(r, 2, 3), 6);
+  const res = op === '+' ? b4add(f, g) : op === '−' ? b4add(f, b4neg(g)) : pMul(f, g);
+  const name = op === '+' ? '(f + g)(x)' : op === '−' ? '(f − g)(x)' : '(fg)(x)';
+  return b4polyQ(r, { stem: `Let f(x) = ${b4T(f)} and g(x) = ${b4T(g)}. Find ${name}.`, res, v: 'x', topic: 'Operations with functions',
+    wrong: op === '·' ? [[f[0] * g[0], ...Array(g.length - 1).fill(0), f[f.length - 1] * g[g.length - 1]].slice(0, Math.max(f.length + g.length - 1, 2)), b4add(f, g), b4flipOne(r, res)] : [op === '+' ? b4add(f, b4neg(g)) : b4add(f, g), b4flipOne(r, res), b4flipOne(r, res)],
+    solution: `${name} = ${op === '·' ? `f(x) · g(x) = (${b4T(f)})(${b4T(g)})` : `f(x) ${op} g(x) = (${b4T(f)}) ${op} (${b4T(g)})`} = ${b4T(res)}` });
+};
+// #44: find a, b, c
+TEMPLATES.a72Struct = (r) => {
+  const A = [pick(r, [2, 3, 4, 5]), nz(r, -5, 5)], B = [pick(r, [1, 2, 3]), nz(r, -6, 6)], [a, b, c] = pMul(A, B);
+  const T = (x, y, z) => `a = ${fmt(x)}, b = ${fmt(y)}, c = ${fmt(z)}`, correct = T(a, b, c);
+  return { topic: 'Multiplying binomials', stem: `Find the values of a, b, and c that make the equation true.   (${b4T(A)})(${b4T(B)}) = ax² + bx + c`,
+    ...buildChoices(r, correct, [...new Set([T(a, A[0] + B[0], c), T(a, b, -c), T(a, -b, c), T(a, A[0] * B[1] - A[1] * B[0], c)])].filter((x) => x !== correct), (i) => T(a, b + i + 1, c)),
+    fr: { fields: [{ kind: 'number', label: 'a =' }, { kind: 'number', label: 'b =' }, { kind: 'number', label: 'c =' }], key: [String(a), String(b), String(c)], display: correct,
+      check: (v) => numOk(v[0], a) && numOk(v[1], b) && numOk(v[2], c), score: (v) => ((numOk(v[0], a) ? 1 : 0) + (numOk(v[1], b) ? 1 : 0) + (numOk(v[2], c) ? 1 : 0)) / 3 },
+    solution: `Multiply: (${b4T(A)})(${b4T(B)}) = ${b4T([a, b, c])}.\nSo ${correct}.` };
+};
+
+// ---------- 7.3 Special Products of Polynomials ----------
+// #1–8 (and #9–12 as areas): square of a binomial
+function a73sq(r, area) {
+  if (!area && r() < 0.25) { // two variables: (2a + b)², (6x − 3y)²
+    const [u, w] = a7VP(r), a = pick(r, [1, 2, 3, 4, 5, 6]), b = nz(r, -4, 4), P = [[a, 1, 0], [b, 0, 1]], res = a7mul2(P, P);
+    return a7polyQ2(r, { stem: `Find the product.   (${a7PT2(P, u, w)})²`, res, u, w, topic: 'Square of a binomial', wrong: [[[a * a, 2, 0], [b * b, 0, 2]], [[a * a, 2, 0], [a * b, 1, 1], [b * b, 0, 2]], [[a * a, 2, 0], [-2 * a * b, 1, 1], [b * b, 0, 2]]],
+      solution: `Use (a + b)² = a² + 2ab + b²: (${a7MT2(a, 1, 0, u, w)})² ${b < 0 ? MINUS : '+'} 2(${a7MT2(a, 1, 0, u, w)})(${a7MT2(Math.abs(b), 0, 1, u, w)}) + (${a7MT2(Math.abs(b), 0, 1, u, w)})²\n= ${a7PT2(res, u, w)}` });
+  }
+  const v = area ? pick(r, ['x', 'n', 'c', 'p']) : a7V(r), A = [pick(r, [1, 1, 2, 3, 4, 5, 6, 7, -7]), nz(r, -12, 12)], res = pMul(A, A);
+  const neg = !area && A[0] < 0 && A[1] < 0 ? '' : '';
+  const shownA = A[0] < 0 && r() < 0.5 ? `(${fmt(A[1])} ${MINUS} ${Math.abs(A[0]) === 1 ? '' : Math.abs(A[0])}${v})` : a7B(A, v);
+  return b4polyQ(r, { stem: area ? `A square has side length (${b4T(A, v)}). Write a polynomial that represents its area.` : `Find the product.   ${shownA}²${neg}`, res, v, topic: area ? 'Area polynomials' : 'Square of a binomial',
+    wrong: [[A[0] * A[0], 0, A[1] * A[1]], [A[0] * A[0], A[0] * A[1], A[1] * A[1]], [A[0] * A[0], -2 * A[0] * A[1], A[1] * A[1]], area ? [4 * A[0], 4 * A[1]] : b4flipOne(r, res)],
+    solution: `Use (a ${A[0] * A[1] < 0 ? '−' : '+'} b)² = a² ${A[0] * A[1] < 0 ? '−' : '+'} 2ab + b² with a = ${b4T([A[0], 0], v)}, b = ${Math.abs(A[1])}:\n(${b4T([A[0], 0], v)})² ${A[0] * A[1] < 0 ? MINUS : '+'} 2(${b4T([Math.abs(A[0]), 0], v)})(${Math.abs(A[1])}) + ${Math.abs(A[1])}² = ${b4T(res, v)}` });
+}
+TEMPLATES.a73Square = (r) => a73sq(r, false);
+TEMPLATES.a73Area = (r) => a73sq(r, true);
+// #13–22: sum and difference pattern
+TEMPLATES.a73SumDiff = (r) => {
+  const kind = pick(r, ['int', 'int', 'int', 'frac', 'dec', 'two', 'two']);
+  if (kind === 'two') {
+    const [u, w] = a7VP(r), a = pick(r, [1, 1, 2, 5, 7, -1, -5]), b = pick(r, [2, 3, 4, 8, 10]), P = [[a, 1, 0], [b, 0, 1]], Q = [[a, 1, 0], [-b, 0, 1]], res = a7mul2(P, Q);
+    return a7polyQ2(r, { stem: `Find the product.   ${r() < 0.5 ? `(${a7PT2(P, u, w)})(${a7PT2(Q, u, w)})` : `(${a7PT2(Q, u, w)})(${a7PT2(P, u, w)})`}`, res, u, w, topic: 'Sum and difference pattern',
+      wrong: [[[a * a, 2, 0], [b * b, 0, 2]], [[a * a, 2, 0], [-2 * a * b, 1, 1], [-b * b, 0, 2]], [[a, 2, 0], [-b, 0, 2]]], solution: `Use (a + b)(a − b) = a² − b²: (${a7MT2(a, 1, 0, u, w)})² − (${a7MT2(b, 0, 1, u, w)})² = ${a7PT2(res, u, w)}` });
+  }
+  const v = a7V(r);
+  let a, b; if (kind === 'frac') { a = -1; b = pick(r, [0.5, 1 / 3, 0.25]); } else if (kind === 'dec') { a = pick(r, [3, 2, 4]); b = pick(r, [2.5, 1.5, 0.5]); } else { a = pick(r, [1, 1, 1, 2, 4, 3, 5]); b = ri(r, 1, 12); }
+  const P = kind === 'int' ? [a, b] : [a, b], Q = kind === 'int' ? [a, -b] : [-a, b], res = pMul(P, Q);
+  const T = (k) => (kind === 'int' ? a7B(k, v) : `(${kind === 'dec' ? fmt(k[1]) : fracT(k[1])} ${k[0] < 0 ? MINUS : '+'} ${Math.abs(k[0]) === 1 ? '' : Math.abs(k[0])}${v})`);
+  const sw = r() < 0.5;
+  return b4polyQ(r, { stem: `Find the product.   ${sw ? T(P) + T(Q) : T(Q) + T(P)}`, res, v, topic: 'Sum and difference pattern',
+    wrong: [res.map((c, i) => (i === 2 ? -c : c)), [res[0], 2 * a * b, res[2]], [res[0], 0, Math.abs(res[2])].map((c) => c)],
+    solution: `Use (a + b)(a − b) = a² − b² with a = ${kind === 'int' ? b4T([a, 0], v) : fracT(b)} and b = ${kind === 'int' ? fracT(b) : b4T([Math.abs(a), 0], v)}:\n${b4T(res, v)}` });
+};
+// #23–28: mental math with the patterns
+TEMPLATES.a73Mental = (r) => {
+  const kind = pick(r, ['dos', 'dos', 'sq', 'sqm', 'half', 'third']);
+  let stem, ans, why;
+  if (kind === 'dos') { const m = pick(r, [20, 30, 40, 50, 60]), d = ri(r, 1, 6); stem = `${m - d} · ${m + d}`; ans = m * m - d * d; why = `(${m} − ${d})(${m} + ${d}) = ${m}² − ${d}² = ${m * m} − ${d * d} = ${ans}`; }
+  else if (kind === 'sq') { const m = pick(r, [20, 30, 40, 50, 60, 70]), d = ri(r, 1, 3); stem = `${m + d}²`; ans = (m + d) ** 2; why = `(${m} + ${d})² = ${m}² + 2(${m})(${d}) + ${d}² = ${m * m} + ${2 * m * d} + ${d * d} = ${ans}`; }
+  else if (kind === 'sqm') { const m = pick(r, [30, 40, 50, 60, 80]), d = ri(r, 1, 2); stem = `${m - d}²`; ans = (m - d) ** 2; why = `(${m} − ${d})² = ${m}² − 2(${m})(${d}) + ${d}² = ${m * m} − ${2 * m * d} + ${d * d} = ${ans}`; }
+  else if (kind === 'half') { const m = pick(r, [20, 30, 40, 60]); stem = `${m}.5²`; ans = (m + 0.5) ** 2; why = `(${m} + 0.5)² = ${m}² + 2(${m})(0.5) + 0.5² = ${m * m} + ${m} + 0.25 = ${fmt(ans)}`; }
+  else { const m = pick(r, [10, 20, 30]); stem = `${m}⅓ · ${m - 1}⅔`; ans = m * m - 1 / 9; why = `(${m} + ⅓)(${m} − ⅓) = ${m}² − (⅓)² = ${m * m} − 1/9 = ${fracT(ans)}`; }
+  const correct = kind === 'half' ? fmt(ans) : fracT(ans);
+  return { topic: 'Special products with numbers', stem: `Use special product patterns to find the product.   ${stem}`,
+    ...buildChoices(r, correct, [...new Set([fracT(ans + 2), fracT(ans - 1), fracT(ans + 100), fracT(Math.round(ans) - 10)])].filter((x) => x !== correct), (i) => fracT(ans + 3 + i)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: '' }], key: [kind === 'half' ? String(ans) : fracL(ans)], display: correct, check: (v) => numOk(v[0], ans, 1e-9) }, solution: why };
+};
+
+// ---------- 7.4 Solving Polynomial Equations in Factored Form ----------
+const a7rootsQ = (r, { v, roots, eq, topic, wrongs = [], solution, label }) => {
+  const R = [...new Set(roots.map((x) => Math.round(x * 1e9) / 1e9))].sort((a, b) => a - b);
+  const text = R.map(fracT).join(', '), latex = R.map(fracL).join(',');
+  return { topic, stem: `Solve the equation.   ${eq}`, ...b3Sol(r, { v, zeros: R.map((x) => ({ v: [x, 0] })), text, latex, wrongs: wrongs.map((W) => `${v} = ${[...new Set(W)].sort((a, b) => a - b).map(fracT).join(', ')}`), label }), solution };
+};
+// #1–10: two linear factors
+TEMPLATES.a74Solve = (r) => {
+  const v = a7V(r), kind = pick(r, ['mono', 'mono', 'two', 'two', 'two']);
+  if (kind === 'mono') { const c = pick(r, [1, 1, 12, -2, 3, 5]), b = nz(r, -10, 10), k = pick(r, [1, 1, 1, 2]); const eq = `${c === 1 ? '' : c === -1 ? MINUS : fmt(c)}${v}(${b4T([k, b], v)}) = 0`;
+    return a7rootsQ(r, { v, roots: [0, -b / k], eq, topic: 'Zero-Product Property', wrongs: [[-b / k], [0, b / k]], solution: `By the Zero-Product Property, ${v} = 0 or ${b4T([k, b], v)} = 0.\nThe roots are ${v} = 0 and ${v} = ${fracT(-b / k)}.` }); }
+  const A = [pick(r, [1, 1, 2, 3, 4, -2]), nz(r, -9, 9)], B = [pick(r, [1, 1, 3, 5, -1]), nz(r, -15, 15)], c = r() < 0.15 ? pick(r, [2, 3]) : 1;
+  const rev = (k) => (r() < 0.3 && k[1] > 0 ? `(${fmt(k[1])} ${k[0] < 0 ? '+' : MINUS} ${Math.abs(k[0]) === 1 ? '' : Math.abs(k[0])}${v})` : a7B(k, v));
+  const shA = rev(A), A2 = shA.startsWith(`(${fmt(A[1])}`) ? [-A[0], A[1]] : A, shB = a7B(B, v);
+  const r1 = -A2[1] / A2[0], r2 = -B[1] / B[0];
+  return a7rootsQ(r, { v, roots: [r1, r2], eq: `${c > 1 ? c : ''}${shA}${shB} = 0`, topic: 'Zero-Product Property', wrongs: [[-r1, -r2], [r1, -r2], [A2[1], B[1]]],
+    solution: `Set each factor equal to 0:\n${b4T(A2, v)} = 0 → ${v} = ${fracT(r1)};  ${b4T(B, v)} = 0 → ${v} = ${fracT(r2)}` });
+};
+// #11–18: repeated factors and three factors
+TEMPLATES.a74Repeat = (r) => {
+  const v = a7V(r), kind = pick(r, ['sq', 'sq', 'three', 'three', 'sqlin']);
+  if (kind === 'sq') { const A = [pick(r, [1, 1, 5, 2]), nz(r, -8, 8)], rt = -A[1] / A[0];
+    return a7rootsQ(r, { v, roots: [rt], eq: r() < 0.5 ? `${a7B(A, v)}² = 0` : `${a7B(A, v)}${a7B(A, v)} = 0`, topic: 'Repeated roots', wrongs: [[rt, -rt], [-rt]], solution: `Both factors are the same: ${b4T(A, v)} = 0, so ${v} = ${fracT(rt)} (a repeated root).` }); }
+  if (kind === 'sqlin') { const A = [1, nz(r, -6, 6)], B = [1, nz(r, -9, 9)]; if (A[1] === B[1]) return TEMPLATES.a74Repeat(r);
+    return a7rootsQ(r, { v, roots: [-A[1], -B[1]], eq: `${a7B(A, v)}²${a7B(B, v)} = 0`, topic: 'Repeated roots', wrongs: [[A[1], B[1]], [-A[1]]], solution: `Set each distinct factor equal to 0: ${v} = ${fmt(-A[1])} (repeated) and ${v} = ${fmt(-B[1])}.` }); }
+  const c = pick(r, [1, 1, 5, -3]), mono = r() < 0.5, A = [pick(r, [1, 1, 2, 5]), nz(r, -6, 6)], B = [pick(r, [1, 1, 3, -1]), nz(r, -7, 7)];
+  const roots = [mono ? 0 : -A[1] / A[0], -B[1] / B[0], mono ? -A[1] / A[0] : 0].filter((x, i) => mono || i < 2);
+  const C = [1, nz(r, -5, 5)], roots3 = mono ? roots : [...roots, -C[1]];
+  const eq = mono ? `${c === 1 ? '' : c === -1 ? MINUS : fmt(c)}${v}${a7B(A, v)}${a7B(B, v)} = 0` : `${a7B(A, v)}${a7B(B, v)}${a7B(C, v)} = 0`;
+  return a7rootsQ(r, { v, roots: roots3, eq, topic: 'Zero-Product Property', wrongs: [roots3.map((x) => -x), roots3.slice(1)], solution: `Set each factor equal to 0. The roots are ${v} = ${[...new Set(roots3)].sort((a, b) => a - b).map(fracT).join(', ')}.` });
+};
+// #19–20: x-intercepts of y = a(x − p)(x − q)
+TEMPLATES.a74Intercepts = (r) => {
+  const p = nz(r, -10, 10), q = nz(r, -10, 16), a = pick(r, [1, 1, -1]); if (p === q) return TEMPLATES.a74Intercepts(r);
+  const f = (t) => (t > 0 ? `(x ${MINUS} ${t})` : `(x + ${-t})`), R = [p, q].sort((x, y) => x - y);
+  const correct = `${R[0]} and ${R[1]}`.replace(/-/g, MINUS), w = [`${-R[1]} and ${-R[0]}`, `${R[0]} and ${-R[1]}`, `0 and ${R[1]}`].map((s) => s.replace(/-/g, MINUS));
+  return { topic: 'x-intercepts from factored form', stem: `Find the x-intercepts of the graph of the function.   y = ${a < 0 ? MINUS : ''}${f(p)}${f(q)}`,
+    ...buildChoices(r, correct, [...new Set(w)].filter((x) => x !== correct), (i) => `${R[0] - i - 1} and ${R[1]}`.replace(/-/g, MINUS)),
+    frStem: `Find the x-intercepts of the graph of the function. Separate them with a comma.   y = ${a < 0 ? MINUS : ''}${f(p)}${f(q)}`,
+    fr: { fields: [{ kind: 'expr', keys: 'words', label: 'x =' }], key: [R.join(',')], display: correct, check: (v) => realListOk(v[0], R) },
+    solution: `The x-intercepts are where y = 0. Set each factor equal to 0: x = ${fmt(p)} or x = ${fmt(q)}.` };
+};
+// #21–26: factor out the GCF
+TEMPLATES.a74Factor = (r) => {
+  const v = a7V(r), g = pick(r, [1, 2, 3, 4, 5, 6]), m = ri(r, 1, 5), n = m + ri(r, 1, 3);
+  let a = nz(r, -9, 9), b = nz(r, -9, 9); if (gcd(Math.abs(a), Math.abs(b)) !== 1 || (g === 1 && m === 0)) return TEMPLATES.a74Factor(r);
+  a = Math.abs(a);
+  const T = [[g * a, n], [g * b, m]], shown = r() < 0.3 ? [T[1], T[0]] : T;
+  const facs = [...Array(m).fill([1, 0]), [a, ...Array(n - m - 1).fill(0), b]];
+  // the leftover factor a·v^(n−m) + b is linear only when n − m = 1; otherwise check the product numerically
+  if (n - m === 1) return b3FactQ(r, { c: g, facs: [...Array(m).fill([1, 0]), [a, b]], vars: [v], poly: b4TT(shown, v), topic: 'Factoring out the GCF',
+    solution: `The GCF of ${b4TT(shown, v)} is ${b4T([g, ...Array(m).fill(0)], v)}.\n${b4TT(shown, v)} = ${b4T([g, ...Array(m).fill(0)], v)}(${b4T([a, b], v)})` });
+  const gT = b4T([g, ...Array(m).fill(0)], v), inner = [a, ...Array(n - m - 1).fill(0), b], correct = `${gT}(${b4T(inner, v)})`;
+  const ok = (raw) => { const s = String(raw || '').replace(/\\left|\\right/g, ''); if (!pxEquiv(s, (x) => g * a * x ** n + g * b * x ** m, { v, lo: -2, hi: 2 })) return false; const t = (pxPlain(s) || '').replace(/\s+/g, ''); let d = 0, at = -1; for (let i = 0; i < t.length; i++) { if (t[i] === '(') { if (!d && t[i - 1] !== '^') at = i; d++; } else if (t[i] === ')') d--; } if (at < 0 || !t.endsWith(')')) return false; const lead = t.slice(0, at); const f = pxParse(lead || '1', [v]); if (!f) return false; return Math.abs(f({ [v]: 1.7, x: 1.7 }) - g * 1.7 ** m) < 1e-9 && /\(/.test(t); };
+  const wrong = [`${b4T([g, ...Array(m - 1 >= 0 ? m - 1 : 0).fill(0)], v)}(${b4T([a, ...Array(n - m).fill(0), b], v)})`, `${b4T([g, ...Array(m).fill(0)], v)}(${b4T([a, ...Array(n - m - 1).fill(0), -b], v)})`, `${b4T([1, ...Array(m).fill(0)], v)}(${b4T([g * a, ...Array(n - m - 1).fill(0), g * b], v)})`];
+  return { topic: 'Factoring out the GCF', stem: `Factor the polynomial.   ${b4TT(shown, v)}`, ...buildChoices(r, correct, [...new Set(wrong)].filter((x) => x !== correct && !ok(x)), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'fact', label: '' }], key: [`${b4L([g, ...Array(m).fill(0)], v)}\\left(${b4L(inner, v)}\\right)`], display: correct, check: (x) => ok(x[0]) },
+    solution: `The GCF is ${gT} (the greatest common factor of ${g * Math.abs(a)} and ${g * Math.abs(b)}, and the lowest power of ${v}).\n${b4TT(shown, v)} = ${correct}` };
+};
+// #27–32: solve by factoring out the GCF
+TEMPLATES.a74SolveGCF = (r) => {
+  const v = a7V(r); let a = nz(r, -9, 12), b = nz(r, -40, 40); if (b % a === 0 && r() < 0.3) b += 1; if (!b) return TEMPLATES.a74SolveGCF(r);
+  const form = pick(r, [0, 0, 1, 2]), co = [a, b, 0];
+  const eq = form === 0 ? `${b4T(co, v)} = 0` : form === 1 ? `${b4T([a, 0, 0], v)} = ${b4T([-b, 0], v)}` : `${b4T([b, 0], v)} = ${b4T([-a, 0, 0], v)}`;
+  const rt = -b / a;
+  return a7rootsQ(r, { v, roots: [0, rt], eq, topic: 'Solving by factoring', wrongs: [[rt], [0, -rt], [0, a / b]],
+    solution: `${form ? `Move every term to one side: ${b4T(co, v)} = 0.\n` : ''}Factor out ${v}: ${v}(${b4T([a, b], v)}) = 0.\nSo ${v} = 0 or ${b4T([a, b], v)} = 0 → ${v} = ${fracT(rt)}.` });
+};
+// #35–36: width of a tunnel or arch at ground level
+TEMPLATES.a74Word = (r) => {
+  const arch = r() < 0.4;
+  if (arch) { const c = pick(r, [100, 150, 200, 300]); // y = −(1/m)(x + c)(x − c)
+    const m = pick(r, [50, 75, 100, 125]), H = (c * c) / m, W = 2 * c;
+    const correct = `${W} feet wide and ${fracT(H)} feet tall`;
+    return { topic: 'Factored form word problems', stem: `An arch can be modeled by y = −(1/${m})(x + ${c})(x − ${c}), where x and y are measured in feet and the x-axis is the ground. Find the width of the arch at ground level and its height.`,
+      ...buildChoices(r, correct, [`${c} feet wide and ${fracT(H)} feet tall`, `${W} feet wide and ${fracT(H / 2)} feet tall`, `${W} feet wide and ${m} feet tall`].filter((x) => x !== correct), () => null),
+      fr: { fields: [{ kind: 'number', label: 'Width (ft):' }, { kind: 'expr', keys: 'num', label: 'Height (ft):' }], key: [String(W), fracL(H)], display: correct, check: (v) => numOk(v[0], W) && numOk(v[1], H), score: (v) => ((numOk(v[0], W) ? 1 : 0) + (numOk(v[1], H) ? 1 : 0)) / 2 },
+      solution: `The arch meets the ground where y = 0: x = −${c} and x = ${c}. Width = ${c} − (−${c}) = ${W} feet.\nThe tallest point is halfway between, at x = 0: y = −(1/${m})(${c})(−${c}) = ${fracT(H)} feet.` };
+  }
+  const p = ri(r, 2, 8), q = p + pick(r, [12, 16, 20, 24]), k = pick(r, [11, 9, 7]), m = pick(r, [50, 40, 30]);
+  return { topic: 'Factored form word problems', stem: `The entrance of a tunnel can be modeled by y = −(${k}/${m})(x − ${p})(x − ${q}), where x and y are measured in feet and the x-axis is the ground. Find the width of the tunnel at ground level.`,
+    ...buildChoices(r, `${q - p} feet`, [`${q + p} feet`, `${q} feet`, `${(q - p) / 2} feet`], () => null),
+    fr: { fields: [{ kind: 'number', label: 'Width (ft):' }], key: [String(q - p)], display: `${q - p} feet`, check: (v) => numOk(v[0], q - p) },
+    solution: `The tunnel meets the ground where y = 0: x = ${p} and x = ${q}. The width is ${q} − ${p} = ${q - p} feet.` };
+};
+
+// ---------- 7.5 Factoring x² + bx + c ----------
+function a75gen(r, kind) { // (x + p)(x + q)
+  for (;;) {
+    let p, q;
+    if (kind === 'pos') { p = ri(r, 1, 10); q = ri(r, 1, 12); }
+    else if (kind === 'negb') { p = -ri(r, 1, 10); q = -ri(r, 1, 12); }
+    else { p = ri(r, 1, 12); q = -ri(r, 1, 12); if (p === -q) continue; }
+    if (Math.abs(p * q) > 120) continue;
+    return { p, q, co: [1, p + q, p * q] };
+  }
+}
+const a75Q = (r, kind) => {
+  const v = a7V(r), { p, q, co } = a75gen(r, kind), shuffled = kind === 'negc' && r() < 0.25;
+  const poly = shuffled ? b4TT(shuffle(r, b4terms(co)), v) : b4T(co, v);
+  return b3FactQ(r, { c: 1, facs: [[1, p], [1, q]], vars: [v], poly, topic: 'Factoring x² + bx + c',
+    extra: [b3FT(1, [[1, -p], [1, -q]], [v]), b3FT(1, [[1, p * q], [1, 1]], [v])],
+    solution: `Find two numbers whose product is ${fmt(p * q)} and whose sum is ${fmt(p + q)}: ${fmt(p)} and ${fmt(q)}.\n${b4T(co, v)} = ${b3FT(1, [[1, p], [1, q]], [v])}` });
+};
+TEMPLATES.a75Pos = (r) => a75Q(r, 'pos');
+TEMPLATES.a75NegB = (r) => a75Q(r, 'negb');
+TEMPLATES.a75NegC = (r) => a75Q(r, 'negc');
+// #27–36: solve by factoring
+TEMPLATES.a75Solve = (r) => {
+  const v = a7V(r), { p, q, co } = a75gen(r, pick(r, ['pos', 'negb', 'negc', 'negc'])), move = r() < 0.5;
+  let eq = `${b4T(co, v)} = 0`;
+  if (move) { const k = pick(r, [ri(r, 1, 30), -ri(r, 1, 30)]), s = pick(r, [0, 1]); eq = s ? `${b4T([1, co[1], co[2] + k], v)} = ${fmt(k)}` : `${b4T([1, 0, co[2] + k], v)} = ${b4T([-co[1], k], v)}`; }
+  return a7rootsQ(r, { v, roots: [-p, -q], eq, topic: 'Solving by factoring', wrongs: [[p, q], [-p, q], [p * q]],
+    solution: `${move ? `Write it with 0 on one side: ${b4T(co, v)} = 0.\n` : ''}Factor: ${b3FT(1, [[1, p], [1, q]], [v])} = 0.\nSo ${v} = ${fmt(-p)} or ${v} = ${fmt(-q)}.` });
+};
+// #25–26: the other side of a rectangle from its area
+TEMPLATES.a75Word = (r) => {
+  const { p, q, co } = a75gen(r, pick(r, ['negb', 'negc'])), kind = pick(r, ['projection', 'land']);
+  const known = [1, p], other = [1, q], thing = kind === 'projection' ? 'A projector displays a rectangular image on a wall. The area (in square feet) of the image' : 'A dentist’s office and parking lot are on a rectangular piece of land. The area (in square meters) of the land';
+  const ok = (raw) => { const s = String(raw || '').replace(/\\left|\\right/g, ''); return pxEquiv(s, (x) => x + q, { lo: -5, hi: 5 }) && !/[()]/.test(pxPlain(s) || '('); };
+  const correct = b4T(other);
+  return { topic: 'Factoring word problems', stem: `${thing} is represented by ${b4T(co)}. One side is (${b4T(known)}). Write a binomial that represents the other side.`,
+    ...buildChoices(r, correct, [b4T([1, -q]), b4T([1, co[1] - p]), b4T([1, co[2]])].filter((x, i, A) => x !== correct && A.indexOf(x) === i), (i) => b4T([1, q + i + 1])),
+    fr: { fields: [{ kind: 'expr', keys: 'poly', label: '' }], key: [b4L(other)], display: correct, check: (v) => ok(v[0]) },
+    solution: `Factor the area: ${b4T(co)} = (${b4T(known)})(${b4T(other)}). The other side is ${correct}.` };
+};
+for (const name of Object.keys(TEMPLATES)) if (/^a7\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== ALGEBRA 1 CH7 END ==== */
+/* ==== ALGEBRA 1 CH8 BEGIN ==== */
+/* ---------- Algebra 1 (Big Ideas Learning 2025), Chapter 8: Data Analysis and Displays ---------- */
+KEYROWS_P.stats = [['a⁄b', '\\frac{#@}{#?}'], [',', ','], ['none', '\\text{none}']];
+const a8sum = (D) => D.reduce((s, x) => s + x, 0);
+const a8mean = (D) => a8sum(D) / D.length;
+const a8sort = (D) => [...D].sort((a, b) => a - b);
+const a8med = (D) => { const S = a8sort(D), n = S.length; return n % 2 ? S[(n - 1) / 2] : (S[n / 2 - 1] + S[n / 2]) / 2; };
+const a8modes = (D) => { const c = new Map(); D.forEach((x) => c.set(x, (c.get(x) || 0) + 1)); const m = Math.max(...c.values()); return m < 2 ? [] : [...c.entries()].filter(([, k]) => k === m).map(([x]) => x).sort((a, b) => a - b); };
+const a8range = (D) => Math.max(...D) - Math.min(...D);
+// five-number summary; the quartiles are the medians of the lower and upper halves (the median itself left out when n is odd)
+const a8five = (D) => { const S = a8sort(D), n = S.length, h = Math.floor(n / 2); return [S[0], a8med(S.slice(0, h)), a8med(S), a8med(S.slice(n - h)), S[n - 1]]; };
+const a8r = (x) => Math.round(x * 100) / 100;
+const a8list = (D) => D.map((x) => fmt(x)).join(', ');
+const a8modeT = (M) => (M.length ? M.map(fmt).join(M.length > 2 ? ', ' : ' and ') : 'none');
+const a8modeOk = (raw, M) => realListOk(String(raw || '').replace(/\\text\{\s*(none|no mode)\s*\}/i, 'none').replace(/\band\b/g, ','), M);
+const a8numOk = (raw, v) => numOk(raw, v, 0.051 / Math.max(1, Math.abs(v))); // the mean may be rounded to the nearest tenth
+const a8meanT = (m) => (Number.isInteger(Math.round(a8r(m) * 1e6) / 1e5) ? fmt(a8r(m)) : `≈ ${fmt(Math.round(m * 10) / 10)}`);
+// a data set of n whole numbers between lo and hi, with or without a repeated value
+function a8data(r, n, lo, hi, { repeat = true } = {}) {
+  const D = [...Array(n)].map(() => ri(r, lo, hi));
+  if (repeat && r() < 0.6) D[ri(r, 0, n - 1)] = D[ri(r, 0, n - 1)];
+  return D;
+}
+
+// ---------- drawings ----------
+// a stem-and-leaf plot: rows [[stem, [leaves…]], …], key text
+const a8stemDraw = (rows, key, title = '', back = null) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, rh = 26, top = title ? 34 : 14, x0 = W / 2 - (back ? 20 : 70);
+  c.clearRect(0, 0, W, H); c.fillStyle = '#1d1d1b'; c.font = '600 15px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (title) c.fillText(title, W / 2, 16);
+  c.font = '600 14px system-ui, sans-serif'; c.textAlign = 'right'; c.fillText(back ? '' : 'Stem', x0 - 10, top + rh / 2); c.textAlign = 'left'; c.fillText(back ? '' : 'Leaf', x0 + 12, top + rh / 2);
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(x0 - 50, top + rh); c.lineTo(x0 + 200, top + rh); c.moveTo(x0, top + 4); c.lineTo(x0, top + rh * (rows.length + 1)); c.stroke();
+  c.font = '16px Georgia, serif';
+  rows.forEach(([s, L], i) => { const y = top + rh * (i + 1.5); c.textAlign = 'right'; c.fillText(String(s), x0 - 12, y); c.textAlign = 'left'; c.fillText(L.join('  '), x0 + 12, y); });
+  c.font = '600 14px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(key, W / 2, top + rh * (rows.length + 1) + 22);
+};
+const a8stemRows = (D) => { const S = a8sort(D), lo = Math.floor(S[0] / 10), hi = Math.floor(S[S.length - 1] / 10), rows = []; for (let s = lo; s <= hi; s++) rows.push([s, S.filter((x) => Math.floor(x / 10) === s).map((x) => x % 10)]); return rows; };
+// a number line from lo to hi with ticks every step and a label every lab
+function a8axis(c, X, y, lo, hi, step, lab, unit) {
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(X(lo) - 8, y); c.lineTo(X(hi) + 8, y); c.stroke();
+  c.font = '12px Georgia, serif'; c.fillStyle = '#1d1d1b'; c.textAlign = 'center'; c.textBaseline = 'top';
+  for (let t = lo; t <= hi + 1e-9; t += step) { const big = Math.abs(t / lab - Math.round(t / lab)) < 1e-9; c.beginPath(); c.moveTo(X(t), y - (big ? 6 : 4)); c.lineTo(X(t), y + (big ? 6 : 4)); c.stroke(); if (big) c.fillText(fmt(Math.round(t * 100) / 100), X(t), y + 9); }
+  if (unit) { c.textAlign = 'right'; c.font = 'italic 12px Georgia, serif'; c.fillText(unit, X(hi) + 8, y + 26); }
+}
+function a8boxShape(c, X, yc, F, color, fill, h = 16) {
+  c.save(); c.strokeStyle = color; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(X(F[0]), yc); c.lineTo(X(F[1]), yc); c.moveTo(X(F[3]), yc); c.lineTo(X(F[4]), yc); c.stroke();
+  c.fillStyle = fill; c.fillRect(X(F[1]), yc - h, X(F[3]) - X(F[1]), 2 * h); c.strokeRect(X(F[1]), yc - h, X(F[3]) - X(F[1]), 2 * h);
+  c.beginPath(); c.moveTo(X(F[2]), yc - h); c.lineTo(X(F[2]), yc + h); c.stroke();
+  [F[0], F[4]].forEach((v) => { c.beginPath(); c.arc(X(v), yc, 4, 0, 2 * Math.PI); c.fillStyle = color; c.fill(); });
+  c.restore();
+}
+// a box-and-whisker plot to read from (optionally labeled with its five numbers)
+const a8boxDraw = (sets, lo, hi, step, lab, unit = '', values = false) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, X = (t) => 40 + ((t - lo) / (hi - lo)) * (W - 80);
+  c.clearRect(0, 0, W, H);
+  const yAxis = H - 46, gap = (yAxis - 30) / sets.length;
+  sets.forEach(({ F, name, color = '#1f5fa8', fill = 'rgba(31,95,168,0.15)' }, i) => {
+    const yc = 30 + gap * (i + 0.5); a8boxShape(c, X, yc, F, color, fill);
+    if (name) { c.fillStyle = color; c.font = '13px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'bottom'; c.fillText(name, 6, yc - 18); }
+    if (values) { c.fillStyle = '#1d1d1b'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom'; F.forEach((v, k) => c.fillText(fmt(v), X(v), yc - (k === 2 ? 20 : 20) - (k % 2 ? 0 : 0))); }
+  });
+  a8axis(c, X, yAxis, lo, hi, step, lab, unit);
+};
+// students make a box-and-whisker plot: five points on a number line (snapped to halves)
+SKETCH.box5 = { roles: ['the least value', 'the first quartile', 'the median', 'the third quartile', 'the greatest value'], short: ['', '', '', '', ''],
+  fit: () => null,
+  match: (pts, T, win) => pts.length === 5 && a8sort(pts.map((p) => p[0])).every((x, i) => Math.abs(x - win.five[i]) < 1e-9),
+  draw: (cv, f, pts, overlay) => {
+    const W = f.win, c = cv._ctx, T = skTransform(cv, W), X = T.X, yc = T.Y(1), yAxis = T.Y(-0.6);
+    c.clearRect(0, 0, cv._w, cv._h);
+    if (overlay) a8boxShape(c, X, yc, W.five, '#7fbf7f', 'rgba(127,191,127,0.18)', 18);
+    const xs = a8sort(pts.map((p) => p[0]));
+    if (xs.length === 5) a8boxShape(c, X, yc, xs, '#1f5fa8', 'rgba(31,95,168,0.12)', 14);
+    a8axis(c, X, yAxis, W.lo, W.hi, W.step, W.lab, W.unit);
+    c.font = '12px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom';
+    pts.forEach(([x]) => { c.beginPath(); c.arc(X(x), yc, 5.5, 0, 2 * Math.PI); c.fillStyle = '#c0392b'; c.fill(); c.fillStyle = '#1d1d1b'; c.fillText(fmt(x), X(x), yc - 18); });
+  } };
+function a8boxWin(F, D) {
+  const lo0 = Math.min(...D), hi0 = Math.max(...D), span = hi0 - lo0, step = span > 30 ? 5 : span > 14 ? 2 : 1, lab = span > 30 ? 10 : span > 14 ? 4 : 2;
+  const lo = Math.floor((lo0 - step) / lab) * lab, hi = Math.ceil((hi0 + step) / lab) * lab, wspan = hi - lo, snapStep = step >= 2 ? 0.5 : 0.5;
+  return { lo, hi, step, lab, five: F, xr: [lo, hi], yr: [-0.6 - 0.1 * wspan, -0.6 + 0.32 * wspan], hFrac: 0.42, snap: (x) => [Math.max(lo, Math.min(hi, Math.round(x / snapStep) * snapStep)), 1] };
+}
+
+// ---------- 8.1 Measures of Center and Variation ----------
+// #1–2: mean, median, and mode
+TEMPLATES.a81Center = (r) => {
+  const n = ri(r, 7, 11), D = a8data(r, n, 1, pick(r, [15, 20, 30]), { repeat: true }), m = a8mean(D), md = a8med(D), M = a8modes(D); if (M.length > 2) return TEMPLATES.a81Center(r);
+  const correct = `mean ${a8meanT(m)}, median ${fmt(md)}, mode ${a8modeT(M)}`;
+  return { topic: 'Mean, median, and mode', stem: `Find the mean, median, and mode of the data. Round the mean to the nearest tenth if needed.   ${a8list(D)}`,
+    ...buildChoices(r, correct, [`mean ${a8meanT(md)}, median ${fmt(m === md ? md + 1 : a8r(m))}, mode ${a8modeT(M)}`, `mean ${a8meanT(m)}, median ${fmt(D[Math.floor(n / 2)])}, mode ${a8modeT(M)}`, `mean ${a8meanT(a8sum(D) / (n - 1))}, median ${fmt(md)}, mode ${a8modeT(M)}`].filter((x) => x !== correct), (i) => `mean ${a8meanT(m + i + 1)}, median ${fmt(md)}, mode ${a8modeT(M)}`),
+    fr: { fields: [{ kind: 'number', label: 'Mean:' }, { kind: 'number', label: 'Median:' }, { kind: 'expr', keys: 'stats', label: 'Mode:' }], key: [String(a8r(m)), String(md), M.length ? M.join(',') : '\\text{none}'], display: correct,
+      check: (v) => a8numOk(v[0], m) && numOk(v[1], md) && a8modeOk(v[2], M), score: (v) => ((a8numOk(v[0], m) ? 1 : 0) + (numOk(v[1], md) ? 1 : 0) + (a8modeOk(v[2], M) ? 1 : 0)) / 3 },
+    solution: `Mean: ${a8sum(D)} ÷ ${n} ${Number.isInteger(m) ? '=' : '≈'} ${fmt(Math.round(m * 10) / 10)}.\nIn order: ${a8list(a8sort(D))}. Median: ${n % 2 ? 'the middle value' : 'the mean of the two middle values'}, ${fmt(md)}.\nMode: ${M.length ? `${a8modeT(M)} (occurs most often)` : 'none (no value occurs more than once)'}.` };
+};
+// #3–4: find x from the mean
+TEMPLATES.a81FindX = (r) => {
+  const n = ri(r, 4, 6), neg = r() < 0.3, D = [...Array(n)].map(() => (neg ? ri(r, -15, 15) : ri(r, 1, 12))), mean = neg ? ri(r, -3, 12) + pick(r, [0, 0.5]) : ri(r, 3, 10);
+  const x = mean * (n + 1) - a8sum(D);
+  return { topic: 'Mean', stem: `Find the value of x.   ${a8list(D)}, x;   the mean is ${fmt(mean)}.`,
+    ...buildChoices(r, fmt(x), [fmt(mean * n - a8sum(D)), fmt(-x), fmt(x + n)].filter((t, i, A) => t !== fmt(x) && A.indexOf(t) === i), (i) => fmt(x + i + 1)),
+    fr: { fields: [{ kind: 'number', label: 'x =' }], key: [String(x)], display: fmt(x), check: (v) => numOk(v[0], x) },
+    solution: `There are ${n + 1} values, so their sum is ${fmt(mean)} · ${n + 1} = ${fmt(mean * (n + 1))}.\nThe other values add to ${fmt(a8sum(D))}, so x = ${a8sum(D) ? `${fmt(mean * (n + 1))} − ${a8sum(D) < 0 ? `(${fmt(a8sum(D))})` : fmt(a8sum(D))} = ` : ''}${fmt(x)}.` };
+};
+// #5–6: an outlier and the mean
+TEMPLATES.a81Outlier = (r) => {
+  const n = ri(r, 7, 9), base = ri(r, 10, 60), spread = Math.max(3, Math.round(base * 0.3)), D = [...Array(n)].map(() => base + ri(r, -spread, spread));
+  const big = r() < 0.65, out = big ? Math.max(...D) + spread * pick(r, [4, 5, 6]) : Math.max(1, Math.min(...D) - spread * pick(r, [3, 4])); if (!big && Math.min(...D) - out < 2 * spread) return TEMPLATES.a81Outlier(r);
+  const all = shuffle(r, [...D, out]), mw = a8mean(all), mo = a8mean(D);
+  const correct = `outlier ${fmt(out)}; mean ${fmt(Math.round(mw * 10) / 10)} with it, ${fmt(Math.round(mo * 10) / 10)} without it`;
+  return { topic: 'Outliers', stem: `Identify the outlier. Then find the mean with and without the outlier. Round to the nearest tenth if needed.   ${a8list(all)}`,
+    ...buildChoices(r, correct, [`outlier ${fmt(out)}; mean ${fmt(Math.round(mo * 10) / 10)} with it, ${fmt(Math.round(mw * 10) / 10)} without it`, `outlier ${fmt(big ? Math.min(...D) : Math.max(...D))}; mean ${fmt(Math.round(mw * 10) / 10)} with it, ${fmt(Math.round(mo * 10) / 10)} without it`, `outlier ${fmt(out)}; mean ${fmt(a8med(all))} with it, ${fmt(a8med(D))} without it`], () => null),
+    fr: { fields: [{ kind: 'number', label: 'Outlier:' }, { kind: 'number', label: 'Mean with it:' }, { kind: 'number', label: 'Mean without it:' }], key: [String(out), String(a8r(mw)), String(a8r(mo))], display: correct,
+      check: (v) => numOk(v[0], out) && a8numOk(v[1], mw) && a8numOk(v[2], mo), score: (v) => ((numOk(v[0], out) ? 1 : 0) + (a8numOk(v[1], mw) ? 1 : 0) + (a8numOk(v[2], mo) ? 1 : 0)) / 3 },
+    solution: `${fmt(out)} is much ${big ? 'greater' : 'less'} than the other values, so it is the outlier.\nWith it: mean = ${a8sum(all)} ÷ ${n + 1} ≈ ${fmt(Math.round(mw * 10) / 10)}. Without it: mean = ${a8sum(D)} ÷ ${n} ≈ ${fmt(Math.round(mo * 10) / 10)}.\nThe outlier ${big ? 'raises' : 'lowers'} the mean; the median changes much less.` };
+};
+// #9–12: range
+TEMPLATES.a81Range = (r) => {
+  const dec = r() < 0.4, n = ri(r, 5, 9), D = [...Array(n)].map(() => (dec ? ri(r, 4, 110) / 10 : ri(r, 20, 160)));
+  const R = a8r(a8range(D));
+  return { topic: 'Range', stem: `Find the range of the data set.   ${a8list(D)}`,
+    ...buildChoices(r, fmt(R), [fmt(a8r(D[n - 1] - D[0])), fmt(Math.max(...D)), fmt(a8r(a8mean(D)))].filter((t, i, A) => t !== fmt(R) && A.indexOf(t) === i), (i) => fmt(a8r(R + i + 1))),
+    fr: { fields: [{ kind: 'number', label: 'Range:' }], key: [String(R)], display: fmt(R), check: (v) => numOk(v[0], R) },
+    solution: `Range = greatest value − least value = ${fmt(Math.max(...D))} − ${fmt(Math.min(...D))} = ${fmt(R)}.` };
+};
+// #7–8: compare the ranges of two data sets
+TEMPLATES.a81Compare = (r) => {
+  const [na, nb] = pick(r, [['Golfer A', 'Golfer B'], ['Rookie season', 'This season'], ['Class A', 'Class B']]), lo = ri(r, 60, 85);
+  const A = [...Array(10)].map(() => lo + ri(r, 0, ri(r, 6, 16))), B = [...Array(10)].map(() => lo + ri(r, 0, ri(r, 6, 16))), ra = a8range(A), rb = a8range(B);
+  if (ra === rb) return TEMPLATES.a81Compare(r);
+  const more = ra > rb ? na : nb, correct = `${na}: ${ra}; ${nb}: ${rb}; ${more}'s data vary more`;
+  return { topic: 'Range', stem: `Find the range of each data set. Which set varies more?   ${na}: ${a8list(A)}.   ${nb}: ${a8list(B)}.`,
+    ...buildChoices(r, correct, [`${na}: ${ra}; ${nb}: ${rb}; ${more === na ? nb : na}'s data vary more`, `${na}: ${rb}; ${nb}: ${ra}; ${more === na ? nb : na}'s data vary more`, `${na}: ${Math.max(...A)}; ${nb}: ${Math.max(...B)}; ${Math.max(...A) > Math.max(...B) ? na : nb}'s data vary more`].filter((x) => x !== correct), () => null),
+    fr: { fields: [{ kind: 'number', label: `${na} range:` }, { kind: 'number', label: `${nb} range:` }, { kind: 'select', label: 'Varies more:', options: [na, nb] }], key: [String(ra), String(rb), more], display: correct,
+      check: (v) => numOk(v[0], ra) && numOk(v[1], rb) && v[2] === more, score: (v) => ((numOk(v[0], ra) ? 1 : 0) + (numOk(v[1], rb) ? 1 : 0) + (v[2] === more ? 1 : 0)) / 3 },
+    solution: `${na}: ${Math.max(...A)} − ${Math.min(...A)} = ${ra}.  ${nb}: ${Math.max(...B)} − ${Math.min(...B)} = ${rb}.\nThe greater range, ${Math.max(ra, rb)}, means ${more}'s data vary more.` };
+};
+// #14–16: transforming data
+TEMPLATES.a81Transform = (r) => {
+  const mean = ri(r, 40, 400), med = mean + ri(r, -30, 30), rng = ri(r, 20, 250), add = r() < 0.5, k = add ? pick(r, [5, 10, 20, -5, -10]) : pick(r, [0.5, 2, 3, 1.1, 0.9]);
+  const f = (v) => a8r(add ? v + k : v * k), g = (v) => a8r(add ? v : v * k);
+  const correct = `mean ${fmt(f(mean))}, median ${fmt(f(med))}, range ${fmt(g(rng))}`;
+  const how = add ? `${k > 0 ? 'increases' : 'decreases'} by ${Math.abs(k)}` : `is multiplied by ${fmt(k)}`;
+  return { topic: 'Transforming data', stem: `Find the mean, median, and range of the data after each value in the data set ${how}.   Mean: ${mean}   Median: ${med}   Range: ${rng}`,
+    ...buildChoices(r, correct, [`mean ${fmt(f(mean))}, median ${fmt(f(med))}, range ${fmt(add ? rng + k : rng)}`, `mean ${fmt(f(mean))}, median ${fmt(med)}, range ${fmt(rng)}`, `mean ${fmt(mean)}, median ${fmt(med)}, range ${fmt(add ? rng + k : a8r(rng * k))}`].filter((x) => x !== correct), () => null),
+    fr: { fields: [{ kind: 'number', label: 'Mean:' }, { kind: 'number', label: 'Median:' }, { kind: 'number', label: 'Range:' }], key: [String(f(mean)), String(f(med)), String(g(rng))], display: correct,
+      check: (v) => numOk(v[0], f(mean)) && numOk(v[1], f(med)) && numOk(v[2], g(rng)), score: (v) => ((numOk(v[0], f(mean)) ? 1 : 0) + (numOk(v[1], f(med)) ? 1 : 0) + (numOk(v[2], g(rng)) ? 1 : 0)) / 3 },
+    solution: add ? `Adding the same number to every value shifts the center by that number but does not change the spread.\nMean ${mean} ${k > 0 ? '+' : MINUS} ${Math.abs(k)} = ${fmt(f(mean))}; median ${med} ${k > 0 ? '+' : MINUS} ${Math.abs(k)} = ${fmt(f(med))}; range stays ${rng}.` : `Multiplying every value by ${fmt(k)} multiplies the measures of center and the range by ${fmt(k)}.\nMean ${fmt(f(mean))}, median ${fmt(f(med))}, range ${fmt(g(rng))}.` };
+};
+
+// ---------- 8.2 Stem-and-Leaf Plots ----------
+const a8leafOk = (raw, L) => { const d = String(raw || '').replace(/\\[a-z]+/gi, '').replace(/[^0-9]/g, '').split('').map(Number); return d.length === L.length && d.every((x, i) => x === L[i]); };
+// #1–6: make a stem-and-leaf plot (type the leaves for each stem)
+TEMPLATES.a82Make = (r) => {
+  const n = ri(r, 9, 15), lo = pick(r, [0, 10, 20, 40, 60, 80]), span = pick(r, [30, 40, 45]), D = [...Array(n)].map(() => lo + ri(r, 0, span)), rows = a8stemRows(D);
+  if (rows.length > 6) return TEMPLATES.a82Make(r);
+  const title = pick(r, ['Books Read', 'Test Scores', 'Points Scored', 'Movie Lengths (minutes)', 'Ages', 'Hours Online']);
+  const correct = rows.map(([s, L]) => `${s} | ${L.join(' ')}`).join(';  ');
+  return { topic: 'Stem-and-leaf plots', stem: `Which stem-and-leaf plot shows the data (${title})?   ${a8list(D)}`,
+    fr: { fields: rows.map(([s]) => ({ kind: 'number', label: `Stem ${s} |` })), key: rows.map(([, L]) => L.join('')), display: correct,
+      check: (v) => rows.every(([, L], i) => a8leafOk(v[i], L)), score: (v) => rows.filter(([, L], i) => a8leafOk(v[i], L)).length / rows.length,
+      answered: (v) => Array.isArray(v) && v.some((x) => String(x || '').trim() !== '') },
+    ...(() => { const T = (R) => R.map(([st, L]) => `${st} | ${L.join(' ')}`).join(';  '), unsorted = T(rows.map(([st, L]) => [st, [...L].reverse()])), tens = T(rows.map(([st, L]) => [st * 10, L])), dropped = T(rows.map(([st, L], i) => [st, i === 0 ? L.slice(1) : L]));
+      return buildChoices(r, correct, [...new Set([unsorted, tens, dropped])].filter((x) => x !== correct), (i) => T(rows.map(([st, L], j) => [st, j === i % rows.length ? [...L, 9].sort() : L]))); })(),
+    frStem: `Make a stem-and-leaf plot of the data (${title}): type the leaves for each stem, in order from least to greatest. Leave a stem blank if it has no leaves.   ${a8list(D)}`,
+    solution: `Each value is split into a stem (the tens digit${rows.some(([s]) => s >= 10) ? 's' : ''}) and a leaf (the ones digit). Order the leaves from least to greatest.\n${rows.map(([s, L]) => `${s} | ${L.join(' ')}`).join('\n')}\nKey: ${rows[0][0]} | ${rows[0][1][0] ?? 0} = ${rows[0][0] * 10 + (rows[0][1][0] ?? 0)}` };
+};
+// #9, 15: read a stem-and-leaf plot
+TEMPLATES.a82Read = (r) => {
+  const n = ri(r, 11, 16), lo = pick(r, [40, 50, 60]), D = [...Array(n)].map(() => lo + ri(r, 0, 38)), rows = a8stemRows(D), S = a8sort(D);
+  const cut = (Math.floor(S[Math.floor(n / 2)] / 10)) * 10, more = D.filter((x) => x > cut).length, m = a8mean(D), md = a8med(D), R = a8range(D);
+  const ask = pick(r, ['count', 'center', 'center', 'range']), title = pick(r, ['Daily High Temperatures (°F)', 'Number of Digs', 'Test Scores']);
+  const unit = title.startsWith('Daily') ? '°F' : '';
+  const draw = a8stemDraw(rows, `Key: ${rows[1] ? `${rows[1][0]} | ${rows[1][1][0] ?? 0} = ${rows[1][0] * 10 + (rows[1][1][0] ?? 0)}${unit}` : ''}`, title), size = [380, 60 + 26 * (rows.length + 2)];
+  if (ask === 'count') return { topic: 'Stem-and-leaf plots', stem: `How many data values are greater than ${cut}?`, draw, size,
+    ...buildChoices(r, String(more), [String(n - more), String(more + 1), String(D.filter((x) => x >= cut + 10).length)].filter((t, i, A) => t !== String(more) && A.indexOf(t) === i), (i) => String(more + i + 2)),
+    fr: { fields: [{ kind: 'number', label: '' }], key: [String(more)], display: String(more), check: (v) => numOk(v[0], more) }, solution: `Count the leaves that make values greater than ${cut}: ${more}.` };
+  if (ask === 'range') return { topic: 'Stem-and-leaf plots', stem: 'Find the range of the data.', draw, size,
+    ...buildChoices(r, String(R), [String(S[n - 1]), String(R + 10), String(a8r(md))].filter((t, i, A) => t !== String(R) && A.indexOf(t) === i), (i) => String(R + i + 1)),
+    fr: { fields: [{ kind: 'number', label: 'Range:' }], key: [String(R)], display: String(R), check: (v) => numOk(v[0], R) }, solution: `Greatest ${S[n - 1]} − least ${S[0]} = ${R}.` };
+  const M = a8modes(D); if (M.length > 2) return TEMPLATES.a82Read(r);
+  const correct = `mean ${a8meanT(m)}, median ${fmt(md)}, mode ${a8modeT(M)}`;
+  return { topic: 'Stem-and-leaf plots', stem: 'Find the mean, median, and mode of the data. Round the mean to the nearest tenth if needed.', draw, size,
+    ...buildChoices(r, correct, [`mean ${a8meanT(md)}, median ${fmt(a8r(m))}, mode ${a8modeT(M)}`, `mean ${a8meanT(m)}, median ${fmt(S[Math.floor(n / 2) - 1])}, mode ${a8modeT(M)}`], (i) => `mean ${a8meanT(m + i + 1)}, median ${fmt(md)}, mode ${a8modeT(M)}`),
+    fr: { fields: [{ kind: 'number', label: 'Mean:' }, { kind: 'number', label: 'Median:' }, { kind: 'expr', keys: 'stats', label: 'Mode:' }], key: [String(a8r(m)), String(md), M.length ? M.join(',') : '\\text{none}'], display: correct,
+      check: (v) => a8numOk(v[0], m) && numOk(v[1], md) && a8modeOk(v[2], M), score: (v) => ((a8numOk(v[0], m) ? 1 : 0) + (numOk(v[1], md) ? 1 : 0) + (a8modeOk(v[2], M) ? 1 : 0)) / 3 },
+    solution: `The ${n} values in order: ${a8list(S)}.\nMean ${a8sum(D)} ÷ ${n} ${Number.isInteger(m) ? '=' : '≈'} ${fmt(Math.round(m * 10) / 10)}; median ${fmt(md)}; mode ${a8modeT(M)}.` };
+};
+// #10: describe the distribution (shape)
+const A8SHAPES = ['Skewed left', 'Symmetric', 'Skewed right'];
+TEMPLATES.a82Shape = (r) => {
+  const shape = pick(r, A8SHAPES), counts = shape === 'Symmetric' ? pick(r, [[1, 3, 5, 3, 1], [2, 4, 4, 2], [1, 2, 4, 2, 1]]) : shape === 'Skewed right' ? pick(r, [[5, 4, 2, 1], [4, 5, 3, 1, 1], [6, 3, 2, 1]]) : pick(r, [[1, 2, 4, 5], [1, 1, 3, 5, 4], [1, 2, 3, 6]]);
+  const s0 = ri(r, 1, 5), rows = counts.map((k, i) => [s0 + i, a8sort([...Array(k)].map(() => ri(r, 0, 9)))]);
+  return { topic: 'Describing distributions', stem: 'Describe the shape of the distribution.', draw: a8stemDraw(rows, `Key: ${s0} | ${rows[0][1][0]} = ${s0 * 10 + rows[0][1][0]}`), size: [380, 60 + 26 * (rows.length + 2)],
+    ...buildChoices(r, shape, A8SHAPES.filter((x) => x !== shape), () => null), fr: FR.select('The distribution is', A8SHAPES, shape),
+    solution: shape === 'Symmetric' ? 'The leaves are spread out about the same on both sides of the middle, so the distribution is symmetric.' : shape === 'Skewed right' ? 'Most of the data are on the left (small stems), and the tail extends to the right (larger values): skewed right.' : 'Most of the data are on the right (large stems), and the tail extends to the left (smaller values): skewed left.' };
+};
+
+// ---------- 8.3 Box-and-Whisker Plots ----------
+const A8M = [['least value', 0], ['greatest value', 4], ['first quartile', 1], ['third quartile', 3], ['median', 2], ['range', 'R'], ['interquartile range', 'I']];
+// #1–6: read a measure from a box-and-whisker plot
+TEMPLATES.a83Read = (r) => {
+  const F = a8sort([...Array(5)].map(() => ri(r, 1, 17))); if (new Set(F).size < 5) return TEMPLATES.a83Read(r);
+  const [name, k] = pick(r, A8M), val = k === 'R' ? F[4] - F[0] : k === 'I' ? F[3] - F[1] : F[k];
+  const w = [F[0], F[1], F[2], F[3], F[4], F[4] - F[0], F[3] - F[1]].map(String);
+  return { topic: 'Box-and-whisker plots', stem: `Use the box-and-whisker plot to find the ${name}.`, draw: a8boxDraw([{ F }], 0, 18, 1, 2), size: [440, 150],
+    ...buildChoices(r, String(val), [...new Set(w)].filter((x) => x !== String(val)), (i) => String(val + i + 1)),
+    fr: { fields: [{ kind: 'number', label: `${name[0].toUpperCase() + name.slice(1)}:` }], key: [String(val)], display: String(val), check: (v) => numOk(v[0], val) },
+    solution: `The plot shows least value ${F[0]}, first quartile ${F[1]}, median ${F[2]}, third quartile ${F[3]}, and greatest value ${F[4]}.\n${k === 'R' ? `Range = ${F[4]} − ${F[0]} = ${val}.` : k === 'I' ? `Interquartile range = Q3 − Q1 = ${F[3]} − ${F[1]} = ${val}.` : `The ${name} is ${val}.`}` };
+};
+// #7–12: the five-number summary of a data set
+TEMPLATES.a83Five = (r) => {
+  const n = ri(r, 7, 12), neg = r() < 0.2, D = [...Array(n)].map(() => (neg ? ri(r, -5, 8) : ri(r, 1, pick(r, [12, 20, 40])))), F = a8five(D), S = a8sort(D), h = Math.floor(n / 2);
+  const names = ['Least value', 'First quartile', 'Median', 'Third quartile', 'Greatest value'], correct = F.map((v, i) => `${names[i].toLowerCase()} ${fmt(v)}`).join(', ');
+  return { topic: 'Five-number summary', stem: `Find the five-number summary of the data.   ${a8list(D)}`,
+    ...buildChoices(r, correct, [F.map((v, i) => `${names[i].toLowerCase()} ${fmt(i === 1 ? S[Math.floor(h / 2)] : i === 3 ? S[n - 1 - Math.floor(h / 2)] : v)}`).join(', ')].filter((x) => x !== correct), (i) => F.map((v, j) => `${names[j].toLowerCase()} ${fmt(j === 2 ? v + i + 1 : v)}`).join(', ')),
+    fr: { fields: names.map((t) => ({ kind: 'number', label: `${t}:` })), key: F.map(String), display: correct, check: (v) => F.every((x, i) => numOk(v[i], x)), score: (v) => F.filter((x, i) => numOk(v[i], x)).length / 5 },
+    solution: `In order: ${a8list(S)}.\nMedian ${fmt(F[2])}. Q1 is the median of the lower half (${a8list(S.slice(0, h))}): ${fmt(F[1])}. Q3 is the median of the upper half (${a8list(S.slice(n - h))}): ${fmt(F[3])}.\nLeast ${fmt(F[0])}, greatest ${fmt(F[4])}.` };
+};
+// #7–12 (students draw it): make a box-and-whisker plot on a number line
+TEMPLATES.a83Sketch = (r) => {
+  const ctx = pick(r, [['Hours of television watched', 'hours', 0, 8], ['Cat lengths (in inches)', 'inches', 14, 26], ['Elevations (in feet)', 'feet', -5, 7], ['Puppy weights (in pounds)', 'pounds', 3, 12], ['Ages of basketball players', 'years', 20, 37]]);
+  const n = ri(r, 7, 12), D = [...Array(n)].map(() => ri(r, ctx[2], ctx[3])), F = a8five(D); if (new Set(F).size < 4) return TEMPLATES.a83Sketch(r);
+  const win = a8boxWin(F, D); win.unit = ctx[1];
+  const fr = skFR({ family: 'box5', target: null, keyPts: F.map((x) => [x, 1]), win, display: `Least ${fmt(F[0])}, Q1 ${fmt(F[1])}, median ${fmt(F[2])}, Q3 ${fmt(F[3])}, greatest ${fmt(F[4])}` });
+  fr._target = 'box5';
+  const S = a8sort(D), h = Math.floor(n / 2);
+  return { topic: 'Box-and-whisker plots', sketch: true, stem: `Make a box-and-whisker plot that represents the data: place the least value, first quartile, median, third quartile, and greatest value on the number line (points snap to halves).   ${ctx[0]}: ${a8list(D)}`, fr, choices: null, answer: -1,
+    solution: `In order: ${a8list(S)}.\nLeast ${fmt(F[0])}; Q1 (median of ${a8list(S.slice(0, h))}) = ${fmt(F[1])}; median ${fmt(F[2])}; Q3 (median of ${a8list(S.slice(n - h))}) = ${fmt(F[3])}; greatest ${fmt(F[4])}.\nDraw the box from Q1 to Q3 with a line at the median, and whiskers out to the least and greatest values.` };
+};
+// #15–16: range and interquartile range of a labeled plot, and where the data are more spread out
+TEMPLATES.a83Interpret = (r) => {
+  const st = pick(r, [0.25, 0.5, 1]), F = a8sort([...Array(5)].map(() => ri(r, 30, 80) * st)); if (new Set(F).size < 5) return TEMPLATES.a83Interpret(r);
+  const R = F[4] - F[0], I = F[3] - F[1], left = F[1] - F[0], right = F[4] - F[3]; if (left === right) return TEMPLATES.a83Interpret(r);
+  const where = left > right ? 'Below Q1' : 'Above Q3', correct = `range ${fmt(R)}, interquartile range ${fmt(I)}; more spread out ${where.replace('B', 'b').replace('A', 'a')}`;
+  const lo = Math.floor(F[0] / 5) * 5 - 5, hi = Math.ceil(F[4] / 5) * 5 + 5;
+  return { topic: 'Box-and-whisker plots', stem: 'Find the range and the interquartile range of the data. Then tell whether the data are more spread out below Q1 or above Q3.', draw: a8boxDraw([{ F }], lo, hi, (hi - lo) > 40 ? 5 : 1, (hi - lo) > 40 ? 10 : 5, '', true), size: [460, 160],
+    ...buildChoices(r, correct, [`range ${fmt(I)}, interquartile range ${fmt(R)}; more spread out ${where.replace('B', 'b').replace('A', 'a')}`, `range ${fmt(R)}, interquartile range ${fmt(I)}; more spread out ${where === 'Below Q1' ? 'above Q3' : 'below Q1'}`, `range ${fmt(R)}, interquartile range ${fmt(F[2] - F[1])}; more spread out ${where.replace('B', 'b').replace('A', 'a')}`].filter((x) => x !== correct), () => null),
+    fr: { fields: [{ kind: 'number', label: 'Range:' }, { kind: 'number', label: 'Interquartile range:' }, { kind: 'select', label: 'More spread out:', options: ['Below Q1', 'Above Q3'] }], key: [String(R), String(I), where], display: correct,
+      check: (v) => numOk(v[0], R) && numOk(v[1], I) && v[2] === where, score: (v) => ((numOk(v[0], R) ? 1 : 0) + (numOk(v[1], I) ? 1 : 0) + (v[2] === where ? 1 : 0)) / 3 },
+    solution: `Range = ${fmt(F[4])} − ${fmt(F[0])} = ${fmt(R)} (the spread of all the data).\nIQR = ${fmt(F[3])} − ${fmt(F[1])} = ${fmt(I)} (the spread of the middle half).\nThe left whisker is ${fmt(left)} long and the right whisker is ${fmt(right)} long, so the data are more spread out ${where.replace('B', 'b').replace('A', 'a')}.` };
+};
+// #17: the shape of a distribution from a box-and-whisker plot
+TEMPLATES.a83Shape = (r) => {
+  const shape = pick(r, A8SHAPES), m = ri(r, 10, 14), a = ri(r, 2, 3), F = shape === 'Symmetric' ? [m - 2 * a - 2, m - a, m, m + a, m + 2 * a + 2] : shape === 'Skewed right' ? [m - a - 1, m - a + 1, m, m + 2 * a + 1, m + 4 * a + 3] : [m - 4 * a - 3, m - 2 * a - 1, m, m + a - 1, m + a + 1];
+  return { topic: 'Describing distributions', stem: 'Identify the shape of the distribution.', draw: a8boxDraw([{ F }], 0, 28, 1, 4), size: [440, 150],
+    ...buildChoices(r, shape, A8SHAPES.filter((x) => x !== shape), () => null), fr: FR.select('The distribution is', A8SHAPES, shape),
+    solution: shape === 'Symmetric' ? 'The whiskers are about the same length and the median is near the middle of the box: symmetric.' : shape === 'Skewed right' ? 'The right whisker is longer and most of the data are on the left: skewed right.' : 'The left whisker is longer and most of the data are on the right: skewed left.' };
+};
+
+// ---------- 8.4 Shapes of Distributions / Data Displays ----------
+const A8QQ = [['brands of cars in a parking lot', 'Qualitative'], ['weights of bears at a zoo', 'Quantitative'], ['budgets of feature films', 'Quantitative'], ['file formats of documents on a computer', 'Qualitative'], ['shoe sizes of students in your class', 'Quantitative'], ['street names in a phone book', 'Qualitative'],
+  ['favorite colors of students', 'Qualitative'], ['heights of trees in a park', 'Quantitative'], ['zip codes of customers', 'Qualitative'], ['numbers of pets owned by students', 'Quantitative'], ['types of music on a playlist', 'Qualitative'], ['minutes spent on homework', 'Quantitative'], ['jersey colors of teams', 'Qualitative'], ['daily high temperatures', 'Quantitative']];
+TEMPLATES.a84Qual = (r) => {
+  const [what, ans] = pick(r, A8QQ), opts = ['Qualitative', 'Quantitative'];
+  return { topic: 'Qualitative and quantitative data', stem: `Tell whether the data are qualitative or quantitative.   ${what}`, ...buildChoices(r, ans, opts.filter((x) => x !== ans), () => null), fr: FR.select('The data are', opts, ans),
+    solution: ans === 'Qualitative' ? 'The data are categories (names or labels), not amounts you measure or count, so they are qualitative.' : 'The data are numbers that are measured or counted, so they are quantitative.' };
+};
+const A8DISP = ['Bar graph', 'Histogram', 'Box-and-whisker plot', 'Line graph', 'Circle graph'];
+TEMPLATES.a84Display = (r) => {
+  const kind = pick(r, [['the colors of cars that drive past a school, with how many of each', 'Bar graph', 'The data are categories with counts, so a bar graph compares them.'], ['test scores (out of 100) for a class of 30 students, to show how many fall in each interval of 10 points', 'Histogram', 'Numerical data grouped into intervals: a histogram shows the frequency of each interval.'],
+    ['a city’s average monthly temperature over one year', 'Line graph', 'The data change over time, so a line graph shows the trend.'], ['the percent of a budget spent on each type of expense', 'Circle graph', 'The data are parts of a whole, so a circle graph shows each part’s share.'], ['the spread of the prices of 40 laptops, including the median and quartiles', 'Box-and-whisker plot', 'A box-and-whisker plot shows the median, the quartiles, and the spread of numerical data.']]);
+  return { topic: 'Choosing a data display', stem: `Which display best represents the data?   ${kind[0]}`, ...buildChoices(r, kind[1], A8DISP.filter((x) => x !== kind[1]), () => null), fr: FR.select('Best display:', A8DISP, kind[1]), solution: kind[2] };
+};
+for (const name of Object.keys(TEMPLATES)) if (/^a8\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== ALGEBRA 1 CH8 END ==== */
+/* ==== ALGEBRA 1 CH9 BEGIN ==== */
+/* ---------- Algebra 1 (Big Ideas Learning 2025), Chapter 9: Probability ---------- */
+KEYROWS_P.prob = [['a⁄b', '\\frac{#@}{#?}'], ['%', '\\%']];
+const a9gcd = (a, b) => (b ? a9gcd(b, a % b) : Math.abs(a));
+const a9fac = (n) => { let p = 1; for (let i = 2; i <= n; i++) p *= i; return p; };
+const a9P = (n, r) => { let p = 1; for (let i = 0; i < r; i++) p *= n - i; return p; };
+const a9C = (n, r) => { if (r < 0 || r > n) return 0; r = Math.min(r, n - r); let p = 1; for (let i = 1; i <= r; i++) p = (p * (n - r + i)) / i; return Math.round(p); };
+// a probability as a reduced fraction a/b (when it is one), and its decimal
+const a9frac = (a, b) => { const g = a9gcd(a, b) || 1; return [a / g, b / g]; };
+const a9fT = (a, b) => { const [p, q] = a9frac(a, b); return q === 1 ? String(p) : `${p}/${q}`; };
+const a9fL = (a, b) => { const [p, q] = a9frac(a, b); return q === 1 ? String(p) : `\\frac{${p}}{${q}}`; };
+const a9dec = (p) => (p === 0 || p === 1 ? String(p) : p < 0.01 ? Number(p.toPrecision(3)).toFixed(2 - Math.floor(Math.log10(p))) : String(Math.round(p * 1000) / 1000));
+const a9pT = (a, b) => { const t = a9fT(a, b), p = a / b; return /\//.test(t) && String(Math.round(p * 1000) / 1000).length <= 5 && Math.abs(Math.round(p * 1000) / 1000 - p) < 1e-12 ? `${t} = ${a9dec(p)}` : /\//.test(t) ? `${t} ≈ ${a9dec(p)}` : t; };
+// typed probability: a fraction, a decimal (rounded to the thousandth is fine), or a percent
+function a9pOk(raw, p) {
+  let s = String(raw || '').replace(/^\s*p\s*\([^)]*\)\s*=/i, '').replace(/^\s*[a-z]\s*=/i, '').split(/≈|\\thickapprox|\\approx|=/)[0]; const pct = /%|\\%/.test(s); s = s.replace(/\\%|%/g, '');
+  let v = pxConst(s); if (!isFinite(v)) return false; if (pct) v /= 100;
+  return Math.abs(v - p) <= (p < 0.01 ? 0.006 * p : 0.0006) + 1e-12;
+}
+function a9probQ(r, { topic, stem, a, b, p = a / b, wrong = [], solution, draw, size, label = 'P =' }) {
+  const correct = b ? a9pT(a, b) : a9dec(p), key = b ? a9fL(a, b) : a9dec(p);
+  const W = [...new Set(wrong.filter(([x, y]) => (y ? x >= 0 && x <= y : x >= 0 && x <= 1)).map(([x, y]) => (y ? a9pT(x, y) : a9dec(x))))].filter((t) => t !== correct && !a9pOk(t.split(' ')[0], p));
+  return { topic, stem, draw, size, ...buildChoices(r, correct, W, (i) => (b ? a9pT(Math.min(a + i + 1, b), b) : a9dec(Math.min(1, p + 0.05 * (i + 1))))),
+    frStem: `${stem} Give a fraction, or a decimal rounded to ${p > 0 && p < 0.01 ? 'three significant digits' : 'the nearest thousandth'}.`,
+    fr: { fields: [{ kind: 'expr', keys: 'prob', label }], key: [key], display: correct, check: (v) => a9pOk(v[0], p) }, solution };
+}
+// ---------- drawings ----------
+// a table: head row, then rows; the first column is the row label. A cell of null is shown blank (to fill in).
+const a9tableDraw = (rows, { title = '', bold = [] } = {}) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, nc = rows[0].length, rh = 30, y0 = title ? 34 : 10;
+  c.font = '600 13px system-ui, sans-serif'; const w0 = Math.max(60, ...rows.map((row) => c.measureText(String(row[0] || '')).width + 16)), cw = Math.min(110, (W - 20 - w0) / (nc - 1)), x0 = (W - w0 - cw * (nc - 1)) / 2;
+  const X = (j) => (j ? x0 + w0 + (j - 1) * cw : x0), CW = (j) => (j ? cw : w0);
+  c.clearRect(0, 0, W, H); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#1d1d1b';
+  if (title) { c.font = '600 15px system-ui, sans-serif'; c.fillText(title, W / 2, 16); }
+  rows.forEach((row, i) => row.forEach((t, j) => {
+    const x = X(j), y = y0 + i * rh, head = i === 0 || j === 0 || bold.includes(i) || (i === rows.length - 1 && /total/i.test(String(rows[i][0])));
+    c.fillStyle = head ? '#efece4' : '#fff'; if (!(i === 0 && j === 0 && !t)) { c.fillRect(x, y, CW(j), rh); c.strokeStyle = '#8a867c'; c.lineWidth = 1; c.strokeRect(x, y, CW(j), rh); }
+    c.fillStyle = t == null ? '#c0392b' : '#1d1d1b'; c.font = head ? '600 13px system-ui, sans-serif' : '15px Georgia, serif';
+    c.fillText(t == null ? '?' : String(t), x + CW(j) / 2, y + rh / 2);
+  }));
+};
+// a spinner with equal sections: [{ n, color }]
+const A9COL = { red: '#e05a4f', blue: '#3f7fd0', yellow: '#f2cf4a', green: '#4fae5c' };
+const a9spinDraw = (S) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 12, k = S.length;
+  c.clearRect(0, 0, W, H);
+  S.forEach(({ n, color }, i) => { const a0 = -Math.PI / 2 + (i * 2 * Math.PI) / k, a1 = a0 + (2 * Math.PI) / k; c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a0, a1); c.closePath(); c.fillStyle = A9COL[color]; c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke();
+    const am = (a0 + a1) / 2; c.fillStyle = '#1d1d1b'; c.font = '600 16px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(n), cx + 0.72 * R * Math.cos(am), cy + 0.72 * R * Math.sin(am)); });
+  c.beginPath(); c.arc(cx, cy, R, 0, 2 * Math.PI); c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.5; c.stroke();
+  c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + 0.55 * R * Math.cos(-1.1), cy + 0.55 * R * Math.sin(-1.1)); c.strokeStyle = '#1d1d1b'; c.lineWidth = 3; c.stroke(); c.beginPath(); c.arc(cx, cy, 5, 0, 2 * Math.PI); c.fillStyle = '#1d1d1b'; c.fill();
+};
+// a probability histogram: xs and probabilities (fractions [a, b])
+const a9histDraw = (xs, P, title, xl) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, L = 60, Rr = W - 20, T = 34, B = H - 46, mx = Math.max(...P.map(([a, b]) => a / b)), top = Math.ceil(mx * 4) / 4 || 0.25, bw = (Rr - L) / xs.length;
+  c.clearRect(0, 0, W, H); c.fillStyle = '#1d1d1b'; c.font = '600 14px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(title, W / 2, 16);
+  const Y = (v) => B - ((B - T) * v) / top;
+  c.strokeStyle = '#e4e1d9'; c.font = '12px Georgia, serif'; c.textAlign = 'right'; c.textBaseline = 'middle';
+  const den = P.reduce((m, [, b]) => Math.max(m, b), 1);
+  for (let k = 0; k <= Math.round(top * den); k++) { const v = k / den; if (v > top + 1e-9) break; c.beginPath(); c.moveTo(L, Y(v)); c.lineTo(Rr, Y(v)); c.stroke(); c.fillStyle = '#1d1d1b'; c.fillText(k ? a9fT(k, den) : '0', L - 6, Y(v)); }
+  xs.forEach((x, i) => { const v = P[i][0] / P[i][1], x0 = L + i * bw + 4; c.fillStyle = '#e8dcc0'; c.fillRect(x0, Y(v), bw - 8, B - Y(v)); c.strokeStyle = '#8a867c'; c.strokeRect(x0, Y(v), bw - 8, B - Y(v)); c.fillStyle = '#1d1d1b'; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillText(String(x), x0 + (bw - 8) / 2, B + 6); });
+  c.strokeStyle = '#1d1d1b'; c.beginPath(); c.moveTo(L, T - 4); c.lineTo(L, B); c.lineTo(Rr, B); c.stroke();
+  c.font = '13px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(xl, (L + Rr) / 2, B + 24);
+  c.save(); c.translate(14, (T + B) / 2); c.rotate(-Math.PI / 2); c.fillText('Probability', 0, 0); c.restore();
+};
+
+// ---------- 9.1 Sample Spaces and Probability ----------
+// #1–4: number of outcomes in a sample space
+TEMPLATES.a91Sample = (r) => {
+  const kind = pick(r, ['coinMarble', 'coins', 'letterNum', 'twoMarbles', 'dieCoin']);
+  let stem, n, why;
+  if (kind === 'coinMarble') { const k = ri(r, 2, 4), m = ri(r, 2, 4); stem = `You flip a coin and draw a marble at random from a bag containing ${k} purple marbles and ${m} white marbles.`; n = 2 * 2; why = 'The coin has 2 outcomes (heads, tails) and the marble has 2 outcomes (purple, white): 2 · 2 = 4.'; }
+  else if (kind === 'coins') { const k = ri(r, 2, 5); stem = `You flip ${k} coins.`; n = 2 ** k; why = `Each coin has 2 outcomes: 2${b3sup(k)} = ${n}.`; }
+  else if (kind === 'letterNum') { const L = ri(r, 4, 8), N = ri(r, 2, 6), last = String.fromCharCode(64 + L); stem = `You randomly choose a letter from A to ${last} and a whole number from 1 to ${N}.`; n = L * N; why = `${L} letters · ${N} numbers = ${n}.`; }
+  else if (kind === 'dieCoin') { stem = 'You roll a six-sided die and flip a coin.'; n = 12; why = '6 · 2 = 12.'; }
+  else { const g = ri(r, 2, 4), b = ri(r, 2, 4); stem = `You draw two marbles without replacement from a bag containing ${g} green marbles and ${b} black marbles. Count the outcomes by color (first marble, second marble).`; n = 4; why = 'Each draw can be green or black, and both colors have more than one marble: GG, GB, BG, BB = 4.'; }
+  return { topic: 'Sample spaces', stem: `Find the number of possible outcomes in the sample space.   ${stem}`,
+    ...buildChoices(r, String(n), [String(n * 2), String(n / 2), String(n + 2)].filter((t, i, A) => t !== String(n) && A.indexOf(t) === i && Number.isInteger(+t)), (i) => String(n + 3 + i)),
+    fr: { fields: [{ kind: 'number', label: 'Outcomes:' }], key: [String(n)], display: String(n), check: (v) => numOk(v[0], n) }, solution: why };
+};
+// #6, 15–16: theoretical probability from counts
+TEMPLATES.a91Theo = (r) => {
+  const kind = pick(r, ['survey', 'survey', 'cards', 'artifacts']);
+  if (kind === 'cards') { const two = r() < 0.5, suit = pick(r, ['spades', 'hearts', 'diamonds', 'clubs']);
+    return two ? a9probQ(r, { topic: 'Theoretical probability', stem: `You randomly draw one card from each of two standard 52-card decks. What is the probability that both cards are ${suit}?`, a: 1, b: 16, wrong: [[1, 4], [1, 2], [1, 8]], solution: `Each draw: 13/52 = 1/4. Both: (1/4)(1/4) = 1/16.` })
+      : a9probQ(r, { topic: 'Theoretical probability', stem: `You randomly draw one card from a standard 52-card deck. What is the probability that it is a face card (jack, queen, or king)?`, a: 12, b: 52, wrong: [[3, 52], [4, 52], [1, 4]], solution: `There are 3 face cards in each of 4 suits: 12/52 = 3/13.` }); }
+  const items = kind === 'artifacts' ? ['tools', 'pottery', 'coins'] : shuffle(r, ['American', 'Italian', 'Mexican', 'Chinese', 'Japanese', 'Other']).slice(0, 5);
+  const counts = items.map(() => ri(r, kind === 'artifacts' ? 4 : 8, kind === 'artifacts' ? 15 : 40)), tot = a8sum(counts), k = ri(r, 0, items.length - 1);
+  const stem = kind === 'artifacts' ? `An archaeologist uncovers ${tot} artifacts: ${items.map((t, i) => `${counts[i]} ${t}`).join(', ')}. An artifact is randomly selected for display. What is the probability that it is ${items[k] === 'pottery' ? 'a piece of pottery' : 'a ' + items[k].replace(/s$/, '')}?`
+    : `A survey of ${tot} teenagers asked what type of food they like best: ${items.map((t, i) => `${t} ${counts[i]}`).join(', ')}. What is the probability that a randomly selected teenager from the survey likes ${items[k]} food best?`;
+  return a9probQ(r, { topic: 'Theoretical probability', stem, a: counts[k], b: tot, wrong: [[counts[k], tot - counts[k]], [1, items.length], [tot - counts[k], tot]], solution: `P = (number of favorable outcomes) ÷ (total) = ${counts[k]}/${tot}${a9fT(counts[k], tot) !== `${counts[k]}/${tot}` ? ` = ${a9fT(counts[k], tot)}` : ''}.` });
+};
+// #7: complements with two dice
+TEMPLATES.a91Complement = (r) => {
+  const kind = pick(r, ['not', 'greater', 'atleast']), s = ri(r, 3, 10), ways = (t) => 6 - Math.abs(t - 7);
+  let fav, stem, why;
+  if (kind === 'not') { fav = 36 - ways(s); stem = `the sum is not ${s}`; why = `P(sum = ${s}) = ${ways(s)}/36, so P(not ${s}) = 1 − ${ways(s)}/36 = ${fav}/36`; }
+  else if (kind === 'greater') { let w = 0; for (let t = 2; t <= s; t++) w += ways(t); fav = 36 - w; stem = `the sum is greater than ${s}`; why = `The complement is a sum of ${s} or less: ${w} outcomes. P = 1 − ${w}/36 = ${fav}/36`; }
+  else { let w = 0; for (let t = 2; t < s; t++) w += ways(t); fav = 36 - w; stem = `the sum is at least ${s}`; why = `The complement is a sum less than ${s}: ${w} outcomes. P = 1 − ${w}/36 = ${fav}/36`; }
+  return a9probQ(r, { topic: 'Complements', stem: `Two six-sided dice are rolled (36 possible outcomes). Find the probability that ${stem}.`, a: fav, b: 36, wrong: [[36 - fav, 36], [fav, 11], [fav + 1, 36]], solution: `${why} = ${a9fT(fav, 36)}.` });
+};
+// #11–12: geometric probability
+TEMPLATES.a91Geo = (r) => {
+  if (r() < 0.5) {
+    const s = pick(r, [12, 16, 18, 20, 24]), rad = s / 2, sq = pick(r, [4, 6, 8]), p = (Math.PI * rad * rad - sq * sq) / (s * s);
+    return a9probQ(r, { topic: 'Geometric probability', stem: `A square dartboard is ${s} inches on each side. A circle of radius ${rad} inches is drawn inside it, and a ${sq}-inch square in the middle of the circle is painted red. Your dart is equally likely to hit any point on the board. What is the probability that it lands inside the circle but not in the red square?`, p,
+      wrong: [[Math.PI * rad * rad / (s * s)], [(s * s - Math.PI * rad * rad) / (s * s)], [Math.PI / 4 - 0.1]], solution: `Area of the circle minus the red square: π(${rad})² − ${sq}² ≈ ${Math.round(Math.PI * rad * rad * 10) / 10 - sq * sq}. Area of the board: ${s * s}.\nP ≈ ${a9dec(p)}.` });
+  }
+  const seg = [pick(r, [0.1, 0.2, 0.3]), pick(r, [0.3, 0.4, 0.5, 0.6]), pick(r, [0.2, 0.3, 0.4])], names = ['Pine Street', 'Park Street', 'Cherry Street'], k = ri(r, 0, 2), tot = a8sum(seg);
+  const [num, den] = [Math.round(seg[k] * 10), Math.round(tot * 10)];
+  return a9probQ(r, { topic: 'Geometric probability', stem: `A student walks home from school along ${names[0]} (${seg[0]} mi), then ${names[1]} (${seg[1]} mi), then ${names[2]} (${seg[2]} mi), and loses his earbuds somewhere along the way. They are equally likely to be at any point on the path. What is the probability that they are on ${names[k]}?`, a: num, b: den,
+    wrong: [[1, 3], [den - num, den], [num, den - num]], solution: `P = (length of ${names[k]}) ÷ (total length) = ${seg[k]} ÷ ${fmt(Math.round(tot * 10) / 10)} = ${a9fT(num, den)}.` });
+};
+// #13: experimental probability from a table of die rolls
+TEMPLATES.a91Exp = (r) => {
+  const N = pick(r, [60, 120, 30]), counts = [...Array(6)].map(() => ri(r, N / 6 - (N >= 60 ? 6 : 3), N / 6 + (N >= 60 ? 6 : 3))); counts[5] = N - a8sum(counts.slice(0, 5)); if (counts[5] < 1) return TEMPLATES.a91Exp(r);
+  const k = ri(r, 0, 5);
+  return a9probQ(r, { topic: 'Experimental probability', stem: `You roll a six-sided die ${N} times. The table shows the results. What is the experimental probability of rolling a ${k + 1}?`, a: counts[k], b: N,
+    draw: a9tableDraw([['Number', 1, 2, 3, 4, 5, 6], ['Times rolled', ...counts]]), size: [440, 90],
+    wrong: [[1, 6], [counts[k], 6 * N / 6 + 6], [k + 1, 6]], solution: `Experimental probability = (times it happened) ÷ (number of trials) = ${counts[k]}/${N}${a9fT(counts[k], N) !== `${counts[k]}/${N}` ? ` = ${a9fT(counts[k], N)}` : ''}. (The theoretical probability is 1/6.)` });
+};
+
+// ---------- 9.2 Two-Way Tables ----------
+// a 2 × 2 table of counts with totals
+const a9tt = (r) => { const a = ri(r, 5, 60), b = ri(r, 5, 60), c = ri(r, 5, 60), d = ri(r, 5, 60); return { a, b, c, d }; };
+const A9CTX = [{ title: 'Preparation', rows: ['Pass', 'Fail'], cols: ['Studied', 'Did Not Study'] }, { title: 'Response', rows: ['Student', 'Teacher'], cols: ['Yes', 'No'] }, { title: 'Curfew', rows: ['Senior', 'Junior'], cols: ['Yes', 'No'] }, { title: 'Washed hands', rows: ['Male', 'Female'], cols: ['Yes', 'No'] }, { title: 'Got the flu', rows: ['Vaccine', 'No vaccine'], cols: ['Flu', 'No flu'] }];
+const a9full = (X, T) => [['', ...X.cols, 'Total'], [X.rows[0], T.a, T.b, T.a + T.b], [X.rows[1], T.c, T.d, T.c + T.d], ['Total', T.a + T.c, T.b + T.d, T.a + T.b + T.c + T.d]];
+// #1–2: complete the two-way table
+TEMPLATES.a92Complete = (r) => {
+  const X = pick(r, A9CTX), T = a9tt(r), F = a9full(X, T);
+  // show 4 cells (enough to find the rest), hide the others
+  const showSets = [[[1, 2], [2, 3], [3, 1], [3, 3]], [[1, 1], [2, 2], [1, 3], [3, 3]], [[1, 1], [1, 2], [2, 1], [3, 3]], [[1, 3], [2, 1], [3, 2], [3, 3]]], show = pick(r, showSets);
+  const G = F.map((row, i) => row.map((t, j) => (i === 0 || j === 0 ? t : show.some(([a, b]) => a === i && b === j) ? t : null)));
+  const ask = [[1, 1], [1, 2], [2, 1], [2, 2]].filter(([i, j]) => G[i][j] == null).slice(0, 2), lbl = ([i, j]) => `${F[i][0]}, ${F[0][j]}`;
+  const correct = ask.map((c) => `${lbl(c)}: ${F[c[0]][c[1]]}`).join('; ');
+  return { topic: 'Two-way tables', stem: 'Complete the two-way table. Then give the missing values asked for.', draw: a9tableDraw(G, { title: X.title }), size: [460, 170],
+    ...buildChoices(r, correct, [ask.map((c) => `${lbl(c)}: ${F[c[0]][c[1]] + 2}`).join('; '), ask.map((c, k) => `${lbl(c)}: ${F[ask[1 - k] ? ask[1 - k][0] : c[0]][ask[1 - k] ? ask[1 - k][1] : c[1]]}`).join('; ')].filter((x) => x !== correct), (i) => ask.map((c) => `${lbl(c)}: ${F[c[0]][c[1]] - i - 1}`).join('; ')),
+    fr: { fields: ask.map((c) => ({ kind: 'number', label: `${lbl(c)}:` })), key: ask.map((c) => String(F[c[0]][c[1]])), display: correct, check: (v) => ask.every((c, k) => numOk(v[k], F[c[0]][c[1]])), score: (v) => ask.filter((c, k) => numOk(v[k], F[c[0]][c[1]])).length / ask.length },
+    solution: `Each row and column adds up to its total.\n${F.slice(1).map((row) => row.join('  ')).join('\n')}` };
+};
+// #3–6: joint and marginal relative frequencies
+TEMPLATES.a92Joint = (r) => {
+  const X = pick(r, A9CTX), T = a9tt(r), F = a9full(X, T), N = F[3][3], joint = r() < 0.6;
+  const i = ri(r, 1, 2), j = ri(r, 1, 2), cnt = joint ? F[i][j] : r() < 0.5 ? F[i][3] : F[3][j], what = joint ? `${F[i][0].toLowerCase()} and ${F[0][j].toLowerCase()}` : F[i][3] === cnt ? F[i][0].toLowerCase() : F[0][j].toLowerCase();
+  return a9probQ(r, { topic: 'Relative frequencies', stem: `Use the two-way table. Find the ${joint ? 'joint' : 'marginal'} relative frequency for "${what}."`, a: cnt, b: N, label: 'Relative frequency:',
+    draw: a9tableDraw(F, { title: X.title }), size: [460, 170], wrong: [[cnt, joint ? F[i][3] : N - cnt], [N - cnt, N], [cnt, F[3][j]]],
+    solution: `A ${joint ? 'joint' : 'marginal'} relative frequency divides a ${joint ? 'cell' : 'total'} by the grand total: ${cnt}/${N} ≈ ${a9dec(cnt / N)}.` });
+};
+// #7–8: conditional relative frequencies
+TEMPLATES.a92Cond = (r) => {
+  const X = pick(r, A9CTX), T = a9tt(r), F = a9full(X, T), byRow = r() < 0.5, i = ri(r, 1, 2), j = ri(r, 1, 2), cnt = F[i][j], tot = byRow ? F[i][3] : F[3][j];
+  return a9probQ(r, { topic: 'Conditional relative frequencies', stem: `Use the two-way table. Find the conditional relative frequency of "${byRow ? F[0][j].toLowerCase() : F[i][0].toLowerCase()}" given "${byRow ? F[i][0].toLowerCase() : F[0][j].toLowerCase()}" (based on the ${byRow ? 'row' : 'column'} total).`, a: cnt, b: tot, label: 'Relative frequency:',
+    draw: a9tableDraw(F, { title: X.title }), size: [460, 170], wrong: [[cnt, F[3][3]], [cnt, byRow ? F[3][j] : F[i][3]], [tot - cnt, tot]],
+    solution: `Divide the cell by its ${byRow ? 'row' : 'column'} total: ${cnt}/${tot} ≈ ${a9dec(cnt / tot)}.` });
+};
+
+// ---------- 9.3 Conditional Probability ----------
+// #3–4: P(A | B) from a two-way table of counts
+TEMPLATES.a93Table = (r) => {
+  const X = pick(r, [{ title: 'Grade', rows: ['Test A', 'Test B', 'Test C'], cols: ['Pass', 'Fail'] }, { title: 'Location', rows: ['Tropical depression', 'Tropical storm', 'Hurricane'], cols: ['Northern', 'Southern'] }]);
+  const cells = X.rows.map(() => X.cols.map(() => ri(r, 5, 120))), rowT = cells.map((row) => a8sum(row)), colT = X.cols.map((_, j) => a8sum(cells.map((row) => row[j])));
+  const i = ri(r, 0, 2), j = ri(r, 0, 1), givenRow = r() < 0.5, cnt = cells[i][j], tot = givenRow ? rowT[i] : colT[j];
+  const A = givenRow ? X.cols[j] : X.rows[i], B = givenRow ? X.rows[i] : X.cols[j];
+  return a9probQ(r, { topic: 'Conditional probability', stem: `Use the two-way table to find P(${A} | ${B}).`, a: cnt, b: tot,
+    draw: a9tableDraw([['', ...X.cols], ...X.rows.map((t, k) => [t, ...cells[k]])], { title: X.title }), size: [440, 160], wrong: [[cnt, givenRow ? colT[j] : rowT[i]], [cnt, a8sum(rowT)], [tot - cnt, tot]],
+    solution: `Only look at the "${B}" ${givenRow ? 'row' : 'column'}: ${tot} in all, ${cnt} of them "${A}".\nP(${A} | ${B}) = ${cnt}/${tot} ≈ ${a9dec(cnt / tot)}.` });
+};
+// #9–10: P(B | A) = P(A and B) / P(A) from percents
+TEMPLATES.a93Formula = (r) => {
+  const pa = ri(r, 30, 90), pab = ri(r, 3, Math.min(pa, 60) - 1);
+  const [A, AB, Q] = pick(r, [['attend the football game', 'attend the football game and the dance', 'a student who attends the football game also attends the dance'],
+    ['buy gasoline', 'buy gasoline and a beverage', 'a customer who buys gasoline also buys a beverage'],
+    ['have video streaming', 'have video streaming and music streaming', 'a person with video streaming also has music streaming']]);
+  return a9probQ(r, { topic: 'Conditional probability', stem: `In a survey, ${pa}% of the people ${A}, and ${pab}% ${AB}. What is the probability that ${Q}?`, p: pab / pa, wrong: [[pab / 100], [pa / 100], [(pa - pab) / pa]],
+    solution: `P(B | A) = P(A and B) ÷ P(A) = ${pab / 100} ÷ ${pa / 100} ≈ ${a9dec(pab / pa)}.` });
+};
+// #1–2: choosing two different items
+TEMPLATES.a93Select = (r) => {
+  const [n1, t1, n2, t2] = pick(r, [[3, 'fruits', 2, 'vegetables'], [3, 'action films', 3, 'comedy films'], [4, 'red marbles', 5, 'blue marbles'], [5, 'mystery books', 3, 'biographies']]), firstSame = r() < 0.4, tot = n1 + n2;
+  const fav = firstSame ? n1 - 1 : n2;
+  return a9probQ(r, { topic: 'Conditional probability', stem: `You choose two different items at random from ${n1} ${t1} and ${n2} ${t2}. Find the probability that the second is one of the ${firstSame ? t1 : t2} given that the first is one of the ${t1}.`, a: fav, b: tot - 1, wrong: [[fav, tot], [firstSame ? n1 : n2, tot], [fav + 1, tot - 1]],
+    solution: `After one of the ${t1} is chosen, ${tot - 1} items are left, and ${fav} of them are ${firstSame ? t1 : t2}: ${fav}/${tot - 1}${a9fT(fav, tot - 1) !== `${fav}/${tot - 1}` ? ` = ${a9fT(fav, tot - 1)}` : ''}.` });
+};
+// #15: a Venn diagram of counts
+TEMPLATES.a93Venn = (r) => {
+  const a = ri(r, 20, 70), both = ri(r, 10, 40), b = ri(r, 10, 40), none = ri(r, 30, 100), N = a + both + b + none, neither = r() < 0.4;
+  return a9probQ(r, { topic: 'Conditional probability', stem: `A survey asked people whether they own a dog and whether they own a cat: ${a} own only a dog, ${b} own only a cat, ${both} own both, and ${none} own neither. ${neither ? 'What is the probability that a randomly selected person owns neither pet?' : 'What is the probability that a randomly selected dog owner also owns a cat?'}`,
+    a: neither ? none : both, b: neither ? N : a + both, wrong: neither ? [[none, N - none], [a + b, N], [none, a + b + both]] : [[both, N], [both, b + both], [both, a]],
+    solution: neither ? `${none} of the ${N} people own neither pet: ${a9fT(none, N)}.` : `Dog owners: ${a} + ${both} = ${a + both}; ${both} of them also own a cat: ${both}/${a + both}${a9fT(both, a + both) !== `${both}/${a + both}` ? ` = ${a9fT(both, a + both)}` : ''}.` });
+};
+
+// ---------- 9.4 Independent and Dependent Events ----------
+const A9IND = ['Independent', 'Dependent'];
+TEMPLATES.a94Indep = (r) => {
+  const S = pick(r, [['You spin a spinner with four equal sections twice. Event A: blue on the first spin. Event B: green on the second spin.', 'Independent', 'The first spin does not change the spinner, so the probability of B is the same either way.'],
+    ['A bowl has three green apples and one red apple. You select one apple to eat now and another to eat later. Event A: a green apple first. Event B: a green apple second.', 'Dependent', 'The first apple is not replaced, so it changes what is left for the second pick.'],
+    ['A student guesses the answers to a three-question multiple-choice quiz. Event A: question 1 correct. Event B: question 2 correct.', 'Independent', 'Each guess has a 1/4 chance no matter how the other guesses turn out.'],
+    ['A bag contains four quarters and one nickel. You select two coins without replacement. Event A: a quarter first. Event B: a quarter second.', 'Dependent', 'Without replacement, the first coin changes the coins that are left.'],
+    ['You flip a coin and roll a six-sided die. Event A: tails. Event B: a 4.', 'Independent', 'The coin has no effect on the die.'],
+    ['You roll a six-sided die two times. Event A: a 6 first. Event B: a 1 second.', 'Independent', 'Each roll has the same six outcomes.'],
+    ['You have six solid and three striped phone cases. You select a case, set it aside, and select another. Event A: striped first. Event B: striped second.', 'Dependent', 'The first case is set aside, so P(striped second) depends on the first pick: 2/8 instead of 3/9.'],
+    ['You draw a card, put it back, shuffle, and draw again. Event A: a heart first. Event B: a heart second.', 'Independent', 'The card is replaced, so the deck is the same for the second draw.']]);
+  return { topic: 'Independent and dependent events', stem: `Determine whether the events are independent or dependent.   ${S[0]}`, ...buildChoices(r, S[1], A9IND.filter((x) => x !== S[1]), () => null), fr: FR.select('The events are', A9IND, S[1]), solution: S[2] };
+};
+// #13–16: P(A and B), with or without replacement
+TEMPLATES.a94Both = (r) => {
+  const [n1, t1, n2, t2] = pick(r, [[12, 'movie tickets', 8, 'concert tickets'], [3, 'animated movies', 4, 'adventure movies'], [6, 'red marbles', 4, 'blue marbles'], [5, 'restaurant gift cards', 3, 'store gift cards']]), rep = r() < 0.35, N = n1 + n2;
+  const sameA = r() < 0.5, aCnt = sameA ? n2 : n1, bCnt = sameA ? (rep ? n2 : n2 - 1) : n2, den = rep ? N * N : N * (N - 1), num = aCnt * bCnt, ta = sameA ? t2 : t1, tb = t2;
+  return a9probQ(r, { topic: 'Independent and dependent events', stem: `A bag contains ${n1} ${t1} and ${n2} ${t2}. You randomly choose one, ${rep ? 'put it back' : 'do not replace it'}, and then randomly choose another. Find the probability that the first is one of the ${ta} and the second is one of the ${tb}.`, a: num, b: den,
+    wrong: [[aCnt * (rep ? bCnt - 1 : bCnt + 1), den], [aCnt + bCnt, 2 * N], [aCnt * n2, N * N]],
+    solution: `P(first) = ${aCnt}/${N}. ${rep ? 'It is replaced, so' : 'It is not replaced, so'} P(second | first) = ${bCnt}/${rep ? N : N - 1}.\nP(both) = (${aCnt}/${N})(${bCnt}/${rep ? N : N - 1}) = ${a9fT(num, den)} ≈ ${a9dec(num / den)}.` });
+};
+// #19–20: find P(A)
+TEMPLATES.a94Solve = (r) => {
+  const ind = r() < 0.5, pa = pick(r, [0.2, 0.25, 0.3, 0.4, 0.5, 0.6]), pb = pick(r, [0.2, 0.4, 0.5, 0.6, 0.8]), pab = Math.round(pa * pb * 10000) / 10000;
+  return ind ? a9probQ(r, { topic: 'Independent and dependent events', stem: `Events A and B are independent. Let P(B) = ${pb} and P(A and B) = ${pab}. Find P(A).`, p: pa, wrong: [[pab * pb], [pb - pab], [pab]], solution: `Independent: P(A and B) = P(A) · P(B), so P(A) = ${pab} ÷ ${pb} = ${pa}.`, label: 'P(A) =' })
+    : a9probQ(r, { topic: 'Independent and dependent events', stem: `Events A and B are dependent. Let P(B | A) = ${pb} and P(A and B) = ${pab}. Find P(A).`, p: pa, wrong: [[pab * pb], [pb - pab], [pab]], solution: `P(A and B) = P(A) · P(B | A), so P(A) = ${pab} ÷ ${pb} = ${pa}.`, label: 'P(A) =' });
+};
+
+// ---------- 9.5 Probability of Disjoint and Overlapping Events ----------
+TEMPLATES.a95Disjoint = (r) => {
+  const fr = r() < 0.5, [a, b] = fr ? [[ri(r, 1, 3), pick(r, [5, 7, 9])], [1, pick(r, [4, 5, 6])]] : [[ri(r, 1, 5) / 10, 1], [ri(r, 1, 4) / 10, 1]];
+  const p = a[0] / a[1] + b[0] / b[1];
+  const t = (x) => (fr ? a9fT(x[0], x[1]) : fmt(x[0]));
+  return fr ? a9probQ(r, { topic: 'Disjoint events', stem: `Events A and B are disjoint. P(A) = ${t(a)} and P(B) = ${t(b)}. Find P(A or B).`, a: a[0] * b[1] + b[0] * a[1], b: a[1] * b[1], wrong: [[a[0] * b[0], a[1] * b[1]], [a[0] + b[0], a[1] + b[1]]], solution: `Disjoint: P(A or B) = P(A) + P(B) = ${t(a)} + ${t(b)} = ${a9fT(a[0] * b[1] + b[0] * a[1], a[1] * b[1])}.`, label: 'P(A or B) =' })
+    : a9probQ(r, { topic: 'Disjoint events', stem: `Events A and B are disjoint. P(A) = ${t(a)} and P(B) = ${t(b)}. Find P(A or B).`, p, wrong: [[a[0] * b[0]], [Math.abs(a[0] - b[0])]], solution: `Disjoint: P(A or B) = P(A) + P(B) = ${t(a)} + ${t(b)} = ${a9dec(p)}.`, label: 'P(A or B) =' });
+};
+// #3–8: a 12-section spinner
+const A9SPIN = [['yellow', 1], ['red', 2], ['blue', 3], ['blue', 4], ['red', 5], ['yellow', 6], ['blue', 7], ['red', 8], ['green', 9], ['blue', 10], ['red', 11], ['blue', 12]].map(([color, n]) => ({ color, n }));
+TEMPLATES.a95Spinner = (r) => {
+  const colors = shuffle(r, ['red', 'blue', 'yellow', 'green']), S = A9SPIN.map((s, i) => ({ n: s.n, color: colors[['yellow', 'red', 'blue', 'green'].indexOf(s.color)] }));
+  const col = pick(r, ['red', 'blue', 'yellow', 'green']);
+  const conds = [['a 1', (n) => n === 1], ['a multiple of 4', (n) => n % 4 === 0], ['an odd number', (n) => n % 2 === 1], ['a number less than 5', (n) => n < 5], ['a factor of 6', (n) => 6 % n === 0], ['a number greater than 9', (n) => n > 9], ['an even number', (n) => n % 2 === 0], ['a prime number', (n) => [2, 3, 5, 7, 11].includes(n)]];
+  const [ct, cf] = pick(r, conds), A = S.filter((s) => s.color === col).length, B = S.filter((s) => cf(s.n)).length, both = S.filter((s) => s.color === col && cf(s.n)).length, U = A + B - both;
+  return a9probQ(r, { topic: 'Overlapping events', stem: `Each section of the spinner has the same area. Find the probability of spinning ${col} or ${ct}.`, a: U, b: 12, draw: a9spinDraw(S), size: [300, 300],
+    wrong: [[A + B + 1, 12], [both || A + B - 1, 12], [Math.max(A, B), 12]], solution: `${col[0].toUpperCase() + col.slice(1)}: ${A} section${A === 1 ? '' : 's'}. ${ct[0].toUpperCase() + ct.slice(1)}: ${B} section${B === 1 ? '' : 's'}. ${both ? `Both: ${both}.\nP = ${A}/12 + ${B}/12 − ${both}/12 = ` : `No section is both, so the events are disjoint.\nP = ${A}/12 + ${B}/12 = `}${U}/12${a9fT(U, 12) !== `${U}/12` ? ` = ${a9fT(U, 12)}` : ''}.` });
+};
+// #11–14: overlapping events from counts
+TEMPLATES.a95Overlap = (r) => {
+  const findBoth = r() < 0.4, N = pick(r, [30, 40, 50, 60, 120]), A = ri(r, Math.round(N * 0.2), Math.round(N * 0.5)), B = ri(r, Math.round(N * 0.2), Math.round(N * 0.5)), both = ri(r, 2, Math.min(A, B) - 1), U = A + B - both;
+  const [w, a, b, one, aS, bS] = pick(r, [['students', 'play a sport', 'play an instrument', 'student', 'plays a sport', 'plays an instrument'], ['teenagers', 'take hip hop', 'take jazz', 'teenager', 'takes hip hop', 'takes jazz'], ['trees', 'have a disease', 'are damaged by insects', 'tree', 'has a disease', 'is damaged by insects'], ['customers', 'buy coffee', 'buy a muffin', 'customer', 'buys coffee', 'buys a muffin']]);
+  return findBoth ? a9probQ(r, { topic: 'Overlapping events', stem: `Of ${N} ${w}, ${A} ${a}, ${B} ${b}, and ${U} ${a} or ${b}. What is the probability that a randomly selected ${one} ${aS} and ${bS}?`, a: both, b: N, wrong: [[A + B, N], [U, N], [N - U, N]],
+      solution: `P(A or B) = P(A) + P(B) − P(A and B), so ${U}/${N} = ${A}/${N} + ${B}/${N} − P(A and B).\nP(A and B) = ${both}/${N}${a9fT(both, N) !== `${both}/${N}` ? ` = ${a9fT(both, N)}` : ''}.` })
+    : a9probQ(r, { topic: 'Overlapping events', stem: `Of ${N} ${w}, ${A} ${a}, ${B} ${b}, and ${both} do both. What is the probability that a randomly selected ${one} ${aS} or ${bS}?`, a: U, b: N, wrong: [[A + B, N], [both, N], [N - U, N]],
+      solution: `P(A or B) = P(A) + P(B) − P(A and B) = ${A}/${N} + ${B}/${N} − ${both}/${N} = ${U}/${N}${a9fT(U, N) !== `${U}/${N}` ? ` = ${a9fT(U, N)}` : ''}.` });
+};
+// #15: two groups (total probability)
+TEMPLATES.a95Groups = (r) => {
+  const m = ri(r, 35, 65), pm = ri(r, 20, 70), pf = ri(r, 20, 70), p = (m * pm + (100 - m) * pf) / 10000;
+  return a9probQ(r, { topic: 'Disjoint and overlapping events', stem: `A focus group is ${m}% male. Of the responses, ${pm}% of the males and ${pf}% of the females said they would buy a new fruit drink. What is the probability that a randomly selected person would buy the drink?`, p, wrong: [[(pm + pf) / 200], [(m * pm) / 10000], [pf / 100]],
+    solution: `P(male and buy) = ${m / 100}(${pm / 100}) = ${a9dec(m * pm / 10000)}; P(female and buy) = ${(100 - m) / 100}(${pf / 100}) = ${a9dec((100 - m) * pf / 10000)}.\nThese are disjoint, so add: ${a9dec(p)}.` });
+};
+
+// ---------- 9.6 Permutations and Combinations ----------
+const A9WORDS = ['AT', 'TRY', 'ROCK', 'WATER', 'FAMILY', 'FLOWERS', 'MATH', 'PLANET', 'CHAIR', 'SPRING', 'DOG', 'BRICK'];
+TEMPLATES.a96Arrange = (r) => {
+  const w = pick(r, A9WORDS), n = w.length, all = a9fac(n), two = n * (n - 1), correct = `all letters: ${all}; 2 letters: ${two}`;
+  return { topic: 'Permutations', stem: `Find the number of ways you can arrange (a) all of the letters and (b) 2 of the letters in the word ${w}.`,
+    ...buildChoices(r, correct, [`all letters: ${n}; 2 letters: ${two}`, `all letters: ${all}; 2 letters: ${a9C(n, 2)}`, `all letters: ${all}; 2 letters: ${n * 2}`].filter((x) => x !== correct), () => null),
+    fr: { fields: [{ kind: 'number', label: '(a) All the letters:' }, { kind: 'number', label: '(b) 2 of the letters:' }], key: [String(all), String(two)], display: correct, check: (v) => numOk(v[0], all) && numOk(v[1], two), score: (v) => ((numOk(v[0], all) ? 1 : 0) + (numOk(v[1], two) ? 1 : 0)) / 2 },
+    solution: `${n} different letters. (a) ${n}! = ${all}. (b) ${n}P2 = ${n} · ${n - 1} = ${two}.` };
+};
+const a9sub = (k) => String(k).split('').map((d) => '₀₁₂₃₄₅₆₇₈₉'[d]).join('');
+TEMPLATES.a96Perm = (r) => {
+  const n = ri(r, 5, 12), k = r() < 0.1 ? n : ri(r, 1, Math.min(n, 6)), v = a9P(n, k);
+  return { topic: 'Permutations', stem: `Evaluate the expression.   ${a9sub(n)}P${a9sub(k)}`,
+    ...buildChoices(r, String(v), [String(a9C(n, k)), String(a9fac(n) / Math.max(1, a9fac(k))), String(n * k)].filter((t, i, A) => t !== String(v) && A.indexOf(t) === i), (i) => String(v + i + 1)),
+    fr: { fields: [{ kind: 'number', label: '' }], key: [String(v)], display: String(v), check: (x) => numOk(x[0], v) },
+    solution: `${a9sub(n)}P${a9sub(k)} = ${n}! / (${n} − ${k})! = ${n}! / ${n - k}! = ${k ? [...Array(k)].map((_, i) => n - i).join(' · ') + ' = ' : ''}${v}` };
+};
+TEMPLATES.a96Comb = (r) => {
+  const n = ri(r, 5, 12), k = r() < 0.1 ? n : ri(r, 1, Math.min(n - 1, 6)), v = a9C(n, k);
+  return { topic: 'Combinations', stem: `Evaluate the expression.   ${a9sub(n)}C${a9sub(k)}`,
+    ...buildChoices(r, String(v), [String(a9P(n, k)), String(n * k), String(a9C(n, k - 1) || 1)].filter((t, i, A) => t !== String(v) && A.indexOf(t) === i), (i) => String(v + i + 1)),
+    fr: { fields: [{ kind: 'number', label: '' }], key: [String(v)], display: String(v), check: (x) => numOk(x[0], v) },
+    solution: `${a9sub(n)}C${a9sub(k)} = ${n}! / ((${n} − ${k})! · ${k}!) = ${a9P(n, k)} / ${a9fac(k)} = ${v}` };
+};
+// #13–14, 17–20, 27–28, 41: counting word problems
+TEMPLATES.a96Count = (r) => {
+  const S = pick(r, [() => { const n = ri(r, 8, 15); return [`${n} students are competing in a contest. In how many different ways can they finish first, second, and third?`, a9P(n, 3), 'Order matters (first, second, third): a permutation', `${n}P3 = ${n} · ${n - 1} · ${n - 2}`]; },
+    () => { const n = ri(r, 4, 7); return [`${n} friends go to a movie. In how many different ways can they sit together in a row of ${n} seats?`, a9fac(n), 'Order matters: all the arrangements', `${n}! `]; },
+    () => { const n = ri(r, 15, 30), k = ri(r, 3, 5); return [`A team of ${n} rowers attends a tournament. ${k} rowers compete at a time. How many combinations of ${k} rowers are possible?`, a9C(n, k), 'Order does not matter: a combination', `${n}C${k}`]; },
+    () => { const n = ri(r, 5, 9); return [`A store sells ${n} flavors of dip. You buy 2 different flavors. How many combinations are possible?`, a9C(n, 2), 'Order does not matter: a combination', `${n}C2`]; },
+    () => { const L = pick(r, [['A', 'B', 'C', 'D'], ['U', 'V', 'W', 'X', 'Y', 'Z'], ['D', 'E', 'F', 'G', 'H'], ['L', 'M', 'N', 'O']]), k = ri(r, 2, Math.min(4, L.length - 1)); return [`Count the possible combinations of ${k} letters chosen from the list ${L.join(', ')}.`, a9C(L.length, k), 'Order does not matter: a combination', `${L.length}C${k}`]; },
+    () => { const m = ri(r, 4, 6), t = ri(r, 5, 7); return [`You are ordering a burrito with 2 different main ingredients from ${m} choices and 3 different toppings from ${t} choices. How many different burritos are possible?`, a9C(m, 2) * a9C(t, 3), 'Order does not matter in either choice; multiply the counts', `${m}C2 · ${t}C3 = ${a9C(m, 2)} · ${a9C(t, 3)}`]; }])();
+  const [stem, v, why, calc] = S;
+  return { topic: 'Permutations and combinations', stem, ...buildChoices(r, String(v), [String(v * 2), String(Math.round(v / 2)), String(v + 10)].filter((t, i, A) => t !== String(v) && A.indexOf(t) === i), (i) => String(v + i + 1)),
+    fr: { fields: [{ kind: 'number', label: '' }], key: [String(v)], display: String(v), check: (x) => numOk(x[0], v) }, solution: `${why}: ${calc.trim()} = ${v}.` };
+};
+// #15, 33–34: probability with counting
+TEMPLATES.a96Prob = (r) => {
+  const kind = pick(r, ['sections', 'audience', 'schedule']);
+  if (kind === 'sections') { const n = ri(r, 6, 10); return a9probQ(r, { topic: 'Probability with counting', stem: `You and your friend are 2 of ${n} servers. At the start of a shift, the manager randomly assigns one section to each server. Find the probability that you are assigned Section 1 and your friend is assigned Section 2.`, a: 1, b: n * (n - 1), wrong: [[2, n * (n - 1)], [1, a9C(n, 2)], [1, n * n]], solution: `There are ${n}P2 = ${n * (n - 1)} ways to fill Sections 1 and 2, and 1 of them works: 1/${n * (n - 1)}.` }); }
+  if (kind === 'audience') { const n = pick(r, [100, 200, 300]); return a9probQ(r, { topic: 'Probability with counting', stem: `You and your friend are in a studio audience of ${n} people. 2 people are randomly selected as contestants. What is the probability that you and your friend are chosen?`, a: 1, b: a9C(n, 2), wrong: [[1, n * (n - 1)], [2, n], [1, n]], solution: `There are ${n}C2 = ${a9C(n, 2)} possible pairs, and 1 of them is you and your friend: 1/${a9C(n, 2)}.` }); }
+  const k = ri(r, 3, 5), fav = a9C(5, k), tot = a9C(7, k);
+  return a9probQ(r, { topic: 'Probability with counting', stem: `You work ${k} evenings each week. Your supervisor assigns you ${k} evenings at random from the 7 possible. What is the probability that your schedule does not include working on the weekend (Saturday or Sunday)?`, a: fav, b: tot, wrong: [[fav, a9P(7, k)], [5, 7], [k, 7]], solution: `Choose all ${k} evenings from the 5 weekdays: 5C${k} = ${fav}. All schedules: 7C${k} = ${tot}. P = ${a9fT(fav, tot)}.` });
+};
+
+// ---------- 9.7 Binomial Distributions ----------
+// #1–4: a probability distribution
+TEMPLATES.a97Dist = (r) => {
+  const counts = [ri(r, 2, 6), ri(r, 1, 5), ri(r, 1, 4)], N = a8sum(counts), k = ri(r, 0, 2);
+  return a9probQ(r, { topic: 'Probability distributions', stem: `A bag contains ${counts[0]} ball${counts[0] === 1 ? '' : 's'} labeled "1," ${counts[1]} ball${counts[1] === 1 ? '' : 's'} labeled "2," and ${counts[2]} ball${counts[2] === 1 ? '' : 's'} labeled "3." Let x be the number on a randomly chosen ball. Find P(x = ${k + 1}).`, a: counts[k], b: N, label: `P(x = ${k + 1}) =`, wrong: [[1, 3], [counts[k], N - counts[k]], [k + 1, N]],
+    solution: `Distribution: P(1) = ${a9fT(counts[0], N)}, P(2) = ${a9fT(counts[1], N)}, P(3) = ${a9fT(counts[2], N)}.\nP(x = ${k + 1}) = ${counts[k]}/${N}${a9fT(counts[k], N) !== `${counts[k]}/${N}` ? ` = ${a9fT(counts[k], N)}` : ''}.` });
+};
+// #5–6: read a probability histogram
+TEMPLATES.a97Read = (r) => {
+  const xs = r() < 0.5 ? [1, 2, 3, 4] : [5, 10, 15, 20, 25], den = xs.length === 4 ? 8 : 12;
+  let parts; for (;;) { parts = xs.map(() => ri(r, 1, 4)); const s = a8sum(parts); if (s === den) break; }
+  const mx = Math.max(...parts); if (parts.filter((p) => p === mx).length > 1) return TEMPLATES.a97Read(r);
+  const most = xs[parts.indexOf(mx)], even = xs.reduce((s, x, i) => s + (x % 2 === 0 ? parts[i] : 0), 0), ask = r() < 0.5;
+  const P = parts.map((p) => [p, den]), draw = a9histDraw(xs, P, 'Spinner Results', 'Number on spinner'), size = [420, 260];
+  if (ask) return { topic: 'Probability distributions', stem: 'Use the probability distribution. Which number is most likely to be spun?', draw, size,
+    ...buildChoices(r, String(most), xs.filter((x) => x !== most).map(String), () => null), fr: { fields: [{ kind: 'number', label: 'Most likely:' }], key: [String(most)], display: String(most), check: (v) => numOk(v[0], most) }, solution: `The tallest bar is at ${most}, so ${most} is most likely.` };
+  return a9probQ(r, { topic: 'Probability distributions', stem: 'Use the probability distribution. What is the probability of spinning an even number?', a: even, b: den, draw, size, wrong: [[1, 2], [den - even, den], [even, xs.length]], solution: `Add the probabilities of the even numbers: ${a9fT(even, den)}.` });
+};
+// #7–10: k heads in 20 coin flips
+TEMPLATES.a97Coin = (r) => {
+  const n = pick(r, [20, 20, 10, 8]), k = pick(r, [1, 4, 18, n, ri(r, 2, n - 2)].filter((x) => x <= n)), p = a9C(n, k) / 2 ** n;
+  return a9probQ(r, { topic: 'Binomial distributions', stem: `Calculate the probability of flipping a coin ${n} times and getting ${k} head${k === 1 ? '' : 's'}.`, a: a9C(n, k), b: 2 ** n, wrong: [[k / n], [1 / a9C(n, k)], [a9C(n, k) / 2 ** (n - 1)]],
+    solution: `P(k = ${k}) = ${n}C${k} (0.5)${b3sup(k)} (0.5)${b3sup(n - k)} = ${a9C(n, k)} / 2${b3sup(n)} ≈ ${a9dec(p)}.` });
+};
+// #11–12: binomial probabilities
+TEMPLATES.a97Binom = (r) => {
+  const n = ri(r, 4, 8), pp = pick(r, [0.3, 0.7, 0.4, 0.6, 0.2, 0.5]), kind = pick(r, ['exact', 'atmost', 'likely']), k = ri(r, 1, n - 1);
+  const f = (j) => a9C(n, j) * pp ** j * (1 - pp) ** (n - j), ex = f(k);
+  let am = 0; for (let j = 0; j <= k; j++) am += f(j);
+  const probs = [...Array(n + 1)].map((_, j) => f(j)), mode = probs.indexOf(Math.max(...probs));
+  const lead = `In your school, ${Math.round(pp * 100)}% of students plan to attend a movie night. You ask ${n} randomly chosen students whether they plan to attend.`;
+  if (kind === 'likely') return { topic: 'Binomial distributions', stem: `${lead} What is the most likely number of students who plan to attend?`, ...buildChoices(r, String(mode), [String(Math.min(n, mode + 1)), String(Math.max(0, mode - 1)), String(n)].filter((t, i, A) => t !== String(mode) && A.indexOf(t) === i), (i) => String((mode + 2 + i) % (n + 1))),
+    fr: { fields: [{ kind: 'number', label: '' }], key: [String(mode)], display: String(mode), check: (v) => numOk(v[0], mode) }, solution: `Compute P(k) = ${n}Ck (${pp})ᵏ(${fmt(Math.round((1 - pp) * 10) / 10)})ⁿ⁻ᵏ for each k. The greatest is at k = ${mode} (P ≈ ${a9dec(probs[mode])}).` };
+  return kind === 'exact' ? a9probQ(r, { topic: 'Binomial distributions', stem: `${lead} What is the probability that exactly ${k} plan to attend?`, p: ex, wrong: [[pp ** k], [a9C(n, k) * pp ** k], [k / n]], solution: `P(k = ${k}) = ${n}C${k} (${pp})${b3sup(k)} (${fmt(Math.round((1 - pp) * 10) / 10)})${b3sup(n - k)} = ${a9C(n, k)} · ${a9dec(pp ** k)} · ${a9dec((1 - pp) ** (n - k))} ≈ ${a9dec(ex)}.` })
+    : a9probQ(r, { topic: 'Binomial distributions', stem: `${lead} What is the probability that at most ${k} plan to attend?`, p: am, wrong: [[ex], [1 - am + ex], [am - f(0)]], solution: `Add P(0) through P(${k}): ${[...Array(k + 1)].map((_, j) => a9dec(f(j))).join(' + ')} ≈ ${a9dec(am)}.` });
+};
+for (const name of Object.keys(TEMPLATES)) if (/^a9\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== ALGEBRA 1 CH9 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -17311,6 +18273,25 @@ Object.assign(SETS, {
   'alg1-6-3': { subject: 'algebra1', title: '6.3 Properties of Radicals', items: [['a63IsSimple', 1], ['a63Sqrt', 3], ['a63Quot', 2], ['a63Cbrt', 2], ['a63FormOne', 1], ['a63Rational', 2], ['a63Conj', 2]] },
   'alg1-6-4': { subject: 'algebra1', title: '6.4 Exponential Functions', items: [['a64IsExp', 2], ['a64Table', 2], ['a64Eval', 3], ['a64Props', 3], ['a64Compare', 1], ['a64Situation', 1], ['a64Sketch', 2], ['a64GraphDR', 3]] },
   'alg1-6-5': { subject: 'algebra1', title: '6.5 Exponential Growth and Decay', items: [['a65Identify', 2], ['a65Write', 2], ['a65Model', 1], ['a65Table', 2], ['a65Rate', 2], ['a65Rewrite', 2], ['a65Compound', 2]] },
+  // ----- Algebra I, Chapter 7: Polynomials -----
+  'alg1-7-1': { subject: 'algebra1', title: '7.1 Adding and Subtracting Polynomials', items: [['a71Degree', 2], ['a71Classify', 2], ['a71Sum', 3], ['a71Diff', 3], ['a71TwoVar', 2], ['a71Word', 1]] },
+  'alg1-7-2': { subject: 'algebra1', title: '7.2 Multiplying Polynomials', items: [['a72Mono', 2], ['a72Binom', 4], ['a72Trinom', 3], ['a72Area', 1], ['a72FuncOps', 2], ['a72Struct', 1]] },
+  'alg1-7-3': { subject: 'algebra1', title: '7.3 Special Products of Polynomials', items: [['a73Square', 4], ['a73Area', 1], ['a73SumDiff', 4], ['a73Mental', 2]] },
+  'alg1-7-4': { subject: 'algebra1', title: '7.4 Solving Polynomial Equations in Factored Form', items: [['a74Solve', 3], ['a74Repeat', 2], ['a74Intercepts', 1], ['a74Factor', 2], ['a74SolveGCF', 3], ['a74Word', 1]] },
+  'alg1-7-5': { subject: 'algebra1', title: '7.5 Factoring x² + bx + c', items: [['a75Pos', 2], ['a75NegB', 2], ['a75NegC', 3], ['a75Solve', 4], ['a75Word', 1]] },
+  // ----- Algebra I, Chapter 8: Data Analysis and Displays -----
+  'alg1-8-1': { subject: 'algebra1', title: '8.1 Measures of Center and Variation', items: [['a81Center', 3], ['a81FindX', 2], ['a81Outlier', 2], ['a81Range', 2], ['a81Compare', 1], ['a81Transform', 2]] },
+  'alg1-8-2': { subject: 'algebra1', title: '8.2 Stem-and-Leaf Plots', items: [['a82Make', 3, 'fr'], ['a82Read', 4], ['a82Shape', 2]] },
+  'alg1-8-3': { subject: 'algebra1', title: '8.3 Box-and-Whisker Plots', items: [['a83Read', 3], ['a83Five', 2], ['a83Sketch', 3], ['a83Interpret', 2], ['a83Shape', 2]] },
+  'alg1-8-4': { subject: 'algebra1', title: '8.4 Data Displays', items: [['a84Qual', 6], ['a84Display', 3]] },
+  // ----- Algebra I, Chapter 9: Probability -----
+  'alg1-9-1': { subject: 'algebra1', title: '9.1 Sample Spaces and Probability', items: [['a91Sample', 2], ['a91Theo', 2], ['a91Complement', 2], ['a91Geo', 2], ['a91Exp', 2]] },
+  'alg1-9-2': { subject: 'algebra1', title: '9.2 Two-Way Tables and Probability', items: [['a92Complete', 3], ['a92Joint', 3], ['a92Cond', 3]] },
+  'alg1-9-3': { subject: 'algebra1', title: '9.3 Conditional Probability', items: [['a93Select', 2], ['a93Table', 3], ['a93Formula', 2], ['a93Venn', 2]] },
+  'alg1-9-4': { subject: 'algebra1', title: '9.4 Independent and Dependent Events', items: [['a94Indep', 4], ['a94Both', 4], ['a94Solve', 2]] },
+  'alg1-9-5': { subject: 'algebra1', title: '9.5 Probability of Disjoint and Overlapping Events', items: [['a95Disjoint', 2], ['a95Spinner', 4], ['a95Overlap', 3], ['a95Groups', 1]] },
+  'alg1-9-6': { subject: 'algebra1', title: '9.6 Permutations and Combinations', items: [['a96Arrange', 2], ['a96Perm', 2], ['a96Comb', 2], ['a96Count', 3], ['a96Prob', 2]] },
+  'alg1-9-7': { subject: 'algebra1', title: '9.7 Binomial Distributions', items: [['a97Dist', 2], ['a97Read', 2], ['a97Coin', 3], ['a97Binom', 3]] },
   // ----- Algebra II, Chapter 3: Quadratic Equations and Complex Numbers -----
   'alg2-3-1': { subject: 'algebra2', title: '3.1 Factoring ax² + bx + c', items: [['b31GCF', 2], ['b31Factor', 4], ['b31Solve', 3], ['b31Intercepts', 1], ['b31Word', 2]] },
   'alg2-3-2': { subject: 'algebra2', title: '3.2 Factoring Special Products', items: [['b32DiffSq', 3], ['b32Mental', 1], ['b32PerfSq', 3], ['b32Mixed', 2], ['b32Solve', 2], ['b32Word', 1]] },
@@ -17451,6 +18432,77 @@ QUESTION_TYPES.push(
   { id: 'a65Rate', subject: 'algebra1', section: '6.5 Exponential Growth and Decay', label: 'Percent rate of change', desc: '#35–42' },
   { id: 'a65Rewrite', subject: 'algebra1', section: '6.5 Exponential Growth and Decay', label: 'Rewrite to find the rate', desc: '#43–50' },
   { id: 'a65Compound', subject: 'algebra1', section: '6.5 Exponential Growth and Decay', label: 'Compound interest', desc: '#53–56' },
+  { id: 'a71Degree', subject: 'algebra1', section: '7.1 Adding and Subtracting Polynomials', label: 'Degree of a monomial', desc: '#1–8' },
+  { id: 'a71Classify', subject: 'algebra1', section: '7.1 Adding and Subtracting Polynomials', label: 'Standard form and classifying', desc: 'Degree, leading coefficient, number of terms (#9–16)' },
+  { id: 'a71Sum', subject: 'algebra1', section: '7.1 Adding and Subtracting Polynomials', label: 'Find the sum', desc: '#19–26' },
+  { id: 'a71Diff', subject: 'algebra1', section: '7.1 Adding and Subtracting Polynomials', label: 'Find the difference', desc: '#27–34' },
+  { id: 'a71TwoVar', subject: 'algebra1', section: '7.1 Adding and Subtracting Polynomials', label: 'Two variables', desc: 'Sum or difference (#39–42)' },
+  { id: 'a71Word', subject: 'algebra1', section: '7.1 Adding and Subtracting Polynomials', label: 'Word problems', desc: 'Costs, memberships, water rockets (#37–38, 43)' },
+  { id: 'a72Mono', subject: 'algebra1', section: '7.2 Multiplying Polynomials', label: 'Monomial times polynomial', desc: '#1–4' },
+  { id: 'a72Binom', subject: 'algebra1', section: '7.2 Multiplying Polynomials', label: 'Two binomials', desc: 'Distributive Property, table, FOIL (#5–24)' },
+  { id: 'a72Trinom', subject: 'algebra1', section: '7.2 Multiplying Polynomials', label: 'Binomial times trinomial', desc: '#31–38' },
+  { id: 'a72Area', subject: 'algebra1', section: '7.2 Multiplying Polynomials', label: 'Area polynomials', desc: 'Rectangles and triangles (#27–30)' },
+  { id: 'a72FuncOps', subject: 'algebra1', section: '7.2 Multiplying Polynomials', label: '(f + g)(x), (f − g)(x), (fg)(x)', desc: '#45–54' },
+  { id: 'a72Struct', subject: 'algebra1', section: '7.2 Multiplying Polynomials', label: 'Find a, b, and c', desc: '#44' },
+  { id: 'a73Square', subject: 'algebra1', section: '7.3 Special Products of Polynomials', label: 'Square of a binomial', desc: '#1–8' },
+  { id: 'a73Area', subject: 'algebra1', section: '7.3 Special Products of Polynomials', label: 'Area of a square', desc: '#9–12' },
+  { id: 'a73SumDiff', subject: 'algebra1', section: '7.3 Special Products of Polynomials', label: 'Sum and difference pattern', desc: '#13–22' },
+  { id: 'a73Mental', subject: 'algebra1', section: '7.3 Special Products of Polynomials', label: 'Mental math with the patterns', desc: 'Like 16 · 24 and 42² (#23–28)' },
+  { id: 'a74Solve', subject: 'algebra1', section: '7.4 Solving Polynomial Equations in Factored Form', label: 'Zero-Product Property', desc: '#1–10' },
+  { id: 'a74Repeat', subject: 'algebra1', section: '7.4 Solving Polynomial Equations in Factored Form', label: 'Repeated or three factors', desc: '#11–18' },
+  { id: 'a74Intercepts', subject: 'algebra1', section: '7.4 Solving Polynomial Equations in Factored Form', label: 'x-intercepts from factored form', desc: '#19–20' },
+  { id: 'a74Factor', subject: 'algebra1', section: '7.4 Solving Polynomial Equations in Factored Form', label: 'Factor out the GCF', desc: '#21–26' },
+  { id: 'a74SolveGCF', subject: 'algebra1', section: '7.4 Solving Polynomial Equations in Factored Form', label: 'Solve by factoring out the GCF', desc: '#27–32' },
+  { id: 'a74Word', subject: 'algebra1', section: '7.4 Solving Polynomial Equations in Factored Form', label: 'Tunnels and arches', desc: '#35–36' },
+  { id: 'a75Pos', subject: 'algebra1', section: '7.5 Factoring x² + bx + c', label: 'Factor: b and c positive', desc: '#1–6' },
+  { id: 'a75NegB', subject: 'algebra1', section: '7.5 Factoring x² + bx + c', label: 'Factor: b negative, c positive', desc: '#7–12' },
+  { id: 'a75NegC', subject: 'algebra1', section: '7.5 Factoring x² + bx + c', label: 'Factor: c negative', desc: '#13–22' },
+  { id: 'a75Solve', subject: 'algebra1', section: '7.5 Factoring x² + bx + c', label: 'Solve by factoring', desc: '#27–36' },
+  { id: 'a75Word', subject: 'algebra1', section: '7.5 Factoring x² + bx + c', label: 'Word problems', desc: 'The other side of a rectangle (#25–26)' },
+  { id: 'a81Center', subject: 'algebra1', section: '8.1 Measures of Center and Variation', label: 'Mean, median, and mode', desc: '#1–2' },
+  { id: 'a81FindX', subject: 'algebra1', section: '8.1 Measures of Center and Variation', label: 'Find x from the mean', desc: '#3–4' },
+  { id: 'a81Outlier', subject: 'algebra1', section: '8.1 Measures of Center and Variation', label: 'Outliers', desc: 'Mean with and without the outlier (#5–6)' },
+  { id: 'a81Range', subject: 'algebra1', section: '8.1 Measures of Center and Variation', label: 'Range', desc: '#9–12' },
+  { id: 'a81Compare', subject: 'algebra1', section: '8.1 Measures of Center and Variation', label: 'Compare ranges', desc: 'Two data sets (#7–8)' },
+  { id: 'a81Transform', subject: 'algebra1', section: '8.1 Measures of Center and Variation', label: 'Transforming data', desc: 'Add or multiply every value (#14–16)' },
+  { id: 'a82Make', subject: 'algebra1', section: '8.2 Stem-and-Leaf Plots', label: 'Make a stem-and-leaf plot', desc: 'Free response: students type the leaves for each stem (#1–6)' },
+  { id: 'a82Read', subject: 'algebra1', section: '8.2 Stem-and-Leaf Plots', label: 'Read a stem-and-leaf plot', desc: 'Count, mean, median, mode, range (#9, 15)' },
+  { id: 'a82Shape', subject: 'algebra1', section: '8.2 Stem-and-Leaf Plots', label: 'Shape of the distribution', desc: '#10b' },
+  { id: 'a83Read', subject: 'algebra1', section: '8.3 Box-and-Whisker Plots', label: 'Read a box-and-whisker plot', desc: '#1–6' },
+  { id: 'a83Five', subject: 'algebra1', section: '8.3 Box-and-Whisker Plots', label: 'Five-number summary', desc: '#7–12' },
+  { id: 'a83Sketch', subject: 'algebra1', section: '8.3 Box-and-Whisker Plots', sketch: true, label: 'Make a box-and-whisker plot (students graph)', desc: 'On a number line (#7–12)' },
+  { id: 'a83Interpret', subject: 'algebra1', section: '8.3 Box-and-Whisker Plots', label: 'Range, IQR, and spread', desc: '#15–16' },
+  { id: 'a83Shape', subject: 'algebra1', section: '8.3 Box-and-Whisker Plots', label: 'Shape of the distribution', desc: '#17a' },
+  { id: 'a84Qual', subject: 'algebra1', section: '8.4 Data Displays', label: 'Qualitative or quantitative?', desc: '#1–6' },
+  { id: 'a84Display', subject: 'algebra1', section: '8.4 Data Displays', label: 'Best data display', desc: '#7–8' },
+  { id: 'a91Sample', subject: 'algebra1', section: '9.1 Sample Spaces and Probability', label: 'Number of outcomes', desc: '#1–4' },
+  { id: 'a91Theo', subject: 'algebra1', section: '9.1 Sample Spaces and Probability', label: 'Theoretical probability', desc: '#5–6, 15–16' },
+  { id: 'a91Complement', subject: 'algebra1', section: '9.1 Sample Spaces and Probability', label: 'Complements (two dice)', desc: '#7–8' },
+  { id: 'a91Geo', subject: 'algebra1', section: '9.1 Sample Spaces and Probability', label: 'Geometric probability', desc: '#11–12' },
+  { id: 'a91Exp', subject: 'algebra1', section: '9.1 Sample Spaces and Probability', label: 'Experimental probability', desc: '#13–14' },
+  { id: 'a92Complete', subject: 'algebra1', section: '9.2 Two-Way Tables and Probability', label: 'Complete a two-way table', desc: '#1–2' },
+  { id: 'a92Joint', subject: 'algebra1', section: '9.2 Two-Way Tables and Probability', label: 'Joint and marginal relative frequencies', desc: '#3–6' },
+  { id: 'a92Cond', subject: 'algebra1', section: '9.2 Two-Way Tables and Probability', label: 'Conditional relative frequencies', desc: '#7–8' },
+  { id: 'a93Select', subject: 'algebra1', section: '9.3 Conditional Probability', label: 'Choosing two items', desc: '#1–2' },
+  { id: 'a93Table', subject: 'algebra1', section: '9.3 Conditional Probability', label: 'P(A | B) from a two-way table', desc: '#3–4' },
+  { id: 'a93Formula', subject: 'algebra1', section: '9.3 Conditional Probability', label: 'P(B | A) from percents', desc: '#9–10' },
+  { id: 'a93Venn', subject: 'algebra1', section: '9.3 Conditional Probability', label: 'Survey counts', desc: '#15' },
+  { id: 'a94Indep', subject: 'algebra1', section: '9.4 Independent and Dependent Events', label: 'Independent or dependent?', desc: '#1–6' },
+  { id: 'a94Both', subject: 'algebra1', section: '9.4 Independent and Dependent Events', label: 'P(A and B), with or without replacement', desc: '#13–16, 24' },
+  { id: 'a94Solve', subject: 'algebra1', section: '9.4 Independent and Dependent Events', label: 'Find P(A)', desc: '#19–20' },
+  { id: 'a95Disjoint', subject: 'algebra1', section: '9.5 Probability of Disjoint and Overlapping Events', label: 'Disjoint events', desc: '#1–2' },
+  { id: 'a95Spinner', subject: 'algebra1', section: '9.5 Probability of Disjoint and Overlapping Events', label: 'Spinner: A or B', desc: '#3–8' },
+  { id: 'a95Overlap', subject: 'algebra1', section: '9.5 Probability of Disjoint and Overlapping Events', label: 'Overlapping events from counts', desc: '#11–14' },
+  { id: 'a95Groups', subject: 'algebra1', section: '9.5 Probability of Disjoint and Overlapping Events', label: 'Two groups', desc: '#15' },
+  { id: 'a96Arrange', subject: 'algebra1', section: '9.6 Permutations and Combinations', label: 'Arrange the letters of a word', desc: '#1–6' },
+  { id: 'a96Perm', subject: 'algebra1', section: '9.6 Permutations and Combinations', label: 'Evaluate nPr', desc: '#7–12' },
+  { id: 'a96Comb', subject: 'algebra1', section: '9.6 Permutations and Combinations', label: 'Evaluate nCr', desc: '#21–26' },
+  { id: 'a96Count', subject: 'algebra1', section: '9.6 Permutations and Combinations', label: 'Counting word problems', desc: '#13–14, 17–20, 27–28, 41' },
+  { id: 'a96Prob', subject: 'algebra1', section: '9.6 Permutations and Combinations', label: 'Probability with counting', desc: '#15–16, 33–34' },
+  { id: 'a97Dist', subject: 'algebra1', section: '9.7 Binomial Distributions', label: 'Probability distributions', desc: '#1–4' },
+  { id: 'a97Read', subject: 'algebra1', section: '9.7 Binomial Distributions', label: 'Read a probability histogram', desc: '#5–6' },
+  { id: 'a97Coin', subject: 'algebra1', section: '9.7 Binomial Distributions', label: 'Heads in n coin flips', desc: '#7–10' },
+  { id: 'a97Binom', subject: 'algebra1', section: '9.7 Binomial Distributions', label: 'Binomial probabilities', desc: '#11–12' },
   { id: 'b31GCF', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: 'Factor out the GCF', desc: 'Then factor the trinomial (#1–6)' },
   { id: 'b31Factor', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: 'Factor ax² + bx + c', desc: 'Including a < 0 (#7–20)' },
   { id: 'b31Solve', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: 'Solve by factoring', desc: '#25–28' },
@@ -19638,7 +20690,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' }, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
