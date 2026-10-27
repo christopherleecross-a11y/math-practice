@@ -19504,6 +19504,330 @@ for (const name of Object.keys(TEMPLATES)) if (/^b6\d[A-Z]/.test(name)) { const 
 Object.assign(TEMPLATES, { b61Sketch: (r) => TEMPLATES.e51Sketch(r), b62ESketch: (r) => TEMPLATES.e51ESketch(r), b63ToExp: (r) => TEMPLATES.e2ToExp(r), b63ToLog: (r) => TEMPLATES.e2ToLog(r), b63Eval: (r) => TEMPLATES.e2Eval(r), b63Sketch: (r) => TEMPLATES.e52LogSketch(r),
   b65Expand: (r) => TEMPLATES.e3Expand(r), b65Condense: (r) => TEMPLATES.e3Condense(r), b66ExpEq: (r) => TEMPLATES.e4ExpEq(r), b66LogEq: (r) => TEMPLATES.e4LogEq(r) });
 /* ==== ALGEBRA 2 CH6 END ==== */
+/* ==== ALGEBRA 2 CH7 BEGIN ==== */
+/* ---------- Algebra 2 (Big Ideas Learning 2025), Chapter 7: Rational Functions ---------- */
+// ---- polynomial helpers (coefficients highest power first) ----
+const b7trim = (p) => { const q = p.slice(); while (q.length > 1 && Math.abs(q[0]) < 1e-12) q.shift(); return q; };
+const b7add = (p, q) => { const n = Math.max(p.length, q.length), a = Array(n - p.length).fill(0).concat(p), b = Array(n - q.length).fill(0).concat(q); return b7trim(a.map((x, i) => x + b[i])); };
+const b7scale = (p, k) => p.map((c) => c * k);
+const b7prod = (...ps) => ps.reduce((a, b) => pMul(a, b), [1]);
+const b7val = (p, x) => p.reduce((s, c) => s * x + c, 0);
+const b7divLin = (p, r0) => { const out = []; let acc = 0; p.forEach((c) => { acc = acc * r0 + c; out.push(acc); }); out.pop(); return out; }; // p ÷ (x − r0), remainder dropped
+// a linear factor [m, a] as text: (mx + a)
+const b7fT = ([m, a], v = 'x', bare = false) => { const t = polyT([m, a], v); return bare || (a === 0 && m === 1) ? t : `(${t})`; };
+const b7facT = (k, F, v = 'x') => { const fs = F.map((f) => b7fT(f, v, F.length === 1 && k === 1)); const body = fs.join(''); return k === 1 ? body || '1' : k === -1 ? `${MINUS}${body}` : `${fmt(k)}${body}`; };
+const b7prodLike = (t) => /^−?[\dx]*(\([^()]*\))+$/.test(t);
+const b7fracT = (nT, dT) => (dT === '1' ? nT : `${/[ +−]/.test(nT.replace(/^−/, '')) && !/^\(.*\)$/.test(nT) && !b7prodLike(nT) ? `(${nT})` : nT}/${/[ +−]|\)\(|\d[a-z(]/.test(dT) && !/^\([^()]*\)$/.test(dT) ? `(${dT})` : dT}`);
+// ---- answer reader: one fraction, equivalent, and fully simplified (same degrees as the answer) ----
+function b7split(raw) {
+  let s = pxPlain(raw); if (s == null) return null; s = s.replace(/\s+/g, '').replace(/^[a-z]\(x\)=|^[a-z]=/i, '');
+  const match = (t, i) => { let d = 0; for (let j = i; j < t.length; j++) { if (t[j] === '(') d++; else if (t[j] === ')' && --d === 0) return j; } return -1; };
+  const strip = (t) => { while (t.startsWith('(') && match(t, 0) === t.length - 1) t = t.slice(1, -1); return t; };
+  const top = (t) => { let d = 0, at = -1; for (let j = 0; j < t.length; j++) { const c = t[j]; if (c === '(') d++; else if (c === ')') d--; else if (d === 0) { if (c === '/') { if (at >= 0) return -2; at = j; } else if ((c === '+' || c === '-') && j > 0 && !/[*/^(]/.test(t[j - 1])) return -3; } } return at; };
+  s = strip(s); let neg = '';
+  if (s.startsWith('-')) { const rest = strip(s.slice(1)); if (top(rest) >= 0) { neg = '-'; s = rest; } }
+  const k = top(s); if (k < 0) return { N: s, D: '1' };
+  return { N: `${neg}(${s.slice(0, k)})`, D: s.slice(k + 1) };
+}
+const b7deg = (f, v, vars) => { const ys = []; for (let t = 0; t <= 12; t++) { const e = {}; vars.forEach((w) => { e[w] = w === v ? t * 0.75 - 2.3 : 1.37; }); const y = f(e); if (!isFinite(y)) return 99; ys.push(y); }
+  const sc = Math.max(1, ...ys.map(Math.abs)); let d = ys.slice(), deg = 0; for (let o = 1; o <= 12; o++) { if (d.every((x) => Math.abs(x) < 1e-7 * sc)) return deg - 1 < 0 ? -1 : deg - 1; d = d.slice(1).map((x, i) => x - d[i]); deg = o; } return d.every((x) => Math.abs(x) < 1e-7 * sc) ? 11 : 99; };
+function b7ratOk(raw, N, D, vars = ['x']) {
+  const sp = b7split(raw); if (!sp) return false;
+  const fn = pxParse(sp.N, vars, ''), fd = pxParse(sp.D, vars, ''); if (!fn || !fd) return false;
+  let n = 0;
+  for (let j = 0; j < 30; j++) { const e = {}; vars.forEach((w, i) => { e[w] = -5.3 + ((j * 7 + i * 11) % 29) * 0.41 + i * 0.13; }); const t = N(e) / D(e); if (!isFinite(t)) continue; const s = fn(e) / fd(e); if (!isFinite(s) || Math.abs(s - t) > 1e-6 * Math.max(1, Math.abs(t))) return false; n++; }
+  if (n < 8) return false;
+  // integer coefficients in lowest terms: the numerator is ± the answer's numerator
+  { const e = {}; vars.forEach((w, i) => { e[w] = 2.17 + i * 0.61; }); const q = fn(e) / N(e); if (isFinite(q) && Math.abs(N(e)) > 1e-9 && Math.abs(Math.abs(q) - 1) > 1e-6) return false; }
+  return vars.every((v) => b7deg(fn, v, vars) === b7deg(N, v, vars) && b7deg(fd, v, vars) === b7deg(D, v, vars));
+}
+// a rational-expression answer: N and D are polynomial coefficient arrays in x (or functions of {x, y})
+function b7Q(r, { topic, stem, N, D, nT, dT, wrongs = [], solution, vars = ['x'], latex }) {
+  const Nf = Array.isArray(N) ? (e) => b7val(N, e.x) : N, Df = Array.isArray(D) ? (e) => b7val(D, e.x) : D, correct = b7fracT(nT, dT);
+  const same = (w) => { const sp = b7split(String(w).replace(/−/g, '-')); if (!sp) return false; const fn = pxParse(sp.N, vars, ''), fd = pxParse(sp.D, vars, ''); if (!fn || !fd) return false; let n = 0; for (let j = 0; j < 12; j++) { const e = {}; vars.forEach((v, i) => { e[v] = -4.1 + j * 0.83 + i * 0.29; }); const t = Nf(e) / Df(e), u = fn(e) / fd(e); if (!isFinite(t) || !isFinite(u)) continue; if (Math.abs(t - u) > 1e-6 * Math.max(1, Math.abs(t))) return false; n++; } return n >= 4; };
+  const W = [...new Set(wrongs)].filter((w) => w && w !== correct && !same(w));
+  return { topic, stem, ...buildChoices(r, correct, W, (i) => b7fracT(nT, `${dT === '1' ? '' : dT}${i + 2}`)),
+    fr: { fields: [{ kind: 'expr', keys: 'func', label: '=' }], key: [latex || correct.replace(/−/g, '-').replace(/²/g, '^2').replace(/³/g, '^3')], display: correct, check: (v) => b7ratOk(v[0], Nf, Df, vars) }, solution };
+}
+const b7lin = (r, lo = -9, hi = 9) => [1, nz(r, lo, hi)];
+
+// ---------- 7.1 Inverse Variation ----------
+const B7VAR = ['Direct variation', 'Inverse variation', 'Neither'];
+TEMPLATES.b71Type = (r) => {
+  const a = ri(r, 2, 15), C = pick(r, [[`y = ${a}/x`, 1], [`xy = ${a}`, 1], [`y/x = ${a}`, 0], [`${a}x = y`, 0], [`y = x + ${a}`, 2], [`x + y = ${a}`, 2], [`${a}y = x`, 0], [`xy = 1/${a}`, 1], [`x = ${a}/y`, 1], [`y = x/${a}`, 0], [`y = ${a}x − 1`, 2], [`y = −${a}/x`, 1]]);
+  const ans = B7VAR[C[1]];
+  return b6sel(r, 'Inverse variation', `Tell whether x and y show direct variation, inverse variation, or neither.   ${C[0]}`, B7VAR, ans, C[1] === 1 ? 'The equation can be written as xy = a (y = a/x), so it is inverse variation.' : C[1] === 0 ? 'The equation can be written as y = ax, so it is direct variation.' : 'The equation cannot be written as y = ax or y = a/x, so it is neither.');
+};
+TEMPLATES.b71Table = (r) => {
+  const kind = ri(r, 0, 2), a = pick(r, [12, 24, 36, 60, 72, 84]);
+  let X, Y;
+  if (kind === 1) { X = shuffle(r, [1, 2, 3, 4, 6, 12].filter((d) => a % d === 0)).slice(0, 5).sort((p, q) => p - q); Y = X.map((x) => a / x); }
+  else if (kind === 0) { const k = pick(r, [3, 9, 11, 2.5]); X = [2, 4, 6, 8, 10].map((x) => x + pick(r, [0, 0, 1])); X = [...new Set(X)].sort((p, q) => p - q); Y = X.map((x) => k * x); }
+  else { X = [4, 5, 6, 7, 11].slice(0, 5); const b = ri(r, 15, 22); Y = X.map((x) => b - x); }
+  if (X.length < 4) return TEMPLATES.b71Table(r);
+  const ans = B7VAR[kind];
+  return b6sel(r, 'Inverse variation', 'Tell whether x and y show direct variation, inverse variation, or neither.', B7VAR, ans, kind === 1 ? `Every product xy = ${a}, so x and y show inverse variation.` : kind === 0 ? `Every ratio y/x = ${fmt(Y[0] / X[0])}, so x and y show direct variation.` : 'Neither the products xy nor the ratios y/x are constant, so it is neither.', { draw: a9tableDraw([['x', ...X.map(fmt)], ['y', ...Y.map(fmt)]]), size: [400, 90] });
+};
+TEMPLATES.b71Write = (r) => {
+  let x0, y0; do { x0 = pick(r, [5, -3, 1, 7, -4, 3 / 4, -12, 5 / 3, 8, 4]); y0 = pick(r, [-4, 8, 9, 2, -5 / 4, 28, -1 / 6, -7, 5, 6]); } while (!Number.isInteger(x0 * y0 * 12));
+  const a = x0 * y0, y3 = a / 3;
+  const okEq = (v) => pxEquiv(String(v || '').replace(/^\s*y\s*=/, ''), (x) => a / x, { lo: 1, hi: 9 });
+  return { topic: 'Inverse variation', stem: `The variables x and y vary inversely. Use the given values to write an equation relating x and y. Then find y when x = 3.   x = ${fracT(x0)}, y = ${fracT(y0)}`,
+    ...buildChoices(r, `y = ${fracT(a)}/x; y = ${fracT(y3)}`, [`y = ${fracT(y0 / x0)}x; y = ${fracT(y0 / x0 * 3)}`, `y = ${fracT(a)}/x; y = ${fracT(a * 3)}`, `y = ${fracT(-a)}/x; y = ${fracT(-y3)}`].filter((t, i, A) => A.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'func', label: 'y =' }, { kind: 'expr', keys: 'num', label: 'y when x = 3:' }], key: [`\\frac{${fracL(a)}}{x}`, fracL(y3)], display: `y = ${fracT(a)}/x; y = ${fracT(y3)}`, check: (v) => okEq(v[0]) && numOk(v[1], y3), score: (v) => ((okEq(v[0]) ? 1 : 0) + (numOk(v[1], y3) ? 1 : 0)) / 2 },
+    solution: `a = xy = (${fracT(x0)})(${fracT(y0)}) = ${fracT(a)}, so y = ${fracT(a)}/x.\nWhen x = 3: y = ${fracT(a)}/3 = ${fracT(y3)}.` };
+};
+TEMPLATES.b71Word = (r) => {
+  const kind = pick(r, ['apps', 'snow', 'struct', 'chips']);
+  if (kind === 'apps') { const n = pick(r, [200, 250, 160]), s = pick(r, [28, 30, 24]), k = n * s, x = pick(r, [20, 25, 30, 50, 40].filter((v) => k % v === 0)); if (!x) return TEMPLATES.b71Word(r);
+    return a1numQ(r, { topic: 'Inverse variation', stem: `The number y of apps that can be stored on a tablet varies inversely with the average size x of an app. A tablet can store ${n} apps when the average size is ${s} megabytes (MB). How many apps will fit when the average size is ${x} MB?`, val: k / x, unit: 'apps', wrongs: [n * x / s, n / s * x, k], solution: `xy = ${s}(${n}) = ${k}, so y = ${k}/x. When x = ${x}: y = ${k / x} apps.` }); }
+  if (kind === 'snow') { const P0 = pick(r, [0.43, 0.5, 0.36]), A0 = pick(r, [360, 400, 300]), A1 = pick(r, [60, 80, 50]), k = P0 * A0, v = Math.round(k / A1 * 100) / 100;
+    return a1numQ(r, { topic: 'Inverse variation', stem: `The average pressure P (in pounds per square inch) you exert on snow varies inversely with the total surface area A (in square inches) of your soles. With snowshoes (A = ${A0} in.²) the pressure is ${P0} lb/in.². Find the pressure with boots (A = ${A1} in.²). Round to two decimal places.`, val: v, tol: 0.011, dec: true, unit: 'lb/in.²', wrongs: [Math.round(P0 * A1 / A0 * 100) / 100, Math.round(k * 100) / 100], solution: `P = k/A with k = ${P0}(${A0}) = ${fmt(k)}. P = ${fmt(k)}/${A1} ≈ ${fmt(v)} lb/in.²` }); }
+  if (kind === 'chips') { const A = [58, 62, 66, 70], k = pick(r, [26000, 27000, 26250]), c = A.map((a) => Math.round(k / a)), a1 = pick(r, [81, 90, 75]), kk = Math.round(a8mean(A.map((a, i) => a * c[i]))), v = Math.round(kk / a1);
+    return a1numQ(r, { topic: 'Inverse variation', stem: `The table compares the area A (in mm²) of a computer chip with the number c of chips that can be obtained from a wafer. c varies inversely with A. Use the mean of the products Ac as the constant of variation to predict the number of chips when A = ${a1} mm². Round to the nearest whole number.`, val: v, tol: 2.01, unit: 'chips', draw: a9tableDraw([['Area, A', ...A], ['Chips, c', ...c]]), size: [400, 90], wrongs: [Math.round(c[0] * a1 / A[0]), Math.round(kk / A[0])], solution: `Products Ac ≈ ${A.map((a, i) => a * c[i]).join(', ')}; mean ≈ ${kk}. c = ${kk}/A, so c = ${kk}/${a1} ≈ ${v} chips.` }); }
+  const P0 = nz(r, -9, 9), t0 = nz(r, -4, 4), t1 = pick(r, [4, 2, -1, 8].filter((x) => x !== t0)), k = P0 * t0, v = k / t1;
+  return a1numQ(r, { topic: 'Inverse variation', stem: `The variable P varies inversely with t, and P = ${P0} when t = ${t0}. Find P when t = ${t1}.`, val: v, label: 'P =', wrongs: [P0 * t1 / t0, -v, k], solution: `k = Pt = (${P0})(${t0}) = ${k}. P = ${k}/${t1} = ${fracT(v)}` });
+};
+
+// ---------- 7.2 Graphing Rational Functions ----------
+// rational graph y = a/(x − h) + k: a point on each asymptote, then a point on the graph
+SKETCH.rat = { roles: ['a point on the vertical asymptote', 'a point on the horizontal asymptote', 'a point on the graph'], short: ['V', 'H', ''],
+  fit: (P) => { if (P.length < 3 || P[2][0] === P[0][0] || P[2][1] === P[1][1]) return null; const h = P[0][0], k = P[1][1], a = (P[2][1] - k) * (P[2][0] - h); return (x) => (x === h ? NaN : a / (x - h) + k); },
+  match: (P, T, win) => P.length === 3 && P[0][0] === win.rat[1] && P[1][1] === win.rat[2] && P[2][0] !== win.rat[1] && Math.abs((P[2][1] - win.rat[2]) * (P[2][0] - win.rat[1]) - win.rat[0]) < 1e-9,
+  draw: (cv, f, pts, overlay) => {
+    const W = f.win, curves = [], T0 = (x, a, h, k) => a / (x - h) + k;
+    if (overlay) { const [a, h, k] = W.rat; curves.push({ f: (x) => (Math.abs(x - h) < 1e-6 ? NaN : T0(x, a, h, k)), color: '#7fbf7f' }); }
+    const S = pts.length === 3 ? SKETCH.rat.fit(pts) : null; if (S) curves.push({ f: S, color: '#1f5fa8' });
+    drawPlot(cv, { xr: W.xr, yr: W.yr, curves }); const T = skTransform(cv, W), c = cv._ctx;
+    const dash = (x1, y1, x2, y2, col) => { c.save(); c.strokeStyle = col; c.lineWidth = 1.8; c.setLineDash([7, 6]); c.beginPath(); c.moveTo(T.X(x1), T.Y(y1)); c.lineTo(T.X(x2), T.Y(y2)); c.stroke(); c.restore(); };
+    if (overlay) { dash(W.rat[1], W.yr[0], W.rat[1], W.yr[1], '#7fbf7f'); dash(W.xr[0], W.rat[2], W.xr[1], W.rat[2], '#7fbf7f'); }
+    if (pts[0]) dash(pts[0][0], W.yr[0], pts[0][0], W.yr[1], '#c0392b'); if (pts[1]) dash(W.xr[0], pts[1][1], W.xr[1], pts[1][1], '#c0392b');
+    pts.forEach(([x, y], j) => { c.beginPath(); c.arc(T.X(x), T.Y(y), 5.5, 0, 2 * Math.PI); c.fillStyle = j < 2 ? '#c0392b' : '#1f5fa8'; c.fill(); c.fillStyle = '#1d1d1b'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'bottom'; c.fillText(`(${fmt(x)}, ${fmt(y)})`, T.X(x) + 7, T.Y(y) - 4); });
+  } };
+const b7ratT = (a, h, k, name = 'g') => `${name}(x) = ${fmt(a)}/${h ? `(x ${h < 0 ? '+' : '−'} ${Math.abs(h)})` : 'x'}${k ? ` ${k < 0 ? '−' : '+'} ${Math.abs(k)}` : ''}`;
+TEMPLATES.b72Graph = (r) => {
+  const a = pick(r, [1, 2, 3, 4, 6, -1, -2, -3, -4, -6]), h = r() < 0.25 ? 0 : nz(r, -4, 4), k = r() < 0.25 ? 0 : nz(r, -4, 4), name = pick(r, ['g', 'h', 'f', 'y']);
+  const W = { xr: [h - 8, h + 8], yr: [k - 8, k + 8], rat: [a, h, k] }, keyPts = [[h, k + 3], [h + 3, k], [h + 1, k + a]];
+  const eq = name === 'y' ? b7ratT(a, h, k, 'y').replace('y(x)', 'y') : b7ratT(a, h, k, name);
+  const fr = skFR({ family: 'rat', target: 1, keyPts, win: W, display: `Asymptotes x = ${h} and y = ${k}; through (${h + 1}, ${k + a})` }); fr._target = 1;
+  return { topic: 'Graphing rational functions', stem: `Graph the function: place a point on the vertical asymptote, a point on the horizontal asymptote, then a point on the graph.   ${eq}`, sketch: true, fr, choices: null, answer: -1,
+    solution: `Vertical asymptote x = ${h}; horizontal asymptote y = ${k}.\nAt x = ${h + 1}: y = ${fmt(a)}/1${k ? ` ${k < 0 ? '−' : '+'} ${Math.abs(k)}` : ''} = ${k + a}, so (${h + 1}, ${k + a}) is on the graph.\nDomain: all real numbers except ${h}. Range: all real numbers except ${k}.` };
+};
+TEMPLATES.b72Asym = (r) => {
+  const name = pick(r, ['f', 'g', 'h', 'y']);
+  let text, h, k;
+  if (r() < 0.45) { const a = nz(r, -10, 10); h = r() < 0.2 ? 0 : nz(r, -7, 7); k = nz(r, -6, 6); text = b7ratT(a, h, k, name); }
+  else { const c = pick(r, [1, 1, 2, 4, -2, 3, 5]), d = nz(r, -10, 10), a = nz(r, -8, 10), b = ri(r, -9, 9); if (a * d === b * c) return TEMPLATES.b72Asym(r); h = -d / c; k = a / c; text = `${name}(x) = (${a1J([[a, 'x'], [b]])})/(${a1J([[c, 'x'], [d]])})`; }
+  if (name === 'y') text = text.replace('y(x)', 'y');
+  const txt = `x = ${fracT(h)}; y = ${fracT(k)}`;
+  return { topic: 'Graphing rational functions', stem: `Find the vertical and horizontal asymptotes of the graph of the function. (Then the domain is all real numbers except x = ${'h'}, and the range is all real numbers except y = k.)`.replace('(Then the domain is all real numbers except x = h, and the range is all real numbers except y = k.)', '') + `  ${text}`,
+    ...buildChoices(r, txt, [`x = ${fracT(-h)}; y = ${fracT(k)}`, `x = ${fracT(k)}; y = ${fracT(h)}`, `x = ${fracT(h)}; y = ${fracT(-k || 1)}`].filter((t, i, A) => t !== txt && A.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Vertical asymptote: x =' }, { kind: 'expr', keys: 'num', label: 'Horizontal asymptote: y =' }], key: [fracL(h), fracL(k)], display: txt, check: (v) => numOk(v[0], h) && numOk(v[1], k), score: (v) => ((numOk(v[0], h) ? 1 : 0) + (numOk(v[1], k) ? 1 : 0)) / 2 },
+    solution: `The vertical asymptote is where the denominator is 0: x = ${fracT(h)}.\nThe horizontal asymptote is y = ${fracT(k)}${text.includes('/(') && !text.includes(')/x') ? ' (for (ax + b)/(cx + d), it is y = a/c)' : ''}.\nDomain: all real numbers except ${fracT(h)}. Range: all real numbers except ${fracT(k)}.` };
+};
+// #31–38 (and 7.4 #27–34): rewrite (px + q)/(x − h) as a/(x − h) + k
+TEMPLATES.b72Rewrite = (r) => {
+  const h = nz(r, -13, 13), k = nz(r, -9, 9), a = nz(r, -40, 40), p = k, q = a - k * h; // (k x + (a − k h))/(x − h)
+  const name = pick(r, ['g', 'f']), given = `${name}(x) = (${a1J([[p, 'x'], [q]])})/(${a1J([[1, 'x'], [-h]])})`, ans = b7ratT(a, h, k, name);
+  const ok = [(v) => numOk(v[0], a), (v) => numOk(v[1], h), (v) => numOk(v[2], k)];
+  return { topic: 'Graphing rational functions', stem: `Rewrite the function in the form g(x) = a/(x − h) + k.   ${given}`, ...buildChoices(r, ans, [b7ratT(-a, h, k, name), b7ratT(a, -h, k, name), b7ratT(q, h, k, name)].filter((t, i, A) => t !== ans && A.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'a =' }, { kind: 'expr', keys: 'num', label: 'h =' }, { kind: 'expr', keys: 'num', label: 'k =' }], key: [String(a), String(h), String(k)], display: ans, check: (v) => ok.every((f) => f(v)), score: (v) => ok.filter((f) => f(v)).length / 3 },
+    solution: `Divide: ${a1J([[p, 'x'], [q]])} = ${fmt(k)}(${a1J([[1, 'x'], [-h]])}) + ${fmt(a)}, so ${name}(x) = ${fmt(a)}/(${a1J([[1, 'x'], [-h]])}) + ${fmt(k)}.\nThe graph is the graph of f(x) = ${fmt(a)}/x translated ${Math.abs(h)} unit${Math.abs(h) === 1 ? '' : 's'} ${h > 0 ? 'right' : 'left'} and ${Math.abs(k)} unit${Math.abs(k) === 1 ? '' : 's'} ${k > 0 ? 'up' : 'down'}.` };
+};
+
+// ---------- 7.3 Multiplying and Dividing Rational Expressions ----------
+// build a fraction k·(factors)/(k'·(factors)) and its simplified form
+function b7fr(kN, FN, kD, FD) {
+  // cancel common linear factors
+  const n = FN.map((f) => f.join(',')), d = FD.map((f) => f.join(',')), keepN = [], keepD = d.slice();
+  n.forEach((f, i) => { const j = keepD.indexOf(f); if (j >= 0) keepD.splice(j, 1); else keepN.push(FN[i]); });
+  const FDk = keepD.map((s) => s.split(',').map(Number)), g = gcd(Math.abs(kN), Math.abs(kD)) || 1; let a = kN / g, b = kD / g; if (b < 0) { a = -a; b = -b; }
+  return { a, b, FN: keepN, FD: FDk, N: b7scale(b7prod(...keepN), a), D: b7scale(b7prod(...FDk), b), nT: b7facT(a, keepN), dT: b7facT(b, FDk) };
+}
+const b7expT = (k, F) => polyT(b7scale(b7prod(...F), k));
+TEMPLATES.b73Simplify = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const kind = pick(r, ['quad', 'quad', 'mono', 'cubic']);
+    let kN, FN, kD, FD;
+    if (kind === 'mono') { const m = pick(r, [2, 3, 4]), c = nz(r, -6, 6); kN = pick(r, [2, -1, 3]); FN = [[1, 0], [1, 0]]; kD = 1; FD = [[1, 0], [m, c]]; }
+    else { const A = b7lin(r), B = b7lin(r), C = b7lin(r); if (B[1] === C[1]) continue; kN = pick(r, [1, 1, 1, 2, 3]); kD = pick(r, [1, 1, 1, 2, 4]); FN = [A, B]; FD = [A, C]; if (kind === 'cubic') { FD = [A, C, b7lin(r)]; } }
+    const S = b7fr(kN, FN, kD, FD); if (!S.FN.length && !S.FD.length) continue;
+    const given = b7fracT(b7expT(kN, FN), b7expT(kD, FD));
+    const wr = [b7fracT(polyT(S.FN.length ? b7prod(...S.FN) : [1]), polyT(S.FD.length ? b7prod(...S.FD) : [1])), b7fracT(b7facT(S.a, S.FN.map((f) => [f[0], -f[1]])), b7facT(S.b, S.FD)), b7fracT(b7facT(-S.a, S.FN), b7facT(S.b, S.FD))];
+    return b7Q(r, { topic: 'Simplifying rational expressions', stem: `Simplify the expression, if possible.   ${given}`, N: S.N, D: S.D, nT: S.nT, dT: S.dT, wrongs: wr, solution: `Factor: ${b7fracT(b7facT(kN, FN), b7facT(kD, FD))}.\nDivide out common factors: ${b7fracT(S.nT, S.dT)}` });
+  }
+};
+// monomials in x and y
+TEMPLATES.b73Mono = (r) => {
+  const div = r() < 0.5, e = () => ri(r, 0, 4), c1 = pick(r, [4, 3, 32, 2, 6]), c2 = pick(r, [1, 9, 8, 3]), c3 = pick(r, [1, 2, 3]), c4 = pick(r, [8, 24, 4, 6]);
+  const E = [[e(), e()], [e() + 1, e()], [e(), e()], [e(), e() + 1]];
+  const mono = (c, [p, q]) => `${c === 1 ? '' : c}${p ? `x${p > 1 ? SUP[p] : ''}` : ''}${q ? `y${q > 1 ? SUP[q] : ''}` : ''}` || '1';
+  const F1 = `${mono(c1, E[0])}/${mono(c2, E[1])}`, F2 = `${mono(c3, E[2])}/${mono(c4, E[3])}`;
+  // result coefficient and exponents
+  const num = div ? c1 * c4 : c1 * c3, den = div ? c2 * c3 : c2 * c4, px = div ? E[0][0] - E[1][0] - E[2][0] + E[3][0] : E[0][0] - E[1][0] + E[2][0] - E[3][0], py = div ? E[0][1] - E[1][1] - E[2][1] + E[3][1] : E[0][1] - E[1][1] + E[2][1] - E[3][1];
+  const g = gcd(num, den), cn = num / g, cd = den / g;
+  const top = mono(cn, [Math.max(px, 0), Math.max(py, 0)]), bot = mono(cd, [Math.max(-px, 0), Math.max(-py, 0)]);
+  const Nf = (v) => cn * v.x ** Math.max(px, 0) * v.y ** Math.max(py, 0), Df = (v) => cd * v.x ** Math.max(-px, 0) * v.y ** Math.max(-py, 0);
+  return b7Q(r, { topic: div ? 'Dividing rational expressions' : 'Multiplying rational expressions', stem: `Find the ${div ? 'quotient' : 'product'}.   (${F1}) ${div ? '÷' : '·'} (${F2})`, N: Nf, D: Df, nT: top, dT: bot, vars: ['x', 'y'],
+    wrongs: [b7fracT(mono(cd, [Math.max(px, 0), Math.max(py, 0)]), mono(cn, [Math.max(-px, 0), Math.max(-py, 0)])), b7fracT(mono(cn, [Math.max(px + 1, 0), Math.max(py, 0)]), bot), b7fracT(mono(num, [Math.max(px, 0), Math.max(py, 0)]), mono(den, [Math.max(-px, 0), Math.max(-py, 0)]))],
+    latex: `\\frac{${top.replace(/([xy])([²³⁴⁵⁶⁷⁸⁹]+)/g, (m, v, s) => `${v}^{${[...s].map((c) => '⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(c)).join('')}}`)}}{${bot.replace(/([xy])([²³⁴⁵⁶⁷⁸⁹]+)/g, (m, v, s) => `${v}^{${[...s].map((c) => '⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(c)).join('')}}`)}}`,
+    solution: `${div ? 'Multiply by the reciprocal of the second fraction, then m' : 'M'}ultiply numerators and denominators and divide out common factors (subtract exponents).\n= ${b7fracT(top, bot)}` });
+};
+TEMPLATES.b73MultDiv = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const div = r() < 0.5, F = [...Array(6)].map(() => b7lin(r));
+    const k = [pick(r, [1, 1, 2]), pick(r, [1, 1, 3]), pick(r, [1, 1, 2]), pick(r, [1, 1, 4])];
+    // first: k0 F0 F1 / (k1 F2 F3); second (for product): k2 F2 F4 / (k3 F0 F5)
+    const n1 = [F[0], F[1]], d1 = [F[2], F[3]], n2 = [F[2], F[4]], d2 = [F[0], F[5]];
+    const S = b7fr(k[0] * k[2], [...n1, ...n2], k[1] * k[3], [...d1, ...d2]);
+    if (S.FN.length + S.FD.length < 2 || new Set(F.map((f) => f[1])).size < 5) continue;
+    const show = (kk, Fs, expand) => (expand ? b7expT(kk, Fs) : b7facT(kk, Fs));
+    const e1 = r() < 0.7, e2 = r() < 0.7;
+    const A = b7fracT(show(k[0], n1, e1), show(k[1], d1, e1)), B = div ? b7fracT(show(k[3], d2, e2), show(k[2], n2, e2)) : b7fracT(show(k[2], n2, e2), show(k[3], d2, e2));
+    const stem = `Find the ${div ? 'quotient' : 'product'}.   ${A.includes('/') && !/^\(.*\)$/.test(A) ? `[${A}]` : A} ${div ? '÷' : '·'} ${B.includes('/') && !/^\(.*\)$/.test(B) ? `[${B}]` : B}`;
+    const wr = [b7fracT(b7facT(S.b, S.FD), b7facT(S.a, S.FN)), b7fracT(b7facT(S.a, [...S.FN, F[0]]), b7facT(S.b, [...S.FD, F[0]].length ? [...S.FD, F[1]] : [F[1]])), b7fracT(b7facT(-S.a, S.FN), b7facT(S.b, S.FD))];
+    return b7Q(r, { topic: div ? 'Dividing rational expressions' : 'Multiplying rational expressions', stem, N: S.N, D: S.D, nT: S.nT, dT: S.dT, wrongs: wr,
+      solution: `${div ? 'Multiply by the reciprocal of the divisor. ' : ''}Factor every numerator and denominator:\n${b7fracT(b7facT(k[0], n1), b7facT(k[1], d1))} · ${b7fracT(b7facT(k[2], n2), b7facT(k[3], d2))}\nDivide out common factors: ${b7fracT(S.nT, S.dT)}` });
+  }
+};
+
+// ---------- 7.4 Adding and Subtracting Rational Expressions ----------
+// sum of n1/D1 + s·n2/D2, with D1, D2 given as factor lists; returns the simplified result
+function b7sum(n1, F1, n2, F2, s) {
+  const k1 = F1.map((f) => f.join(',')), k2 = F2.map((f) => f.join(',')), L = F1.slice(); const used = k1.slice();
+  F2.forEach((f, i) => { const j = used.indexOf(k2[i]); if (j >= 0) used.splice(j, 1, '#'); else L.push(f); });
+  const rest = (Fs) => { const keys = L.map((f) => f.join(',')), out = []; const rm = Fs.map((f) => f.join(',')); keys.forEach((kk, i) => { const j = rm.indexOf(kk); if (j >= 0) rm.splice(j, 1); else out.push(L[i]); }); return out; };
+  let N = b7add(pMul(n1, b7prod(...rest(F1))), b7scale(pMul(n2, b7prod(...rest(F2))), s)), D = L.slice();
+  // cancel factors of the LCD that divide the numerator
+  for (let guard = 0; guard < 4; guard++) { const i = D.findIndex((f) => Math.abs(b7val(N, -f[1] / f[0])) < 1e-9 && N.length > 1); if (i < 0) break; N = b7scale(b7divLin(N, -D[i][1] / D[i][0]), 1 / D[i][0]); D.splice(i, 1); }
+  return { N: b7trim(N), F: D, L };
+}
+TEMPLATES.b74Like = (r) => {
+  const kind = pick(r, ['mono', 'lin', 'quad']);
+  if (kind === 'mono') { const c = pick(r, [4, 2, 16, 3]), a = ri(r, 2, 20), b = ri(r, 1, 15) * pick(r, [1, -1]), e = pick(r, [1, 2]), dv = e === 1 ? [c, 0] : [c, 0, 0], sum = a + b; if (!sum) return TEMPLATES.b74Like(r);
+    const g = gcd(Math.abs(sum), c), N = [sum / g], D = e === 1 ? [c / g, 0] : [c / g, 0, 0];
+    return b7Q(r, { topic: 'Adding and subtracting rational expressions', stem: `Find the ${b < 0 ? 'difference' : 'sum'}.   ${a}/${polyT(dv)} ${b < 0 ? '−' : '+'} ${Math.abs(b)}/${polyT(dv)}`, N, D, nT: fmt(sum / g), dT: polyT(D), wrongs: [b7fracT(fmt(sum), polyT(b7scale(dv, 2))), b7fracT(fmt(a - b), polyT(dv))], solution: `The denominators are the same, so ${b < 0 ? 'subtract' : 'add'} the numerators: ${fmt(sum)}/${polyT(dv)} = ${b7fracT(fmt(sum / g), polyT(D))}` }); }
+  const F = b7lin(r), a = nz(r, -12, 12), b = nz(r, -9, 9), s = pick(r, [1, -1]);
+  const N1 = kind === 'lin' ? [0, a] : [ri(r, 2, 5), 0, 0], N2 = kind === 'lin' ? [b, 0] : [ri(r, 2, 8), 0];
+  const N = b7add(N1, b7scale(N2, s));
+  let D = [F]; let Np = N; if (Math.abs(b7val(N, -F[1])) < 1e-9) { Np = b7divLin(N, -F[1]); D = []; }
+  return b7Q(r, { topic: 'Adding and subtracting rational expressions', stem: `Find the ${s < 0 ? 'difference' : 'sum'}.   ${polyT(N1)}/${b7fT(F)} ${s < 0 ? '−' : '+'} ${polyT(N2)}/${b7fT(F)}`, N: Np, D: D.length ? D[0] : [1], nT: polyT(Np), dT: D.length ? b7fT(D[0], 'x', true) : '1', wrongs: [b7fracT(polyT(N), polyT(b7scale(D.length ? D[0] : [1], 2))), b7fracT(polyT(b7add(N1, b7scale(N2, -s))), b7fT(F, 'x', true))],
+    solution: `The denominators are the same, so ${s < 0 ? 'subtract' : 'add'} the numerators: (${polyT(N)})/${b7fT(F)}${D.length ? '' : ` = ${polyT(Np)}`}` });
+};
+TEMPLATES.b74LCM = (r) => {
+  const kind = pick(r, ['mono', 'lin', 'quad']);
+  if (kind === 'mono') { const a = pick(r, [3, 5, 4, 2]), b = pick(r, [3, 6, 10, 4].filter((x) => x !== a)), c = nz(r, -6, 6), L = a * b / gcd(a, b);
+    // a x and b(x + c)
+    const tA = `${a}x`, tB = `${b}(x ${c < 0 ? '−' : '+'} ${Math.abs(c)})`, truth = (x) => L * x * (x + c);
+    return { topic: 'Least common multiple', stem: `Find the least common multiple of the expressions.   ${tA}, ${tB}`, ...buildChoices(r, `${L}x(x ${c < 0 ? '−' : '+'} ${Math.abs(c)})`, [`${a * b}x(x ${c < 0 ? '−' : '+'} ${Math.abs(c)})`, `${L}(x ${c < 0 ? '−' : '+'} ${Math.abs(c)})`, `x(x ${c < 0 ? '−' : '+'} ${Math.abs(c)})`].filter((t, i, A) => A.indexOf(t) === i && t !== `${L}x(x ${c < 0 ? '−' : '+'} ${Math.abs(c)})`), () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'func', label: 'LCM =' }], key: [`${L}x\\left(x${c < 0 ? '-' : '+'}${Math.abs(c)}\\right)`], display: `${L}x(x ${c < 0 ? '−' : '+'} ${Math.abs(c)})`, check: (v) => pxEquiv(v[0], truth) }, solution: `LCM of ${a} and ${b} is ${L}; include each variable factor the greatest number of times it appears: ${L}x(x ${c < 0 ? '−' : '+'} ${Math.abs(c)})` }; }
+  const A = b7lin(r), B = b7lin(r), C = b7lin(r); if (A[1] === B[1] || A[1] === C[1] || B[1] === C[1]) return TEMPLATES.b74LCM(r);
+  const k = kind === 'quad' ? pick(r, [1, 2]) : 1, P = kind === 'quad' ? b7scale(b7prod(A, B), k) : b7prod(A), Q = kind === 'quad' ? b7prod(A, C) : b7prod(B);
+  const Ls = kind === 'quad' ? [A, B, C] : [A, B], truth = (x) => k * Ls.reduce((s, f) => s * b7val(f, x), 1), lcmT = b7facT(k, Ls);
+  return { topic: 'Least common multiple', stem: `Find the least common multiple of the expressions.   ${polyT(P)}, ${polyT(Q)}`, ...buildChoices(r, lcmT, [b7facT(k, kind === 'quad' ? [A, B, A, C] : [A]), b7facT(k, [A, C]), kind === 'quad' ? polyT(b7prod(P, Q)) : b7facT(2, [A, B])].filter((t, i, A2) => t !== lcmT && A2.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'func', label: 'LCM =' }], key: [lcmT.replace(/−/g, '-')], display: lcmT, check: (v) => pxEquiv(v[0], truth) }, solution: `Factor: ${b7facT(kind === 'quad' ? k : 1, kind === 'quad' ? [A, B] : [A])} and ${b7facT(1, kind === 'quad' ? [A, C] : [B])}.\nThe LCM uses each factor the greatest number of times it appears: ${lcmT}` };
+};
+TEMPLATES.b74AddDiff = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const kind = pick(r, ['mono', 'lin', 'lin', 'shared']), s = pick(r, [1, -1]);
+    let n1, F1, n2, F2, show1, show2;
+    if (kind === 'mono') { const a = pick(r, [5, 3, 2]), b = pick(r, [6, 4, 3].filter((x) => x !== a)), m = ri(r, 2, 12), n = ri(r, 1, 9), L = a * b / gcd(a, b), top = m * L / a + s * n * L / b; if (!top) continue; const g = gcd(Math.abs(top), L);
+      const nT = fmt(top / g), dT = `${L / g === 1 ? '' : L / g}x`;
+      return b7Q(r, { topic: 'Adding and subtracting rational expressions', stem: `Find the ${s < 0 ? 'difference' : 'sum'}.   ${m}/(${a}x) ${s < 0 ? '−' : '+'} ${n}/(${b}x)`, N: [top / g], D: [L / g, 0], nT, dT, wrongs: [b7fracT(fmt(m + s * n), `${a + b}x`), b7fracT(fmt(top), `${L}x²`), b7fracT(fmt(-top / g), dT)], solution: `The LCD is ${L}x: ${m * L / a}/(${L}x) ${s < 0 ? '−' : '+'} ${n * L / b}/(${L}x) = ${fmt(top)}/(${L}x)${g > 1 ? ` = ${b7fracT(nT, dT)}` : ''}` }); }
+    else if (kind === 'lin') { const A = b7lin(r), B = b7lin(r); if (A[1] === B[1]) continue; n1 = [nz(r, -9, 9)]; n2 = r() < 0.5 ? [nz(r, -6, 6)] : [ri(r, 1, 3), 0]; F1 = [A]; F2 = [B]; show1 = b7fT(A, 'x', true); show2 = b7fT(B, 'x', true); }
+    else { const A = b7lin(r), B = b7lin(r); if (A[1] === B[1]) continue; n1 = [nz(r, -12, 12)]; n2 = [nz(r, -6, 6)]; F1 = [A, B]; F2 = [B]; show1 = polyT(b7prod(A, B)); show2 = b7fT(B, 'x', true); }
+    const R = b7sum(n1, F1, n2, F2, s); if (R.N.length === 1 && R.N[0] === 0) continue;
+    const den = R.F.length ? b7prod(...R.F) : [1], nT = polyT(R.N), dT = R.F.length ? b7facT(1, R.F) : '1';
+    const g = R.F.length === 1 && R.F[0][1] === 0 ? R.F[0][0] : 1;
+    const wrongs = [b7fracT(polyT(b7add(n1, b7scale(n2, s))), polyT(b7add(b7prod(...F1), b7scale(b7prod(...F2), 1)))), b7fracT(polyT(b7add(R.N, [s * 2])), dT), b7fracT(polyT(b7scale(R.N, -1)), dT)];
+    return b7Q(r, { topic: 'Adding and subtracting rational expressions', stem: `Find the ${s < 0 ? 'difference' : 'sum'}.   ${polyT(n1)}/${/[ +−]/.test(show1) ? `(${show1})` : show1} ${s < 0 ? '−' : '+'} ${polyT(n2)}/${/[ +−]/.test(show2) ? `(${show2})` : show2}`, N: R.N, D: den, nT, dT, wrongs,
+      solution: `The LCD is ${b7facT(1, R.L)}. Rewrite each fraction with the LCD, then ${s < 0 ? 'subtract' : 'add'} the numerators${R.F.length < R.L.length ? ' and divide out the common factor' : ''}:\n= ${b7fracT(nT, dT)}` });
+  }
+};
+TEMPLATES.b74Complex = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const kind = pick(r, ['ab', 'ab', 'lin', 'xp']);
+    if (kind === 'ab') { const a = nz(r, -8, 10), b = nz(r, -9, 9), c = nz(r, -6, 10), d = nz(r, -9, 9); if (a * d === b * c) continue; const g = gcd(gcd(Math.abs(a), Math.abs(b)), gcd(Math.abs(c), Math.abs(d))) || 1; const N = [a / g, b / g], D = [c / g, d / g];
+      return b7Q(r, { topic: 'Complex fractions', stem: `Simplify the complex fraction.   (${fmt(a)} ${b < 0 ? '−' : '+'} ${Math.abs(b)}/x) / (${fmt(c)} ${d < 0 ? '−' : '+'} ${Math.abs(d)}/x)`, N, D, nT: polyT(N), dT: polyT(D), wrongs: [b7fracT(polyT([a, b]), polyT([c, d]).replace('x', 'x²')), b7fracT(polyT([b, a]), polyT([d, c])), b7fracT(`${fmt(a + b)}`, `${fmt(c + d)}`)], solution: `Multiply the numerator and the denominator by x: (${polyT([a, b])})/(${polyT([c, d])})${g > 1 ? ` = (${polyT(N)})/(${polyT(D)})` : ''}` }); }
+    if (kind === 'lin') { const A = b7lin(r), B = b7lin(r), a = nz(r, -9, 9), b = nz(r, -9, 9); if (A[1] === B[1]) continue; const g = gcd(Math.abs(a), Math.abs(b)), aa = a / g * Math.sign(b), bb = Math.abs(b) / g;
+      return b7Q(r, { topic: 'Complex fractions', stem: `Simplify the complex fraction.   (${a}/${b7fT(A)}) / (${b}/${b7fT(B)})`.replace(/-(\d)/g, '−$1'), N: b7scale(B, aa), D: b7scale(A, bb), nT: b7facT(aa, [B]), dT: b7facT(bb, [A]), wrongs: [b7fracT(b7facT(aa, [A]), b7facT(bb, [B])), b7fracT(b7facT(a * b, [B]), b7fT(A, 'x', true))], solution: `Multiply by the reciprocal: ${a}/${b7fT(A)} · ${b7fT(B)}/${b} = ${b7fracT(b7facT(aa, [B]), b7facT(bb, [A]))}`.replace(/-(\d)/g, '−$1') }); }
+    const p = pick(r, [3, 2, 4, 5]), q = ri(r, 1, 6), rr = ri(r, 2, 10), s = pick(r, [4, 3, 2, 5]);
+    // (x/p − q)/(r + s/x) = x(x − pq)/(p(r x + s))
+    const g = gcd(rr, s), N = b7prod([1, 0], [1, -p * q]), D = b7scale([rr / g, s / g], p * g);
+    return b7Q(r, { topic: 'Complex fractions', stem: `Simplify the complex fraction.   (x/${p} − ${q}) / (${rr} + ${s}/x)`, N, D, nT: `x(x − ${p * q})`, dT: `${p * g}(${polyT([rr / g, s / g])})`, wrongs: [b7fracT(`x − ${p * q}`, `${p}(${polyT([rr, s])})`), b7fracT(`x(x − ${q})`, polyT([rr, s])), b7fracT(`x(x − ${p * q})`, polyT([rr, s]))], solution: `Numerator: (x − ${p * q})/${p}. Denominator: (${polyT([rr, s])})/x.\nMultiply by the reciprocal: (x − ${p * q})/${p} · x/(${polyT([rr, s])}) = ${b7fracT(`x(x − ${p * q})`, `${p * g}(${polyT([rr / g, s / g])})`)}` });
+  }
+};
+TEMPLATES.b74Word = (r) => {
+  if (r() < 0.5) { const R1 = pick(r, [2000, 1200, 600, 300]), R2 = pick(r, [5600, 1800, 400, 900]), v = R1 * R2 / (R1 + R2);
+    return a1numQ(r, { topic: 'Complex fractions', stem: `The total resistance Rₜ of a parallel circuit with resistances R₁ and R₂ is Rₜ = 1/(1/R₁ + 1/R₂). Find the total resistance when R₁ = ${R1} ohms and R₂ = ${R2} ohms. Round to two decimal places if necessary.`, val: Math.round(v * 100) / 100, tol: 0.011, dec: true, unit: 'ohms', wrongs: [R1 + R2, Math.round((R1 + R2) / (R1 * R2) * 1e6) / 1e6, (R1 + R2) / 2], solution: `Simplify: Rₜ = R₁R₂/(R₁ + R₂) = ${R1}(${R2})/${R1 + R2} ≈ ${fmt(Math.round(v * 100) / 100)} ohms` }); }
+  const d = pick(r, [2468, 2475, 2500]), a = pick(r, [510, 500, 480]), j = pick(r, [115, 100, 90]), T = d / (a - j) + d / (a + j);
+  return a1numQ(r, { topic: 'Adding and subtracting rational expressions', stem: `The total time T (in hours) to fly from New York to Los Angeles and back is T = d/(a − j) + d/(a + j), where d = ${d} miles is the distance each way, a is the average airplane speed, and j is the jet stream speed (both in miles per hour). Find T when a = ${a} and j = ${j}. Round to two decimal places.`, val: Math.round(T * 100) / 100, tol: 0.011, dec: true, unit: 'h', wrongs: [Math.round(2 * d / a * 100) / 100, Math.round(d / (a - j) * 100) / 100], solution: `T = ${d}/${a - j} + ${d}/${a + j} ≈ ${(d / (a - j)).toFixed(2)} + ${(d / (a + j)).toFixed(2)} ≈ ${T.toFixed(2)} hours` });
+};
+
+// ---------- 7.5 Solving Rational Equations ----------
+function b7solQ(r, { topic, eq, sols, extr = [], solution, wrongs = [] }) {
+  return a1setQ(r, { v: 'x', eq, vals: sols, wrongs: [sols.concat(extr), ...wrongs], topic, solution });
+}
+TEMPLATES.b75Cross = (r) => {
+  for (let t = 0; t < 400; t++) {
+    // (a x + b)/(c x + d) = (e x + f)/(g x + h): cross multiply → quadratic or linear
+    const kind = pick(r, ['lin', 'lin', 'quad']);
+    const a = kind === 'lin' ? 0 : ri(r, 1, 2), b = nz(r, -9, 9), c = ri(r, 1, 3), d = ri(r, -9, 9), e = ri(r, 0, 2), f = nz(r, -9, 9), g = ri(r, 1, 3), h = ri(r, -9, 9);
+    // (a x² ... ) handle: numerator1 = a x + b? use L = [a, b] linear; R = [e, f]
+    const L1 = kind === 'lin' ? [b] : [a, b], D1 = [c, d], L2 = kind === 'lin' ? [e, f] : [e, f], D2 = [g, h];
+    const P = b7add(pMul(L1, D2), b7scale(pMul(L2, D1), -1)); if (P.length < 2 || P.every((x) => !x)) continue;
+    let roots;
+    if (P.length === 2) roots = [-P[1] / P[0]];
+    else { const [A, B, C] = P.slice(-3); if (!A) roots = B ? [-C / B] : []; else { const disc = B * B - 4 * A * C; if (disc < 0) continue; const sq = Math.sqrt(disc); if (Math.abs(sq - Math.round(sq)) > 1e-9) continue; roots = [...new Set([(-B - sq) / (2 * A), (-B + sq) / (2 * A)].map((x) => Math.round(x * 1e9) / 1e9))]; } }
+    if (!roots.length || roots.some((x) => !Number.isInteger(x * 6))) continue;
+    const good = roots.filter((x) => Math.abs(b7val(D1, x)) > 1e-9 && Math.abs(b7val(D2, x)) > 1e-9), extr = roots.filter((x) => !good.includes(x));
+    if (!good.length && r() < 0.7) continue;
+    const eq = `${b7fracT(polyT(L1), polyT(D1))} = ${b7fracT(polyT(L2), polyT(D2))}`;
+    return b7solQ(r, { topic: 'Solving rational equations', eq, sols: good, extr, wrongs: [roots.map((x) => -x)], solution: `Cross multiply: (${polyT(L1)})(${polyT(D2)}) = (${polyT(L2)})(${polyT(D1)}).\n${polyT(P)} = 0, so x = ${roots.map(fracT).join(' or ')}.${extr.length ? `\n${extr.map(fracT).join(', ')} makes a denominator 0, so it is extraneous.` : ''}\n${good.length ? `x = ${good.map(fracT).join(' and ')}` : 'No solution'}` });
+  }
+};
+TEMPLATES.b75LCD = (r) => {
+  for (let t = 0; t < 600; t++) {
+    // A/(x − p) + B/(x − q) = C  →  A(x − q) + B(x − p) = C(x − p)(x − q)
+    const p = ri(r, -6, 6), q = ri(r, -6, 6), A = nz(r, -8, 8), B = nz(r, -8, 8), C = pick(r, [1, 2, -1, 3, 0]); if (p === q) continue;
+    const lhs = b7add(b7scale([1, -q], A), b7scale([1, -p], B)), rhs = b7scale(b7prod([1, -p], [1, -q]), C), P = b7trim(b7add(rhs, b7scale(lhs, -1)));
+    let roots;
+    if (P.length === 1) continue; if (P.length === 2) roots = [-P[1] / P[0]]; else { const [a, b, c] = P; const disc = b * b - 4 * a * c; if (disc < 0) continue; const sq = Math.sqrt(disc); if (Math.abs(sq - Math.round(sq)) > 1e-9) continue; roots = [...new Set([(-b - sq) / (2 * a), (-b + sq) / (2 * a)].map((x) => Math.round(x * 1e9) / 1e9))]; }
+    if (roots.some((x) => !Number.isInteger(x * 4))) continue;
+    const good = roots.filter((x) => x !== p && x !== q), extr = roots.filter((x) => !good.includes(x)); if (!good.length && r() < 0.6) continue;
+    const den = (z) => (z === 0 ? 'x' : `x ${z < 0 ? '+' : '−'} ${Math.abs(z)}`);
+    const eq = `${A}/(${den(p)}) ${B < 0 ? '−' : '+'} ${Math.abs(B)}/(${den(q)}) = ${C}`.replace(/\(x\)/g, 'x').replace(/^-/, '−');
+    return b7solQ(r, { topic: 'Solving rational equations', eq, sols: good, extr, wrongs: [roots.map((x) => x + 1)], solution: `Multiply each side by the LCD, ${p ? `(${den(p)})` : 'x'}${q ? `(${den(q)})` : 'x'}:\n${A}(${den(q)}) ${B < 0 ? '−' : '+'} ${Math.abs(B)}(${den(p)}) = ${C}(${den(p)})(${den(q)})\n${polyT(P)} = 0 → x = ${roots.map(fracT).join(' or ')}${extr.length ? `\n${extr.map(fracT).join(', ')} makes a denominator 0, so it is extraneous.` : ''}\n${good.length ? `x = ${good.map(fracT).join(' and ')}` : 'No solution'}`.replace(/^-|\(-/g, (m) => m.replace('-', '−')) });
+  }
+};
+TEMPLATES.b75Inverse = (r) => {
+  const kind = pick(r, ['a', 'ak', 'ab']), a = nz(r, -9, 9), h = nz(r, -9, 9), k = nz(r, -9, 9);
+  if (kind === 'a') { const f = `f(x) = ${a}/(x ${h < 0 ? '+' : '−'} ${Math.abs(h)})`, inv = (x) => a / x + h, ans = `${a}/x ${h < 0 ? '−' : '+'} ${Math.abs(h)}`;
+    return { topic: 'Inverses of rational functions', stem: `Find the inverse of the function.   ${f}`.replace(/-(\d)/g, '−$1'), ...buildChoices(r, `y = ${ans}`.replace(/-(\d)/g, '−$1'), [`y = ${a}/x ${h < 0 ? '+' : '−'} ${Math.abs(h)}`, `y = x/${a} + ${h}`, `y = ${a}/(x + ${-h})`].map((t) => t.replace(/-(\d)/g, '−$1')), () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'func', label: 'y =' }], key: [`\\frac{${a}}{x}${h < 0 ? '-' : '+'}${Math.abs(h)}`], display: `y = ${ans}`.replace(/-(\d)/g, '−$1'), check: (v) => pxEquiv(String(v[0] || '').replace(/^\s*[a-z](\\left)?\(?x?(\\right)?\)?\s*=/, ''), inv, { lo: 0.5, hi: 9 }) }, solution: `Switch x and y: x = ${a}/(y ${h < 0 ? '+' : '−'} ${Math.abs(h)}). Solve: y ${h < 0 ? '+' : '−'} ${Math.abs(h)} = ${a}/x, so y = ${ans}.`.replace(/-(\d)/g, '−$1') }; }
+  if (kind === 'ak') { const f = `f(x) = ${a}/x ${k < 0 ? '−' : '+'} ${Math.abs(k)}`, inv = (x) => a / (x - k), ans = `${a}/(x ${k < 0 ? '+' : '−'} ${Math.abs(k)})`;
+    return { topic: 'Inverses of rational functions', stem: `Find the inverse of the function.   ${f}`.replace(/-(\d)/g, '−$1'), ...buildChoices(r, `y = ${ans}`.replace(/-(\d)/g, '−$1'), [`y = ${a}/(x ${k < 0 ? '−' : '+'} ${Math.abs(k)})`, `y = ${a}/x ${k < 0 ? '+' : '−'} ${Math.abs(k)}`, `y = x/${a} − ${k}`].map((t) => t.replace(/-(\d)/g, '−$1')), () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'func', label: 'y =' }], key: [`\\frac{${a}}{x${k < 0 ? '+' : '-'}${Math.abs(k)}}`], display: `y = ${ans}`.replace(/-(\d)/g, '−$1'), check: (v) => pxEquiv(String(v[0] || '').replace(/^\s*[a-z](\\left)?\(?x?(\\right)?\)?\s*=/, ''), inv, { lo: -9, hi: 9 }) }, solution: `Switch x and y: x = ${a}/y ${k < 0 ? '−' : '+'} ${Math.abs(k)}. Then x ${k < 0 ? '+' : '−'} ${Math.abs(k)} = ${a}/y, so y = ${ans}.`.replace(/-(\d)/g, '−$1') }; }
+  const b = pick(r, [2, 3, 5]), c = nz(r, -9, 9), num = pick(r, [4, 8, 6]); // f(x) = num/(c + b x) → inverse (num − c x)/(b x)
+  if (gcd(gcd(num, Math.abs(c)), b) > 1) return TEMPLATES.b75Inverse(r);
+  const inv = (x) => (num - c * x) / (b * x), ans = `(${num} ${c < 0 ? '+' : '−'} ${Math.abs(c)}x)/(${b}x)`;
+  return { topic: 'Inverses of rational functions', stem: `Find the inverse of the function.   f(x) = ${num}/(${c} + ${b}x)`.replace(/-(\d)/g, '−$1'), ...buildChoices(r, `y = ${ans}`, [`y = (${c} + ${b}x)/${num}`, `y = (${num} ${c < 0 ? '−' : '+'} ${Math.abs(c)}x)/(${b}x)`, `y = ${num}/(${b}x) + ${c}`].map((t) => t.replace(/-(\d)/g, '−$1')), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'func', label: 'y =' }], key: [`\\frac{${num}${c < 0 ? '+' : '-'}${Math.abs(c)}x}{${b}x}`], display: `y = ${ans}`, check: (v) => pxEquiv(String(v[0] || '').replace(/^\s*[a-z](\\left)?\(?x?(\\right)?\)?\s*=/, ''), inv, { lo: 0.5, hi: 9 }) }, solution: `Switch x and y: x = ${num}/(${c} + ${b}y). Then ${c} + ${b}y = ${num}/x, so y = ${ans}.`.replace(/-(\d)/g, '−$1') };
+};
+TEMPLATES.b75Word = (r) => {
+  const kind = pick(r, ['trivia', 'batting', 'brass', 'work']);
+  if (kind === 'trivia') { const a = ri(r, 30, 40), n = a + ri(r, 4, 9), p = pick(r, [90, 95, 85]), x = (p * n - 100 * a) / (100 - p); if (!Number.isInteger(x) || x <= 0) return TEMPLATES.b75Word(r);
+    return a1numQ(r, { topic: 'Solving rational equations', stem: `A game show contestant has answered ${a} out of ${n} trivia questions correctly. Solve ${p}/100 = (${a} + x)/(${n} + x) to find the number of consecutive questions the contestant must answer correctly to raise the percentage to ${p}%.`, val: x, unit: 'questions', wrongs: [Math.round(p * n / 100 - a), x + 1], solution: `${p}(${n} + x) = 100(${a} + x) → ${p * n} + ${p}x = ${100 * a} + 100x → ${100 - p}x = ${p * n - 100 * a} → x = ${x}` }); }
+  if (kind === 'batting') { const h = ri(r, 10, 15), ab = ri(r, 50, 60), avg = pick(r, [0.36, 0.3, 0.32, 0.35]), x = (avg * ab - h) / (1 - avg); if (x <= 0) return TEMPLATES.b75Word(r); const n = Math.ceil(x - 1e-9);
+    return a1numQ(r, { topic: 'Solving rational equations', stem: `Your friend has ${h} hits out of ${ab} times at-bat. Solve ${avg.toFixed(3)} = (${h} + x)/(${ab} + x) to find the number of consecutive hits needed to raise the batting average to ${avg.toFixed(3)}. (Round up to a whole number of hits.)`, val: n, unit: 'hits', wrongs: [Math.floor(x), Math.round(avg * ab - h)].filter((w) => w !== n), solution: `${avg}(${ab} + x) = ${h} + x → x = (${fmt(avg * ab)} − ${h})/(1 − ${avg}) ≈ ${x.toFixed(2)}, so ${n} hits.` }); }
+  if (kind === 'brass') { const c = pick(r, [25, 20, 30]), pc = pick(r, [0.55, 0.6, 0.65]), z = c / pc - c, v = Math.round(z * 100) / 100;
+    return a1numQ(r, { topic: 'Solving rational equations', stem: `Brass is an alloy composed of ${Math.round(pc * 100)}% copper and ${Math.round((1 - pc) * 100)}% zinc by weight. You have ${c} ounces of copper. How many ounces of zinc do you need to make brass? Round to two decimal places.`, val: v, tol: 0.011, dec: true, unit: 'oz', wrongs: [Math.round(c * (1 - pc) * 100) / 100, Math.round(c * (1 - pc) / pc * 1000) / 1000 + 1], solution: `${c}/(${c} + x) = ${pc} → ${c} = ${pc}(${c} + x) → x = ${c}/${pc} − ${c} ≈ ${fmt(v)} oz` }); }
+  const you = pick(r, [2, 3, 4]), tog = pick(r, [1.2, 1.5, 2]), f = tog * you / (you - tog); if (f <= 0 || !isFinite(f)) return TEMPLATES.b75Word(r);
+  return a1numQ(r, { topic: 'Solving rational equations', stem: `You can clean a park in ${you} hours. Working together, you and your friend can clean the park in ${fmt(tog)} hours. How long (in hours) would it take your friend working alone? Round to two decimal places if necessary.`, val: Math.round(f * 100) / 100, tol: 0.011, dec: true, unit: 'h', wrongs: [you - tog, you + tog, Math.round(tog * you / (you + tog) * 100) / 100], solution: `${fmt(tog)}/${you} + ${fmt(tog)}/t = 1 → ${fmt(tog)}/t = 1 − ${fmt(tog / you)} → t ≈ ${fmt(Math.round(f * 100) / 100)} hours` });
+};
+for (const name of Object.keys(TEMPLATES)) if (/^b7\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+TEMPLATES.b74Rewrite = (r) => TEMPLATES.b72Rewrite(r);
+/* ==== ALGEBRA 2 CH7 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -19961,6 +20285,12 @@ Object.assign(SETS, {
   'alg2-6-6': { subject: 'algebra2', title: '6.6 Solving Exponential and Logarithmic Equations', items: [['b66ExpEq', 4], ['b66LogEq', 4], ['b66Ineq', 2], ['b66Word', 2]] },
   'alg2-6-7': { subject: 'algebra2', title: '6.7 Modeling with Exponential and Logarithmic Functions', items: [['b67Type', 3], ['b67TwoPts', 3]] },
   'alg2-6-8': { subject: 'algebra2', title: '6.8 Piecewise Functions', items: [['b68Eval', 4]] },
+  // ----- Algebra II, Chapter 7: Rational Functions -----
+  'alg2-7-1': { subject: 'algebra2', title: '7.1 Inverse Variation', items: [['b71Type', 3], ['b71Table', 2], ['b71Write', 3], ['b71Word', 2]] },
+  'alg2-7-2': { subject: 'algebra2', title: '7.2 Graphing Rational Functions', items: [['b72Graph', 3], ['b72Asym', 3], ['b72Rewrite', 3]] },
+  'alg2-7-3': { subject: 'algebra2', title: '7.3 Multiplying and Dividing Rational Expressions', items: [['b73Simplify', 3], ['b73Mono', 2], ['b73MultDiv', 4]] },
+  'alg2-7-4': { subject: 'algebra2', title: '7.4 Adding and Subtracting Rational Expressions', items: [['b74Like', 2], ['b74LCM', 2], ['b74AddDiff', 4], ['b74Rewrite', 1], ['b74Complex', 3], ['b74Word', 1]] },
+  'alg2-7-5': { subject: 'algebra2', title: '7.5 Solving Rational Equations', items: [['b75Cross', 3], ['b75LCD', 3], ['b75Word', 2], ['b75Inverse', 2]] },
   // ----- Geometry, Chapter 7: Quadrilaterals and Other Polygons -----
   'geo-7-1': { subject: 'geometry', title: '7.1 Angles of Polygons', items: [['g71Sum', 2], ['g71Sides', 2], ['g71FindX', 4], ['g71Ext', 3], ['g71Regular', 2]] },
   'geo-7-2': { subject: 'geometry', title: '7.2 Properties of Parallelograms', items: [['g72Vars', 3], ['g72Angle', 2], ['g72Diag', 3], ['g72Alg', 3], ['g72Coord', 2]] },
@@ -20417,6 +20747,26 @@ QUESTION_TYPES.push(
   { id: 'b67Type', subject: 'algebra2', section: '6.7 Modeling with Exponential and Logarithmic Functions', label: 'Linear, exponential, or neither?', desc: '#1–4' },
   { id: 'b67TwoPts', subject: 'algebra2', section: '6.7 Modeling with Exponential and Logarithmic Functions', label: 'Exponential function through two points', desc: '#5–12' },
   { id: 'b68Eval', subject: 'algebra2', section: '6.8 Piecewise Functions', label: 'Evaluate a piecewise function', desc: '#1–8' },
+  { id: 'b71Type', subject: 'algebra2', section: '7.1 Inverse Variation', label: 'Direct, inverse, or neither: equations', desc: '#1–8' },
+  { id: 'b71Table', subject: 'algebra2', section: '7.1 Inverse Variation', label: 'Direct, inverse, or neither: tables', desc: '#9–12' },
+  { id: 'b71Write', subject: 'algebra2', section: '7.1 Inverse Variation', label: 'Write an inverse variation equation', desc: '#13–20' },
+  { id: 'b71Word', subject: 'algebra2', section: '7.1 Inverse Variation', label: 'Real-life inverse variation', desc: '#22, 25–27' },
+  { id: 'b72Graph', subject: 'algebra2', section: '7.2 Graphing Rational Functions', sketch: true, label: 'Graph a rational function (students graph)', desc: '#1–16' },
+  { id: 'b72Asym', subject: 'algebra2', section: '7.2 Graphing Rational Functions', label: 'Vertical and horizontal asymptotes', desc: '#9–16, 21–28' },
+  { id: 'b72Rewrite', subject: 'algebra2', section: '7.2 Graphing Rational Functions', label: 'Rewrite as a/(x − h) + k', desc: '#31–38' },
+  { id: 'b73Simplify', subject: 'algebra2', section: '7.3 Multiplying and Dividing Rational Expressions', label: 'Simplify', desc: '#1–8' },
+  { id: 'b73Mono', subject: 'algebra2', section: '7.3 Multiplying and Dividing Rational Expressions', label: 'Monomial products and quotients', desc: '#9–10, 23–24' },
+  { id: 'b73MultDiv', subject: 'algebra2', section: '7.3 Multiplying and Dividing Rational Expressions', label: 'Products and quotients', desc: '#11–18, 25–30' },
+  { id: 'b74Like', subject: 'algebra2', section: '7.4 Adding and Subtracting Rational Expressions', label: 'Like denominators', desc: '#1–6' },
+  { id: 'b74LCM', subject: 'algebra2', section: '7.4 Adding and Subtracting Rational Expressions', label: 'Least common multiple', desc: '#7–14' },
+  { id: 'b74AddDiff', subject: 'algebra2', section: '7.4 Adding and Subtracting Rational Expressions', label: 'Unlike denominators', desc: '#15–22' },
+  { id: 'b74Rewrite', subject: 'algebra2', section: '7.4 Adding and Subtracting Rational Expressions', label: 'Rewrite as a/(x − h) + k', desc: '#27–34' },
+  { id: 'b74Complex', subject: 'algebra2', section: '7.4 Adding and Subtracting Rational Expressions', label: 'Complex fractions', desc: '#35–40' },
+  { id: 'b74Word', subject: 'algebra2', section: '7.4 Adding and Subtracting Rational Expressions', label: 'Real-life rational expressions', desc: '#41–44' },
+  { id: 'b75Cross', subject: 'algebra2', section: '7.5 Solving Rational Equations', label: 'Solve by cross multiplying', desc: '#1–8' },
+  { id: 'b75LCD', subject: 'algebra2', section: '7.5 Solving Rational Equations', label: 'Solve using the LCD', desc: '#17–28' },
+  { id: 'b75Word', subject: 'algebra2', section: '7.5 Solving Rational Equations', label: 'Real-life rational equations', desc: '#9–12, 33' },
+  { id: 'b75Inverse', subject: 'algebra2', section: '7.5 Solving Rational Equations', label: 'Inverse of a rational function', desc: '#35–42' },
   { id: 'g71Sum', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Interior angle sum', desc: '#1–4' },
   { id: 'g71Sides', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Number of sides from the sum', desc: 'Classify the polygon (#5–8)' },
   { id: 'g71FindX', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Find x from interior angles', desc: '#9–14, 17–20' },
@@ -22475,7 +22825,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
