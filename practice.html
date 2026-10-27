@@ -18827,6 +18827,406 @@ TEMPLATES.a26Word = (r) => {
 };
 for (const name of Object.keys(TEMPLATES)) if (/^a2\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 /* ==== ALGEBRA 1 CH2 END ==== */
+/* ==== ALGEBRA 1 CH3 BEGIN ==== */
+/* ---------- Algebra 1 (Big Ideas Learning 2025), Chapter 3: Graphing Linear Functions ---------- */
+const a3win = (pts, min = 10) => { const W = skWin(pts); if (W && W.xr[1] - W.xr[0] >= min) return W; if (W) return W; const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]); return { xr: [Math.min(-1, ...xs) - 2, Math.max(1, ...xs) + 2], yr: [Math.min(-1, ...ys) - 2, Math.max(1, ...ys) + 2] }; };
+const a3sel = (r, stem, opts, ans, solution, topic, extra = {}) => ({ topic, stem, ...extra, ...buildChoices(r, ans, opts.filter((o) => o !== ans), () => null), fr: FR.select(extra.selLabel || 'Answer:', opts, ans), solution });
+// a set of numbers typed as {−2, 0, 2} or −2, 0, 2
+function a3listOk(raw, vals) {
+  const s = pxPlain(String(raw || '').replace(/\\left|\\right|\\lbrace|\\rbrace|\\[{}]/g, '')); if (s == null) return false;
+  const parts = s.replace(/[{}()\s]/g, '').replace(/\\lbrace|\\rbrace/g, '').split(',').filter(Boolean); if (!parts.length) return false;
+  const got = parts.map((p) => pxConst(p)); if (got.some((g) => !isFinite(g))) return false;
+  const A = [...new Set(got.map((g) => Math.round(g * 1e6)))].sort((a, b) => a - b), B = [...new Set(vals.map((g) => Math.round(g * 1e6)))].sort((a, b) => a - b);
+  return A.length === B.length && A.every((x, i) => x === B[i]);
+}
+const a3setT = (vals) => `{${[...new Set(vals)].sort((a, b) => a - b).map(fracT).join(', ')}}`;
+// an ordered pair typed as (a, b)
+function a3ptOk(raw, P) { const s = pxPlain(raw); if (s == null) return false; const m = s.replace(/\s/g, '').replace(/^\(|\)$/g, '').split(','); if (m.length !== 2) return false; const v = m.map(pxConst); return v.every(isFinite) && Math.abs(v[0] - P[0]) < 1e-6 && Math.abs(v[1] - P[1]) < 1e-6; }
+const a3P = (p) => `(${fracT(p[0])}, ${fracT(p[1])})`;
+const a3lin = (m, b, v = 'x') => a1J([[m, v], [b]]);
+
+// ---------- 3.1 Functions ----------
+// mapping diagram
+const a3mapDraw = (X, Y, pairs) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, n = Math.max(X.length, Y.length), top = 40, gap = Math.min(36, (H - top - 20) / n), xL = W * 0.3, xR = W * 0.7;
+  c.clearRect(0, 0, W, H); c.fillStyle = '#1d1d1b'; c.font = '600 14px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText('Input, x', xL, 18); c.fillStyle = '#c0392b'; c.fillText('Output, y', xR, 18);
+  const yAt = (i, N) => top + gap * (i + 0.5) + (n - N) * gap / 2;
+  c.strokeStyle = '#8a867c'; c.lineWidth = 1.5;
+  for (const [x0, cnt] of [[xL, X.length], [xR, Y.length]]) { c.beginPath(); c.ellipse(x0, top + n * gap / 2, 34, n * gap / 2 + 10, 0, 0, 2 * Math.PI); c.stroke(); }
+  c.font = '16px Georgia, serif'; c.textBaseline = 'middle';
+  X.forEach((x, i) => { c.fillStyle = '#1d1d1b'; c.fillText(fracT(x), xL, yAt(i, X.length)); });
+  Y.forEach((y, i) => { c.fillStyle = '#c0392b'; c.fillText(fracT(y), xR, yAt(i, Y.length)); });
+  c.strokeStyle = '#1d1d1b'; c.fillStyle = '#1d1d1b'; c.lineWidth = 1.3;
+  pairs.forEach(([x, y]) => { const a = [xL + 16, yAt(X.indexOf(x), X.length)], b = [xR - 16, yAt(Y.indexOf(y), Y.length)], t = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    c.beginPath(); c.moveTo(...a); c.lineTo(...b); c.stroke(); c.beginPath(); c.moveTo(...b); c.lineTo(b[0] - 9 * Math.cos(t - 0.35), b[1] - 9 * Math.sin(t - 0.35)); c.lineTo(b[0] - 9 * Math.cos(t + 0.35), b[1] - 9 * Math.sin(t + 0.35)); c.closePath(); c.fill(); });
+};
+TEMPLATES.a31IsFunc = (r) => {
+  const n = ri(r, 4, 5), func = r() < 0.5, xs = shuffle(r, [-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]).slice(0, n);
+  let pairs = xs.map((x) => [x, ri(r, -8, 9)]);
+  if (!func) { const k = ri(r, 1, n - 1); let y; do { y = ri(r, -8, 9); } while (y === pairs[0][1]); pairs[k] = [pairs[0][0], y]; }
+  const kind = pick(r, ['pairs', 'map', 'table']), dup = !func ? pairs[0][0] : null;
+  const why = func ? 'Each input is paired with exactly one output, so the relation is a function.' : `The input ${fmt(dup)} is paired with two outputs, so the relation is not a function.`;
+  if (kind === 'pairs') return a3sel(r, `Determine whether the relation is a function.   ${pairs.map(a3P).join(', ')}`, ['Function', 'Not a function'], func ? 'Function' : 'Not a function', why, 'Functions');
+  if (kind === 'map') { const X = [...new Set(pairs.map((p) => p[0]))].sort((a, b) => a - b), Y = [...new Set(pairs.map((p) => p[1]))].sort((a, b) => a - b);
+    return a3sel(r, 'Determine whether the relation is a function.', ['Function', 'Not a function'], func ? 'Function' : 'Not a function', why, 'Functions', { draw: a3mapDraw(X, Y, pairs), size: [300, Math.max(X.length, Y.length) * 36 + 70] }); }
+  return a3sel(r, 'Determine whether the relation is a function.', ['Function', 'Not a function'], func ? 'Function' : 'Not a function', why, 'Functions', { draw: a9tableDraw([['Input, x', ...pairs.map((p) => fmt(p[0]))], ['Output, y', ...pairs.map((p) => fmt(p[1]))]]), size: [460, 90] });
+};
+// #7–10: does the graph represent a function?
+TEMPLATES.a31Graph = (r) => {
+  const kind = pick(r, ['pts', 'pts', 'v', 'sideways', 'circle', 'wave']);
+  let o, func, why;
+  if (kind === 'pts') { func = r() < 0.5; const xs = shuffle(r, [0, 1, 2, 3, 4, 5, 6]).slice(0, 5); let P = xs.map((x) => [x, ri(r, 1, 6)]); if (!func) { let y; do { y = ri(r, 1, 6); } while (y === P[0][1]); P.push([P[0][0], y]); }
+    o = { xr: [-1, 7], yr: [-1, 7], curves: [], pts: P.map((p) => ({ p })) }; why = func ? 'No vertical line passes through more than one point.' : `The vertical line x = ${P[0][0]} passes through two points.`; }
+  else if (kind === 'v') { const h = ri(r, 1, 5), k = ri(r, 0, 3); func = true; o = { xr: [-1, 7], yr: [-1, 7], curves: [{ f: (x) => Math.abs(x - h) + k }] }; why = 'Every vertical line crosses the graph at most once.'; }
+  else if (kind === 'wave') { func = true; o = { xr: [-2, 8], yr: [-4, 4], curves: [{ f: (x) => 2.5 * Math.sin((x - 1) * 1.2) }] }; why = 'Every vertical line crosses the graph at most once.'; }
+  else if (kind === 'sideways') { func = false; const k = ri(r, -1, 1); o = { xr: [-2, 8], yr: [-5, 5], curves: [{ param: [(t) => [0.4 * t * t, t + k], -4.5, 4.5] }] }; why = 'A vertical line such as x = 2 crosses the graph twice.'; }
+  else { func = false; o = { xr: [-5, 5], yr: [-5, 5], curves: [{ param: [(t) => [3 * Math.cos(t), 3 * Math.sin(t)], 0, 2 * Math.PI] }] }; why = 'A vertical line through the middle crosses the circle twice.'; }
+  return a3sel(r, 'Determine whether the graph represents a function. (Use the Vertical Line Test.)', ['Function', 'Not a function'], func ? 'Function' : 'Not a function', why, 'Functions', { draw: plotQ(o), size: [300, 300] });
+};
+// #11–14: domain and range from a graph
+TEMPLATES.a31DomRange = (r) => {
+  if (r() < 0.45) { const n = ri(r, 3, 5), xs = shuffle(r, [-3, -2, -1, 0, 1, 2, 3, 4]).slice(0, n), P = xs.map((x) => [x, ri(r, -3, 4)]);
+    const D = P.map((p) => p[0]), R = P.map((p) => p[1]), Dt = a3setT(D), Rt = a3setT(R);
+    return { topic: 'Domain and range', stem: 'Find the domain and range of the function represented by the graph.', draw: plotQ({ xr: [-5, 6], yr: [-5, 6], curves: [], pts: P.map((p) => ({ p })) }), size: [300, 300],
+      ...buildChoices(r, `domain ${Dt}, range ${Rt}`, [`domain ${Rt}, range ${Dt}`, `domain ${Dt}, range ${a3setT(R.map((y) => y + 1))}`, `domain ${a3setT(D.map((x) => -x))}, range ${Rt}`].filter((t, i, A) => A.indexOf(t) === i), () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Domain:' }, { kind: 'expr', keys: 'num', label: 'Range:' }], key: [D.join(','), R.join(',')], display: `domain ${Dt}, range ${Rt}`, check: (v) => a3listOk(v[0], D) && a3listOk(v[1], R), score: (v) => ((a3listOk(v[0], D) ? 1 : 0) + (a3listOk(v[1], R) ? 1 : 0)) / 2 },
+      solution: `The domain is the set of x-coordinates: ${Dt}. The range is the set of y-coordinates: ${Rt}.` }; }
+  let x1, x2, y1, y2; do { x1 = ri(r, -5, 0); x2 = x1 + ri(r, 3, 7); y1 = ri(r, -4, 4); y2 = ri(r, -4, 5); } while (y1 === y2 || x2 > 6);
+  const c1 = r() < 0.6, c2 = r() < 0.6, D = [a2I(x1, x2, c1, c2)], lo = Math.min(y1, y2), hi = Math.max(y1, y2), R = [a2I(lo, hi, y1 < y2 ? c1 : c2, y1 < y2 ? c2 : c1)];
+  const o = { xr: [-6, 7], yr: [-6, 7], curves: [{ f: (x) => y1 + (y2 - y1) * (x - x1) / (x2 - x1), a: x1, b: x2 }], pts: [{ p: [x1, y1], open: !c1 }, { p: [x2, y2], open: !c2 }] };
+  return { topic: 'Domain and range', stem: 'Find the domain and range of the function represented by the graph. (A closed dot is included; an open dot is not.)', draw: plotQ(o), size: [300, 300],
+    ...buildChoices(r, `domain ${a2T('x', D)}, range ${a2T('y', R)}`, [`domain ${a2T('x', a2inc(D))}, range ${a2T('y', a2inc(R))}`, `domain ${a2T('x', [a2I(lo, hi, R[0].ca, R[0].cb)])}, range ${a2T('y', [a2I(x1, x2, c1, c2)])}`, `domain ${a2T('x', D)}, range ${a2T('y', [a2I(lo - 1, hi + 1, true, true)])}`].filter((t, i, A) => A.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'ineq', label: 'Domain:' }, { kind: 'expr', keys: 'ineq', label: 'Range:' }], key: [a2T('x', D, { latex: true }), a2T('y', R, { latex: true })], display: `domain ${a2T('x', D)}, range ${a2T('y', R)}`, check: (v) => a2ok(v[0], D, 'x') && a2ok(v[1], R, 'y'), score: (v) => ((a2ok(v[0], D, 'x') ? 1 : 0) + (a2ok(v[1], R, 'y') ? 1 : 0)) / 2 },
+    solution: `The graph runs from x = ${x1} to x = ${x2}: ${a2T('x', D)}.\nIts y-values run from ${lo} to ${hi}: ${a2T('y', R)}.` };
+};
+// #15–16: independent and dependent variables
+TEMPLATES.a31IndDep = (r) => {
+  const C = pick(r, [['the number of quarters you put into a parking meter', 'the amount of time on the meter'], ['the amount of time spent driving', 'the amount of gasoline in a car’s fuel tank'], ['the number of hours you work', 'the amount of money you earn'], ['the number of tickets sold', 'the money raised'], ['the length of a side of a square', 'the area of the square'], ['the number of miles you ride in a taxi', 'the cost of the ride']]), ind = C[0];
+  const opts = shuffle(r, C.map((t) => t[0].toUpperCase() + t.slice(1)));
+  return a3sel(r, `Identify the independent variable.   ${opts[0]} and ${opts[1].toLowerCase()}`, opts, ind[0].toUpperCase() + ind.slice(1), `The ${C[1]} depends on ${ind}, so ${ind} is the independent variable and ${C[1]} is the dependent variable.`, 'Functions');
+};
+// #19–22: does the equation represent a function? Domain?
+TEMPLATES.a31EqFunc = (r) => {
+  const a = ri(r, 2, 9), C = pick(r, [[`y = x²/${a}`, 'Yes', 'All real numbers'], [`y = √(${a} − x)`, 'Yes', `x ≤ ${a}`], [`x = ${a}`, 'No', `x = ${a} only`], [`y = ${a + 4}/(x − ${a - 1})`, 'Yes', `All real numbers except x = ${a - 1}`], [`y = √(x + ${a})`, 'Yes', `x ≥ −${a}`], [`y = ${a}x − 1`, 'Yes', 'All real numbers']]);
+  const doms = [...new Set(['All real numbers', `x ≤ ${a}`, `x ≥ −${a}`, `All real numbers except x = ${a - 1}`, `x = ${a} only`, C[2]])];
+  const ans = C[1] === 'No' ? 'Not a function' : `Function; domain: ${C[2]}`;
+  const opts = [ans, ...shuffle(r, doms.filter((d) => d !== C[2])).slice(0, 2).map((d) => `Function; domain: ${d}`), C[1] === 'No' ? `Function; domain: ${C[2]}` : 'Not a function'];
+  return { topic: 'Functions', stem: `Determine whether the equation represents y as a function of x. If it does, find the domain.   ${C[0]}`, ...buildChoices(r, ans, opts.slice(1), () => null), fr: FR.select('Answer:', shuffle(r, opts), ans),
+    solution: C[1] === 'No' ? `x = ${a} is a vertical line: the input ${a} has infinitely many outputs, so it is not a function.` : `Each x gives exactly one y, so it is a function. Domain: ${C[2]}${/√/.test(C[0]) ? ' (the expression under the square root cannot be negative)' : /\//.test(C[0]) ? ' (you cannot divide by 0)' : ''}.` };
+};
+// #17–18: domain and range in context
+TEMPLATES.a31Word = (r) => {
+  if (r() < 0.5) { const fee = pick(r, [2.8, 3, 2.5]), rate = pick(r, [3.5, 2.75, 3]), mi = pick(r, [20, 15, 10]), top = Math.round((fee + rate * mi) * 100) / 100, R = [a2I(fee, top, true, true)];
+    return a2Q(r, { topic: 'Domain and range', stem: `A taxi company charges an initial fee of $${fee.toFixed(2)} plus $${rate.toFixed(2)} per mile traveled. You have enough money to travel at most ${mi} miles. Find the range of the cost y (in dollars).`, v: 'y', S: R, dec: true, label: 'Range:', wrongs: [[a2I(0, mi, true, true)], [a2I(0, top, true, true)], [a2I(fee, top)]], solution: `Domain: 0 ≤ x ≤ ${mi}. The cost is ${fee.toFixed(2)} + ${rate.toFixed(2)}x, from $${fee.toFixed(2)} at 0 miles to $${top.toFixed(2)} at ${mi} miles.\nRange: ${fmt(fee)} ≤ y ≤ ${fmt(top)}` }); }
+  const per = pick(r, [30, 25, 40]), mx = pick(r, [4, 5, 3]), D = [...Array(mx)].map((_, i) => i + 1), Rg = D.map((d) => d * per);
+  return { topic: 'Domain and range', stem: `A cell phone plan costs $${per} for each line. You can have a maximum of ${mx} lines on a plan. Find the domain and range of the cost function.`,
+    ...buildChoices(r, `domain ${a3setT(D)}, range ${a3setT(Rg)}`, [`domain ${a3setT([0, ...D])}, range ${a3setT([0, ...Rg])}`, `domain ${a3setT(Rg)}, range ${a3setT(D)}`, `domain 1 ≤ x ≤ ${mx}, range ${per} ≤ y ≤ ${per * mx}`], () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Domain:' }, { kind: 'expr', keys: 'num', label: 'Range:' }], key: [D.join(','), Rg.join(',')], display: `domain ${a3setT(D)}, range ${a3setT(Rg)}`, check: (v) => a3listOk(v[0], D) && a3listOk(v[1], Rg), score: (v) => ((a3listOk(v[0], D) ? 1 : 0) + (a3listOk(v[1], Rg) ? 1 : 0)) / 2 },
+    solution: `You can have 1 to ${mx} lines (whole numbers): domain ${a3setT(D)}. The costs are ${per} times those: range ${a3setT(Rg)}.` };
+};
+
+// ---------- 3.2 Characteristics of Functions ----------
+// a function with integer intercepts: line, absolute value, or quadratic
+function a3fn(r) {
+  const kind = pick(r, ['line', 'abs', 'abs', 'quad', 'quad']);
+  if (kind === 'line') { const z = ri(r, -5, 5), m = pick(r, [1, -1, 2, -2, 1 / 2, -1 / 2, 3]), b = -m * z; if (!Number.isInteger(b) || Math.abs(b) > 7) return a3fn(r);
+    return { kind, f: (x) => m * x + b, eq: `y = ${a3lin(m, b)}`, zeros: [z], yint: b, pos: a2S(m > 0 ? '>' : '<', z), neg: a2S(m > 0 ? '<' : '>', z), inc: m > 0 ? ALL : [], dec: m < 0 ? ALL : [], L: m > 0 ? '−∞' : '+∞', R: m > 0 ? '+∞' : '−∞', key: [[z, 0], [0, b]] }; }
+  if (kind === 'abs') { const a = pick(r, [1, -1, 2, -2]), h = ri(r, -4, 4), d = ri(r, 1, 3), k = -a * d; const z = [h - d, h + d], b = a * Math.abs(h) + k; if (Math.abs(b) > 8) return a3fn(r);
+    const between = [a2I(h - d, h + d)], out = [a2I(-Infinity, h - d), a2I(h + d, Infinity)];
+    return { kind, f: (x) => a * Math.abs(x - h) + k, eq: `y = ${a === 1 ? '' : a === -1 ? '−' : a}|x ${h < 0 ? '+' : '−'} ${Math.abs(h)}| ${k < 0 ? '−' : '+'} ${Math.abs(k)}`.replace('|x − 0|', '|x|').replace('|x + 0|', '|x|'), zeros: z, yint: b, pos: a > 0 ? out : between, neg: a > 0 ? between : out, inc: a > 0 ? a2S('>', h) : a2S('<', h), dec: a > 0 ? a2S('<', h) : a2S('>', h), L: a > 0 ? '+∞' : '−∞', R: a > 0 ? '+∞' : '−∞', key: [[h, k], ...z.map((x) => [x, 0])] }; }
+  const a = pick(r, [1, -1]), r1 = ri(r, -5, 2), r2 = r1 + ri(r, 2, 6), b = a * r1 * r2; if (Math.abs(b) > 9 || Math.abs(a * ((r1 - r2) / 2) ** 2) > 9) return a3fn(r);
+  const p = -(r1 + r2), q = r1 * r2, xv = (r1 + r2) / 2, between = [a2I(r1, r2)], out = [a2I(-Infinity, r1), a2I(r2, Infinity)];
+  return { kind, f: (x) => a * (x - r1) * (x - r2), eq: `y = ${a < 0 ? '−' : ''}${a < 0 ? `(x² ${p < 0 ? '−' : '+'} ${Math.abs(p)}x ${q < 0 ? '−' : '+'} ${Math.abs(q)})` : `x² ${p < 0 ? '−' : '+'} ${Math.abs(p)}x ${q < 0 ? '−' : '+'} ${Math.abs(q)}`}`.replace(/ \+ 0x| − 0x/, '').replace(/ \+ 0\)| − 0\)/, ')').replace(/ [+−] 0$/, ''),
+    zeros: [r1, r2], yint: b, pos: a > 0 ? out : between, neg: a > 0 ? between : out, inc: a > 0 ? a2S('>', xv) : a2S('<', xv), dec: a > 0 ? a2S('<', xv) : a2S('>', xv), L: a > 0 ? '+∞' : '−∞', R: a > 0 ? '+∞' : '−∞', key: [[r1, 0], [r2, 0], [xv, a * (xv - r1) * (xv - r2)]] };
+}
+const a3fnDraw = (F) => { const W = a3win([...F.key, [0, F.yint]]); return { draw: plotQ({ xr: W.xr, yr: W.yr, curves: [{ f: F.f }] }), size: [320, 320] }; };
+TEMPLATES.a32Intercepts = (r) => {
+  const F = a3fn(r), Z = [...new Set(F.zeros)].sort((a, b) => a - b), txt = `x-intercept${Z.length > 1 ? 's' : ''} ${Z.map(fracT).join(' and ')}; y-intercept ${fmt(F.yint)}`;
+  return { topic: 'Intercepts', stem: `Find the intercepts of the graph of the function.   ${F.eq}`, ...a3fnDraw(F),
+    ...buildChoices(r, txt, [`x-intercept${Z.length > 1 ? 's' : ''} ${Z.map((z) => fracT(-z)).join(' and ')}; y-intercept ${fmt(F.yint)}`, `x-intercept ${fmt(F.yint)}; y-intercept ${fracT(Z[0])}`, `x-intercept${Z.length > 1 ? 's' : ''} ${Z.map(fracT).join(' and ')}; y-intercept ${fmt(-F.yint || F.yint + 2)}`].filter((t, i, A) => t !== txt && A.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'x-intercept(s):' }, { kind: 'expr', keys: 'num', label: 'y-intercept:' }], key: [Z.join(','), String(F.yint)], display: txt, check: (v) => a3listOk(v[0], Z) && numOk(v[1], F.yint), score: (v) => ((a3listOk(v[0], Z) ? 1 : 0) + (numOk(v[1], F.yint) ? 1 : 0)) / 2 },
+    solution: `The graph crosses the x-axis at x = ${Z.map(fracT).join(' and ')} and the y-axis at y = ${fmt(F.yint)}.` };
+};
+TEMPLATES.a32Behavior = (r) => {
+  const F = a3fn(r), ask = pick(r, ['pos', 'neg', 'inc', 'dec', 'end']);
+  if (ask === 'end') { const opts = ['y → +∞ as x → −∞ and y → +∞ as x → +∞', 'y → −∞ as x → −∞ and y → −∞ as x → +∞', 'y → −∞ as x → −∞ and y → +∞ as x → +∞', 'y → +∞ as x → −∞ and y → −∞ as x → +∞'], ans = `y → ${F.L} as x → −∞ and y → ${F.R} as x → +∞`;
+    return a3sel(r, `Describe the end behavior of the function.   ${F.eq}`, opts, ans, `As you move left, the graph goes ${F.L === '+∞' ? 'up' : 'down'}; as you move right, it goes ${F.R === '+∞' ? 'up' : 'down'}.`, 'Characteristics of functions', a3fnDraw(F)); }
+  const S = F[ask], word = { pos: 'positive', neg: 'negative', inc: 'increasing', dec: 'decreasing' }[ask];
+  const q = a2Q(r, { topic: 'Characteristics of functions', stem: `Approximate when the function is ${word}. (Answer with an inequality, "all real numbers," or "no solution" if never.)   ${F.eq}`, v: 'x', S, ...a3fnDraw(F), wrongs: a2isAll(S) || !S.length ? [a2isAll(S) ? [] : ALL, a2S('<', F.zeros[0]), a2S('>', F.zeros[0])] : [F[{ pos: 'neg', neg: 'pos', inc: 'dec', dec: 'inc' }[ask]], a2rev(S)],
+    solution: `${ask === 'pos' || ask === 'neg' ? `The graph is ${ask === 'pos' ? 'above' : 'below'} the x-axis` : `The graph ${ask === 'inc' ? 'rises' : 'falls'} from left to right`} ${a2isAll(S) ? 'everywhere: all real numbers' : S.length ? `when ${a2T('x', S)}` : 'nowhere: no solution'}.` });
+  if (ask === 'inc' || ask === 'dec') q.fr.check = (x) => a2ok(x[0], S, 'x') || (S.length && !a2isAll(S) && a2ok(x[0], a2inc(S), 'x'));
+  q.choices = q.choices.map((c, i) => (i !== q.answer && q.fr.check([c]) ? a2T('x', a2at(S.length && !a2isAll(S) ? S : a2S('>', 0), (e) => e + 3 + i)) : c));
+  return q;
+};
+
+// ---------- 3.3 Linear Functions ----------
+TEMPLATES.a33Graph = (r) => {
+  const C = pick(r, [() => { const m = pick(r, [1, -2, 1 / 2, 3, -1]), b = ri(r, -3, 3); return [{ f: (x) => m * x + b }, true]; }, () => [{ f: () => ri(r, -3, 3) }, true], () => { const h = ri(r, -2, 2); return [{ f: (x) => 2 * Math.abs(x - h) - 3 }, false]; }, () => [{ f: (x) => 0.5 * x * x - 2 }, false], () => [{ f: (x) => 2 ** x - 2 }, false], () => [{ f: (x) => 0.3 * x ** 3 }, false]])();
+  const ans = C[1] ? 'Linear' : 'Nonlinear';
+  return a3sel(r, 'Determine whether the graph represents a linear or nonlinear function.', ['Linear', 'Nonlinear'], ans, C[1] ? 'The graph is a (nonvertical) line, so the function is linear.' : 'The graph is not a line, so the function is nonlinear.', 'Linear functions', { draw: plotQ({ xr: [-5, 5], yr: [-5, 5], curves: [C[0]] }), size: [280, 280] });
+};
+TEMPLATES.a33Table = (r) => {
+  const lin = r() < 0.5, x0 = ri(r, -2, 5), steps = pick(r, [[1, 1, 1], [2, 2, 2], [4, 4, 4], [-1, -1, -1]]), X = [x0]; steps.forEach((s) => X.push(X[X.length - 1] + s));
+  const m = pick(r, [5, -3, 2.5, -1.2, 4]), b = ri(r, -10, 20); let Y = X.map((x) => Math.round((m * x + b) * 10) / 10);
+  if (!lin) { if (r() < 0.5) Y = X.map((x) => x * x + b); else { const k = ri(r, 1, 2); Y[k + 1] = Math.round((Y[k + 1] + pick(r, [-2, 2, 3])) * 10) / 10; } }
+  const d = Y.slice(1).map((y, i) => Math.round((y - Y[i]) * 10) / 10), ans = lin ? 'Linear' : 'Nonlinear';
+  return a3sel(r, 'Determine whether the table represents a linear or nonlinear function.', ['Linear', 'Nonlinear'], ans, `As x increases by ${Math.abs(steps[0])}, y changes by ${d.map(fmt).join(', ')}. ${lin ? 'The rate of change is constant, so the function is linear.' : 'The rate of change is not constant, so the function is nonlinear.'}`, 'Linear functions',
+    { draw: a9tableDraw([['x', ...X.map(fmt)], ['y', ...Y.map(fmt)]]), size: [420, 90] });
+};
+TEMPLATES.a33Eq = (r) => {
+  const a = ri(r, 2, 9), b = ri(r, 2, 13), C = pick(r, [[`y = x² + ${b}`, false], [`y = ${b} − ${a}x`, true], [`y = ∛8 − x`, true], [`y = ${a}x(${b} − x)`, false], [`2 + (1/6)y = ${a}x + 4`, true], [`y − x = 2x − (2/3)y`, true], [`${a * 2}x − 2y = ${b}`, true], [`2x + 3y = ${a}xy`, false], [`y = √x + ${b}`, false], [`x = ${a}`, false], [`y = ${b}x/11`, true], [`y = ${a}/x`, false], [`${b} = 2x² + 4y²`, false]]);
+  const ans = C[1] ? 'Linear' : 'Nonlinear';
+  return a3sel(r, `Determine whether the equation represents a linear or nonlinear function.   ${C[0]}`, ['Linear', 'Nonlinear'], ans, C[1] ? 'It can be written as y = mx + b, so it is a linear function.' : C[0].startsWith('x =') ? 'x = a is a vertical line, which is not a function at all (so not a linear function).' : 'It cannot be written in the form y = mx + b, so it is nonlinear.', 'Linear functions');
+};
+TEMPLATES.a33Discrete = (r) => {
+  if (r() < 0.5) { const C = pick(r, [['the number of relay teams', 'the number of athletes', 'Discrete'], ['the time (in hours)', 'the distance traveled (in miles)', 'Continuous'], ['the number of photographs printed', 'the money left (in dollars)', 'Discrete'], ['the number of minutes', 'the gallons of water in a pool being filled', 'Continuous'], ['the number of checked bags', 'the cost of the ticket', 'Discrete'], ['the number of minutes', 'the liters of air in a diving tank', 'Continuous'], ['the number of tickets sold', 'the money raised', 'Discrete']]);
+    return a3sel(r, `A function relates ${C[0]} (input) to ${C[1]} (output). Is the domain discrete or continuous?`, ['Discrete', 'Continuous'], C[2], C[2] === 'Discrete' ? `${C[0][0].toUpperCase() + C[0].slice(1)} can only be whole numbers, so the domain is discrete.` : `${C[0][0].toUpperCase() + C[0].slice(1)} can be any value in an interval (including fractions), so the domain is continuous.`, 'Discrete and continuous domains'); }
+  const disc = r() < 0.5, m = pick(r, [3, 5, 6]), b = ri(r, 0, 10), xs = [0, 1, 2, 3, 4, 5];
+  const o = disc ? { xr: [-1, 7], yr: [-2, 40], curves: [], pts: xs.slice(0, 5).map((x) => ({ p: [x, m * x + b] })), step: 5 } : { xr: [-1, 7], yr: [-2, 40], curves: [{ f: (x) => m * x + b, a: 0, b: 5 }], pts: [{ p: [0, b] }, { p: [5, 5 * m + b] }], step: 5 };
+  return a3sel(r, 'Is the domain of the function represented by the graph discrete or continuous?', ['Discrete', 'Continuous'], disc ? 'Discrete' : 'Continuous', disc ? 'The graph consists of separate points, so the domain is discrete.' : 'The graph is an unbroken segment, so the domain is continuous.', 'Discrete and continuous domains', { draw: plotQ(o), size: [300, 300] });
+};
+
+// ---------- 3.4 Function Notation ----------
+function a3fx(r) {
+  const name = pick(r, ['f', 'g', 'h', 'r', 'p', 'b', 'k', 'm', 'q', 'j']), F = pick(r, [() => { const c = nz(r, -9, 9); return [`x ${c < 0 ? '−' : '+'} ${Math.abs(c)}`, (x) => x + c]; }, () => { const a = nz(r, -6, 6); return [`${a === -1 ? '−' : a}x`, (x) => a * x]; },
+    () => { const a = nz(r, -5, 5), c = nz(r, -9, 9); return [a3lin(a, c), (x) => a * x + c]; }, () => { const c = nz(r, -5, 5); return [`${c} + (1/4)x`.replace(/^-/, '−'), (x) => c + x / 4]; }, () => { const c = ri(r, 5, 20); return [`${c} − 0.5x`, (x) => c - 0.5 * x]; },
+    () => { const c = nz(r, -5, 5), k = ri(r, 2, 5); return [`${c} + |${k}x|`.replace(/^-/, '−'), (x) => c + Math.abs(k * x)]; }, () => { const c = ri(r, 2, 20); return [`${c} + 0.5x²`, (x) => c + 0.5 * x * x]; }])();
+  return { name, rule: F[0], f: F[1] };
+}
+TEMPLATES.a34Eval = (r) => {
+  const F = a3fx(r), x = pick(r, [-2, 0, 5, -4, 3, 6, -1]), v = Math.round(F.f(x) * 1e6) / 1e6;
+  return a1numQ(r, { topic: 'Function notation', stem: `Evaluate the function when x = ${fmt(x)}.   ${F.name}(x) = ${F.rule}`, val: v, label: `${F.name}(${fmt(x)}) =`, wrongs: [F.f(-x), v + 1, F.f(x) - 2 * (F.f(0))].map((w) => Math.round(w * 1e6) / 1e6), solution: `${F.name}(${fmt(x)}) = ${F.rule.replace(/x/g, `(${fmt(x)})`)} = ${fracT(v)}` });
+};
+TEMPLATES.a34Solve = (r) => {
+  const name = pick(r, ['h', 'm', 'k', 'q', 'j', 't', 'f']), kind = pick(r, ['ax', 'ax+b', 'dec', 'frac']);
+  let a, b, x, rule;
+  if (kind === 'ax') { a = nz(r, -9, 9); b = 0; x = nz(r, -9, 9); rule = `${a === -1 ? '−' : a}x`; }
+  else if (kind === 'ax+b') { a = pick(r, [2, 3, 4, 6, -3]); b = nz(r, -15, 15); x = nz(r, -6, 6) + pick(r, [0, 0, 0.5]); if (!Number.isInteger(a * x)) x = Math.round(x); rule = a3lin(a, b); }
+  else if (kind === 'dec') { a = 0.5; b = -ri(r, 1, 6); x = nz(r, -8, 8); rule = `0.5x − ${-b}`; }
+  else { a = -4 / 5; b = ri(r, 2, 9); x = 5 * nz(r, -4, 4); rule = `−(4/5)x + ${b}`; }
+  const val = Math.round((a * x + b) * 1e9) / 1e9;
+  return a1numQ(r, { topic: 'Function notation', stem: `Find the value of x so that the function has the given value.   ${name}(x) = ${rule};  ${name}(x) = ${fmt(val)}`, val: x, label: 'x =', wrongs: [a * val + b, (val + b) / a, -x].map((w) => Math.round(w * 1e6) / 1e6), solution: `${rule} = ${fmt(val)}\n${b ? `${b < 0 ? 'Add' : 'Subtract'} ${Math.abs(b)}: ${a === -4 / 5 ? '−(4/5)x' : a === 1 ? 'x' : `${a === -1 ? '−' : fmt(a)}x`} = ${fmt(val - b)}\n` : ''}x = ${fmt(x)}` });
+};
+TEMPLATES.a34Graph = (r) => {
+  const m = pick(r, [1, 2, -1, 3, -2, 1 / 2]), x0 = ri(r, -3, 4), y0 = pick(r, [7, 5, 4, 6, 3]), b = y0 - m * x0; if (!Number.isInteger(b) || Math.abs(b) > 8) return TEMPLATES.a34Graph(r);
+  const W = a3win([[x0, y0], [0, b]]);
+  return a1numQ(r, { topic: 'Function notation', stem: `Use the graph of f to find the value of x so that f(x) = ${y0}.`, val: x0, label: 'x =', draw: plotQ({ xr: W.xr, yr: W.yr, curves: [{ f: (x) => m * x + b }] }), size: [320, 320], wrongs: [y0 * m + b, b, -x0], solution: `Find ${y0} on the y-axis, go across to the line, and read the x-coordinate: f(${x0}) = ${y0}, so x = ${x0}.` });
+};
+TEMPLATES.a34Word = (r) => {
+  const kind = pick(r, ['tickets', 'light', 'deck']);
+  if (kind === 'tickets') { const p = pick(r, [17.5, 12.5, 22]), cpn = pick(r, [10, 5, 8]), n = ri(r, 3, 8), v = Math.round((p * n - cpn) * 100) / 100;
+    return a1numQ(r, { topic: 'Function notation', stem: `The function C(x) = ${fmt(p)}x − ${cpn} represents the cost (in dollars) of buying x tickets to the orchestra with a $${cpn} coupon. How much does it cost to buy ${n} tickets?`, val: v, dec: true, label: '$', wrongs: [p * n + cpn, p * n, p - cpn * n], solution: `C(${n}) = ${fmt(p)}(${n}) − ${cpn} = $${v.toFixed(2)}` }); }
+  if (kind === 'light') { const t = ri(r, 5, 20);
+    return a1numQ(r, { topic: 'Function notation', stem: `The function d(t) = 300,000t represents the distance (in kilometers) that light travels in t seconds. How far does light travel in ${t} seconds?`, val: 300000 * t, unit: 'km', wrongs: [300000 / t, 30000 * t, 3000000 * t], solution: `d(${t}) = 300,000(${t}) = ${(300000 * t).toLocaleString('en-US')} km` }); }
+  const a = pick(r, [25, 20, 30]), f = pick(r, [50, 60, 40]), h = pick(r, [6, 8, 10]), v = a * h + f;
+  return a1numQ(r, { topic: 'Function notation', stem: `The function C(x) = ${a}x + ${f} represents the labor cost (in dollars) for a contractor to build a deck, where x is the number of hours of labor. Find C(${h}) and use it to estimate the cost of ${h} hours of labor.`, val: v, label: '$', wrongs: [a + f * h, a * h, (a + f) * h], solution: `C(${h}) = ${a}(${h}) + ${f} = $${v}` });
+};
+// #21–26: graph a linear function (students graph)
+TEMPLATES.a34GraphLin = (r) => {
+  const name = pick(r, ['p', 'h', 'd', 'w', 'g', 'f']), den = pick(r, [1, 1, 2]), num = nz(r, -5, 5) * (den === 2 ? 1 : 1), m = num / den, b = ri(r, -4, 4);
+  if (den === 2 && num % 2 === 0) return TEMPLATES.a34GraphLin(r);
+  const p1 = [0, b], p2 = [den * (Math.abs(num) > 3 ? 1 : 2), b + m * den * (Math.abs(num) > 3 ? 1 : 2)], W = skWin([p1, p2]); if (!skOk(W, [p1, p2])) return TEMPLATES.a34GraphLin(r);
+  const am = Math.abs(m), rule = r() < 0.4 && b ? `${fmt(b)} ${m < 0 ? '−' : '+'} ${am === 1 ? '' : den > 1 ? `(${fracT(am)})` : fmt(am)}x` : a3lin(m, b);
+  return skQ({ topic: 'Graphing linear functions', stem: `Graph the linear function by placing two points on its graph.   ${name}(x) = ${rule}`, family: 'line', target: (x) => m * x + b, keyPts: [p1, p2], win: W, display: `The line through ${skText([p1, p2])}`, solution: `Start at the y-intercept (0, ${b}). The slope is ${fracT(m)}: move ${Math.abs(num)} ${num > 0 ? 'up' : 'down'} and ${den} right.` });
+};
+
+// ---------- 3.5 Graphing Linear Equations in Standard Form ----------
+// horizontal and vertical lines (students graph): two points on the line
+SKETCH.hvline = { roles: ['a point on the line', 'another point on the line'], short: ['', ''], fit: () => null,
+  match: (pts, T, win) => { if (pts.length !== 2 || (pts[0][0] === pts[1][0] && pts[0][1] === pts[1][1])) return false; const [ax, c] = win.hv; return pts.every((p) => Math.abs(p[ax] - c) < 1e-9); },
+  draw: (cv, f, pts, overlay) => {
+    const W = f.win; drawPlot(cv, { xr: W.xr, yr: W.yr, curves: [] }); const T = skTransform(cv, W), c = cv._ctx;
+    const seg = (p, q, col) => { c.save(); c.beginPath(); c.rect(T.X(W.xr[0]), T.Y(W.yr[1]), T.X(W.xr[1]) - T.X(W.xr[0]), T.Y(W.yr[0]) - T.Y(W.yr[1])); c.clip(); c.strokeStyle = col; c.lineWidth = 2.6; const d = [q[0] - p[0], q[1] - p[1]], L = 60; c.beginPath(); c.moveTo(T.X(p[0] - L * d[0]), T.Y(p[1] - L * d[1])); c.lineTo(T.X(p[0] + L * d[0]), T.Y(p[1] + L * d[1])); c.stroke(); c.restore(); };
+    if (overlay) { const [ax, v] = W.hv; seg(ax ? [0, v] : [v, 0], ax ? [1, v] : [v, 1], '#7fbf7f'); }
+    if (pts.length === 2 && (pts[0][0] !== pts[1][0] || pts[0][1] !== pts[1][1])) seg(pts[0], pts[1], '#1f5fa8');
+    pts.forEach(([x, y]) => { c.beginPath(); c.arc(T.X(x), T.Y(y), 5, 0, 2 * Math.PI); c.fillStyle = '#1f5fa8'; c.fill(); c.fillStyle = '#1d1d1b'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'bottom'; c.fillText(`(${fmt(x)}, ${fmt(y)})`, T.X(x) + 7, T.Y(y) - 4); });
+  } };
+TEMPLATES.a35HV = (r) => {
+  const vert = r() < 0.5, c = nz(r, -6, 6) + (r() < 0.2 ? 0.5 : 0), W = { xr: [-8, 8], yr: [-8, 8], hv: [vert ? 0 : 1, c], snap: (x, y) => [Math.round(x * 2) / 2, Math.round(y * 2) / 2] };
+  const key = vert ? [[c, 0], [c, 2]] : [[0, c], [2, c]], eq = `${vert ? 'x' : 'y'} = ${fmt(c)}`;
+  const q = skQ({ topic: 'Horizontal and vertical lines', stem: `Graph the linear equation by placing two points on the line (points snap to halves).   ${eq}`, family: 'hvline', target: 1, keyPts: key, win: W, display: `The ${vert ? 'vertical' : 'horizontal'} line through ${skText(key)}`, solution: `Every point on the graph has ${vert ? 'x' : 'y'}-coordinate ${fmt(c)}, so the graph is a ${vert ? 'vertical' : 'horizontal'} line through ${vert ? `(${fmt(c)}, 0)` : `(0, ${fmt(c)})`}.` });
+  return q;
+};
+// standard form A x + B y = C with integer intercepts
+function a3std(r, intOnly = true) {
+  for (let t = 0; t < 500; t++) {
+    const xi = nz(r, -8, 8), yi = nz(r, -8, 8); if (Math.abs(xi) === Math.abs(yi) && r() < 0.6) continue;
+    const L = Math.abs(xi * yi) / gcd(Math.abs(xi), Math.abs(yi)), A0 = L / xi, B0 = L / yi, k = pick(r, [1, 1, 2, 3]), A = A0 * k, B = B0 * k, C = L * k; if (Math.abs(A) > 15 || Math.abs(B) > 15) continue;
+    const form = pick(r, ['std', 'std', 'std', 'move']);
+    const eq = form === 'std' ? `${a1J([[A, 'x'], [B, 'y']])} = ${fmt(C)}` : `${a1J([[A, 'x']])} = ${a1J([[-B, 'y'], [C]])}`;
+    return { eq, xi, yi, A, B, C };
+  }
+}
+TEMPLATES.a35Intercepts = (r) => {
+  const S = a3std(r), txt = `x-intercept ${fmt(S.xi)}, y-intercept ${fmt(S.yi)}`;
+  return { topic: 'Standard form', stem: `Find the x- and y-intercepts of the graph of the linear equation.   ${S.eq}`, ...buildChoices(r, txt, [`x-intercept ${fmt(S.yi)}, y-intercept ${fmt(S.xi)}`, `x-intercept ${fmt(-S.xi)}, y-intercept ${fmt(-S.yi)}`, `x-intercept ${fmt(S.A)}, y-intercept ${fmt(S.B)}`].filter((t, i, A) => t !== txt && A.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'x-intercept:' }, { kind: 'expr', keys: 'num', label: 'y-intercept:' }], key: [String(S.xi), String(S.yi)], display: txt, check: (v) => numOk(v[0], S.xi) && numOk(v[1], S.yi), score: (v) => ((numOk(v[0], S.xi) ? 1 : 0) + (numOk(v[1], S.yi) ? 1 : 0)) / 2 },
+    solution: `x-intercept: let y = 0 and solve: ${S.A}x = ${S.C}, so x = ${fmt(S.xi)}.\ny-intercept: let x = 0 and solve: ${S.B}y = ${S.C}, so y = ${fmt(S.yi)}.` };
+};
+TEMPLATES.a35Graph = (r) => {
+  let S, W; do { S = a3std(r); W = skWin([[S.xi, 0], [0, S.yi]]); } while (!skOk(W, [[S.xi, 0], [0, S.yi]]));
+  const m = -S.A / S.B, b = S.yi;
+  return skQ({ topic: 'Standard form', stem: `Use intercepts to graph the linear equation: place the x-intercept and the y-intercept.   ${S.eq}`, family: 'line', target: (x) => m * x + b, keyPts: [[S.xi, 0], [0, S.yi]], win: W, display: `The line through (${fmt(S.xi)}, 0) and (0, ${fmt(S.yi)})`, solution: `x-intercept: y = 0 → x = ${fmt(S.xi)}. y-intercept: x = 0 → y = ${fmt(S.yi)}.\nPlot (${fmt(S.xi)}, 0) and (0, ${fmt(S.yi)}) and draw the line through them.` });
+};
+TEMPLATES.a35Word = (r) => {
+  const a = pick(r, [10, 8, 12, 15]), b = pick(r, [12, 15, 20, 10].filter((x) => x !== a)), T = a * b * pick(r, [2, 3, 1]), asks = r() < 0.5;
+  return a1numQ(r, { topic: 'Standard form', stem: `You have a budget of $${T} to order shirts. The equation ${a}x + ${b}y = ${T} models the total cost, where x is the number of short-sleeved shirts and y is the number of long-sleeved shirts. ${asks ? 'How many short-sleeved shirts can you buy if you buy no long-sleeved shirts? (the x-intercept)' : 'How many long-sleeved shirts can you buy if you buy no short-sleeved shirts? (the y-intercept)'}`, val: asks ? T / a : T / b, unit: 'shirts', wrongs: [asks ? T / b : T / a, T / (a + b)], solution: asks ? `Let y = 0: ${a}x = ${T}, so x = ${T / a}.` : `Let x = 0: ${b}y = ${T}, so y = ${T / b}.` });
+};
+
+// ---------- 3.6 Graphing Linear Equations in Slope-Intercept Form ----------
+function a3slopeQ(r, { stem, m, solution, draw, size }) {
+  const und = m === null, txt = und ? 'undefined' : fracT(m);
+  return { topic: 'Slope', stem, draw, size, ...buildChoices(r, txt, (und ? ['0', '1', '−1'] : [fracT(-m), m ? fracT(1 / m) : 'undefined', fracT(m + 1)]).filter((t, i, A) => t !== txt && A.indexOf(t) === i), (i) => fracT((m || 0) + i + 2)),
+    fr: { fields: [{ kind: 'expr', keys: 'slope', label: 'm =' }], key: [und ? '\\text{undefined}' : fracL(m)], display: txt, check: (v) => (und ? /undefined|none|nosl/.test(pxWords(v[0])) : numOk(v[0], m)) }, solution };
+}
+TEMPLATES.a36SlopePts = (r) => {
+  const kind = pick(r, ['gen', 'gen', 'gen', 'zero', 'und']), x1 = nz(r, -7, 4), y1 = nz(r, -6, 6); let x2 = x1 + ri(r, 1, 6) * pick(r, [1, -1]), y2 = y1 + nz(r, -7, 7);
+  if (kind === 'zero') y2 = y1; if (kind === 'und') x2 = x1; if (x2 === x1 && kind !== 'und') x2 += 2;
+  const m = x2 === x1 ? null : (y2 - y1) / (x2 - x1);
+  return a3slopeQ(r, { stem: `Find the slope of the line that passes through the given points.   ${a3P([x1, y1])}, ${a3P([x2, y2])}`, m, solution: m === null ? `The x-coordinates are equal, so the line is vertical and the slope is undefined.` : `m = (y₂ − y₁)/(x₂ − x₁) = (${fmt(y2)} − ${a1P(y1)})/(${fmt(x2)} − ${a1P(x1)}) = ${fmt(y2 - y1)}/${a1P(x2 - x1)} = ${fracT(m)}` });
+};
+TEMPLATES.a36SlopeGraph = (r) => {
+  let p, q; do { p = [ri(r, -5, 3), ri(r, -5, 4)]; q = [p[0] + ri(r, 1, 5), p[1] + nz(r, -5, 5)]; } while (q[1] > 6 || q[1] < -6 || q[0] > 6);
+  const m = (q[1] - p[1]) / (q[0] - p[0]), b = p[1] - m * p[0];
+  return a3slopeQ(r, { stem: 'Find the slope of the line.', m, draw: plotQ({ xr: [-7, 7], yr: [-7, 7], curves: [{ f: (x) => m * x + b }], pts: [{ p, label: a3P(p) }, { p: q, label: a3P(q) }] }), size: [320, 320], solution: `Rise ${fmt(q[1] - p[1])} over run ${fmt(q[0] - p[0])}: m = ${fracT(m)}. The line ${m > 0 ? 'rises' : 'falls'} from left to right, so the slope is ${m > 0 ? 'positive' : 'negative'}.` });
+};
+TEMPLATES.a36SlopeTable = (r) => {
+  const kind = pick(r, ['gen', 'gen', 'zero', 'und']), x0 = ri(r, -9, 0), dx = pick(r, [2, 3, 4, 1]), m = kind === 'zero' ? 0 : kind === 'und' ? null : nz(r, -4, 4) / pick(r, [1, 1, 2]), b = ri(r, -8, 8);
+  const X = [0, 1, 2, 3].map((i) => (kind === 'und' ? 0 : x0 + i * dx)), Y = kind === 'und' ? [-4, 0, 4, 8] : X.map((x) => m * x + b);
+  if (Y.some((y) => !Number.isInteger(y * 2))) return TEMPLATES.a36SlopeTable(r);
+  return a3slopeQ(r, { stem: 'The points represented by the table lie on a line. Find the slope of the line.', m, draw: a9tableDraw([['x', ...X.map(fmt)], ['y', ...Y.map(fmt)]]), size: [380, 90], solution: m === null ? 'The x-values do not change, so the line is vertical and the slope is undefined.' : `m = (change in y)/(change in x) = ${fmt(Y[1] - Y[0])}/${fmt(X[1] - X[0])} = ${fracT(m)}` });
+};
+TEMPLATES.a36SlopeInt = (r) => {
+  const kind = pick(r, ['si', 'si', 'std', 'dec', 'flat']);
+  let m, b, eq;
+  if (kind === 'si') { m = pick(r, [-3, 4, 6, -1, 2, 1 / 2, -2 / 3]); b = ri(r, -9, 9); eq = r() < 0.5 ? `y = ${a3lin(m, b)}` : `y = ${b ? `${fmt(b)} ${m < 0 ? '−' : '+'} ${Math.abs(m) === 1 ? '' : fracT(Math.abs(m)).includes('/') ? `(${fracT(Math.abs(m))})` : fracT(Math.abs(m))}x` : a3lin(m, 0)}`; }
+  else if (kind === 'flat') { m = 0; b = nz(r, -6, 6); eq = `y = ${fmt(b)}`; }
+  else if (kind === 'dec') { m = pick(r, [0.75, -1.5, 2.5, 4.8 / 2]); b = pick(r, [4, -2.25, 1.5, 3]); eq = `${a1J([[-m, 'x'], [1, 'y']], true)} = ${fmt(b)}`; }
+  else { const A = nz(r, -6, 6), B = pick(r, [1, 2, 3, 4, -1]), C = ri(r, -12, 12); m = -A / B; b = C / B; eq = `${a1J([[A, 'x'], [B, 'y']])} = ${fmt(C)}`; }
+  const N = kind === 'dec' ? fmt : fracT, txt = `slope ${N(m)}, y-intercept ${N(b)}`;
+  return { topic: 'Slope-intercept form', stem: `Find the slope and the y-intercept of the graph of the linear equation.   ${eq}`, ...buildChoices(r, txt, [`slope ${N(b)}, y-intercept ${N(m)}`, `slope ${N(-m)}, y-intercept ${N(b)}`, `slope ${N(m)}, y-intercept ${N(-b || b + 1)}`].filter((t, i, A) => t !== txt && A.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Slope:' }, { kind: 'expr', keys: 'num', label: 'y-intercept:' }], key: kind === 'dec' ? [String(m), String(b)] : [fracL(m), fracL(b)], display: txt, check: (v) => numOk(v[0], m) && numOk(v[1], b), score: (v) => ((numOk(v[0], m) ? 1 : 0) + (numOk(v[1], b) ? 1 : 0)) / 2 },
+    solution: `Write the equation in slope-intercept form: y = ${a3lin(m, b) || fmt(b)}.\nThe slope is ${fracT(m)} and the y-intercept is ${fracT(b)}.` };
+};
+// #23–30: graph, then identify the x-intercept (students graph)
+TEMPLATES.a36Graph = (r) => {
+  for (let t = 0; t < 400; t++) {
+    const den = pick(r, [1, 1, 2, 3]), num = nz(r, -4, 4), m = num / den, b = ri(r, -5, 5); if (den > 1 && gcd(Math.abs(num), den) !== 1) continue;
+    const xi = -b / m, p1 = [0, b], p2 = [den, b + num], W = skWin([p1, p2, [xi, 0]]); if (!skOk(W, [p1, p2]) || !Number.isInteger(xi * 6)) continue;
+    const form = pick(r, ['si', 'si', 'std']), A = -num, B = den, C = b * den, eq = form === 'si' ? `y = ${a3lin(m, b)}` : `${a1J([[-A, 'x'], [-B, 'y']])} = ${fmt(-C)}`;
+    const fr = skFRplus({ family: 'line', target: (x) => m * x + b, keyPts: [p1, p2], win: W, display: `The line through ${skText([p1, p2])}; x-intercept ${fracT(xi)}`, more: { fields: [{ kind: 'expr', keys: 'num', label: 'x-intercept:' }], key: [fracL(xi)], check: (v) => numOk(v[0], xi) } });
+    fr._target = (x) => m * x + b;
+    return { topic: 'Slope-intercept form', stem: `Graph the linear equation by placing two points on the line. Then identify the x-intercept.   ${eq}`, sketch: true, fr, choices: null, answer: -1, solution: `${form === 'std' ? `Solve for y: y = ${a3lin(m, b)}.\n` : ''}Plot (0, ${b}), then move ${Math.abs(num)} ${num > 0 ? 'up' : 'down'} and ${den} right. The x-intercept: 0 = ${a3lin(m, b)} → x = ${fracT(xi)}.` };
+  }
+};
+TEMPLATES.a36Word = (r) => {
+  const kind = pick(r, ['bus', 'admission', 'truck']);
+  if (kind === 'bus') { const s = pick(r, [60, 55, 50, 65, 45]);
+    return a1numQ(r, { topic: 'Slope', stem: `The graph shows the distance y (in miles) that a bus travels in x hours. Find the slope of the line. What does it represent?`, val: s, unit: 'mi/h', draw: plotQ({ xr: [-0.3, 3.4], yr: [-10, 3.4 * s], curves: [{ f: (x) => s * x, a: 0 }], pts: [{ p: [1, s], label: `(1, ${s})` }, { p: [2, 2 * s], label: `(2, ${2 * s})` }], step: 1, axisNames: ['x', 'y'] }), size: [320, 320], wrongs: [2 * s, s / 2, 1 / s], solution: `m = (${2 * s} − ${s})/(2 − 1) = ${s}. The bus travels ${s} miles per hour.` }); }
+  if (kind === 'admission') { const p = pick(r, [54.99, 49.99, 39.95]);
+    return a1numQ(r, { topic: 'Slope', stem: `At a theme park, the admission fee y (in dollars) is $${p.toFixed(2)} whether you stay 6, 7, or 8 hours. Find the slope of the line through these points and interpret it.`, val: 0, wrongs: [p, p / 6, 1], solution: `The fee does not change, so the slope is 0: the fee does not depend on the time you spend in the park.` }); }
+  const a = pick(r, [0.5, 0.6, 0.75]), fA = pick(r, [70, 60, 50]), bRate = pick(r, [0.8, 0.4, 0.9].filter((x) => x !== a)), fB = pick(r, [40, 30, 80]);
+  const ans = a > bRate ? 'Company A' : 'Company B';
+  return a3sel(r, `Moving Company A charges c(x) = ${fmt(a)}x + ${fA} dollars to rent a truck and drive it x miles. Company B's cost is shown in the table. Which company charges more per mile?`, ['Company A', 'Company B'], ans, `Company A: slope ${fmt(a)} dollars per mile. Company B: slope (${fmt(fB + 50 * bRate)} − ${fB})/50 = ${fmt(bRate)} dollars per mile. ${ans} charges more per mile.`, 'Slope', { draw: a9tableDraw([['Miles, x', 0, 50, 100], ['Cost (dollars), y', fB, fmt(fB + 50 * bRate), fmt(fB + 100 * bRate)]]), size: [360, 90] });
+};
+
+// ---------- 3.7 Transformations of Linear Functions ----------
+const A3TR = [
+  (r) => { const k = nz(r, -6, 6); return [`g(x) = f(x) ${k < 0 ? '−' : '+'} ${Math.abs(k)}`, `vertical translation ${Math.abs(k)} unit${Math.abs(k) === 1 ? '' : 's'} ${k > 0 ? 'up' : 'down'}`, `vertical translation ${Math.abs(k)} unit${Math.abs(k) === 1 ? '' : 's'} ${k > 0 ? 'down' : 'up'}`, `horizontal translation ${Math.abs(k)} unit${Math.abs(k) === 1 ? '' : 's'} ${k > 0 ? 'left' : 'right'}`]; },
+  (r) => { const h = nz(r, -6, 6); return [`g(x) = f(x ${h < 0 ? '+' : '−'} ${Math.abs(h)})`, `horizontal translation ${Math.abs(h)} unit${Math.abs(h) === 1 ? '' : 's'} ${h > 0 ? 'right' : 'left'}`, `horizontal translation ${Math.abs(h)} unit${Math.abs(h) === 1 ? '' : 's'} ${h > 0 ? 'left' : 'right'}`, `vertical translation ${Math.abs(h)} unit${Math.abs(h) === 1 ? '' : 's'} ${h > 0 ? 'up' : 'down'}`]; },
+  () => ['g(x) = −f(x)', 'reflection in the x-axis', 'reflection in the y-axis', 'vertical shrink by a factor of 1/2'],
+  () => ['g(x) = f(−x)', 'reflection in the y-axis', 'reflection in the x-axis', 'horizontal stretch by a factor of 2'],
+  (r) => { const a = pick(r, [2, 3, 4, 5, 6]); return [`g(x) = ${a}f(x)`, `vertical stretch by a factor of ${a}`, `vertical shrink by a factor of 1/${a}`, `horizontal shrink by a factor of 1/${a}`]; },
+  (r) => { const a = pick(r, [2, 3, 4, 6]); return [`g(x) = (1/${a})f(x)`, `vertical shrink by a factor of 1/${a}`, `vertical stretch by a factor of ${a}`, `horizontal stretch by a factor of ${a}`]; },
+  (r) => { const a = pick(r, [2, 3, 5]); return [`g(x) = f(${a}x)`, `horizontal shrink by a factor of 1/${a}`, `horizontal stretch by a factor of ${a}`, `vertical stretch by a factor of ${a}`]; },
+  (r) => { const a = pick(r, [2, 3, 4]); return [`g(x) = f((1/${a})x)`, `horizontal stretch by a factor of ${a}`, `horizontal shrink by a factor of 1/${a}`, `vertical shrink by a factor of 1/${a}`]; }];
+TEMPLATES.a37Describe = (r) => {
+  const [g, ans, ...wr] = pick(r, A3TR)(r), m = pick(r, [1, -1, 2, -2, 1 / 3, 1 / 2, 3]), b = nz(r, -5, 5);
+  const opts = [ans, ...wr, pick(r, ['reflection in the x-axis', 'reflection in the y-axis', 'vertical translation 2 units up', 'horizontal translation 3 units right'].filter((x) => x !== ans && !wr.includes(x)))];
+  return { topic: 'Transformations', stem: `Describe the transformation from the graph of f to the graph of g.   f(x) = ${a3lin(m, b)};  ${g}`, ...buildChoices(r, ans, opts.slice(1), () => null), fr: FR.select('Transformation:', shuffle(r, opts), ans),
+    solution: `${g} is a ${ans} of the graph of f.\n(Adding outside f moves the graph up or down; changing x inside f moves it left or right, opposite the sign.)` };
+};
+TEMPLATES.a37Write = (r) => {
+  const [g, desc] = pick(r, A3TR)(r), opts0 = A3TR.map((F) => F(r)[0]);
+  const opts = [g, ...shuffle(r, [...new Set(opts0.filter((x) => x !== g))]).slice(0, 3)];
+  return { topic: 'Transformations', stem: `Write a function g in terms of f so that the statement is true.   The graph of g is a ${desc} of the graph of f.`, ...buildChoices(r, g, opts.slice(1), () => null), fr: FR.select('g:', shuffle(r, opts), g), solution: `${g}` };
+};
+// #55–58: find r
+TEMPLATES.a37FindR = (r) => {
+  const m = pick(r, [2 / 3, 3, -3, 1 / 2, 2, -2]), b = nz(r, -8, 8), kind = pick(r, ['shiftx', 'shifty', 'scale', 'xscale']), rr = kind === 'scale' || kind === 'xscale' ? pick(r, [2, 3, -1, 4]) : nz(r, -6, 6);
+  let gm = m, gb = b, gT;
+  if (kind === 'shiftx') { gb = b - m * rr; gT = 'g(x) = f(x − r)'; } else if (kind === 'shifty') { gb = b + rr; gT = 'g(x) = f(x) + r'; } else if (kind === 'scale') { gm = m * rr; gb = b * rr; gT = 'g(x) = r·f(x)'; } else { gm = m * rr; gT = 'g(x) = f(rx)'; }
+  if (!Number.isInteger(gb * 6)) return TEMPLATES.a37FindR(r);
+  return a1numQ(r, { topic: 'Transformations', stem: `f(x) = ${a3lin(m, b)} and g(x) = ${a3lin(gm, gb)}. If ${gT}, find the value of r.`, val: rr, label: 'r =', wrongs: [-rr, gb - b, gm / m + 1], solution: kind === 'shiftx' ? `f(x − r) = ${a3lin(m, 0)}(x − r) + ${fmt(b)} → constant ${fmt(b)} − ${a1P(m)}r = ${fracT(gb)}, so r = ${fmt(rr)}.`.replace('xx', 'x') : kind === 'shifty' ? `f(x) + r = ${a3lin(m, b)} + r, so ${fmt(b)} + r = ${fracT(gb)} and r = ${fmt(rr)}.` : kind === 'scale' ? `r·f(x) multiplies every coefficient by r: ${fracT(gm)} ÷ ${fracT(m)} = ${fmt(rr)}.` : `f(rx) = ${fracT(m)}(rx) + ${fmt(b)}, so ${fracT(m)}r = ${fracT(gm)} and r = ${fmt(rr)}.` });
+};
+
+// ---------- 3.8 Graphing Absolute Value Functions ----------
+TEMPLATES.a38Graph = (r) => {
+  for (let t = 0; t < 400; t++) {
+    const a = pick(r, [1, 1, -1, 2, -2, 3, 1 / 2, -1 / 2, 1 / 3]), h = ri(r, -5, 5), k = ri(r, -5, 5), dx = Number.isInteger(a) ? (Math.abs(a) > 1 ? 1 : 2) : 1 / Math.abs(a) * 1;
+    const name = pick(r, ['f', 'g', 'h', 'r', 'n', 'q', 'v']), V = [h, k], P = [h + dx, k + a * dx], W = skWin([V, P, [h - dx, k + a * dx]]); if (!skOk(W, [V, P])) continue;
+    const aT = a === 1 ? '' : a === -1 ? '−' : Number.isInteger(a) ? String(a) : `${a < 0 ? '−' : ''}(${fracT(Math.abs(a))})`;
+    const inside = h ? `x ${h < 0 ? '+' : '−'} ${Math.abs(h)}` : 'x', eq = `${name}(x) = ${aT}|${inside}|${k ? ` ${k < 0 ? '−' : '+'} ${Math.abs(k)}` : ''}`, R = a2S(a > 0 ? '≥' : '≤', k);
+    const T = (x) => a * Math.abs(x - h) + k;
+    const fr = skFRplus({ family: 'abs', target: T, keyPts: [V, P], win: W, display: `Vertex (${h}, ${k}), through ${a3P(P)}; range ${a2T('y', R)}`, more: { fields: [{ kind: 'expr', keys: 'ineq', label: 'Range:' }], key: [a2T('y', R, { latex: true })], check: (v) => a2ok(v[0], R, 'y') } });
+    fr._target = T;
+    const desc = [h ? `a horizontal translation ${Math.abs(h)} unit${Math.abs(h) === 1 ? '' : 's'} ${h > 0 ? 'right' : 'left'}` : '', Math.abs(a) !== 1 ? `a vertical ${Math.abs(a) > 1 ? 'stretch' : 'shrink'} by a factor of ${fracT(Math.abs(a))}` : '', a < 0 ? 'a reflection in the x-axis' : '', k ? `a vertical translation ${Math.abs(k)} unit${Math.abs(k) === 1 ? '' : 's'} ${k > 0 ? 'up' : 'down'}` : ''].filter(Boolean);
+    return { topic: 'Absolute value functions', stem: `Graph the function: place the vertex, then another point. Then find the range.   ${eq}`, sketch: true, fr, choices: null, answer: -1,
+      solution: `The vertex is (${h}, ${k}). ${desc.length ? `Compared with f(x) = |x|, the graph is ${desc.join(', ')}.` : ''}\nFrom the vertex, move ${fmt(dx)} right and ${fracT(Math.abs(a * dx))} ${a > 0 ? 'up' : 'down'} to ${a3P(P)}.\nDomain: all real numbers. Range: ${a2T('y', R)}.` };
+  }
+};
+TEMPLATES.a38Write = (r) => {
+  const C = pick(r, [() => { const k = ri(r, 1, 9); return [`vertical translation ${k} units down`, `|x| − ${k}`, (x) => Math.abs(x) - k]; }, () => { const k = ri(r, 1, 9); return [`vertical translation ${k} units up`, `|x| + ${k}`, (x) => Math.abs(x) + k]; },
+    () => { const h = ri(r, 2, 10); return [`horizontal translation ${h} units left`, `|x + ${h}|`, (x) => Math.abs(x + h)]; }, () => { const h = ri(r, 2, 10); return [`horizontal translation ${h} units right`, `|x − ${h}|`, (x) => Math.abs(x - h)]; },
+    () => { const a = pick(r, [2, 3, 4]); return [`vertical shrink by a factor of 1/${a}`, `(1/${a})|x|`, (x) => Math.abs(x) / a]; }, () => { const a = pick(r, [2, 3, 5]); return [`vertical stretch by a factor of ${a} and a reflection in the x-axis`, `−${a}|x|`, (x) => -a * Math.abs(x)]; }])();
+  const wr = [C[1].replace('−', '+').replace(/\+ (\d)\|/, '− $1|'), C[1].includes('|x') ? C[1].replace(/\|x ([+−]) (\d+)\|/, (m, s, d) => `|x| ${s} ${d}`) : C[1], `|x| ${C[1].includes('−') ? '+' : '−'} 1`].filter((w) => w !== C[1]);
+  return { topic: 'Absolute value functions', stem: `Write an equation that represents the given transformation of the graph of g(x) = |x|.   ${C[0]}`, ...buildChoices(r, `h(x) = ${C[1]}`, [...new Set(wr)].map((w) => `h(x) = ${w}`), (i) => `h(x) = |x| + ${i + 11}`),
+    fr: { fields: [{ kind: 'expr', keys: 'func', label: 'h(x) =' }], key: [C[1].replace(/\(1\/(\d)\)/, '\\frac{1}{$1}').replace(/−/g, '-').replace(/\|([^|]*)\|/, '\\left|$1\\right|')], display: `h(x) = ${C[1]}`, check: (v) => pxEquiv(String(v[0] || '').replace(/^\s*[a-z]\s*(\\left)?\(\s*x\s*(\\right)?\)\s*=/, ''), C[2], { lo: -9, hi: 9 }) }, solution: `h(x) = ${C[1]}` };
+};
+TEMPLATES.a38Value = (r) => {
+  const kind = pick(r, ['h', 'k', 'a']), val = kind === 'a' ? pick(r, [2, 3, -2, 1 / 2, -1 / 2]) : nz(r, -4, 4);
+  const g = kind === 'h' ? (x) => Math.abs(x - val) : kind === 'k' ? (x) => Math.abs(x) + val : (x) => val * Math.abs(x);
+  const lab = kind === 'h' ? 'g(x) = |x − h|' : kind === 'k' ? 'g(x) = |x| + k' : 'g(x) = a|x|';
+  const P = kind === 'a' ? [2, val * 2] : kind === 'h' ? [val, 0] : [0, val];
+  return a1numQ(r, { topic: 'Absolute value functions', stem: `The graphs of f(x) = |x| (gray) and ${lab} (blue) are shown. Find the value of ${kind}.`, val, label: `${kind} =`, draw: plotQ({ xr: [-6, 6], yr: [-6, 6], curves: [{ f: (x) => Math.abs(x), color: '#a9a49a' }, { f: g }], pts: [{ p: P, label: a3P(P) }] }), size: [320, 320], wrongs: [-val, kind === 'a' ? 1 / val : val + 1],
+    solution: kind === 'h' ? `The vertex moved to (${val}, 0): h = ${val}.` : kind === 'k' ? `The vertex moved to (0, ${val}): k = ${val}.` : `At x = 2, g(2) = ${fracT(val * 2)} while f(2) = 2, so a = ${fracT(val)}.` });
+};
+TEMPLATES.a38Vertex = (r) => {
+  const a = pick(r, [1, -1, 2, -3, 1 / 2, 4]), h = nz(r, -6, 6), k = nz(r, -6, 6), b = pick(r, [1, 1, 2, 5]);
+  // g(x) = a|b x − b h| + k
+  const inside = b === 1 ? `x ${h < 0 ? '+' : '−'} ${Math.abs(h)}` : `${b}x ${b * h < 0 ? '+' : '−'} ${Math.abs(b * h)}`, aT = a === 1 ? '' : a === -1 ? '−' : Number.isInteger(a) ? String(a) : `(${fracT(a)})`;
+  const eq = `g(x) = ${aT}|${inside.replace(/ [+−] 0$/, '')}| ${k < 0 ? '−' : '+'} ${Math.abs(k)}`.replace(/ \+ 0$| − 0$/, '');
+  const ans = [h, k];
+  return { topic: 'Absolute value functions', stem: `Find the vertex of the graph of the function.   ${eq}`, ...buildChoices(r, a3P(ans), [a3P([-h, k]), a3P([k, h]), a3P([b * h, k])].filter((t, i, A) => t !== a3P(ans) && A.indexOf(t) === i), (i) => a3P([h + i + 1, k])),
+    fr: { fields: [{ kind: 'expr', keys: 'point', label: 'Vertex:' }], key: [`\\left(${h},${k}\\right)`], display: a3P(ans), check: (v) => a3ptOk(v[0], ans) }, solution: `The vertex is where the expression inside the absolute value is 0: ${inside} = 0 → x = ${h}. Then g(${h}) = ${k}. Vertex (${h}, ${k}).` };
+};
+
+// ---------- 3.9 Analyzing and Sketching Graphs ----------
+const a39pwDraw = (name, pieces) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, n = pieces.length, lh = 30, top = (H - n * lh) / 2;
+  c.clearRect(0, 0, W, H); c.fillStyle = '#1d1d1b'; c.font = 'italic 18px Georgia, serif'; c.textBaseline = 'middle'; c.textAlign = 'right';
+  c.fillText(`${name}(x) =`, 92, H / 2);
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.6; const bx = 104, y0 = top + 2, y1 = top + n * lh - 2, ym = H / 2;
+  c.beginPath(); c.moveTo(bx + 8, y0); c.quadraticCurveTo(bx, y0, bx, y0 + 10); c.lineTo(bx, ym - 6); c.quadraticCurveTo(bx, ym, bx - 6, ym); c.quadraticCurveTo(bx, ym, bx, ym + 6); c.lineTo(bx, y1 - 10); c.quadraticCurveTo(bx, y1, bx + 8, y1); c.stroke();
+  c.textAlign = 'left'; c.font = '17px Georgia, serif';
+  pieces.forEach(([rule, cond], i) => { const y = top + lh * (i + 0.5); c.fillText(rule.replace(/-/g, '−') + ',', bx + 16, y); c.fillText(cond.replace(/-/g, '−'), bx + 150, y); });
+};
+TEMPLATES.a39Eval = (r) => {
+  const name = pick(r, ['f', 'g', 'h']), three = r() < 0.5, c1 = ri(r, -3, 0), c2 = c1 + ri(r, 2, 3);
+  const r1 = [pick(r, [5, -1, 2, 3]), nz(r, -5, 5)], r2 = [pick(r, [1, -2, 4]), nz(r, -4, 6)], r3 = [pick(r, [2, -3, 1]), nz(r, -6, 6)], k = nz(r, -5, 5);
+  const inc1 = r() < 0.5;
+  const pieces = three ? [[a3lin(r1[0], r1[1]), `if x ${inc1 ? '≤' : '<'} ${c1}`, (x) => (inc1 ? x <= c1 : x < c1), (x) => r1[0] * x + r1[1]], [String(k).replace('-', '−'), `if ${c1} ${inc1 ? '<' : '≤'} x < ${c2}`, (x) => (inc1 ? x > c1 : x >= c1) && x < c2, () => k], [a3lin(r3[0], r3[1]), `if x ≥ ${c2}`, (x) => x >= c2, (x) => r3[0] * x + r3[1]]]
+    : [[a3lin(r1[0], r1[1]), `if x ${inc1 ? '≤' : '<'} ${c1}`, (x) => (inc1 ? x <= c1 : x < c1), (x) => r1[0] * x + r1[1]], [a3lin(r2[0], r2[1]), `if x ${inc1 ? '>' : '≥'} ${c1}`, (x) => (inc1 ? x > c1 : x >= c1), (x) => r2[0] * x + r2[1]]];
+  const x = pick(r, [c1, c1, c2, c1 - ri(r, 1, 3), c1 + 1, c2 + ri(r, 0, 3), 0].filter((v) => three || v !== c2)), P = pieces.find((p) => p[2](x)), val = P[3](x), other = pieces.filter((p) => p !== P).map((p) => p[3](x));
+  return a1numQ(r, { topic: 'Piecewise functions', stem: `Evaluate the function.   ${name}(${fmt(x)})`, val, label: `${name}(${fmt(x)}) =`, draw: a39pwDraw(name, pieces.map((p) => [p[0], p[1]])), size: [380, three ? 120 : 90], wrongs: other,
+    solution: `x = ${fmt(x)} satisfies "${P[1].replace(/-/g, '−')}", so use ${P[0]}: ${name}(${fmt(x)}) = ${P[0].replace(/x/g, `(${fmt(x)})`)} = ${fmt(val)}.` });
+};
+TEMPLATES.a39Word = (r) => {
+  const s1 = pick(r, [55, 60, 50]), t1 = 2, s2 = pick(r, [65, 70, 75]), off = s2 * t1 - s1 * t1, T = pick(r, [3, 4, 4.5, 5]), v = s2 * T - off;
+  return a1numQ(r, { topic: 'Piecewise functions', stem: `On a trip, the total distance (in miles) you travel in x hours is d(x) = ${s1}x if 0 ≤ x ≤ ${t1}, and d(x) = ${s2}x − ${off} if ${t1} < x ≤ 5. How far do you travel in ${fmt(T)} hours?`, val: v, unit: 'mi', wrongs: [s1 * T, s2 * T, s1 * t1 + s2 * T], solution: `${fmt(T)} > ${t1}, so use the second piece: d(${fmt(T)}) = ${s2}(${fmt(T)}) − ${off} = ${fmt(v)} miles.` });
+};
+for (const name of Object.keys(TEMPLATES)) if (/^a3\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== ALGEBRA 1 CH3 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -19200,6 +19600,16 @@ Object.assign(SETS, {
   'alg1-2-4': { subject: 'algebra1', title: '2.4 Solving Multi-Step Inequalities', items: [['a24Solve', 4], ['a24Graph', 2], ['a24Special', 2], ['a24Ident', 1], ['a24Word', 1]] },
   'alg1-2-5': { subject: 'algebra1', title: '2.5 Solving Compound Inequalities', items: [['a25Write', 2], ['a25Solve', 4], ['a25Graph', 2], ['a25Word', 1]] },
   'alg1-2-6': { subject: 'algebra1', title: '2.6 Solving Absolute Value Inequalities', items: [['a26Solve', 4], ['a26Graph', 2], ['a26Write', 1], ['a26Word', 2]] },
+  // ----- Algebra I, Chapter 3: Graphing Linear Functions -----
+  'alg1-3-1': { subject: 'algebra1', title: '3.1 Functions', items: [['a31IsFunc', 3], ['a31Graph', 2], ['a31DomRange', 3], ['a31IndDep', 1], ['a31Word', 1], ['a31EqFunc', 2]] },
+  'alg1-3-2': { subject: 'algebra1', title: '3.2 Characteristics of Functions', items: [['a32Intercepts', 3], ['a32Behavior', 5]] },
+  'alg1-3-3': { subject: 'algebra1', title: '3.3 Linear Functions', items: [['a33Graph', 2], ['a33Table', 3], ['a33Eq', 3], ['a33Discrete', 2]] },
+  'alg1-3-4': { subject: 'algebra1', title: '3.4 Function Notation', items: [['a34Eval', 3], ['a34Solve', 3], ['a34Graph', 1], ['a34GraphLin', 2], ['a34Word', 1]] },
+  'alg1-3-5': { subject: 'algebra1', title: '3.5 Graphing Linear Equations in Standard Form', items: [['a35HV', 2], ['a35Intercepts', 3], ['a35Graph', 3], ['a35Word', 1]] },
+  'alg1-3-6': { subject: 'algebra1', title: '3.6 Graphing Linear Equations in Slope-Intercept Form', items: [['a36SlopeGraph', 2], ['a36SlopePts', 2], ['a36SlopeTable', 2], ['a36SlopeInt', 3], ['a36Graph', 2], ['a36Word', 1]] },
+  'alg1-3-7': { subject: 'algebra1', title: '3.7 Transformations of Linear Functions', items: [['a37Describe', 5], ['a37Write', 2], ['a37FindR', 2]] },
+  'alg1-3-8': { subject: 'algebra1', title: '3.8 Graphing Absolute Value Functions', items: [['a38Graph', 3], ['a38Write', 2], ['a38Value', 2], ['a38Vertex', 2]] },
+  'alg1-3-9': { subject: 'algebra1', title: '3.9 Analyzing and Sketching Graphs', items: [['a39Eval', 4], ['a39Word', 1]] },
   // ----- Algebra I, Chapter 4: Writing Linear Functions -----
   'alg1-4-1': { subject: 'algebra1', title: '4.1 Writing Equations in Slope-Intercept Form', items: [['a41SlopeInt', 3], ['a41Graph', 2], ['a41TwoPts', 2], ['a41FuncVals', 2], ['a41Table', 1], ['a41Word', 2]] },
   'alg1-4-2': { subject: 'algebra1', title: '4.2 Writing Equations in Point-Slope Form', items: [['a42PointSlope', 3], ['a42Graph', 2], ['a42TwoPts', 3], ['a42FuncVals', 2], ['a42TableLinear', 2], ['a42Word', 2]] },
@@ -19354,6 +19764,42 @@ QUESTION_TYPES.push(
   { id: 'a26Graph', subject: 'algebra1', section: '2.6 Solving Absolute Value Inequalities', sketch: true, label: 'Solve and graph (students graph)', desc: 'On a number line (#1–16)' },
   { id: 'a26Write', subject: 'algebra1', section: '2.6 Solving Absolute Value Inequalities', label: 'Write and solve', desc: '#17–18' },
   { id: 'a26Word', subject: 'algebra1', section: '2.6 Solving Absolute Value Inequalities', label: 'Real-life inequalities', desc: '#19–20, 23–24' },
+  { id: 'a31IsFunc', subject: 'algebra1', section: '3.1 Functions', label: 'Is the relation a function?', desc: '#1–6' },
+  { id: 'a31Graph', subject: 'algebra1', section: '3.1 Functions', label: 'Vertical Line Test', desc: '#7–10' },
+  { id: 'a31DomRange', subject: 'algebra1', section: '3.1 Functions', label: 'Domain and range from a graph', desc: '#11–14' },
+  { id: 'a31IndDep', subject: 'algebra1', section: '3.1 Functions', label: 'Independent and dependent variables', desc: '#15–16' },
+  { id: 'a31Word', subject: 'algebra1', section: '3.1 Functions', label: 'Domain and range in context', desc: '#17–18' },
+  { id: 'a31EqFunc', subject: 'algebra1', section: '3.1 Functions', label: 'Equations: function and domain', desc: '#19–22' },
+  { id: 'a32Intercepts', subject: 'algebra1', section: '3.2 Characteristics of Functions', label: 'Intercepts from a graph', desc: '#1–4' },
+  { id: 'a32Behavior', subject: 'algebra1', section: '3.2 Characteristics of Functions', label: 'Positive, negative, increasing, decreasing, end behavior', desc: '#5–10' },
+  { id: 'a33Graph', subject: 'algebra1', section: '3.3 Linear Functions', label: 'Linear or nonlinear: graph', desc: '#1–6' },
+  { id: 'a33Table', subject: 'algebra1', section: '3.3 Linear Functions', label: 'Linear or nonlinear: table', desc: '#7–10' },
+  { id: 'a33Eq', subject: 'algebra1', section: '3.3 Linear Functions', label: 'Linear or nonlinear: equation', desc: '#15–22' },
+  { id: 'a33Discrete', subject: 'algebra1', section: '3.3 Linear Functions', label: 'Discrete or continuous domain', desc: '#25–32' },
+  { id: 'a34Eval', subject: 'algebra1', section: '3.4 Function Notation', label: 'Evaluate a function', desc: '#1–8' },
+  { id: 'a34Solve', subject: 'algebra1', section: '3.4 Function Notation', label: 'Find x for a given value', desc: '#11–16' },
+  { id: 'a34Graph', subject: 'algebra1', section: '3.4 Function Notation', label: 'Find x from a graph', desc: '#17–18' },
+  { id: 'a34GraphLin', subject: 'algebra1', section: '3.4 Function Notation', sketch: true, label: 'Graph a linear function (students graph)', desc: '#21–26' },
+  { id: 'a34Word', subject: 'algebra1', section: '3.4 Function Notation', label: 'Real-life functions', desc: '#19–20, 28' },
+  { id: 'a35HV', subject: 'algebra1', section: '3.5 Graphing Linear Equations in Standard Form', sketch: true, label: 'Horizontal and vertical lines (students graph)', desc: '#1–4' },
+  { id: 'a35Intercepts', subject: 'algebra1', section: '3.5 Graphing Linear Equations in Standard Form', label: 'Find the intercepts', desc: '#5–8' },
+  { id: 'a35Graph', subject: 'algebra1', section: '3.5 Graphing Linear Equations in Standard Form', sketch: true, label: 'Graph using intercepts (students graph)', desc: '#9–18' },
+  { id: 'a35Word', subject: 'algebra1', section: '3.5 Graphing Linear Equations in Standard Form', label: 'Interpret the intercepts', desc: '#23–24' },
+  { id: 'a36SlopeGraph', subject: 'algebra1', section: '3.6 Graphing Linear Equations in Slope-Intercept Form', label: 'Slope from a graph', desc: '#1–4' },
+  { id: 'a36SlopePts', subject: 'algebra1', section: '3.6 Graphing Linear Equations in Slope-Intercept Form', label: 'Slope from two points', desc: '#5–6' },
+  { id: 'a36SlopeTable', subject: 'algebra1', section: '3.6 Graphing Linear Equations in Slope-Intercept Form', label: 'Slope from a table', desc: '#7–10' },
+  { id: 'a36SlopeInt', subject: 'algebra1', section: '3.6 Graphing Linear Equations in Slope-Intercept Form', label: 'Slope and y-intercept', desc: '#13–20' },
+  { id: 'a36Graph', subject: 'algebra1', section: '3.6 Graphing Linear Equations in Slope-Intercept Form', sketch: true, label: 'Graph and find the x-intercept (students graph)', desc: '#23–30' },
+  { id: 'a36Word', subject: 'algebra1', section: '3.6 Graphing Linear Equations in Slope-Intercept Form', label: 'Interpret the slope', desc: '#11–12, 40' },
+  { id: 'a37Describe', subject: 'algebra1', section: '3.7 Transformations of Linear Functions', label: 'Describe the transformation', desc: '#1–32' },
+  { id: 'a37Write', subject: 'algebra1', section: '3.7 Transformations of Linear Functions', label: 'Write g in terms of f', desc: '#33–36' },
+  { id: 'a37FindR', subject: 'algebra1', section: '3.7 Transformations of Linear Functions', label: 'Find the value of r', desc: '#55–58' },
+  { id: 'a38Graph', subject: 'algebra1', section: '3.8 Graphing Absolute Value Functions', sketch: true, label: 'Graph and find the range (students graph)', desc: '#1–8, 23–30' },
+  { id: 'a38Write', subject: 'algebra1', section: '3.8 Graphing Absolute Value Functions', label: 'Write the transformed function', desc: '#9–12' },
+  { id: 'a38Value', subject: 'algebra1', section: '3.8 Graphing Absolute Value Functions', label: 'Find h, k, or a from graphs', desc: '#19–22' },
+  { id: 'a38Vertex', subject: 'algebra1', section: '3.8 Graphing Absolute Value Functions', label: 'Find the vertex', desc: '#23–30' },
+  { id: 'a39Eval', subject: 'algebra1', section: '3.9 Analyzing and Sketching Graphs', label: 'Evaluate a piecewise function', desc: '#21–32' },
+  { id: 'a39Word', subject: 'algebra1', section: '3.9 Analyzing and Sketching Graphs', label: 'Piecewise function in context', desc: '#34' },
   { id: 'a41SlopeInt', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'From slope and y-intercept', desc: 'Write y = mx + b (#1–6)' },
   { id: 'a41Graph', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'From a graph', desc: 'Line through the y-intercept and one more point (#7–10)' },
   { id: 'a41TwoPts', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'Through two points', desc: 'One point is the y-intercept (#11–16)' },
@@ -21708,7 +22154,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
