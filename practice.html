@@ -5792,7 +5792,7 @@ function tokTrig(s) {
 }
 // → syntax tree, or null if it can't be read
 function parseTrig(src) {
-  const raw = String(src == null ? '' : src);
+  const raw = String(src == null ? '' : src).replace(/\\placeholder\{[^}]*\}|\\mathstrut|\\phantom\{[^}]*\}|\^\{\s*\}|_\{\s*\}/g, '').replace(/\\(?:quad|qquad|[,:;! ])/g, ' ').replace(/[=\s]+$/, '');
   const toks = tokTrig(/[\\{}]/.test(raw) ? latexToPlain(raw) : raw);
   if (!toks || !toks.length) return null;
   let i = 0;
@@ -20597,6 +20597,463 @@ TEMPLATES.b96Count = (r) => {
 };
 for (const name of Object.keys(TEMPLATES)) if (/^b9\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 /* ==== ALGEBRA 2 CH9 END ==== */
+/* ==== ALGEBRA 2 CH1 BEGIN ==== */
+/* ---------- Algebra 2 (Big Ideas Learning 2025), Chapter 1: Linear Functions, Linear Systems, and Matrices ---------- */
+KEYROWS_P.setb = [['{ | }', '\\left\\lbrace #?\\mid #?\\right\\rbrace'], ['≤', '\\le '], ['≥', '\\ge '], ['≠', '\\ne '], ['∞', '\\infty'], ['( , )', '\\left(#?,#?\\right)'], ['[ , ]', '\\left\\lbrack#?,#?\\right\\rbrack'], ['∪', '\\cup '], ['a⁄b', '\\frac{#@}{#?}']];
+KEYROWS_P.sys3 = [['( , , )', '\\left(#?,#?,#?\\right)'], ['a⁄b', '\\frac{#@}{#?}'], ['no solution', '\\text{no solution}'], ['infinitely many', '\\text{infinitely many solutions}']];
+KEYROWS_P.mat = [[',', ','], [';', ';'], ['a⁄b', '\\frac{#@}{#?}'], ['not possible', '\\text{not possible}']];
+KEYROWS_P.absfn = [['| |', '\\left|#?\\right|'], ['( )', '\\left(#?\\right)'], ['a⁄b', '\\frac{#@}{#?}']];
+// ---- text helpers ----
+const b1c = (m, v = 'x') => (m === 1 ? v : m === -1 ? `${MINUS}${v}` : `${fracT(m).replace(/^(−?)(\d+)\/(\d+)$/, '$1($2/$3)')}${v}`);
+const b1L = (m, b, v = 'x') => (m === 0 ? fracT(b) : `${b1c(m, v)}${b === 0 ? '' : `${b > 0 ? ' + ' : ' − '}${fracT(Math.abs(b))}`}`);
+const b1cl = (m, v = 'x') => (m === 1 ? v : m === -1 ? `-${v}` : `${fracL(m)}${v}`);
+const b1LL = (m, b, v = 'x') => (m === 0 ? fracL(b) : `${b1cl(m, v)}${b === 0 ? '' : `${b > 0 ? '+' : '-'}${fracL(Math.abs(b))}`}`);
+// a|px + q| + k
+const b1A = (a, p, q, k) => `${a === 1 ? '' : a === -1 ? MINUS : fracT(a).replace(/^(−?)(\d+)\/(\d+)$/, '$1($2/$3)')}|${b1L(p, q)}|${k === 0 ? '' : `${k > 0 ? ' + ' : ' − '}${fracT(Math.abs(k))}`}`;
+const b1AL = (a, p, q, k) => `${a === 1 ? '' : a === -1 ? '-' : fracL(a)}\\left|${b1LL(p, q)}\\right|${k === 0 ? '' : `${k > 0 ? '+' : '-'}${fracL(Math.abs(k))}`}`;
+const b1absF = (a, p, q, k) => (x) => a * Math.abs(p * x + q) + k;
+const b1strip = (raw) => String(raw || '').replace(/^\s*[a-z]\s*(\\left)?\(\s*x\s*(\\right)?\)\s*=/, '').replace(/^\s*[a-z]\s*=/, '');
+const b1fnOk = (raw, f) => pxEquiv(b1strip(raw), f, { lo: -43, hi: 41 });
+// a function-rule question: answer text, LaTeX, truth function
+function b1fnQ(r, { topic, stem, name = 'g', T, L, f, wrongs = [], solution, draw, size, keys = 'absfn' }) {
+  const c = `${name}(x) = ${T}`, W = [...new Set(wrongs.filter((w) => w && w !== T).map((w) => `${name}(x) = ${w}`))].filter((w) => w !== c);
+  return { topic, stem, draw, size, ...buildChoices(r, c, W, () => null), fr: { fields: [{ kind: 'expr', keys, label: `${name}(x) =` }], key: [L], display: c, check: (v) => b1fnOk(v[0], f) }, solution };
+}
+
+// ---------- 1.1 Interval Notation and Set Notation ----------
+const b1I = (a, b, ca, cb) => ({ a, b, ca: ca && isFinite(a), cb: cb && isFinite(b) });
+const b1setB = (S, v = 'x') => `{${v} | ${a2T(v, S).replace(/^\(?(.*?)\)?$/, '$1')}}`;
+const b1setBL = (S, v = 'x') => `\\left\\lbrace ${v}\\mid ${a2T(v, S, { latex: true })}\\right\\rbrace`;
+const b1isInterval = (raw) => /^\s*[(\[]/.test((pxPlain(String(raw || '').replace(/\\left\\lbrack|\\lbrack/g, '[').replace(/\\left\(|\\left\[/g, (m) => m.slice(-1))) || '').replace(/\s+/g, ''));
+const b1intOk = (raw, S) => b1isInterval(raw) && setOk(String(raw || '').replace(/\\infty/g, '∞'), S);
+// set-builder: {x | …}
+function b1sbOk(raw, S) {
+  let s = String(raw || '').replace(/\\left\\lbrace|\\right\\rbrace|\\lbrace|\\rbrace|\\left\\\{|\\right\\\}|\\\{|\\\}/g, ' ').replace(/\\left\\vert|\\right\\vert|\\mid|\\vert|\\left\||\\right\|/g, '|').trim();
+  s = s.replace(/^\{/, '').replace(/\}$/, '');
+  const k = s.indexOf('|'); if (k < 0) return false; const lhs = s.slice(0, k).trim(), rhs = s.slice(k + 1).trim();
+  if (!/^[a-z]$/.test(lhs) || b1isInterval(rhs)) return false;
+  return setOk(rhs.replace(/\\text\{\s*or\s*\}|\bor\b/g, ' or '), S);
+}
+const b1randS = (r, kind) => {
+  const a = ri(r, -12, 10), b = a + ri(r, 3, 15), ca = r() < 0.5, cb = r() < 0.5;
+  if (kind === 'bounded') return [b1I(a, b, ca, cb)];
+  if (kind === 'ray') return r() < 0.5 ? [b1I(a, Infinity, ca, false)] : [b1I(-Infinity, a, false, cb)];
+  return [b1I(-Infinity, a, false, ca), b1I(b, Infinity, cb, false)]; // union of two rays
+};
+const b1W = (r, S) => { const W = [S.map((I) => b1I(I.a, I.b, !I.ca, !I.cb)), S.map((I) => b1I(I.a, I.b, !I.ca, I.cb)), S.map((I) => b1I(I.a, I.b, I.ca, !I.cb))]; return W.filter((w) => setText(w) !== setText(S)); };
+TEMPLATES.b11ToInterval = (r) => {
+  const kind = pick(r, ['bounded', 'bounded', 'ray', 'ray', 'words']); let S, shown;
+  if (kind === 'words') { const a = ri(r, -20, 100) * pick(r, [1, 1, 10]), b = a + ri(r, 5, 110); const C = pick(r, [[`the real numbers from ${a} through ${b}`, [b1I(a, b, true, true)]], [`the real numbers between ${a} and ${b}`, [b1I(a, b, false, false)]], [`the real numbers greater than ${a}`, [b1I(a, Infinity, false, false)]], [`the real numbers at most ${b}`, [b1I(-Infinity, b, false, true)]]]); shown = C[0].replace(/-(\d)/g, '−$1'); S = C[1]; }
+  else { S = b1randS(r, kind); shown = a2T('x', S); }
+  const c = setText(S);
+  return { topic: 'Interval notation', stem: `Write the interval in interval notation.   ${shown}`, ...buildChoices(r, c, b1W(r, S).map(setText), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'setb', label: '' }], key: [setLatex(S)], display: c, check: (v) => b1intOk(v[0], S) },
+    solution: `Use a bracket [ or ] when an endpoint is included (≤, ≥, "through") and a parenthesis ( or ) when it is not (<, >, "between"). ∞ and −∞ always get a parenthesis.\n${shown} → ${c}` };
+};
+TEMPLATES.b11FromGraph = (r) => {
+  const S = b1randS(r, pick(r, ['bounded', 'ray', 'union'])), sc = pick(r, [1, 1, 5, 10]), T = S.map((I) => b1I(I.a * sc, I.b * sc, I.ca, I.cb)), c = setText(T);
+  return { topic: 'Interval notation', stem: 'Write the interval shown in interval notation.', draw: a2graphDraw(T), size: [440, 120], ...buildChoices(r, c, b1W(r, T).map(setText), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'setb', label: '' }], key: [setLatex(T)], display: c, check: (v) => b1intOk(v[0], T) },
+    solution: `A closed dot means the endpoint is included (bracket); an open dot means it is not (parenthesis). An arrow means the set continues to ±∞.\n${c}` };
+};
+TEMPLATES.b11ToSetBuilder = (r) => {
+  const kind = pick(r, ['bounded', 'ray', 'union', 'except', 'words']); let S, shown;
+  if (kind === 'except') { const a = pick(r, [100, 50, 4, -3, 12]); S = [b1I(-Infinity, a, false, false), b1I(a, Infinity, false, false)]; shown = `the set of all real numbers except ${fracT(a)}`; }
+  else if (kind === 'words') { const a = ri(r, 10, 30), b = a + ri(r, 5, 20); S = [b1I(a, b, false, false)]; shown = `the set of all real numbers greater than ${a} and less than ${b}`; }
+  else { S = b1randS(r, kind); shown = setText(S).replace(' ∪ ', ' or '); }
+  const c = kind === 'except' ? `{x | x ≠ ${fracT(S[0].b)}}` : b1setB(S), L = kind === 'except' ? `\\left\\lbrace x\\mid x\\ne ${fracL(S[0].b)}\\right\\rbrace` : b1setBL(S);
+  return { topic: 'Set-builder notation', stem: `Write the set of numbers in set-builder notation.   ${shown}`, ...buildChoices(r, c, kind === 'except' ? [`{x | x = ${fracT(S[0].b)}}`, `{x | x < ${fracT(S[0].b)}}`, `{x | x > ${fracT(S[0].b)}}`] : b1W(r, S).map((w) => b1setB(w)), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'setb', label: '' }], key: [L], display: c, check: (v) => b1sbOk(v[0], S) },
+    solution: `Set-builder notation names the variable, then the condition: {x | condition}. Use ≤ or ≥ for brackets (included endpoints) and < or > for parentheses.\n${c}` };
+};
+TEMPLATES.b11Graph = (r) => {
+  const kind = pick(r, ['bounded', 'union', 'except', 'ray']); let S;
+  if (kind === 'except') { const a = ri(r, -6, 6); S = [b1I(-Infinity, a, false, false), b1I(a, Infinity, false, false)]; }
+  else { const a = ri(r, -8, 4), b = a + ri(r, 3, 9); S = kind === 'bounded' ? [b1I(a, b, r() < 0.5, r() < 0.5)] : kind === 'ray' ? [b1I(a, Infinity, r() < 0.5, false)] : [b1I(-Infinity, a, false, r() < 0.5), b1I(b, Infinity, r() < 0.5, false)]; }
+  const shown = kind === 'except' ? `{x | x ≠ ${fracT(S[0].b)}}` : b1setB(S);
+  return a2GQ(r, { topic: 'Set-builder notation', stem: `Sketch the graph of the set of numbers.   ${shown}`, v: 'x', S, typed: false, solution: `${shown} is the same as ${setText(S)}.` });
+};
+TEMPLATES.b11Word = (r) => {
+  const C = pick(r, [() => { const lo = -pick(r, [282, 86, 105]), hi = pick(r, [20320, 14505, 6288]); return [`The elevation (in feet) relative to sea level in a region ranges from ${fracT(lo)} feet to ${hi.toLocaleString('en-US')} feet. Write the range of elevations in interval notation and in set-builder notation.`, [b1I(lo, hi, true, true)], 'e']; },
+    () => { const lo = pick(r, [26, 30]), hi = lo + pick(r, [8, 11]); return [`The floor of a balcony ranges from ${lo} to ${hi} feet above a stage. Write the range of the floor levels in interval notation and in set-builder notation.`, [b1I(lo, hi, true, true)], 'h']; },
+    () => { const lo = pick(r, [15, 20, 25]), hi = pick(r, [45, 55, 65]); return [`The legal driving speeds on a road are at least ${lo} miles per hour and at most ${hi} miles per hour. Write the legal speeds in interval notation and in set-builder notation.`, [b1I(lo, hi, true, true)], 's']; },
+    () => { const t = pick(r, [32, 40]); return [`A recipe says a dough must rise at a temperature greater than ${t}°F and less than ${t + 50}°F. Write the temperatures in interval notation and in set-builder notation.`, [b1I(t, t + 50, false, false)], 't']; }])();
+  const [stem, S, v] = C, c1 = setText(S), c2 = b1setB(S, v), ok1 = (raw) => b1intOk(raw, S), ok2 = (raw) => b1sbOk(raw, S);
+  return { topic: 'Interval notation', stem, ...buildChoices(r, `${c1};  ${c2}`, b1W(r, S).map((w) => `${setText(w)};  ${b1setB(w, v)}`), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'setb', label: 'Interval notation:' }, { kind: 'expr', keys: 'setb', label: 'Set-builder notation:' }], key: [setLatex(S), b1setBL(S, v)], display: `${c1};  ${c2}`, check: (x) => ok1(x[0]) && ok2(x[1]), score: (x) => ((ok1(x[0]) ? 1 : 0) + (ok2(x[1]) ? 1 : 0)) / 2 },
+    solution: `Both endpoints are ${S[0].ca ? 'included' : 'not included'}.\nInterval notation: ${c1}\nSet-builder notation: ${c2}` };
+};
+
+// ---------- 1.2 Parent Functions and Transformations ----------
+const B1FAM = ['Constant', 'Linear', 'Absolute value', 'Quadratic'];
+TEMPLATES.b12Family = (r) => {
+  const C = pick(r, [() => [`f(x) = ${b1L(nz(r, -5, 5), nz(r, -9, 9))}`, 'Linear'], () => { const a = nz(r, -3, 3), k = ri(r, -8, 8); return [`f(x) = ${b1A(a, 1, nz(r, -4, 4), k)}`, 'Absolute value']; }, () => { const a = nz(r, -3, 3); return [`f(x) = ${a === 1 ? '' : a === -1 ? '−' : a}x² ${pick(r, ['+', '−'])} ${ri(r, 1, 9)}`, 'Quadratic']; }, () => [`f(x) = ${nz(r, -9, 9)}`.replace('-', '−'), 'Constant'],
+    () => [`The function f(t) = −16t² + ${ri(r, 15, 30)}t + ${ri(r, 3, 8)} represents the height (in feet) of a ball t seconds after it is tossed.`, 'Quadratic'], () => [`The trade-in value of a car is f(x) = ${pick(r, [10000, 15000])} − ${pick(r, [1250, 1500])}x, where x is the number of years after purchase.`, 'Linear']])();
+  const [t, ans] = C;
+  return b6sel(r, 'Parent functions', `Identify the function family to which f belongs.   ${t}`, B1FAM, ans, `${ans === 'Linear' ? 'The highest power of x is 1' : ans === 'Quadratic' ? 'The highest power of the variable is 2' : ans === 'Constant' ? 'The function has the same value for every x' : 'The variable is inside absolute value bars'}, so f belongs to the ${ans.toLowerCase()} family.`);
+};
+// one transformation of a parent function
+TEMPLATES.b12Describe = (r) => {
+  const k = ri(r, 1, 6), c = pick(r, [2, 3, 4, 1 / 2, 1 / 3, 3 / 4, 4 / 3]), cT = fracT(c), fam = pick(r, ['lin', 'quad', 'abs']);
+  const P = { lin: (u) => u, quad: (u) => `${u}²`.replace('(x)²', 'x²'), abs: (u) => `|${u}|` }[fam], par = { lin: 'f(x) = x', quad: 'f(x) = x²', abs: 'f(x) = |x|' }[fam];
+  const C = pick(r, [[`${P('x')} + ${k}`, `translation ${k} unit${k > 1 ? 's' : ''} up`], [`${P('x')} − ${k}`, `translation ${k} unit${k > 1 ? 's' : ''} down`], ...(fam === 'lin' ? [] : [[P(`(x + ${k})`).replace('|(x', '|x').replace(')|', '|'), `translation ${k} unit${k > 1 ? 's' : ''} left`], [P(`(x − ${k})`).replace('|(x', '|x').replace(')|', '|'), `translation ${k} unit${k > 1 ? 's' : ''} right`]]),
+    [`${/\//.test(cT) ? cT.replace(/^(\d+)\/(\d+)$/, '($1/$2)') : cT}${P('x')}`, `vertical ${c > 1 ? 'stretch' : 'shrink'} by a factor of ${cT}`], [`−${P('x')}`, 'reflection in the x-axis']]);
+  const [g, ans] = C, pool = [`translation ${k} unit${k > 1 ? 's' : ''} up`, `translation ${k} unit${k > 1 ? 's' : ''} down`, `translation ${k} unit${k > 1 ? 's' : ''} left`, `translation ${k} unit${k > 1 ? 's' : ''} right`, `vertical stretch by a factor of ${c > 1 ? cT : fracT(1 / c)}`, `vertical shrink by a factor of ${c < 1 ? cT : fracT(1 / c)}`, 'reflection in the x-axis', 'reflection in the y-axis'];
+  const opts = [ans, ...shuffle(r, pool.filter((p) => p !== ans)).slice(0, 3)];
+  return b6sel(r, 'Transformations of parent functions', `Describe the transformation of the parent function ${par} represented by g(x) = ${g}.`, shuffle(r, opts), ans,
+    `${ans.startsWith('translation') ? (/up|down/.test(ans) ? 'Adding or subtracting a constant outside the function shifts the graph vertically' : 'Adding or subtracting inside the function shifts the graph horizontally (the opposite way of the sign)') : ans.startsWith('reflection') ? 'Multiplying the output by −1 reflects the graph in the x-axis' : 'Multiplying the output by a positive constant stretches (> 1) or shrinks (< 1) the graph vertically'}: ${ans}.`);
+};
+TEMPLATES.b12Multi = (r) => {
+  const fam = pick(r, ['lin', 'quad', 'abs']), a = pick(r, [3, -3, 4, 1 / 2, -1, 3 / 4, -2]), k = nz(r, -6, 6), h = fam === 'lin' ? 0 : pick(r, [0, 0, 3, -1]);
+  const P = { lin: 'x', quad: h ? `(x ${h > 0 ? '+' : '−'} ${Math.abs(h)})²` : 'x²', abs: h ? `|x ${h > 0 ? '+' : '−'} ${Math.abs(h)}|` : '|x|' }[fam], par = { lin: 'f(x) = x', quad: 'f(x) = x²', abs: 'f(x) = |x|' }[fam];
+  const aT = a === 1 ? '' : a === -1 ? '−' : /\//.test(fracT(Math.abs(a))) ? `${a < 0 ? '−' : ''}(${fracT(Math.abs(a))})` : fracT(a), g = `${aT}${P} ${k > 0 ? '+' : '−'} ${Math.abs(k)}`;
+  const parts = (hh, aa, kk) => [hh ? `a translation ${Math.abs(hh)} unit${Math.abs(hh) > 1 ? 's' : ''} ${hh > 0 ? 'left' : 'right'}` : '', Math.abs(aa) !== 1 ? `a vertical ${Math.abs(aa) > 1 ? 'stretch' : 'shrink'} by a factor of ${fracT(Math.abs(aa))}` : '', aa < 0 ? 'a reflection in the x-axis' : '', `a translation ${Math.abs(kk)} unit${Math.abs(kk) > 1 ? 's' : ''} ${kk > 0 ? 'up' : 'down'}`].filter(Boolean);
+  const T = (hh, aa, kk) => { const p = parts(hh, aa, kk); return p.length > 1 ? `${p.slice(0, -1).join(', ')}${p.length > 2 ? ',' : ''} and ${p[p.length - 1]}` : p[0]; };
+  const ans = T(h, a, k), W = [T(-h, a, k), T(h, -a, k), T(h, a, -k), T(h, a < 0 ? a : 1 / a, k)].filter((w, i, A) => w !== ans && A.indexOf(w) === i);
+  return { topic: 'Transformations of parent functions', stem: `Describe the transformations of the parent function ${par} represented by g(x) = ${g}.`, ...buildChoices(r, ans[0].toUpperCase() + ans.slice(1), W.map((w) => w[0].toUpperCase() + w.slice(1)), () => null),
+    fr: FR.select('Choose:', shuffle(r, [ans, ...W.slice(0, 3)].map((w) => w[0].toUpperCase() + w.slice(1))), ans[0].toUpperCase() + ans.slice(1)), solution: `g(x) = ${g}: ${ans}.` };
+};
+TEMPLATES.b12DomainRange = (r) => {
+  const fam = pick(r, ['abs', 'abs', 'lin', 'quad', 'quad']), a = nz(r, -5, 5), h = ri(r, -4, 4), k = ri(r, -8, 11);
+  const g = fam === 'abs' ? `${a === 1 ? '' : a === -1 ? '−' : a}|x ${h >= 0 ? '+' : '−'} ${Math.abs(h)}| ${k >= 0 ? '+' : '−'} ${Math.abs(k)}`.replace('|x + 0|', '|x|').replace(' + 0', '') : fam === 'lin' ? b1L(a, k) : `${a === 1 ? '' : a === -1 ? '−' : a}x² ${k >= 0 ? '+' : '−'} ${Math.abs(k)}`.replace(' + 0', '');
+  const fn = { abs: 'Absolute value', lin: 'Linear', quad: 'Quadratic' }[fam], RS = fam === 'lin' ? ALL : a > 0 ? [{ a: k, b: Infinity, ca: true, cb: false }] : [{ a: -Infinity, b: k, ca: false, cb: true }];
+  const rT = fam === 'lin' ? 'all real numbers' : `y ${a > 0 ? '≥' : '≤'} ${fracT(k)}`, c = `${fn}; domain: all real numbers; range: ${rT}`;
+  const ok0 = (v) => v === fn, ok1 = (v) => setOk(String(v || '').replace(/\\text\{([^}]*)\}/g, ' $1 '), RS);
+  return { topic: 'Domain and range', stem: `Identify the function family to which g belongs. Then find the range (the domain is all real numbers).   g(x) = ${g}`,
+    ...buildChoices(r, c, [`${fn}; domain: all real numbers; range: ${fam === 'lin' ? `y ≥ ${fracT(k)}` : `y ${a > 0 ? '≤' : '≥'} ${fracT(k)}`}`, `${fn}; domain: all real numbers; range: ${fam === 'lin' ? `y = ${fracT(k)}` : 'all real numbers'}`, `${fam === 'quad' ? 'Absolute value' : 'Quadratic'}; domain: all real numbers; range: ${rT}`], () => null),
+    fr: { fields: [{ kind: 'select', label: 'Family:', options: ['Linear', 'Absolute value', 'Quadratic'] }, { kind: 'expr', keys: 'ineq', label: 'Range:' }], key: [fn, fam === 'lin' ? '\\text{all real numbers}' : `y${a > 0 ? '\\ge ' : '\\le '}${k}`], display: c, check: (v) => ok0(v[0]) && ok1(v[1]), score: (v) => ((ok0(v[0]) ? 1 : 0) + (ok1(v[1]) ? 1 : 0)) / 2 },
+    solution: fam === 'lin' ? `g is linear with nonzero slope, so every y-value occurs: the range is all real numbers.` : `The ${fam === 'abs' ? 'vertex' : 'vertex'} is at y = ${fracT(k)} and the graph opens ${a > 0 ? 'up' : 'down'}, so the range is ${rT}.` };
+};
+TEMPLATES.b12Figure = (r) => {
+  const n = pick(r, [3, 4]), P = []; while (P.length < n) { const p = [ri(r, -4, 4), ri(r, -4, 4)]; if (!P.some((q) => q[0] === p[0] && q[1] === p[1])) P.push(p); }
+  const k = ri(r, 1, 4), C = pick(r, [[`Translate ${k} unit${k > 1 ? 's' : ''} down`, (p) => [p[0], p[1] - k]], [`Translate ${k} unit${k > 1 ? 's' : ''} up`, (p) => [p[0], p[1] + k]], [`Translate ${k} unit${k > 1 ? 's' : ''} left`, (p) => [p[0] - k, p[1]]], ['Reflect in the x-axis', (p) => [p[0], -p[1]]], ['Reflect in the y-axis', (p) => [-p[0], p[1]]]]);
+  const [what, f] = C, Q = P.map(f), names = 'ABCD'.slice(0, n), c = Q.map((q, i) => `${names[i]}′${ptT(q)}`).join(', ');
+  const ok = (raw) => { const s = pxPlain(raw) || ''; const pts = [...s.replace(/\s+/g, '').matchAll(/\(([^(),]+),([^(),]+)\)/g)].map((m) => [pxConst(m[1]), pxConst(m[2])]); return pts.length === n && Q.every((q, i) => Math.abs(pts[i][0] - q[0]) < 1e-9 && Math.abs(pts[i][1] - q[1]) < 1e-9); };
+  const W = [P.map((p) => [p[0], p[1] + k]), P.map((p) => [-p[0], p[1]]), P.map((p) => [p[0], -p[1]]), P.map((p) => [p[0] + k, p[1]])].map((L) => L.map((q, i) => `${names[i]}′${ptT(q)}`).join(', ')).filter((w, i, A) => w !== c && A.indexOf(w) === i);
+  return { topic: 'Transformations of figures', stem: `${what}. Find the coordinates of the figure after the transformation.   ${P.map((p, i) => `${names[i]}${ptT(p)}`).join(', ')}`, ...buildChoices(r, c, W, () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'pts2', label: 'Image vertices:' }], key: [Q.map((q) => `\\left(${q[0]},${q[1]}\\right)`).join(',')], display: c, check: (v) => ok(v[0]) }, solution: `${what.replace(/^(\w)/, (m) => m)}: ${C[0].startsWith('Reflect in the x') ? '(x, y) → (x, −y)' : C[0].startsWith('Reflect in the y') ? '(x, y) → (−x, y)' : C[0].includes('down') ? `(x, y) → (x, y − ${k})` : C[0].includes('up') ? `(x, y) → (x, y + ${k})` : `(x, y) → (x − ${k}, y)`}\n${c}` };
+};
+
+// ---------- 1.3 Transformations of Linear and Absolute Value Functions ----------
+// f is linear (m, b) or absolute value (a, p, q, k); each transformation returns the new rule
+const b1Fgen = (r) => (r() < 0.5 ? { kind: 'lin', m: pick(r, [1, -1, 2, -5, 1 / 2, 3, -2, 4]), b: nz(r, -9, 9) } : { kind: 'abs', a: pick(r, [1, 1, 2, -2, 3, -3]), p: pick(r, [1, 1, 2, 4, 6]), q: ri(r, -11, 11), k: ri(r, -9, 9) });
+const b1FT = (F) => (F.kind === 'lin' ? b1L(F.m, F.b) : b1A(F.a, F.p, F.q, F.k));
+const b1FL = (F) => (F.kind === 'lin' ? b1LL(F.m, F.b) : b1AL(F.a, F.p, F.q, F.k));
+const b1Ff = (F) => (F.kind === 'lin' ? (x) => F.m * x + F.b : b1absF(F.a, F.p, F.q, F.k));
+const b1R = (x) => { const v = Math.round(x * 1e12) / 1e12, q = fracParts(v); return q ? q[0] / q[1] : Math.round(v * 1e9) / 1e9; };
+// apply a transformation to F (returns a new F)
+function b1apply(F, t) {
+  const [kind, n] = t;
+  if (F.kind === 'lin') { const { m, b } = F; return { kind: 'lin', ...{ left: { m, b: b1R(b + m * n) }, right: { m, b: b1R(b - m * n) }, up: { m, b: b + n }, down: { m, b: b - n }, rx: { m: -m, b: -b }, ry: { m: -m, b }, vs: { m: b1R(m * n), b: b1R(b * n) }, hs: { m: b1R(m / n), b } }[kind] }; }
+  const { a, p, q, k } = F; return { kind: 'abs', ...{ left: { a, p, q: q + p * n, k }, right: { a, p, q: q - p * n, k }, up: { a, p, q, k: k + n }, down: { a, p, q, k: k - n }, rx: { a: -a, p, q, k: -k }, ry: { a, p, q: -q, k }, vs: { a: b1R(a * n), p, q, k: b1R(k * n) }, hs: { a, p: b1R(p / n), q, k } }[kind] };
+}
+const b1tText = ([kind, n]) => ({ left: `translation ${n} unit${n > 1 ? 's' : ''} left`, right: `translation ${n} unit${n > 1 ? 's' : ''} right`, up: `translation ${n} unit${n > 1 ? 's' : ''} up`, down: `translation ${n} unit${n > 1 ? 's' : ''} down`, rx: 'reflection in the x-axis', ry: 'reflection in the y-axis', vs: `vertical ${n > 1 ? 'stretch' : 'shrink'} by a factor of ${fracT(n)}`, hs: `horizontal ${n > 1 ? 'stretch' : 'shrink'} by a factor of ${fracT(n)}` }[kind]);
+const b1how = ([kind, n]) => ({ left: `replace x with x + ${n}`, right: `replace x with x − ${n}`, up: `add ${n} to the output`, down: `subtract ${n} from the output`, rx: 'multiply the output by −1: g(x) = −f(x)', ry: 'replace x with −x: g(x) = f(−x)', vs: `multiply the output by ${fracT(n)}: g(x) = ${fracT(n)}f(x)`, hs: `replace x with x/${fracT(n)}: g(x) = f(${fracT(1 / n)}x)` }[kind]);
+const B1OPP = { left: 'right', right: 'left', up: 'down', down: 'up', rx: 'ry', ry: 'rx' };
+function b1transQ(r, kinds, { topic, two = false }) {
+  for (let t = 0; t < 50; t++) {
+    const F = b1Fgen(r), T1 = pick(r, kinds)(), T2 = two ? pick(r, kinds)() : null;
+    if (T2 && T2[0] === T1[0]) continue;
+    const G = T2 ? b1apply(b1apply(F, T1), T2) : b1apply(F, T1);
+    const f = b1Ff(G), wr = [B1OPP[T1[0]] ? b1apply(F, [B1OPP[T1[0]], T1[1]]) : b1apply(F, [T1[0], 1 / T1[1]])];
+    if (T2) { wr.push(b1apply(b1apply(F, T2), T1)); wr.push(b1apply(F, T1)); }
+    else if (T1[0] === 'vs') wr.push(F.kind === 'lin' ? { kind: 'lin', m: b1R(F.m * T1[1]), b: F.b } : { ...F, a: b1R(F.a * T1[1]) });
+    else if (T1[0] === 'hs') wr.push(F.kind === 'lin' ? { kind: 'lin', m: b1R(F.m * T1[1]), b: F.b } : { ...F, p: b1R(F.p * T1[1]) });
+    else wr.push(F.kind === 'lin' ? { kind: 'lin', m: F.m, b: F.b + (T1[0] === 'left' ? T1[1] : -T1[1]) } : { ...F, k: F.k + 1 });
+    if (G.kind === 'abs' && (!Number.isInteger(G.p * 6) || Math.abs(G.q) > 40)) continue;
+    const desc = T2 ? `${b1tText(T1)} followed by a ${b1tText(T2)}` : b1tText(T1);
+    return b1fnQ(r, { topic, stem: `Write a function g whose graph represents the indicated transformation${T2 ? 's' : ''} of the graph of f.   f(x) = ${b1FT(F)};  ${desc}`, T: b1FT(G), L: b1FL(G), f, wrongs: wr.map(b1FT),
+      solution: `${T2 ? `First ${b1how(T1)}: ${b1FT(b1apply(F, T1))}.\nThen ${b1how(T2)}.` : `To make a ${b1tText(T1)}, ${b1how(T1)}.`}\ng(x) = ${b1FT(G)}` });
+  }
+}
+const B1T = (r) => ({ trans: () => [pick(r, ['left', 'right', 'up', 'down']), ri(r, 2, 6)], refl: () => [pick(r, ['rx', 'ry']), 1], vs: () => { const n = pick(r, [2, 3, 5, 1 / 2, 1 / 3]); return ['vs', n]; }, hs: () => { const n = pick(r, [2, 4, 1 / 2, 1 / 3]); return ['hs', n]; } });
+TEMPLATES.b13Translate = (r) => b1transQ(r, [B1T(r).trans], { topic: 'Translations' });
+TEMPLATES.b13Reflect = (r) => b1transQ(r, [B1T(r).refl], { topic: 'Reflections' });
+TEMPLATES.b13Stretch = (r) => b1transQ(r, [B1T(r).vs, B1T(r).hs], { topic: 'Stretches and shrinks' });
+TEMPLATES.b13Combo = (r) => b1transQ(r, [B1T(r).trans, B1T(r).refl, B1T(r).vs, B1T(r).hs], { topic: 'Combinations of transformations', two: true });
+TEMPLATES.b13Graph = (r) => {
+  for (let t = 0; t < 60; t++) {
+    const a = pick(r, [1, -1, 2, -2, 1 / 2, -1 / 2, 3]), h = ri(r, -4, 4), k = ri(r, -4, 4), x2 = h + pick(r, [2, -2]), y2 = a * Math.abs(x2 - h) + k;
+    if (!Number.isInteger(y2) || Math.abs(y2) > 6 || (h === 0 && k === 0 && a === 1)) continue;
+    const G = { kind: 'abs', a, p: 1, q: -h, k }, f = b1Ff(G);
+    return b1fnQ(r, { topic: 'Transformations from a graph', stem: 'The graphs of f(x) = |x| (gray) and g (blue) are shown. Write a rule for g.', T: b1FT(G), L: b1FL(G), f,
+      wrongs: [b1FT({ ...G, q: h }), b1FT({ ...G, a: -a }), b1FT({ ...G, k: -k }), b1FT({ ...G, a: 1 / a })],
+      draw: plotQ({ xr: [-7, 7], yr: [-7, 7], curves: [{ f: (x) => Math.abs(x), color: '#9a968c' }, { f }], pts: [{ p: [h, k], label: ptT([h, k]) }, { p: [x2, y2], label: ptT([x2, y2]) }] }), size: [320, 320],
+      solution: `The vertex of g is ${ptT([h, k])}, so g(x) = a|x ${h > 0 ? '−' : '+'} ${Math.abs(h)}| ${k < 0 ? '−' : '+'} ${Math.abs(k)}.\nUse ${ptT([x2, y2])}: ${y2} = a|${x2} ${h > 0 ? '−' : '+'} ${Math.abs(h)}| ${k < 0 ? '−' : '+'} ${Math.abs(k)}, so a = ${fracT(a)}.\ng(x) = ${b1FT(G)}`.replace(/ \+ 0\b/g, '').replace(/\| \+ 0/g, '|').replace(/x \+ 0/g, 'x').replace(/x − 0/g, 'x') });
+  }
+};
+TEMPLATES.b13Word = (r) => {
+  if (r() < 0.5) { const rate = pick(r, [2.3, 1.85, 2.1]), mult = pick(r, [1.2, 1.5, 1.25]), add = pick(r, [5, 3, 4]), mi = pick(r, [6, 8, 10, 12]), v = Math.round((mult * rate * mi + add) * 100) / 100;
+    return b6moneyQ(r, { topic: 'Transformations in real life', stem: `The cost (in dollars) of a car ride from a ride-sharing company during regular hours is f(x) = ${rate.toFixed(2)}x, where x is the number of miles driven. The cost of a ride during high-demand hours, including a tip, is $${add} more than ${Math.round(mult * 100)}% of the cost during regular hours. What is the cost of a ${mi}-mile ride during high-demand hours?`, val: v, wrongs: [rate * mi + add, mult * (rate * mi + add), rate * mi * mult],
+      solution: `g(x) = ${mult}f(x) + ${add} = ${mult}(${rate.toFixed(2)}x) + ${add}\ng(${mi}) = ${mult}(${rate.toFixed(2)})(${mi}) + ${add} = ${b6money(v)}` }); }
+  const m = pick(r, [1 / 4, 1 / 5, 1 / 2]), b0 = pick(r, [11.3, 9.8, 14.5]), yr = pick(r, [2014, 2015]), t = pick(r, [6, 8, 10]), g = Math.round((b0 - 2 * m * t) * 100) / 100;
+  return a1numQ(r, { topic: 'Transformations in real life', stem: `Sales (in billions of dollars) of a product can be modeled by f(t) = −(${fracT(m)})t + ${b0}, where t is the number of years since ${yr}. Transform the graph of f to model sales that decrease at twice this rate (a horizontal shrink by a factor of 1/2). Use the new model to estimate sales in ${yr + t}.`, val: g, dec: true, tol: 0.011, unit: 'billion dollars', wrongs: [Math.round((b0 - m * t) * 100) / 100, Math.round((b0 - m * t / 2) * 100) / 100, Math.round(2 * (b0 - m * t) * 100) / 100],
+    solution: `g(t) = f(2t) = −(${fracT(m)})(2t) + ${b0} = −${fracT(2 * m)}t + ${b0}\ng(${t}) = −${fracT(2 * m)}(${t}) + ${b0} = ${fmt(g)} billion dollars` });
+};
+
+// ---------- 1.4 Modeling with Linear Functions ----------
+// a first-quadrant line graph with its own x and y scales
+const b1nice = (v) => [1, 2, 4, 5, 10, 20, 25, 30, 50, 60, 100, 200, 300, 500].find((s) => v / s <= 6) || 1000;
+const b1chart = (P, m, b, xl, yl, title) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h; c.clearRect(0, 0, W, H);
+  const xmax0 = Math.max(...P.map((p) => p[0])) * 1.5, ymax0 = Math.max(...P.map((p) => p[1]), b) * 1.3, sx = b1nice(xmax0), sy = b1nice(ymax0), xmax = Math.ceil(xmax0 / sx) * sx, ymax = Math.ceil(ymax0 / sy) * sy;
+  const L = 56, R = W - 14, T = 30, B = H - 46, X = (x) => L + (x / xmax) * (R - L), Y = (y) => B - (y / ymax) * (B - T);
+  c.fillStyle = '#1d1d1b'; c.font = '600 14px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.fillText(title, (L + R) / 2, 18);
+  c.font = '12px system-ui, sans-serif'; c.strokeStyle = '#e4e1d9'; c.lineWidth = 1;
+  for (let x = 0; x <= xmax + 1e-9; x += sx) { c.beginPath(); c.moveTo(X(x), T); c.lineTo(X(x), B); c.stroke(); c.textBaseline = 'top'; c.fillText(fmt(x), X(x), B + 4); }
+  c.textAlign = 'right'; c.textBaseline = 'middle'; for (let y = 0; y <= ymax + 1e-9; y += sy) { c.beginPath(); c.moveTo(L, Y(y)); c.lineTo(R, Y(y)); c.stroke(); c.fillText(fmt(y), L - 4, Y(y)); }
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(L, T); c.lineTo(L, B); c.lineTo(R, B); c.stroke();
+  c.save(); c.beginPath(); c.rect(L, T, R - L, B - T); c.clip(); c.strokeStyle = '#2b5fad'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(X(0), Y(b)); c.lineTo(X(xmax), Y(m * xmax + b)); c.stroke(); c.restore();
+  P.forEach((p) => { c.fillStyle = '#2b5fad'; c.beginPath(); c.arc(X(p[0]), Y(p[1]), 4.5, 0, 2 * Math.PI); c.fill(); c.fillStyle = '#1d1d1b'; c.textAlign = 'left'; c.textBaseline = 'bottom'; c.font = '12px system-ui, sans-serif'; c.fillText(ptT(p), X(p[0]) + 6, Y(p[1]) - 4); });
+  c.textAlign = 'center'; c.textBaseline = 'bottom'; c.font = '13px system-ui, sans-serif'; c.fillText(xl, (L + R) / 2, H - 2); c.save(); c.translate(14, (T + B) / 2); c.rotate(-Math.PI / 2); c.textBaseline = 'middle'; c.fillText(yl, 0, 0); c.restore();
+};
+TEMPLATES.b14Graph = (r) => {
+  const C = pick(r, [['Tipping', 'Cost of meal (dollars)', 'Tip (dollars)', [[10, 2], [20, 4]], 'the tip', 'dollars per dollar of the meal'], ['Gasoline Tank', 'Distance (miles)', 'Fuel (gallons)', [[30, 11], [90, 9]], 'the fuel in the tank', 'gallons per mile'], ['Savings Account', 'Time (weeks)', 'Balance (dollars)', [[1, 150], [4, 300]], 'the balance', 'dollars per week'],
+    ['Tree Growth', 'Age (years)', 'Tree height (feet)', [[1, 2.5], [4, 5.5]], 'the tree height', 'feet per year'], ['Typing Speed', 'Time (minutes)', 'Words typed', [[1, 55], [3, 165]], 'the number of words typed', 'words per minute'], ['Swimming Pool', 'Time (hours)', 'Volume (cubic feet)', [[3, 300], [5, 180]], 'the volume of water', 'cubic feet per hour']]);
+  const [title, xl, yl, base, subj, per] = C, s = pick(r, [1, 1, 2]), P = base.map(([x, y]) => [x, y * s]), m = b1R((P[1][1] - P[0][1]) / (P[1][0] - P[0][0])), b = b1R(P[0][1] - m * P[0][0]);
+  const I = (mm) => `${subj} ${mm > 0 ? 'increases' : 'decreases'} by ${fracT(Math.abs(mm))} ${per}`;
+  const c = `y = ${b1L(m, b)}`, ok = (raw) => lineOk(String(raw || ''), [m, -1, b]);
+  return { topic: 'Modeling with linear functions', stem: `Use the graph to write an equation of the line. Then interpret the slope.`, draw: b1chart(P, m, b, xl, yl, title), size: [380, 320],
+    ...buildChoices(r, `${c};  ${I(m)}`, [`y = ${b1L(b1R(1 / m), b)};  ${I(1 / m)}`, `y = ${b1L(m, b1R(P[0][1]))};  ${I(m)}`, `y = ${b1L(-m, b)};  ${I(-m)}`], () => null),
+    fr: { frStem: 'Use the graph to write an equation of the line.', fields: [{ kind: 'expr', keys: 'lin', label: '' }], key: [`y=${b1LL(m, b)}`], display: c, check: (v) => ok(v[0]) },
+    solution: `Slope: m = (${fmt(P[1][1])} − ${fmt(P[0][1])})/(${fmt(P[1][0])} − ${fmt(P[0][0])}) = ${fracT(m)}.\ny-intercept: b = ${fmt(P[0][1])} − (${fracT(m)})(${fmt(P[0][0])}) = ${fracT(b)}.\n${c}. The slope means ${I(m)}.` };
+};
+TEMPLATES.b14Table = (r) => {
+  const m = pick(r, [50, 45, 60, 25]), b = pick(r, [350, 200, 400, 150]), xs = [3, 6, 9, 12, 15], m2 = m + pick(r, [5, 10, 15]), b2 = b - (m2 - m) * pick(r, [4, 6, 10]);
+  if (b2 <= 0) return TEMPLATES.b14Table(r);
+  const xEq = (b - b2) / (m2 - m), ok1 = (raw) => lineOk(String(raw || ''), [m, -1, b]), ok2 = (raw) => numOk(raw, xEq), c = `y = ${m}x + ${b};  ${xEq} months`;
+  return { topic: 'Modeling with linear functions', stem: `The table shows the total costs (in dollars) of a phone and x months of service at Carrier A. The total cost at Carrier B is represented by y = ${m2}x + ${b2}. Write an equation for Carrier A. After how many months of service are the total costs the same?`,
+    draw: a9tableDraw([['Months, x', ...xs.map(String)], ['Total cost, y', ...xs.map((x) => `$${m * x + b}`)]]), size: [460, 80], ...buildChoices(r, c, [`y = ${m}x + ${b};  ${xEq + 3} months`, `y = ${b}x + ${m};  ${xEq} months`, `y = ${m * 3}x + ${b};  ${(b - b2) / (m2 - 3 * m) > 0 ? fmt((b - b2) / (m2 - 3 * m)) : xEq + 6} months`], () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'lin', label: 'Carrier A:' }, { kind: 'expr', keys: 'num', label: 'Months:' }], key: [`y=${m}x+${b}`, String(xEq)], display: c, check: (v) => ok1(v[0]) && ok2(v[1]), score: (v) => ((ok1(v[0]) ? 1 : 0) + (ok2(v[1]) ? 1 : 0)) / 2 },
+    solution: `Slope: (${m * 6 + b} − ${m * 3 + b})/(6 − 3) = ${m}. y-intercept: ${m * 3 + b} − ${m}(3) = ${b}, so y = ${m}x + ${b}.\nSet the costs equal: ${m}x + ${b} = ${m2}x + ${b2}, so ${m2 - m}x = ${b - b2} and x = ${xEq} months.` };
+};
+TEMPLATES.b14Temp = (r) => {
+  if (r() < 0.5) { const C = pick(r, [15, 20, 25, -5, 30, 10]), F = (9 / 5) * C + 32;
+    return a1numQ(r, { topic: 'Modeling with linear functions', stem: `Temperatures in degrees Fahrenheit and degrees Celsius have a linear relationship. Water freezes at 0°C, which is 32°F, and boils at 100°C, which is 212°F. A forecast shows a high of ${fracT(C)}°C. What is this temperature in degrees Fahrenheit?`, val: F, dec: true, unit: '°F', wrongs: [C + 32, (5 / 9) * (C - 32), (9 / 5) * C], solution: `Slope = (212 − 32)/100 = 9/5 and the F-intercept is 32, so F = (9/5)C + 32.\nF = (9/5)(${fracT(C)}) + 32 = ${fmt(F)}°F` }); }
+  const F = pick(r, [68, 50, 77, 95, 41, 86]), C = Math.round(((5 / 9) * (F - 32)) * 10) / 10;
+  return a1numQ(r, { topic: 'Modeling with linear functions', stem: `Temperatures in degrees Fahrenheit and degrees Celsius have a linear relationship: F = (9/5)C + 32. A forecast shows a high of ${F}°F. What is this temperature in degrees Celsius? Round to the nearest tenth if necessary.`, val: C, dec: true, tol: 0.051, unit: '°C', wrongs: [F - 32, Math.round((9 / 5) * F + 32), Math.round(((5 / 9) * F - 32) * 10) / 10], solution: `C = (5/9)(F − 32) = (5/9)(${F} − 32) ${Number.isInteger(C) ? '=' : '≈'} ${fmt(C)}°C` });
+};
+
+// ---------- 1.5 Solving Linear Systems (three variables) ----------
+const b1det3 = (M) => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+const b1eqT = ([a, b, c, d], V = ['x', 'y', 'z']) => { const t = []; [a, b, c].forEach((k, i) => { if (!k) return; const s = Math.abs(k) === 1 ? V[i] : `${Math.abs(k)}${V[i]}`; t.push(t.length ? `${k < 0 ? '−' : '+'} ${s}` : `${k < 0 ? '−' : ''}${s}`); }); return `${t.join(' ')} = ${fracT(d)}`; };
+const b1tri = (raw) => { const s = (pxPlain(raw) || '').replace(/\s+/g, '').replace(/^\(|\)$/g, ''); const m = s.split(','); if (m.length !== 3) return null; const v = m.map(pxConst); return v.every(isFinite) ? v : null; };
+const b1triT = (p) => `(${p.map(fracT).join(', ')})`;
+function b1sysOk(raw, kind, sol) {
+  const w = pxWords(raw);
+  if (/infinit|many/.test(w)) return kind === 'inf';
+  if (/nosolution|none|nosol|empty/.test(w)) return kind === 'none';
+  const p = b1tri(raw); return kind === 'one' && !!p && p.every((v, i) => Math.abs(v - sol[i]) < 1e-6);
+}
+function b1sysGen(r, { kind = 'one', big = false, subst = false } = {}) {
+  const R = big ? 7 : 3, co = () => ri(r, -R, R);
+  for (let t = 0; t < 500; t++) {
+    const sol = [ri(r, -5, 5), ri(r, -5, 5), ri(r, -5, 5)];
+    let M = [[co(), co(), co()], [co(), co(), co()], [co(), co(), co()]];
+    if (M.some((row) => row.filter((x) => x).length < 2)) continue;
+    if (subst) { const j = ri(r, 0, 2), i = ri(r, 0, 2); M[i] = [0, 0, 0]; M[i][j] = 1; }
+    if (kind === 'one') { if (Math.abs(b1det3(M)) < 1) continue; return { M: M.map((row) => [...row, row[0] * sol[0] + row[1] * sol[1] + row[2] * sol[2]]), sol, kind }; }
+    const k1 = nz(r, -2, 2), k2 = nz(r, -2, 2); M = [M[0], M[1], M[0].map((x, i) => k1 * x + k2 * M[1][i])];
+    if (M[2].some((x) => Math.abs(x) > 12) || M[2].filter((x) => x).length < 2) continue;
+    const D = M.map((row) => row[0] * sol[0] + row[1] * sol[1] + row[2] * sol[2]);
+    const cr = [M[0][1] * M[1][2] - M[0][2] * M[1][1], M[0][2] * M[1][0] - M[0][0] * M[1][2], M[0][0] * M[1][1] - M[0][1] * M[1][0]]; if (cr.every((v) => !v)) continue;
+    if (kind === 'none') D[2] += nz(r, -4, 4);
+    return { M: M.map((row, i) => [...row, D[i]]), sol, kind };
+  }
+}
+function b1sysQ(r, { topic, stem, S, solution }) {
+  const c = S.kind === 'one' ? b1triT(S.sol) : S.kind === 'none' ? 'No solution' : 'Infinitely many solutions';
+  const W = [S.kind === 'one' ? 'No solution' : S.kind === 'none' ? 'Infinitely many solutions' : 'No solution', b1triT(S.kind === 'one' ? [S.sol[1], S.sol[0], S.sol[2]] : S.sol), b1triT(S.sol.map((v, i) => (i === 1 ? -v || 1 : v))), b1triT(S.sol.map((v, i) => (i === 2 ? v + 1 : v)))];
+  return { topic, stem, ...buildChoices(r, c, [...new Set(W)].filter((w) => w !== c), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'sys3', label: '(x, y, z) =' }], key: [S.kind === 'one' ? `\\left(${S.sol.join(',')}\\right)` : S.kind === 'none' ? '\\text{no solution}' : '\\text{infinitely many solutions}'], display: c, check: (v) => b1sysOk(v[0], S.kind, S.sol) }, solution };
+}
+const b1sysSol = (S) => (S.kind === 'one' ? `Eliminate one variable from two pairs of equations to get a system in two variables, solve it, and back-substitute.\nThe solution is ${b1triT(S.sol)}.\nCheck each equation by substituting ${b1triT(S.sol)}.` : S.kind === 'none' ? 'Combining the equations to eliminate variables leads to a false statement such as 0 = k (k ≠ 0), so the system has no solution.' : 'Combining the equations to eliminate variables leads to an identity 0 = 0 (one equation is a combination of the other two), so the system has infinitely many solutions.');
+TEMPLATES.b15Elim = (r) => { const S = b1sysGen(r, { kind: pick(r, ['one', 'one', 'one', 'none', 'inf']) }); return b1sysQ(r, { topic: 'Solving linear systems', stem: `Solve the system using the elimination method.   ${S.M.map((row) => b1eqT(row)).join(';   ')}`, S, solution: b1sysSol(S) }); };
+TEMPLATES.b15Subst = (r) => { const S = b1sysGen(r, { kind: 'one', subst: true }); return b1sysQ(r, { topic: 'Solving linear systems', stem: `Solve the system using the substitution method.   ${S.M.map((row) => b1eqT(row)).join(';   ')}`, S, solution: `Substitute the value given by the one-variable equation into the other two equations, solve the resulting two-variable system, then find the third variable.\nThe solution is ${b1triT(S.sol)}.` }); };
+function b1threeQ(r, { topic, stem, labels, vals, unit = '$', solution, dec = true }) {
+  const T = (v) => (unit === '$' ? b6money(v) : fmt(v)), c = labels.map((l, i) => `${l}: ${T(vals[i])}`).join(', '), oks = (v) => vals.map((x, i) => { const s = String(v[i] || '').replace(/,|\\\$|\$/g, ''); const y = pxConst(s); return isFinite(y) && Math.abs(y - x) < 0.006; });
+  const W = [[vals[1], vals[0], vals[2]], [vals[0], vals[2], vals[1]], vals.map((v) => v + (unit === '$' ? 1 : 1))].map((L) => labels.map((l, i) => `${l}: ${T(L[i])}`).join(', '));
+  return { topic, stem, ...buildChoices(r, c, W.filter((w) => w !== c), () => null),
+    fr: { fields: labels.map((l) => ({ kind: 'expr', keys: 'num', label: `${l}:`, ...(unit === '$' ? { prefix: '$' } : {}) })), key: vals.map((v) => String(v)), display: c, check: (v) => oks(v).every(Boolean), score: (v) => oks(v).filter(Boolean).length / vals.length }, solution };
+}
+TEMPLATES.b15Word = (r) => {
+  const kind = pick(r, ['furn', 'pizza', 'track', 'tickets']);
+  if (kind === 'furn') { const s = pick(r, [800, 900, 950, 1000]), l = pick(r, [400, 500, 450]), c = pick(r, [200, 250, 300]);
+    return b1threeQ(r, { topic: 'Linear systems in real life', stem: `A furniture store advertises: sofa and love seat $${(s + l).toLocaleString('en-US')}; sofa and two chairs $${(s + 2 * c).toLocaleString('en-US')}; sofa, love seat, and one chair $${(s + l + c).toLocaleString('en-US')}. What is the price of each piece of furniture?`, labels: ['Sofa', 'Love seat', 'Chair'], vals: [s, l, c],
+      solution: `s + l = ${s + l}, s + 2c = ${s + 2 * c}, s + l + c = ${s + l + c}.\nSubtract the first equation from the third: c = ${c}. Then s = ${s + 2 * c} − 2(${c}) = ${s}, and l = ${s + l} − ${s} = ${l}.` }); }
+  if (kind === 'pizza') { const p = pick(r, [4, 4.5, 5]), d = pick(r, [1.5, 2, 2.5]), s = pick(r, [2, 2.5, 3]), A = [2, 1, 1], B = [1, 1, 3], C = [3, 1, 2], tot = (X) => X[0] * p + X[1] * d + X[2] * s;
+    return b1threeQ(r, { topic: 'Linear systems in real life', stem: `Three orders are placed at a pizza shop. Two small pizzas, a liter of soda, and a salad cost ${b6money(tot(A))}; one small pizza, a liter of soda, and three salads cost ${b6money(tot(B))}; and three small pizzas, a liter of soda, and two salads cost ${b6money(tot(C))}. How much does each item cost?`, labels: ['Small pizza', 'Liter of soda', 'Salad'], vals: [p, d, s],
+      solution: `2p + d + s = ${fmt(tot(A))}, p + d + 3s = ${fmt(tot(B))}, 3p + d + 2s = ${fmt(tot(C))}.\nSubtracting pairs of equations eliminates d: p − 2s = ${fmt(tot(A) - tot(B))} and p + s = ${fmt(tot(C) - tot(A))}. So 3s = ${fmt(tot(C) - tot(A) - (tot(A) - tot(B)))}, s = ${fmt(s)}, p = ${fmt(p)}, d = ${fmt(d)}.` }); }
+  if (kind === 'track') { const f = ri(r, 4, 8), t = ri(r, 2, 6), s = f + t, n = f + s + t, pts = 5 * f + 3 * s + t;
+    return b1threeQ(r, { topic: 'Linear systems in real life', stem: `A high school track team won a meet with the help of ${n} individual-event placers earning a combined ${pts} points. A first-place finish earns 5 points, a second-place finish earns 3 points, and a third-place finish earns 1 point. The team had as many second-place finishers as first- and third-place finishers combined. How many athletes finished in each place?`, labels: ['First', 'Second', 'Third'], vals: [f, s, t], unit: '',
+      solution: `x + y + z = ${n}, 5x + 3y + z = ${pts}, y = x + z.\nSubstitute y = x + z into the first equation: 2y = ${n}, so y = ${s}. Then x + z = ${s} and 5x + z = ${pts - 3 * s}, so 4x = ${pts - 3 * s - s}, x = ${f}, z = ${t}.` }); }
+  const a = pick(r, [12, 15, 10]), st = pick(r, [8, 9, 7]), ch = pick(r, [5, 6, 4]), X = [2, 3, 1], Y = [1, 2, 3], Z = [3, 1, 2], tot = (V) => V[0] * a + V[1] * st + V[2] * ch;
+  return b1threeQ(r, { topic: 'Linear systems in real life', stem: `A theater sells adult, student, and child tickets. Group 1 buys 2 adult, 3 student, and 1 child ticket for $${tot(X)}. Group 2 buys 1 adult, 2 student, and 3 child tickets for $${tot(Y)}. Group 3 buys 3 adult, 1 student, and 2 child tickets for $${tot(Z)}. What is the price of each type of ticket?`, labels: ['Adult', 'Student', 'Child'], vals: [a, st, ch],
+    solution: `2a + 3s + c = ${tot(X)}, a + 2s + 3c = ${tot(Y)}, 3a + s + 2c = ${tot(Z)}.\nSolving the system gives a = ${a}, s = ${st}, c = ${ch}.` });
+};
+
+// ---------- 1.6 Solving Linear Systems Using Technology ----------
+const b1rowsT = (M) => M.map((row) => `[ ${row.slice(0, -1).map(fracT).join('  ')} | ${fracT(row[row.length - 1])} ]`).join('  ');
+const b1listOk = (raw, vals) => { const s = pxPlain(raw); if (s == null) return false; const P = s.replace(/\s+/g, '').replace(/^[[(]|[\])]$/g, '').replace(/\|/g, ',').split(/[,;]/).filter((x) => x !== ''); return P.length === vals.length && P.every((p, i) => Math.abs(pxConst(p) - vals[i]) < 1e-9); };
+const b1dimOk = (raw, m, n) => { const s = (pxPlain(raw) || '').toLowerCase().replace(/\s+/g, '').replace(/\*|×|by|x/g, '×'); const t = /^(\d+)×(\d+)$/.exec(s); return !!t && +t[1] === m && +t[2] === n; };
+TEMPLATES.b16Augment = (r) => {
+  const n3 = r() < 0.7, V = n3 ? ['x', 'y', 'z'] : ['x', 'y'], k = V.length;
+  let M; do { M = [...Array(k)].map(() => [...Array(k)].map(() => ri(r, -9, 9)).concat([ri(r, -15, 15)])); } while (M.some((row) => row.slice(0, k).filter((x) => x).length < 2));
+  // write each equation, sometimes with terms moved
+  const shown = M.map((row, i) => { if (i === 0 || r() < 0.5) return b1eqT(k === 3 ? row : [row[0], row[1], 0, row[2]], V.concat(['z']).slice(0, 3)); const j = row.findIndex((x, q) => q < k && x); const left = row.map((x, q) => (q === j || q === k ? 0 : x)), rhsVar = row[j];
+    const L = [...left.slice(0, k)]; const lhs = L.map((x, q) => [x, V[q]]).filter(([x]) => x).map(([x, v], q2) => `${q2 ? (x < 0 ? '− ' : '+ ') : x < 0 ? '−' : ''}${Math.abs(x) === 1 ? '' : Math.abs(x)}${v}`).join(' '); const rv = -rhsVar;
+    return `${lhs || '0'} = ${rv === 1 ? '' : rv === -1 ? '−' : fracT(rv)}${V[j]} ${row[k] < 0 ? '−' : '+'} ${Math.abs(row[k])}`.replace(' + 0', '').replace(' − 0', ''); });
+  const rows = M.map((row) => [...row.slice(0, k), row[k]]), c = `${b1rowsT(rows)};  ${k} × ${k + 1}`;
+  const oks = (v) => rows.map((row, i) => b1listOk(v[i], row)).concat([b1dimOk(v[k], k, k + 1)]);
+  return { topic: 'Augmented matrices', stem: `Write an augmented matrix for the system. Then state the dimensions.   ${shown.join(';   ')}`,
+    ...buildChoices(r, c, [`${b1rowsT(rows)};  ${k + 1} × ${k}`, `${b1rowsT(rows.map((row) => row.map((x, q) => (q === k ? -x : x))))};  ${k} × ${k + 1}`, `${b1rowsT(rows.map((row) => [...row.slice(1, k), row[0], row[k]]))};  ${k} × ${k + 1}`], () => null),
+    fr: { frStem: `Write an augmented matrix for the system. Then state the dimensions. Enter each row's entries separated by commas (coefficients of ${V.join(', ')}, then the constant).   ${shown.join(';   ')}`, fields: rows.map((_, i) => ({ kind: 'expr', keys: 'mat', label: `Row ${i + 1}:` })).concat([{ kind: 'expr', keys: 'num', label: 'Dimensions (rows × columns):' }]), key: rows.map((row) => row.join(',')).concat([`${k}\\times${k + 1}`]), display: c, check: (v) => oks(v).every(Boolean), score: (v) => oks(v).filter(Boolean).length / (k + 1) },
+    solution: `Write each equation in standard form (variables in the order ${V.join(', ')} on the left, constant on the right). Each row lists the coefficients and the constant.\n${b1rowsT(rows)}\nThe matrix has ${k} rows and ${k + 1} columns: ${k} × ${k + 1}.` };
+};
+TEMPLATES.b16Solve = (r) => { const S = b1sysGen(r, { kind: pick(r, ['one', 'one', 'one', 'one', 'none', 'inf']), big: true }); return b1sysQ(r, { topic: 'Solving systems with technology', stem: `Use technology (an augmented matrix and reduced row-echelon form) to solve the system.   ${S.M.map((row) => b1eqT(row)).join(';   ')}`, S, solution: `Enter the augmented matrix ${b1rowsT(S.M)} and find its reduced row-echelon form.\n${S.kind === 'one' ? `The rref shows x = ${S.sol[0]}, y = ${S.sol[1]}, z = ${S.sol[2]}: the solution is ${b1triT(S.sol)}.` : S.kind === 'none' ? 'The rref has a row [0 0 0 | 1], which means 0 = 1: no solution.' : 'The rref has a row of all zeros, so a variable is free: infinitely many solutions.'}`.replace(/-(\d)/g, '−$1') }); };
+TEMPLATES.b16Word = (r) => {
+  const m = pick(r, [5, 6, 7.5]), p = pick(r, [3.5, 4, 2.5]), d = pick(r, [12, 15, 10]), A = [2, 1, 0], B = [2, 2, 1], C = [4, 3, 2], tot = (X) => X[0] * m + X[1] * p + X[2] * d;
+  return b1threeQ(r, { topic: 'Solving systems with technology', stem: `A company sells three types of gift baskets. The basic basket has two movie passes and one package of popcorn and costs ${b6money(tot(A))}. The medium basket has two movie passes, two packages of popcorn, and one DVD and costs ${b6money(tot(B))}. The super basket has four movie passes, three packages of popcorn, and two DVDs and costs ${b6money(tot(C))}. Use an augmented matrix and technology to find the cost of each item.`, labels: ['Movie pass', 'Popcorn', 'DVD'], vals: [m, p, d],
+    solution: `Augmented matrix: [2 1 0 | ${fmt(tot(A))}]  [2 2 1 | ${fmt(tot(B))}]  [4 3 2 | ${fmt(tot(C))}]\nThe reduced row-echelon form gives a movie pass ${b6money(m)}, popcorn ${b6money(p)}, and a DVD ${b6money(d)}.` });
+};
+
+// ---------- 1.7 Basic Matrix Operations ----------
+// draw a row of matrices and symbols: items are strings or { M } objects
+const b1matDraw = (items) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h; c.clearRect(0, 0, W, H); c.fillStyle = '#1d1d1b'; c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.4; c.textBaseline = 'middle';
+  const fs = 16, rh = 26, cw = (M) => Math.max(...M.flat().map((x) => { c.font = `${fs}px Georgia, serif`; return c.measureText(typeof x === 'string' ? x : fracT(x)).width; })) + 14;
+  c.font = `${fs}px Georgia, serif`;
+  const widths = items.map((it) => (typeof it === 'string' ? c.measureText(it).width + 10 : cw(it.M) * it.M[0].length + 16));
+  let x = Math.max(8, (W - widths.reduce((s, w) => s + w, 0)) / 2); const cy = H / 2;
+  items.forEach((it, i) => {
+    if (typeof it === 'string') { c.textAlign = 'left'; c.fillText(it, x + 5, cy); x += widths[i]; return; }
+    const M = it.M, w = cw(M), h = rh * M.length, top = cy - h / 2;
+    c.beginPath(); c.moveTo(x + 6, top); c.lineTo(x + 2, top); c.lineTo(x + 2, top + h); c.lineTo(x + 6, top + h); c.stroke();
+    const xr = x + widths[i] - 2; c.beginPath(); c.moveTo(xr - 4, top); c.lineTo(xr, top); c.lineTo(xr, top + h); c.lineTo(xr - 4, top + h); c.stroke();
+    c.textAlign = 'center'; M.forEach((row, ri2) => row.forEach((e, ci) => c.fillText(typeof e === 'string' ? e : fracT(e), x + 8 + w * ci + w / 2, top + rh * ri2 + rh / 2)));
+    x += widths[i];
+  });
+};
+const b1matT = (M) => `[${M.map((row) => row.map(fracT).join(', ')).join('; ')}]`;
+const b1matL = (M) => M.map((row) => row.map((v) => fracL(v)).join(',')).join(';');
+function b1matParse(raw) {
+  const s = pxPlain(String(raw || '').replace(/\\\\/g, ';')); if (s == null) return null;
+  const rows = s.replace(/\s+/g, '').replace(/^\[|\]$/g, '').split(';').filter((x) => x !== '');
+  const M = rows.map((row) => row.replace(/^\[|\]$/g, '').split(',').map(pxConst)); return M.every((row) => row.every(isFinite)) ? M : null;
+}
+const b1matOk = (raw, M) => { if (M === null) return /notpossible|impossible|undefined|notdefined|cannot/.test(pxWords(raw)); const P = b1matParse(raw); return !!P && P.length === M.length && P.every((row, i) => row.length === M[i].length && row.every((v, j) => Math.abs(v - M[i][j]) < 1e-9)); };
+const b1rand = (r, m, n, R = 9) => [...Array(m)].map(() => [...Array(n)].map(() => ri(r, -R, R)));
+const b1mop = (A, B, f) => A.map((row, i) => row.map((v, j) => b1R(f(v, B ? B[i][j] : 0))));
+function b1matQ(r, { topic, stem, items, M, wrongs = [], solution, size }) {
+  const c = M === null ? 'Not possible' : b1matT(M), W = [...new Set(wrongs.filter(Boolean).map((w) => (w === 'NP' ? 'Not possible' : b1matT(w))))].filter((w) => w !== c);
+  return { topic, stem, draw: b1matDraw(items), size: size || [520, M ? 40 + 26 * Math.max(...items.filter((it) => it.M).map((it) => it.M.length)) : 140], ...buildChoices(r, c, W, (i) => b1matT(M ? M.map((row) => row.map((v) => v + i + 1)) : [[i + 1]])),
+    fr: { frStem: `${stem} Enter the matrix row by row: separate entries with commas and rows with semicolons (for example 1, 2; 3, 4). If the operation is not possible, type "not possible".`, fields: [{ kind: 'expr', keys: 'mat', label: '' }], key: [M === null ? '\\text{not possible}' : b1matL(M)], display: c, check: (v) => b1matOk(v[0], M) }, solution };
+}
+TEMPLATES.b17AddSub = (r) => {
+  const m = pick(r, [2, 2, 3]), n = pick(r, [1, 2, 2, 3]), bad = r() < 0.2, op = pick(r, ['+', '−']), A = b1rand(r, m, n), B = bad ? b1rand(r, m === 2 ? 3 : 2, n) : b1rand(r, m, n);
+  const M = bad ? null : b1mop(A, B, op === '+' ? (x, y) => x + y : (x, y) => x - y);
+  return b1matQ(r, { topic: 'Adding and subtracting matrices', stem: 'Perform the indicated operation, if possible. If not possible, explain why not.', items: [{ M: A }, op, { M: B }], M,
+    wrongs: bad ? [b1rand(r, m, n), b1rand(r, m, n), b1rand(r, B.length, n)] : ['NP', b1mop(A, B, op === '+' ? (x, y) => x - y : (x, y) => x + y), b1mop(A, B, op === '+' ? (x, y) => x + y + 1 : (x, y) => y - x)],
+    solution: bad ? `The matrices have different dimensions (${m} × ${n} and ${B.length} × ${n}), so they cannot be ${op === '+' ? 'added' : 'subtracted'}.` : `${op === '+' ? 'Add' : 'Subtract'} corresponding entries.\n${b1matT(M)}` });
+};
+TEMPLATES.b17Scalar = (r) => {
+  const m = pick(r, [2, 3]), n = pick(r, [2, 3]), A = b1rand(r, m, n, 8), k = pick(r, [3, -4, 6, -2, 1 / 2, 5]); let A2 = A;
+  if (k === 1 / 2) A2 = A.map((row) => row.map((v) => 2 * Math.round(v / 2)));
+  if (r() < 0.5) { const M = b1mop(A2, null, (x) => x * k);
+    return b1matQ(r, { topic: 'Scalar multiplication', stem: 'Perform the indicated operation.', items: [k === 1 / 2 ? '½' : fmt(k), { M: A2 }], M, wrongs: [b1mop(A2, null, (x) => x + k), b1mop(A2, null, (x) => -x * k), A2.map((row, i) => row.map((v, j) => (i === 0 ? v * k : v)))], solution: `Multiply every entry by ${fracT(k)}.\n${b1matT(M)}` }); }
+  const B = b1rand(r, m, n, 8), a = pick(r, [6, 7, 2, 3]), b = pick(r, [-3, 4, -2, 3]), M = b1mop(A, B, (x, y) => a * x + b * y);
+  return b1matQ(r, { topic: 'Scalar multiplication', stem: 'Perform the indicated operations.', items: [String(a), { M: A }, b < 0 ? '−' : '+', String(Math.abs(b)), { M: B }], M, wrongs: [b1mop(A, B, (x, y) => a * x - b * y), b1mop(A, B, (x, y) => a * x + y), b1mop(A, B, (x, y) => x + b * y)], solution: `Multiply each matrix by its scalar, then ${b < 0 ? 'subtract' : 'add'} corresponding entries.\n${b1matT(M)}` });
+};
+TEMPLATES.b17Expr = (r) => {
+  const A = b1rand(r, 2, 2), B = b1rand(r, 2, 2), C = b1rand(r, 2, 2), E = pick(r, [['A + B', (a, b, c) => a + b], ['2B − C', (a, b, c) => 2 * b - c], ['B − A', (a, b, c) => b - a], ['C + 2A', (a, b, c) => c + 2 * a], ['A + B + 10C', (a, b, c) => a + b + 10 * c], ['2B − 10C + A', (a, b, c) => 2 * b - 10 * c + a]]);
+  const M = A.map((row, i) => row.map((v, j) => E[1](v, B[i][j], C[i][j])));
+  return b1matQ(r, { topic: 'Matrix expressions', stem: `Use the given matrices to evaluate the expression.   ${E[0]}`, items: ['A =', { M: A }, ',  B =', { M: B }, ',  C =', { M: C }], M, size: [560, 100],
+    wrongs: [A.map((row, i) => row.map((v, j) => E[1](B[i][j], v, C[i][j]))), M.map((row) => row.map((v) => -v)), A.map((row, i) => row.map((v, j) => E[1](v, B[i][j], -C[i][j])))], solution: `Apply the operations entry by entry.\n${E[0]} = ${b1matT(M)}` });
+};
+TEMPLATES.b17Solve = (r) => {
+  const vals = { a: nz(r, -9, 9), b: nz(r, -9, 9), c: nz(r, -9, 9), d: nz(r, -9, 9) }, names = shuffle(r, ['a', 'b', 'c', 'd']), cells = [];
+  const L = [[0, 0], [0, 0]], R = [[0, 0], [0, 0]];
+  names.forEach((v, i) => { const pos = [Math.floor(i / 2), i % 2], form = pick(r, ['plain', 'plus', 'mult', 'minus']), k = form === 'mult' ? pick(r, [2, 3, 4, 5]) : ri(r, 2, 18), x = vals[v];
+    L[pos[0]][pos[1]] = form === 'plain' ? v : form === 'plus' ? `${v} + ${k}` : form === 'mult' ? `${k}${v}` : `${k} − ${v}`; R[pos[0]][pos[1]] = form === 'plain' ? x : form === 'plus' ? x + k : form === 'mult' ? k * x : k - x; cells.push([v, L[pos[0]][pos[1]], R[pos[0]][pos[1]]]); });
+  const order = ['a', 'b', 'c', 'd'], oks = (v) => order.map((n, i) => numOk(String(v[i] || '').replace(/^[a-d]\s*=/, ''), vals[n])), c = order.map((n) => `${n} = ${fracT(vals[n])}`).join(', ');
+  return { topic: 'Matrix equations', stem: 'Solve the matrix equation for a, b, c, and d.', draw: b1matDraw([{ M: L.map((row) => row.map((e) => (typeof e === 'string' ? e : fracT(e)))) }, '=', { M: R }]), size: [420, 90],
+    ...buildChoices(r, c, [order.map((n) => `${n} = ${fracT(-vals[n])}`).join(', '), order.map((n, i) => `${n} = ${fracT(cells.find((q) => q[0] === n)[2])}`).join(', '), order.map((n, i) => `${n} = ${fracT(vals[order[(i + 1) % 4]])}`).join(', ')].filter((w) => w !== c), () => null),
+    fr: { fields: order.map((n) => ({ kind: 'expr', keys: 'num', label: `${n} =` })), key: order.map((n) => fracL(vals[n])), display: c, check: (v) => oks(v).every(Boolean), score: (v) => oks(v).filter(Boolean).length / 4 },
+    solution: `Equal matrices have equal corresponding entries:\n${cells.map(([v, e, x]) => `${e} = ${fracT(x)} → ${v} = ${fracT(vals[v])}`).join('\n')}`.replace(/-(\d)/g, '−$1') };
+};
+TEMPLATES.b17FindX = (r) => {
+  const A = b1rand(r, 2, 2), Xs = b1rand(r, 2, 2), form = pick(r, ['plus', 'minus', 'neg', 'two']);
+  const B = Xs.map((row, i) => row.map((x, j) => (form === 'plus' ? x + A[i][j] : form === 'minus' ? x - A[i][j] : form === 'neg' ? -x + A[i][j] : 2 * x + A[i][j])));
+  const lhs = { plus: 'X +', minus: 'X −', neg: '−X +', two: '2X +' }[form];
+  return b1matQ(r, { topic: 'Matrix equations', stem: 'Find the matrix X that makes the equation true.', items: [lhs, { M: A }, '=', { M: B }], M: Xs, wrongs: [b1mop(B, A, (b, a) => b + a), b1mop(B, A, (b, a) => (form === 'two' ? b - a : -(b - a))), b1mop(B, A, (b, a) => (form === 'two' ? (b + a) / 2 : a - b))].map((W) => (W.every((row) => row.every(Number.isInteger)) ? W : null)),
+    solution: `${form === 'plus' ? 'X = B − A' : form === 'minus' ? 'X = B + A' : form === 'neg' ? 'X = A − B' : '2X = B − A, so X = (B − A)/2'} (where A and B are the matrices on the left and right).\nX = ${b1matT(Xs)}` });
+};
+TEMPLATES.b17Word = (r) => {
+  const C = pick(r, [['Amount of Snow (inches)', ['City A', 'City B', 'City C'], ['January', 'February'], 'the change in the amount of snow from 2018 to 2019', '2018', '2019'], ['Sales (thousands of dollars)', ['Store A', 'Store B'], ['Shirts', 'Pants', 'Shoes'], 'the change in sales from last year to this year', 'Last year', 'This year']]);
+  const [title, rowsN, colsN, what, y1, y2] = C, A = rowsN.map(() => colsN.map(() => ri(r, 2, 50))), B = A.map((row) => row.map((v) => Math.max(1, v + ri(r, -15, 15)))), M = b1mop(B, A, (b, a) => b - a);
+  return b1matQ(r, { topic: 'Matrices in real life', stem: `The table shows ${title.toLowerCase()} for ${y1.toLowerCase()} and ${y2.toLowerCase()}. Organize the data using two matrices (rows: ${rowsN.join(', ')}; columns: ${colsN.join(', ')}). Then find the matrix that gives ${what}.`, items: [`${y1}:`, { M: A }, `   ${y2}:`, { M: B }], M, size: [560, 40 + 26 * rowsN.length], wrongs: [b1mop(A, B, (a, b) => a - b), b1mop(A, B, (a, b) => a + b)],
+    solution: `Subtract the ${y1.toLowerCase()} matrix from the ${y2.toLowerCase()} matrix.\n${b1matT(M)}\nPositive entries are increases; negative entries are decreases.` });
+};
+
+// ---------- 1.8 Systems of Linear Inequalities ----------
+const B1M = [1, 2, -1, -2, 1 / 2, -1 / 2, 3, -3, 0];
+const b1ineqT = ({ m, b, op }) => `y ${op} ${lineText(m, b).slice(4)}`;
+const b1ineqL = ({ m, b, op }) => `y${{ '<': '<', '>': '>', '≤': '\\le ', '≥': '\\ge ' }[op]}${b1LL(b1R(m), b1R(b)).replace(/^0$/, '0')}`;
+const b1sat = (I, x, y) => a6test(I.op, y, I.m * x + I.b);
+const b1sysDraw = (L) => (cv) => {
+  drawPlot(cv, { xr: [-6, 6], yr: [-6, 6] });
+  const ctx = cv._ctx, W = cv._w, H = cv._h, mg = 26, sc = Math.min((W - 2 * mg) / 12, (H - 2 * mg) / 12), ox = (W - sc * 12) / 2, oy = (H - sc * 12) / 2, X = (x) => ox + (x + 6) * sc, Y = (y) => oy + (6 - y) * sc;
+  ctx.save(); ctx.beginPath(); ctx.rect(X(-6), Y(6), 12 * sc, 12 * sc); ctx.clip();
+  L.forEach((I) => { const above = I.op === '>' || I.op === '≥', yb = above ? 40 : -40; ctx.beginPath(); ctx.moveTo(X(-7), Y(I.m * -7 + I.b)); ctx.lineTo(X(7), Y(I.m * 7 + I.b)); ctx.lineTo(X(7), Y(yb)); ctx.lineTo(X(-7), Y(yb)); ctx.closePath(); ctx.clip(); });
+  ctx.fillStyle = 'rgba(31,95,168,0.22)'; ctx.fillRect(0, 0, W, H); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(X(-6), Y(6), 12 * sc, 12 * sc); ctx.clip();
+  L.forEach((I) => { ctx.strokeStyle = '#1f5fa8'; ctx.lineWidth = 2.4; ctx.setLineDash(I.op === '<' || I.op === '>' ? [9, 7] : []); ctx.beginPath(); ctx.moveTo(X(-7), Y(I.m * -7 + I.b)); ctx.lineTo(X(7), Y(I.m * 7 + I.b)); ctx.stroke(); });
+  ctx.restore();
+};
+const b1sysPick = (r) => { for (let t = 0; t < 200; t++) { const A = { m: pick(r, B1M), b: ri(r, -3, 3), op: pick(r, a6ops) }, B = { m: pick(r, B1M), b: ri(r, -3, 3), op: pick(r, a6ops) }; if (A.m === B.m) continue; const xi = (B.b - A.b) / (A.m - B.m); if (Math.abs(xi) > 4 || Math.abs(A.m * xi + A.b) > 4) continue; let n = 0; for (let x = -5; x <= 5; x++) for (let y = -5; y <= 5; y++) if (b1sat(A, x, y) && b1sat(B, x, y)) n++; if (n < 8) continue; return [A, B]; } return null; };
+TEMPLATES.b18IsSol = (r) => {
+  const L = b1sysPick(r), want = r() < 0.5; let P; for (let t = 0; t < 400; t++) { const p = [ri(r, -6, 6), ri(r, -6, 6)]; if ((L.every((I) => b1sat(I, ...p))) === want) { P = p; break; } }
+  if (!P) return TEMPLATES.b18IsSol(r);
+  const ok = L.every((I) => b1sat(I, ...P));
+  return b6sel(r, 'Systems of linear inequalities', `Tell whether the ordered pair is a solution of the system of linear inequalities.   ${ptT(P)};   ${L.map(b1ineqT).join(',   ')}`, ['Yes', 'No'], ok ? 'Yes' : 'No',
+    L.map((I) => `${b1ineqT(I).replace(/x/g, `(${fracT(P[0])})`).replace(/^y/, fracT(P[1]))}: ${b1sat(I, ...P) ? 'true' : 'false'}`).join('\n') + `\n${ok ? 'Both inequalities are true, so it is a solution.' : 'At least one inequality is false, so it is not a solution.'}`);
+};
+TEMPLATES.b18Graph = (r) => {
+  const L = b1sysPick(r), want = r() < 0.5; let P; for (let t = 0; t < 400; t++) { const p = [ri(r, -5, 5), ri(r, -5, 5)]; if (L.every((I) => Math.abs(p[1] - (I.m * p[0] + I.b)) > 0.1) && (L.every((I) => b1sat(I, ...p))) === want) { P = p; break; } }
+  if (!P) return TEMPLATES.b18Graph(r);
+  return b6sel(r, 'Systems of linear inequalities', `The graph of a system of linear inequalities is shown. Tell whether ${ptT(P)} is a solution of the system.`, ['Yes', 'No'], want ? 'Yes' : 'No', want ? `${ptT(P)} lies in the region shaded for both inequalities, so it is a solution.` : `${ptT(P)} is not in the region where the shadings overlap, so it is not a solution.`, { draw: b1sysDraw(L), size: [340, 340] });
+};
+TEMPLATES.b18Write = (r) => {
+  const L = b1sysPick(r), oks = (v) => { const a = L.map((I) => a6ok(v[0], I.m, I.b, I.op)), b = L.map((I) => a6ok(v[1], I.m, I.b, I.op)); return [(a[0] && b[1]) || (a[1] && b[0]), a[0] || a[1], b[0] || b[1]]; };
+  const c = L.map(b1ineqT).join(';  '), W = [L.map((I) => b1ineqT({ ...I, op: a6flip[I.op] })).join(';  '), L.map((I, i) => b1ineqT(i ? I : { ...I, op: a6flip[I.op] })).join(';  '), L.map((I) => b1ineqT({ ...I, op: I.op === '<' ? '≤' : I.op === '≤' ? '<' : I.op === '>' ? '≥' : '>' })).join(';  ')];
+  return { topic: 'Systems of linear inequalities', stem: 'Write a system of linear inequalities represented by the graph.', draw: b1sysDraw(L), size: [340, 340], ...buildChoices(r, c, W.filter((w) => w !== c), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'ineq', label: 'Inequality 1:' }, { kind: 'expr', keys: 'ineq', label: 'Inequality 2:' }], key: L.map(b1ineqL), display: c, check: (v) => oks(v)[0], score: (v) => { const o = oks(v); return o[0] ? 1 : ((o[1] ? 1 : 0) + (o[2] ? 1 : 0)) / 2; } },
+    solution: L.map((I) => `Boundary y = ${lineText(I.m, I.b).slice(4)} is ${I.op === '<' || I.op === '>' ? 'dashed' : 'solid'} with the region ${I.op === '>' || I.op === '≥' ? 'above' : 'below'} shaded: ${b1ineqT(I)}`).join('\n') };
+};
+TEMPLATES.b18Point = (r) => {
+  const L = b1sysPick(r), ok = (raw) => { const s = (pxPlain(raw) || '').replace(/\s+/g, '').replace(/^\(|\)$/g, '').split(','); if (s.length !== 2) return false; const p = s.map(pxConst); return p.every(isFinite) && L.every((I) => b1sat(I, ...p)); };
+  const inside = []; for (let x = -5; x <= 5; x++) for (let y = -5; y <= 5; y++) if (L.every((I) => b1sat(I, x, y) && Math.abs(y - (I.m * x + I.b)) > 0.1)) inside.push([x, y]);
+  const outside = []; for (let x = -5; x <= 5; x++) for (let y = -5; y <= 5; y++) if (!L.every((I) => b1sat(I, x, y))) outside.push([x, y]);
+  const P = pick(r, inside), W = shuffle(r, outside).slice(0, 3).map(ptT);
+  return { topic: 'Systems of linear inequalities', stem: `Graph the system. Then identify a solution.   ${L.map(b1ineqT).join(',   ')}`, ...buildChoices(r, ptT(P), W, () => null),
+    fr: { frStem: `Graph the system on your paper or in your work space. Then identify any one solution (x, y).   ${L.map(b1ineqT).join(',   ')}`, fields: [{ kind: 'expr', keys: 'pts2', label: '(x, y) =' }], key: [`\\left(${P[0]},${P[1]}\\right)`], display: `any point in the overlap, such as ${ptT(P)}`, check: (v) => ok(v[0]) },
+    solution: `Graph both boundary lines (${L.map((I) => `${I.op === '<' || I.op === '>' ? 'dashed' : 'solid'} y = ${lineText(I.m, I.b).slice(4)}`).join(' and ')}) and shade the overlap of the two half-planes.\nOne solution is ${ptT(P)}: ${L.map((I) => b1ineqT(I).replace(/x/g, `(${fracT(P[0])})`).replace(/^y/, fracT(P[1]))).join(' and ')} are both true.` };
+};
+TEMPLATES.b18Which = (r) => {
+  const L = b1sysPick(r), c = L.map(b1ineqT).join(';  '), W = [L.map((I) => b1ineqT({ ...I, op: a6flip[I.op] })).join(';  '), L.map((I, i) => b1ineqT(i ? { ...I, op: a6flip[I.op] } : I)).join(';  '), L.map((I, i) => b1ineqT(i ? I : { ...I, op: a6flip[I.op] })).join(';  ')];
+  return { topic: 'Systems of linear inequalities', stem: 'Which system of inequalities is represented by the graph?', draw: b1sysDraw(L), size: [340, 340], ...buildChoices(r, c, W, () => null), fr: FR.select('System:', shuffle(r, [c, ...W]), c), solution: L.map((I) => `${I.op === '<' || I.op === '>' ? 'Dashed' : 'Solid'} line y = ${lineText(I.m, I.b).slice(4)} with the region ${I.op === '>' || I.op === '≥' ? 'above' : 'below'} shaded: ${b1ineqT(I)}`).join('\n') };
+};
+TEMPLATES.b18Word = (r) => {
+  const p1 = pick(r, [10, 12]), p2 = pick(r, [15, 18]), min1 = pick(r, [8, 6]), cap = pick(r, [20, 24]), goal = pick(r, [120, 150]), x = ri(r, 4, 16), y = ri(r, 0, 12);
+  const ok = x >= min1 && x + y <= cap && p1 * x + p2 * y >= goal;
+  return b6sel(r, 'Systems of linear inequalities', `You earn $${p1} per hour working at a grocery store and must work there at least ${min1} hours per week. You also teach music lessons for $${p2} per hour. Between the two jobs, you need to earn at least $${goal} per week and work no more than ${cap} hours per week. The system x ≥ ${min1}, x + y ≤ ${cap}, ${p1}x + ${p2}y ≥ ${goal} represents the situation, where x is grocery hours and y is music hours. Can you work ${x} hours at the grocery store and ${y} hours teaching lessons?`, ['Yes', 'No'], ok ? 'Yes' : 'No',
+    `x ≥ ${min1}: ${x} ≥ ${min1} is ${x >= min1}.\nx + y ≤ ${cap}: ${x + y} ≤ ${cap} is ${x + y <= cap}.\n${p1}x + ${p2}y ≥ ${goal}: ${p1 * x + p2 * y} ≥ ${goal} is ${p1 * x + p2 * y >= goal}.\n${ok ? 'All three are true, so yes.' : 'At least one is false, so no.'}`);
+};
+for (const name of Object.keys(TEMPLATES)) if (/^b1\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+TEMPLATES.b14LineFit = (r) => TEMPLATES.a45LineFit(r);
+TEMPLATES.b14Correlation = (r) => TEMPLATES.a46Correlation(r);
+TEMPLATES.b14Perp = (r) => TEMPLATES.a44PerpThrough(r);
+/* ==== ALGEBRA 2 CH1 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -21020,6 +21477,14 @@ Object.assign(SETS, {
   'alg1-9-6': { subject: 'algebra1', title: '9.6 Permutations and Combinations', items: [['a96Arrange', 2], ['a96Perm', 2], ['a96Comb', 2], ['a96Count', 3], ['a96Prob', 2]] },
   'alg1-9-7': { subject: 'algebra1', title: '9.7 Binomial Distributions', items: [['a97Dist', 2], ['a97Read', 2], ['a97Coin', 3], ['a97Binom', 3]] },
   // ----- Algebra II, Chapter 3: Quadratic Equations and Complex Numbers -----
+  'alg2-1-1': { subject: 'algebra2', title: '1.1 Interval Notation and Set Notation', items: [['b11ToInterval', 3], ['b11FromGraph', 2], ['b11ToSetBuilder', 3], ['b11Graph', 2], ['b11Word', 1]] },
+  'alg2-1-2': { subject: 'algebra2', title: '1.2 Parent Functions and Transformations', items: [['b12Family', 2], ['b12Describe', 3], ['b12Multi', 3], ['b12DomainRange', 2], ['b12Figure', 1]] },
+  'alg2-1-3': { subject: 'algebra2', title: '1.3 Transformations of Linear and Absolute Value Functions', items: [['b13Translate', 3], ['b13Reflect', 2], ['b13Stretch', 2], ['b13Combo', 2], ['b13Graph', 2], ['b13Word', 1]] },
+  'alg2-1-4': { subject: 'algebra2', title: '1.4 Modeling with Linear Functions', items: [['b14Graph', 2], ['b14Table', 1], ['b14Temp', 1], ['b14LineFit', 2], ['b14Correlation', 1], ['b14Perp', 1]] },
+  'alg2-1-5': { subject: 'algebra2', title: '1.5 Solving Linear Systems', items: [['b15Elim', 4], ['b15Subst', 2], ['b15Word', 2]] },
+  'alg2-1-6': { subject: 'algebra2', title: '1.6 Solving Linear Systems Using Technology', items: [['b16Augment', 3], ['b16Solve', 3], ['b16Word', 1]] },
+  'alg2-1-7': { subject: 'algebra2', title: '1.7 Basic Matrix Operations', items: [['b17AddSub', 3], ['b17Scalar', 2], ['b17Expr', 2], ['b17Solve', 2], ['b17FindX', 2], ['b17Word', 1]] },
+  'alg2-1-8': { subject: 'algebra2', title: '1.8 Systems of Linear Inequalities', items: [['b18IsSol', 2], ['b18Graph', 2], ['b18Write', 2], ['b18Point', 2], ['b18Which', 1], ['b18Word', 1]] },
   'alg2-3-1': { subject: 'algebra2', title: '3.1 Factoring ax² + bx + c', items: [['b31GCF', 2], ['b31Factor', 4], ['b31Solve', 3], ['b31Intercepts', 1], ['b31Word', 2]] },
   'alg2-3-2': { subject: 'algebra2', title: '3.2 Factoring Special Products', items: [['b32DiffSq', 3], ['b32Mental', 1], ['b32PerfSq', 3], ['b32Mixed', 2], ['b32Solve', 2], ['b32Word', 1]] },
   'alg2-3-3': { subject: 'algebra2', title: '3.3 Solving Quadratic Equations', items: [['b33SqRoot', 3], ['b33Factor', 3], ['b33Zeros', 2], ['b33Any', 2], ['b33Revenue', 1], ['b33GraphSolve', 3]] },
@@ -21360,6 +21825,46 @@ QUESTION_TYPES.push(
   { id: 'a97Read', subject: 'algebra1', section: '9.7 Binomial Distributions', label: 'Read a probability histogram', desc: '#5–6' },
   { id: 'a97Coin', subject: 'algebra1', section: '9.7 Binomial Distributions', label: 'Heads in n coin flips', desc: '#7–10' },
   { id: 'a97Binom', subject: 'algebra1', section: '9.7 Binomial Distributions', label: 'Binomial probabilities', desc: '#11–12' },
+  { id: 'b11ToInterval', subject: 'algebra2', section: '1.1 Interval Notation and Set Notation', label: 'Write an interval in interval notation', desc: '#1–4, 9, 10' },
+  { id: 'b11FromGraph', subject: 'algebra2', section: '1.1 Interval Notation and Set Notation', label: 'Interval notation from a graph', desc: '#5–8' },
+  { id: 'b11ToSetBuilder', subject: 'algebra2', section: '1.1 Interval Notation and Set Notation', label: 'Set-builder notation', desc: '#15–22' },
+  { id: 'b11Graph', subject: 'algebra2', section: '1.1 Interval Notation and Set Notation', label: 'Graph a set of numbers', desc: '#11–14' },
+  { id: 'b11Word', subject: 'algebra2', section: '1.1 Interval Notation and Set Notation', label: 'Interval and set-builder notation in real life', desc: '#25, 26, 28' },
+  { id: 'b12Family', subject: 'algebra2', section: '1.2 Parent Functions and Transformations', label: 'Identify the function family', desc: '#1–6' },
+  { id: 'b12Describe', subject: 'algebra2', section: '1.2 Parent Functions and Transformations', label: 'Describe a transformation', desc: '#7–24' },
+  { id: 'b12Multi', subject: 'algebra2', section: '1.2 Parent Functions and Transformations', label: 'Describe several transformations', desc: '#25–32' },
+  { id: 'b12DomainRange', subject: 'algebra2', section: '1.2 Parent Functions and Transformations', label: 'Function family, domain, and range', desc: '#37–42' },
+  { id: 'b12Figure', subject: 'algebra2', section: '1.2 Parent Functions and Transformations', label: 'Transform a figure', desc: '#35, 36' },
+  { id: 'b13Translate', subject: 'algebra2', section: '1.3 Transformations of Linear and Absolute Value Functions', label: 'Write a translation', desc: '#1–4' },
+  { id: 'b13Reflect', subject: 'algebra2', section: '1.3 Transformations of Linear and Absolute Value Functions', label: 'Write a reflection', desc: '#9–14' },
+  { id: 'b13Stretch', subject: 'algebra2', section: '1.3 Transformations of Linear and Absolute Value Functions', label: 'Write a stretch or shrink', desc: '#15–20' },
+  { id: 'b13Combo', subject: 'algebra2', section: '1.3 Transformations of Linear and Absolute Value Functions', label: 'Write combined transformations', desc: '#27–30' },
+  { id: 'b13Graph', subject: 'algebra2', section: '1.3 Transformations of Linear and Absolute Value Functions', label: 'Write a transformation from a graph', desc: '#5, 6, 21, 22, 31, 32' },
+  { id: 'b13Word', subject: 'algebra2', section: '1.3 Transformations of Linear and Absolute Value Functions', label: 'Transformations in real life', desc: '#35, 36' },
+  { id: 'b14Graph', subject: 'algebra2', section: '1.4 Modeling with Linear Functions', label: 'Write an equation from a graph', desc: '#1–6' },
+  { id: 'b14Table', subject: 'algebra2', section: '1.4 Modeling with Linear Functions', label: 'Write an equation from a table', desc: '#7, 8' },
+  { id: 'b14Temp', subject: 'algebra2', section: '1.4 Modeling with Linear Functions', label: 'Temperature conversion model', desc: '#10' },
+  { id: 'b14LineFit', subject: 'algebra2', section: '1.4 Modeling with Linear Functions', label: 'Line of fit', desc: '#11–16' },
+  { id: 'b14Correlation', subject: 'algebra2', section: '1.4 Modeling with Linear Functions', label: 'Correlation coefficient', desc: '#17–20, 24' },
+  { id: 'b14Perp', subject: 'algebra2', section: '1.4 Modeling with Linear Functions', label: 'Perpendicular lines', desc: '#25' },
+  { id: 'b15Elim', subject: 'algebra2', section: '1.5 Solving Linear Systems', label: 'Solve a system by elimination', desc: '#1–12' },
+  { id: 'b15Subst', subject: 'algebra2', section: '1.5 Solving Linear Systems', label: 'Solve a system by substitution', desc: '#17–26' },
+  { id: 'b15Word', subject: 'algebra2', section: '1.5 Solving Linear Systems', label: 'Linear systems in real life', desc: '#15, 16, 27' },
+  { id: 'b16Augment', subject: 'algebra2', section: '1.6 Solving Linear Systems Using Technology', label: 'Write an augmented matrix', desc: '#1–8' },
+  { id: 'b16Solve', subject: 'algebra2', section: '1.6 Solving Linear Systems Using Technology', label: 'Solve a system using technology', desc: '#11–20' },
+  { id: 'b16Word', subject: 'algebra2', section: '1.6 Solving Linear Systems Using Technology', label: 'Systems with technology in real life', desc: '#21' },
+  { id: 'b17AddSub', subject: 'algebra2', section: '1.7 Basic Matrix Operations', label: 'Add and subtract matrices', desc: '#1–6' },
+  { id: 'b17Scalar', subject: 'algebra2', section: '1.7 Basic Matrix Operations', label: 'Scalar multiplication', desc: '#9–16' },
+  { id: 'b17Expr', subject: 'algebra2', section: '1.7 Basic Matrix Operations', label: 'Evaluate matrix expressions', desc: '#17–22' },
+  { id: 'b17Solve', subject: 'algebra2', section: '1.7 Basic Matrix Operations', label: 'Solve a matrix equation', desc: '#23–30, 35' },
+  { id: 'b17FindX', subject: 'algebra2', section: '1.7 Basic Matrix Operations', label: 'Find the matrix X', desc: '#37–40' },
+  { id: 'b17Word', subject: 'algebra2', section: '1.7 Basic Matrix Operations', label: 'Matrices in real life', desc: '#31–33' },
+  { id: 'b18IsSol', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Is the point a solution of the system?', desc: '#1–4' },
+  { id: 'b18Graph', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Solutions from a graph', desc: '#5–8' },
+  { id: 'b18Write', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Write a system from a graph', desc: '#19–24' },
+  { id: 'b18Point', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Graph a system and identify a solution', desc: '#9–18' },
+  { id: 'b18Which', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Which system matches the graph?', desc: '#26' },
+  { id: 'b18Word', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Systems of inequalities in real life', desc: '#28' },
   { id: 'b31GCF', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: 'Factor out the GCF', desc: 'Then factor the trinomial (#1–6)' },
   { id: 'b31Factor', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: 'Factor ax² + bx + c', desc: 'Including a < 0 (#7–20)' },
   { id: 'b31Solve', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: 'Solve by factoring', desc: '#25–28' },
@@ -21732,8 +22237,13 @@ function applyMode(q, mode) {
 const isAnswered = (q, a) => (q.mode === 'fr'
   ? Array.isArray(a) && (q.fr.answered ? q.fr.answered(a) : q.fr.fields.every((_, k) => String(a[k] || '').trim() !== ''))
   : a !== null && a !== undefined && !Array.isArray(a));
+// pasted math (from the work space or elsewhere) can carry $$ … $$ wrappers, display-style commands and other text-mode spellings
+const cleanPaste = (v) => (typeof v !== 'string' ? v : v.replace(/^\s*\${1,2}|\${1,2}\s*$/g, '').replace(/\\(?:displaystyle|textstyle)\s*/g, '').replace(/\\(?:textrm|textnormal|textup|textit|mathit)\{/g, '\\text{').replace(/\\placeholder\{\}/g, '').trim());
+// math pasted into an answer box: drop $$ wrappers and turn text-mode pieces (from the work space's Aa Text mode) back into math
+const cleanPasteMath = (t) => cleanPaste(String(t)).replace(/\\text\{([^{}]*)\}/g, (m, w) => (/^[\s\w.,+\-−=()^/*]*$/.test(w) && !/[a-z]{4,}/i.test(w.replace(/\b(?:sin|cos|tan|csc|sec|cot|log|ln)\b/g, '')) ? ` ${w.replace(/\b(sin|cos|tan|csc|sec|cot|log|ln)\b/g, '\\$1')} ` : m));
+const cleanAns = (a) => (Array.isArray(a) ? a.map(cleanPaste) : a);
 const scoreOf = (q, a) => (q.mode === 'fr'
-  ? (q.fr.score ? q.fr.score(Array.isArray(a) ? a : []) : Array.isArray(a) && q.fr.check(a) ? 1 : 0)
+  ? (q.fr.score ? q.fr.score(Array.isArray(a) ? cleanAns(a) : []) : Array.isArray(a) && q.fr.check(cleanAns(a)) ? 1 : 0)
   : a === q.answer ? 1 : 0);
 const isCorrect = (q, a) => scoreOf(q, a) === 1;
 const norm = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
@@ -22405,10 +22915,14 @@ const MATH_KEYS = [
   ['π', '\\pi'], ['°', '^{\\circ}'], ['≅', '\\cong'], ['∠', '\\angle'], ['△', '\\triangle'], ['⊥', '\\perp'], ['∥', '\\parallel'],
   ['≠', '\\ne'], ['≤', '\\le'], ['≥', '\\ge'], ['±', '\\pm'], ['×', '\\times'], ['÷', '\\div'], ['θ', '\\theta'],
 ];
+// the work-space keys for one question: α and β join θ when the question uses them
+const workKeys = (i) => { const q = state.qs && state.qs[i], t = q ? [q.stem, q.frStem, ...(q.choices || [])].join(' ') : '', extra = [];
+  if (/α/.test(t)) extra.push(['α', '\\alpha']); if (/β/.test(t)) extra.push(['β', '\\beta']);
+  return MATH_KEYS.concat(extra); };
 // typing "+-" should mean plus a negative, not ± (students type ± with the ± key)
 function noPmShortcut(mf) { try { const s = { ...(mf.inlineShortcuts || {}) }; delete s['+-']; delete s['-+']; mf.inlineShortcuts = s; } catch {} }
 function configureField(mf) {
-  mf.smartMode = true;               // typed words become text
+  mf.smartMode = false;              // smart mode guessed text vs. math and could drop function names (tan x − 1 → x − 1); words go through the Aa Text button
   mf.mathModeSpace = '\\:';          // the space bar makes a space
   mf.mathVirtualKeyboardPolicy = 'manual';
   mf.menuItems = [];
@@ -22449,7 +22963,7 @@ function mathWork(i, done) {
   const lines = workLines(i);
   (lines.length ? lines : ['']).forEach((l) => addLine(l));
   const target = () => (focused && focused.isConnected ? focused : list.lastElementChild.querySelector('math-field'));
-  const keys = el('div', { class: 'mkeys' }, ...MATH_KEYS.map(([label, latex]) => {
+  const keys = el('div', { class: 'mkeys' }, ...workKeys(i).map(([label, latex]) => {
     const b = el('button', { type: 'button', title: 'Insert ' + label }, label);
     b.addEventListener('mousedown', (e) => e.preventDefault()); // keep the cursor in the line
     b.addEventListener('click', () => { const mf = target(); mf.focus(); mf.insert(latex, { format: 'latex', selectionMode: 'placeholder' }); save(); });
@@ -22542,6 +23056,11 @@ function frArea(q, i) {
       input.smartMode = false; input.mathVirtualKeyboardPolicy = 'manual'; input.menuItems = []; noPmShortcut(input);
       if (f.keys === 'growth') input.smartSuperscript = false; // exponents like 12t stay together
       input.className = 'mans' + (f.kind === 'expr' ? ' wide' : ''); input.setAttribute('aria-label', f.label || 'Answer');
+      input.addEventListener('paste', (e) => { // pasted work-space lines come in as $$ … $$ with text-mode words; paste them as plain math
+        const t = e.clipboardData && (e.clipboardData.getData('application/x-latex') || e.clipboardData.getData('text/plain'));
+        if (!t || input.readOnly) return;
+        e.preventDefault(); e.stopPropagation(); input.insert(cleanPasteMath(t), { format: 'latex' }); input.dispatchEvent(new Event('input', { bubbles: true }));
+      }, { capture: true });
       input.value = vals[k] || '';
       if (reveal) input.readOnly = true;
       controls[k] = input;
@@ -23668,7 +24187,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
