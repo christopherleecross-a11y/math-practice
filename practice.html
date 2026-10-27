@@ -4113,7 +4113,7 @@ TEMPLATES.e4ExpEq = (r) => {
     else if (k === 3) { const A = pick(r, [500, 100, 50, 200]), kk = pick(r, [-2, -1, 3, 2]), C = A * pick(r, [0.25, 0.5, 2, 3, 0.2]); const kx = kk === 1 ? 'x' : kk === -1 ? '−x' : `${fmt(kk)}x`; eq = `${A}e^(${kx}) = ${fmt(C)}`; const q = C / A; const qq = kk > 0 ? q : 1 / q; S = [{ v: Math.log(q) / kk, t: `ln(${fracT(qq)})${Math.abs(kk) === 1 ? '' : `/${Math.abs(kk)}`}`.replace(/^ln\((\d+)\)/, 'ln $1') }]; why = `Divide: e^(${kx}) = ${fracT(q)}. Take ln: ${kx} = ln(${fracT(q)}), so x = ${S[0].t}.`; }
     else if (k === 4) { const a = ri(r, 3, 15), c = pick(r, [2, 3, 4]); const t = ri(r, 1, a - 1); eq = `${a} − ${c}eˣ = ${a - c * t}`; S = [{ v: Math.log(t), t: t === 1 ? '0' : `ln ${t}` }]; why = `${c}eˣ = ${c * t}, so eˣ = ${t} and x = ${S[0].t}.`; }
     else if (k === 5) { const [r1, r2] = pick(r, [[2, -1], [3, -2], [4, -3], [-1, 2]]); const c = -r1 * r2; eq = r() < 0.5 ? `eˣ = e^(x² − ${c})` : `e^(x² − ${c}) = eˣ`; S = [r1, r2].sort((p, q) => p - q).map((v) => ({ v, t: fmt(v) })); why = `One-to-One Property: x = x² − ${c}, so x² − x − ${c} = 0 and x = ${S.map((s) => s.t).join(', ')}.`; }
-    else if (k === 6) { const m = pick(r, [2, 3, 4, 5, 6]), n = pick(r, [-1, 1, 2, 3, 5, -2]); if (m === n) continue; const p = -(m + n), q = m * n; eq = `e²ˣ ${p < 0 ? MINUS : '+'} ${Math.abs(p) === 1 ? '' : Math.abs(p)}eˣ ${q < 0 ? MINUS : '+'} ${Math.abs(q)} = 0`; S = [m, n].filter((u) => u > 0).sort((a, b) => a - b).map((u) => ({ v: Math.log(u), t: u === 1 ? '0' : `ln ${u}` })); why = `Factor as a quadratic in eˣ: (eˣ − ${m})(eˣ ${n < 0 ? '+' : '−'} ${Math.abs(n)}) = 0. eˣ = ${m}${n > 0 ? ` or eˣ = ${n}` : ` (eˣ = ${n} is impossible)`}, so x = ${S.map((s) => s.t).join(', ')}.`; }
+    else if (k === 6) { const m = pick(r, [2, 3, 4, 5, 6]), n = pick(r, [-1, 1, 2, 3, 5, -2]); if (m === n) continue; const p = -(m + n), q = m * n; eq = `e²ˣ ${p ? `${p < 0 ? MINUS : '+'} ${Math.abs(p) === 1 ? '' : Math.abs(p)}eˣ ` : ''}${q < 0 ? MINUS : '+'} ${Math.abs(q)} = 0`; S = [m, n].filter((u) => u > 0).sort((a, b) => a - b).map((u) => ({ v: Math.log(u), t: u === 1 ? '0' : `ln ${u}` })); why = `Factor as a quadratic in eˣ: (eˣ − ${m})(eˣ ${n < 0 ? '+' : '−'} ${Math.abs(n)}) = 0. eˣ = ${m}${n > 0 ? ` or eˣ = ${n}` : ` (eˣ = ${n} is impossible)`}, so x = ${S.map((s) => s.t).join(', ')}.`; }
     else if (k === 7) { const c = pick(r, [5, 4, 2, 10]), kind = r() < 0.5; if (kind) { eq = `1/(1 − eˣ) = ${c}`; const q = 1 - 1 / c; S = [{ v: Math.log(q), t: `ln(${fracT(q)})` }]; why = `1 − eˣ = 1/${c}, so eˣ = ${fracT(q)} and x = ${S[0].t}.`; } else { const N = pick(r, [100, 50, 400]); eq = `${N}/(1 + e²ˣ) = ${c}`; const q = N / c - 1; S = [{ v: Math.log(q) / 2, t: `(1/2) ln ${fmt(q)}` }]; why = `1 + e²ˣ = ${fmt(N / c)}, so e²ˣ = ${fmt(q)} and x = ${S[0].t}.`; } }
     else { const rr = pick(r, [0.065, 0.1, 0.08, 0.05]), n = pick(r, [12, 365, 4]), K = pick(r, [2, 3, 4]); eq = `(1 + ${rr}/${n})^(${n}t) = ${K}`; S = [{ v: Math.log(K) / (n * Math.log(1 + rr / n)), t: `ln ${K}/(${n} ln(1 + ${rr}/${n}))` }]; why = `Take ln: ${n}t · ln(1 + ${rr}/${n}) = ln ${K}, so t = ${S[0].t}.`; }
     const vals = S.map((s) => s.v), correct = (k === 8 ? 't' : 'x') + ' = ' + solsT(S);
@@ -6241,7 +6241,15 @@ TEMPLATES.trigVerifyStep = (r) => {
           const p = parseTrig(vals[0]);
           if (!p || !trigEquiv(p, ansAst)) return false;
           const pi = trigInfo(p);
-          return pi.fns <= info.fns && [...pi.names].every((f) => info.names.has(f)) && (pi.simpleArgs || !info.simpleArgs);
+          if (!(pi.simpleArgs || !info.simpleArgs)) return false;
+          // not just a copy of the line before or after (unless the step itself looks like that line)
+          const nb = [k ? steps[k - 1][0] : lhs, steps[k + 1][0]].map((s) => trigInfo(parseTrig(trigVar(s, v))));
+          const same = (x) => x.fns === pi.fns && x.names.size === pi.names.size && [...x.names].every((f) => pi.names.has(f));
+          if (nb.some(same) && !same(info)) return false;
+          if (pi.fns <= info.fns && [...pi.names].every((f) => info.names.has(f))) return true;
+          // another correct way to write this step, built from the functions in the lines before and after
+          const names = new Set([...info.names, ...nb.flatMap((x) => [...x.names])]);
+          return [...pi.names].every((f) => names.has(f)) && pi.fns <= Math.max(info.fns, ...nb.map((x) => x.fns)) + 1;
         } },
       solution: `Use the ${STEP_NOTE[steps[k][1]]}: ${prettyTrig(k ? steps[k - 1][0] : lhs, v)} = ${prettyTrig(ans, v)}.\n` + chainLines(lhs, rhs, steps, v, { note: steps.map(([, why]) => `(${STEP_NOTE[why]})`) }),
     };
@@ -19227,6 +19235,275 @@ TEMPLATES.a39Word = (r) => {
 };
 for (const name of Object.keys(TEMPLATES)) if (/^a3\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 /* ==== ALGEBRA 1 CH3 END ==== */
+/* ==== ALGEBRA 2 CH6 BEGIN ==== */
+/* ---------- Algebra 2 (Big Ideas Learning 2025), Chapter 6: Exponential and Logarithmic Functions ---------- */
+const B6X = [{ x: 0.7 }, { x: 1.3 }, { x: 2.2 }, { x: 3.1 }, { x: 4.6 }, { x: 5.5 }, { x: 7.9 }];
+const B6XBIG = [{ x: 5.3 }, { x: 6.7 }, { x: 8.1 }, { x: 9.4 }, { x: 11.2 }, { x: 14.6 }];
+// does the typed expression in x match truth(x)? (at least 3 sample points where truth is defined)
+const b6node = (raw, truth, S = B6X) => { if (S.filter((e) => isFinite(truth(e.x))).length < 3) return null; return lgEquiv(String(raw || '').replace(/^\s*[a-z]\s*(\\left)?\(\s*x\s*(\\right)?\)\s*=/, '').replace(/^\s*[a-z]\s*=/, ''), (e) => truth(e.x), ['x'], S); };
+const b6eq = (raw, truth, S = B6X) => !!b6node(raw, truth, S);
+// a decimal answer shown to three places
+function b6d3Q(r, { topic, stem, val, wrongs = [], solution, tol = 0.0011, unit = '' }) {
+  const T = (x) => d3(x) + (unit ? ` ${unit}` : ''), c = T(val);
+  return { topic, stem, ...buildChoices(r, c, [...new Set(wrongs.filter(isFinite).map(T))].filter((w) => w !== c), (i) => T(val + 0.1 * (i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: '', suffix: unit ? ` ${unit}` : '' }], key: [d3(val).replace(MINUS, '-')], display: c, check: (v) => lgOk(String(v[0] || '').replace(/[a-z\s]+$/i, ''), val, tol) }, solution };
+}
+const b6numT = (v) => { const p = fracParts(v); return p && p[1] <= 400 ? fracT(v) : d3(v); };
+const b6pct = (raw) => { const v = lgConst(String(raw || '').replace(/\\%|%/g, '')); return v; };
+const b6GD = ['Exponential growth', 'Exponential decay'];
+// a choice question with a select free response
+const b6sel = (r, topic, stem, opts, ans, solution, extra = {}) => ({ topic, stem, ...extra, ...buildChoices(r, ans, opts.filter((o) => o !== ans), () => null), fr: FR.select(extra.selLabel || 'Answer:', shuffle(r, opts), ans), solution });
+// growth/decay plus a percent
+function b6rateQ(r, { topic, stem, growth, pct, solution, dp = 0 }) {
+  const word = growth ? 'Exponential growth' : 'Exponential decay', p = Math.round(pct * 10 ** dp) / 10 ** dp, txt = `${word}; ${growth ? 'increase' : 'decrease'} of ${fmt(p)}%`, tol = dp ? 0.6 * 10 ** -dp + 1e-9 : 0.06;
+  return { topic, stem, ...buildChoices(r, txt, [`${growth ? 'Exponential decay' : 'Exponential growth'}; ${growth ? 'decrease' : 'increase'} of ${fmt(p)}%`, `${word}; ${growth ? 'increase' : 'decrease'} of ${fmt(Math.round((100 - p) * 100) / 100)}%`, `${word}; ${growth ? 'increase' : 'decrease'} of ${fmt(Math.round((100 + p) * 100) / 100)}%`].filter((t, i, A) => t !== txt && A.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'select', label: 'Type:', options: b6GD }, { kind: 'expr', keys: 'num', label: `Percent ${growth ? 'increase' : 'decrease'} or ${growth ? 'decrease' : 'increase'}:`, suffix: '%' }], key: [word, String(p)], display: txt,
+      check: (v) => v[0] === word && Math.abs(b6pct(v[1]) - pct) <= tol, score: (v) => ((v[0] === word ? 1 : 0) + (Math.abs(b6pct(v[1]) - pct) <= tol ? 1 : 0)) / 2 }, solution };
+}
+const b6money = (v) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function b6moneyQ(r, { topic, stem, val, wrongs, solution, tol = 0.011 }) {
+  const c = Math.round(val * 100) / 100;
+  return { topic, stem, ...buildChoices(r, b6money(c), [...new Set(wrongs.map((w) => b6money(Math.round(w * 100) / 100)))].filter((w) => w !== b6money(c)), (i) => b6money(c + 10 * (i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: '$' }], key: [c.toFixed(2)], display: b6money(c), check: (v) => { const x = lgConst(String(v[0] || '').replace(/,|\\\$|\$/g, '')); return isFinite(x) && Math.abs(x - val) <= tol; } }, solution };
+}
+const b6eT = (k) => { const t = fmt(k); return t === '1' ? '' : t === MINUS + '1' ? MINUS : t; }; // coefficient of x in an exponent
+
+// ---------- 6.1 Exponential Growth and Decay Functions ----------
+const B6BASES = [[2, '2'], [1 / 4, '1/4'], [3, '3'], [1 / 2, '1/2'], [1.03, '1.03'], [0.8, '0.8'], [5, '5'], [3 / 2, '3/2'], [1 / 3, '1/3']];
+TEMPLATES.b61Eval = (r) => {
+  const [b, bT] = pick(r, B6BASES), a = pick(r, [1, 1, 8, 6, 5, -2, 3, 4]), f = (x) => a * b ** x, x1 = -2, x2 = 3;
+  const text = a === 1 && Number.isInteger(b) ? powT(bT, 'x') : `${a === 1 ? '' : fmt(a)}${powT(`(${bT})`, 'x')}`;
+  const v1 = f(x1), v2 = f(x2), t1 = b6numT(v1), t2 = b6numT(v2), ok = (raw, v) => exOrRoundOk(raw, v, 3);
+  return { topic: 'Exponential functions', stem: `Evaluate the expression for (a) x = −2 and (b) x = 3.   ${text}`, ...buildChoices(r, `(a) ${t1}  (b) ${t2}`, [`(a) ${b6numT(-v1)}  (b) ${t2}`, `(a) ${b6numT(a * b * -2)}  (b) ${b6numT(a * b * 3)}`, `(a) ${b6numT(a / b ** 2 * (b < 1 ? 1 : 1) === v1 ? a * b ** 2 : a / b ** 2)}  (b) ${b6numT((a * b) ** 3)}`].filter((t, i, A) => t !== `(a) ${t1}  (b) ${t2}` && A.indexOf(t) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: '(a) x = −2:' }, { kind: 'expr', keys: 'num', label: '(b) x = 3:' }], key: [fracParts(v1) && fracParts(v1)[1] <= 400 ? fracL(v1) : d3(v1).replace(MINUS, '-'), fracParts(v2) && fracParts(v2)[1] <= 400 ? fracL(v2) : d3(v2).replace(MINUS, '-')], display: `(a) ${t1}  (b) ${t2}`,
+      check: (v) => ok(v[0], v1) && ok(v[1], v2), score: (v) => ((ok(v[0], v1) ? 1 : 0) + (ok(v[1], v2) ? 1 : 0)) / 2 },
+    solution: `(a) ${a === 1 ? '' : `${fmt(a)} · `}(${bT})⁻² = ${a === 1 ? '' : `${fmt(a)} · `}${b6numT(b ** -2)} = ${t1}\n(b) ${a === 1 ? '' : `${fmt(a)} · `}(${bT})³ = ${a === 1 ? '' : `${fmt(a)} · `}${b6numT(b ** 3)} = ${t2}${fracParts(v2) && fracParts(v2)[1] <= 400 ? '' : ' (rounded)'}` };
+};
+TEMPLATES.b61GrowDecay = (r) => {
+  const [b, bT] = pick(r, [[6, '6'], [7, '7'], [1 / 6, '1/6'], [1 / 8, '1/8'], [4 / 3, '4/3'], [2 / 5, '2/5'], [1.2, '1.2'], [0.75, '0.75'], [1.8, '1.8'], [0.6, '0.6'], [5 / 2, '5/2'], [0.95, '0.95']]), a = pick(r, [1, 1, 2, 3, 5]), name = pick(r, ['y', 'f(x)']);
+  const g = b > 1, ans = g ? 'Exponential growth' : 'Exponential decay';
+  return b6sel(r, 'Exponential growth and decay', `Determine whether the function represents exponential growth or exponential decay.   ${name} = ${a === 1 ? '' : a}${Number.isInteger(b) && a === 1 ? powT(bT, 'x') : powT(`(${bT})`, 'x')}`, b6GD, ans, `The base is ${bT}, which is ${g ? 'greater than 1' : 'between 0 and 1'}, so the function represents exponential ${g ? 'growth' : 'decay'}.`);
+};
+TEMPLATES.b61Base = (r) => {
+  const [b, bT] = pick(r, [[2, '2'], [3, '3'], [4, '4'], [5, '5'], [1 / 2, '1/2'], [1 / 3, '1/3'], [1 / 4, '1/4']]), up = b > 1, M = up ? b : 1 / b;
+  const pts = [[-1, 1 / b], [0, 1], [1, b]];
+  return a1numQ(r, { topic: 'Exponential functions', stem: 'Use the graph of f(x) = bˣ to identify the value of the base b.', val: b, label: 'b =', draw: plotQ({ xr: [-4, 4], yr: [-1, M + 2], curves: [{ f: (x) => b ** x }], pts: pts.map((p) => ({ p, label: `(${fmt(p[0])}, ${fracT(p[1])})` })) }), size: [300, 300], wrongs: [1 / b, b + 1, b * 2],
+    solution: `The graph passes through (1, ${bT}), and f(1) = b¹ = b, so b = ${bT}.` });
+};
+TEMPLATES.b61Rate = (r) => {
+  const C = pick(r, [() => { const a = pick(r, [200, 450, 1200, 85]), b = pick(r, [0.65, 0.8, 0.92, 0.75, 0.88]); return [`The value of a mountain bike y (in dollars) can be approximated by the model y = ${a}(${b})ᵗ, where t is the number of years since the bike was purchased.`, b]; },
+    () => { const a = pick(r, [28.22, 4.5, 310]), b = pick(r, [1.01, 1.03, 1.025, 1.12]); return [`The population P (in millions) of a country can be approximated by P = ${a}(${b})ᵗ, where t is the number of years since the beginning of the decade.`, b]; },
+    () => { const a = pick(r, [325, 500, 200]), b = pick(r, [0.71, 0.85, 0.6]); return [`The amount y (in milligrams) of a medication in your bloodstream t hours after a dose is y = ${a}(${b})ᵗ.`, b]; },
+    () => { const a = pick(r, [2500, 6850, 1500]), b = pick(r, [1.5, 1.03, 1.08]); return [`The number y of users of a website t years after it launched can be modeled by y = ${a}(${b})ᵗ.`, b]; }])();
+  const b = C[1], growth = b > 1, pct = Math.round(Math.abs(b - 1) * 10000) / 100;
+  return b6rateQ(r, { topic: 'Exponential growth and decay', stem: `${C[0]} Determine whether the model represents exponential growth or exponential decay, and identify the percent increase or decrease.`, growth, pct, dp: 2, solution: `The base is ${b}, which is ${growth ? 'greater than 1, so the model is exponential growth' : 'less than 1, so the model is exponential decay'}.\n${growth ? `1 + r = ${b}, so r = ${fmt(b - 1)}` : `1 − r = ${b}, so r = ${fmt(Math.round((1 - b) * 100) / 100)}`}: a ${fmt(pct)}% ${growth ? 'increase' : 'decrease'} each year.` });
+};
+// #27–34: rewrite a(b)^(t/k) or a(b)^(kt) as a(1 ± r)^t
+TEMPLATES.b61Rewrite = (r) => {
+  const [B, BT] = pick(r, [[2, '2'], [0.5, '0.5'], [4, '4'], [0.25, '0.25'], [2 / 3, '2/3'], [5 / 4, '5/4'], [1 / 3, '1/3'], [3, '3']]), form = pick(r, ['div', 'div', 'mul']), k = form === 'div' ? pick(r, [3, 6, 9, 10, 12, 14, 22]) : pick(r, [2, 3, 8]);
+  const g = form === 'div' ? B ** (1 / k) : B ** k, growth = g > 1, pct = Math.abs(g - 1) * 100;
+  if (pct > 900) return TEMPLATES.b61Rewrite(r);
+  const expo = form === 'div' ? `t/${k}` : `${k}t`, shown = `y = a${powT(`(${BT})`, form === 'div' ? 'x' : String(k) + 't').replace('ˣ', '')}`;
+  return b6rateQ(r, { topic: 'Exponential growth and decay', stem: `Rewrite the function in the form y = a(1 + r)ᵗ or y = a(1 − r)ᵗ. State the growth or decay rate (round to two decimal places of a percent).   y = a(${BT})^(${expo})`, growth, pct, dp: 2,
+    solution: `y = a[(${BT})^(${form === 'div' ? `1/${k}` : k})]ᵗ ≈ a(${g.toFixed(4)})ᵗ = a(1 ${growth ? '+' : '−'} ${Math.abs(g - 1).toFixed(4)})ᵗ.\nSo the function represents exponential ${growth ? 'growth' : 'decay'} with a rate of about ${pct.toFixed(2)}%.` });
+};
+TEMPLATES.b61Compound = (r) => {
+  const P = pick(r, [3500, 5000, 2200, 1000, 8000]), rp = pick(r, [2.16, 2.29, 1.26, 1.83, 2.25, 3, 4.5]), [nm, n] = pick(r, [['yearly', 1], ['quarterly', 4], ['monthly', 12], ['daily', 365]]), t = pick(r, [5, 6, 3, 10]);
+  const A = P * (1 + rp / 100 / n) ** (n * t);
+  return b6moneyQ(r, { topic: 'Compound interest', stem: `You deposit $${P.toLocaleString('en-US')} in an account that pays ${rp}% annual interest compounded ${nm}. Find the balance after ${t} years. (A = P(1 + r/n)ⁿᵗ)`, val: A, tol: 0.021,
+    wrongs: [P * (1 + rp / 100) ** t, P * (1 + rp / 100 * t), P * (1 + rp / n) ** (n * t) > 1e7 ? P * 2 : P * (1 + rp / n) ** (n * t), P * (1 + rp / 100 / n) ** t],
+    solution: `A = ${P}(1 + ${rp / 100}/${n})^(${n}·${t}) ≈ ${b6money(Math.round(A * 100) / 100)}` });
+};
+TEMPLATES.b61Model = (r) => {
+  const C = pick(r, [() => { const a = pick(r, [6.26, 5.4, 3.8]), p = pick(r, [4, 5, 3]), t = pick(r, [4, 5, 6]); return [`In a recent year, there were about ${a} billion cell phone subscribers. During the next several years, the number increased by about ${p}% each year. Use an exponential model to estimate the number of subscribers (in billions) ${t} years later.`, a, 1 + p / 100, t, 'billion']; },
+    () => { const a = pick(r, [325, 400, 200]), p = pick(r, [29, 25, 20]), t = pick(r, [2, 3, 4, 5]); return [`You take a ${a}-milligram dose of a medication. The amount in your bloodstream decreases by about ${p}% each hour. Use an exponential model to find the amount (in milligrams) left after ${t} hours.`, a, 1 - p / 100, t, 'mg']; },
+    () => { const a = pick(r, [24000, 30000, 18500]), p = pick(r, [15, 12, 18]), t = pick(r, [3, 4, 6]); return [`A car is worth $${a.toLocaleString('en-US')}. Its value decreases by ${p}% each year. Use an exponential model to estimate its value (in dollars) after ${t} years.`, a, 1 - p / 100, t, 'dollars']; }])();
+  const [stem, a, b, t, u] = C, v = a * b ** t, rv = Math.round(v * 100) / 100;
+  if (u === 'dollars') return b6moneyQ(r, { topic: 'Exponential models', stem: stem.replace(' (in dollars)', ''), val: v, wrongs: [a * (1 - Math.abs(b - 1) * t), a * (2 - b) ** t, a * b ** (t + 1)], solution: `y = ${a}(${fmt(b)})ᵗ\ny = ${a}(${fmt(b)})^${t} ≈ ${b6money(rv)}` });
+  return a1numQ(r, { topic: 'Exponential models', stem: `${stem} Round to two decimal places.`, val: rv, tol: Math.max(0.011, v * 0.002), dec: true, unit: u === 'dollars' ? '' : u, label: u === 'dollars' ? '$' : '', wrongs: [Math.round(a * (1 + (b > 1 ? 1 : -1) * Math.abs(b - 1) * t) * 100) / 100, Math.round(a * (2 - b) ** t * 100) / 100, Math.round(a * b ** (t + 1) * 100) / 100],
+    solution: `y = ${a}(${fmt(b)})ᵗ\ny = ${a}(${fmt(b)})^${t} ≈ ${fmt(rv)}` });
+};
+
+// ---------- 6.2 The Natural Base e ----------
+TEMPLATES.b62Simplify = (r) => {
+  const p = ri(r, 2, 9), q = ri(r, 2, 9), k = pick(r, [2, 3, 4, 5]), m = pick(r, [2, 3, 7, -2]), n = pick(r, [2, 3, 4]);
+  const C = pick(r, [() => [`${powT('e', String(p))} · ${powT('e', String(q))}`, (x) => Math.exp(p + q), powT('e', String(p + q)), `e^{${p + q}}`, [powT('e', String(p * q)), `${powT('e', String(p))}${powT('', String(q))}`, powT('e', String(p - q))]],
+    () => [`${powT('e', `−${p}`)} · ${powT('e', String(q))}`, (x) => Math.exp(q - p), powT('e', fmt(q - p).replace(MINUS, '−')), `e^{${q - p}}`, [powT('e', String(-p * q).replace('-', '−')), powT('e', String(p + q))]],
+    () => { const a = q + 1, c = k * a; return [`${c}${powT('e', String(p + q))}/(${a}${powT('e', String(p))})`, (x) => k * Math.exp(q), `${k}${powT('e', String(q))}`, `${k}e^{${q}}`, [`${k}${powT('e', String(2 * p + q))}`, `${c - a}${powT('e', String(q))}`]]; },
+    () => [`(${k}${powT('e', `${m === 1 ? '' : fmt(m).replace(MINUS, '−')}x`)})${powT('', String(n))}`, (x) => k ** n * Math.exp(m * n * x), `${k ** n}${powT('e', `${fmt(m * n).replace(MINUS, '−')}x`)}`, `${k ** n}e^{${m * n}x}`, [`${k * n}${powT('e', `${fmt(m * n).replace(MINUS, '−')}x`)}`, `${k ** n}${powT('e', `${fmt(m + n).replace(MINUS, '−')}x`)}`]],
+    () => [`√(${k * k}${powT('e', `${2 * Math.abs(m)}x`)})`, (x) => k * Math.exp(Math.abs(m) * x), `${k}${powT('e', `${Math.abs(m)}x`)}`, `${k}e^{${Math.abs(m)}x}`, [`${k * k / 2}${powT('e', `${Math.abs(m)}x`)}`, `${k}${powT('e', `${2 * Math.abs(m) - 2}x`)}`]],
+    () => [`∛(${k ** 3}${powT('e', `${3 * Math.abs(m)}x`)})`, (x) => k * Math.exp(Math.abs(m) * x), `${k}${powT('e', `${Math.abs(m)}x`)}`, `${k}e^{${Math.abs(m)}x}`, [`${k ** 3 / k}${powT('e', `${Math.abs(m)}x`)}`, `${k}${powT('e', `${3 * Math.abs(m) - 3}x`)}`]],
+    () => [`eˣ · ${powT('e', `−${p}x`)} · ${powT('e', String(q))}`, (x) => Math.exp((1 - p) * x + q), powT('e', `${b6eT(1 - p)}x+${q}`), `e^{${1 - p}x+${q}}`, [powT('e', `${p + 1}x+${q}`), powT('e', `−${p}x+${q}`)]],
+    () => [`eˣ · ${powT('e', String(p))} · ${powT('e', `x+${q}`)}`, (x) => Math.exp(2 * x + p + q), powT('e', `2x+${p + q}`), `e^{2x+${p + q}}`, [powT('e', `x+${p + q}`), powT('e', `2x+${p * q}`)]]])();
+  const [given, truth, ans, key, wr] = C;
+  const ok = (raw) => { const n0 = b6node(raw, truth); return !!n0 && lgNodes(n0).filter((t) => t.t === 'n' && t.e).length <= 1; };
+  return { topic: 'The natural base e', stem: `Simplify the expression.   ${given}`, ...buildChoices(r, ans, [...new Set(wr)].filter((w) => w !== ans), (i) => powT('e', String(p + q + i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: '=' }], key: [key.replace(/\+-/g, '-')], display: ans, check: (v) => ok(v[0]) }, solution: `Use the properties of exponents (product of powers, quotient of powers, power of a product).\n${given} = ${ans}` };
+};
+TEMPLATES.b62GrowDecay = (r) => {
+  const k = pick(r, [3, -1, 2, -0.8, 0.5, -3, -0.25, 0.25]), a = pick(r, [1, 2, 3, 0.4, 0.6, 1 / 2, 1 / 4]), g = k > 0;
+  const aT = a === 1 ? '' : a < 1 && fracParts(a)[1] <= 4 && !String(a).includes('.') ? `(${fracT(a)})` : fmt(a);
+  return b6sel(r, 'The natural base e', `Determine whether the function represents exponential growth or exponential decay.   y = ${aT === '(1/2)' || aT === '(1/4)' ? aT : fmt(a) === '1' ? '' : fmt(a)}${powT('e', `${b6eT(k)}x`)}`, b6GD, g ? 'Exponential growth' : 'Exponential decay', `y = ae^(kx) with a > 0 is exponential ${g ? 'growth because k > 0' : 'decay because k < 0'}.`);
+};
+TEMPLATES.b62Rate = (r) => {
+  const k = pick(r, [-0.75, 0.4, -0.25, 0.8, 0.05, -0.12, 0.15]), a = pick(r, [1, 2, 0.5, 3]), g = Math.exp(k), growth = k > 0, pct = Math.abs(g - 1) * 100;
+  return b6rateQ(r, { topic: 'The natural base e', stem: `Rewrite the function in the form y = a(1 + r)ᵗ or y = a(1 − r)ᵗ. Then find the percent rate of change (round to two decimal places of a percent).   y = ${a === 1 ? '' : fmt(a)}${powT('e', `${fmt(k).replace(MINUS, '−')}t`).replace('^(', '^(')}`, growth, pct, dp: 2,
+    solution: `y = ${a === 1 ? '' : fmt(a)}(e^${fmt(k)})ᵗ ≈ ${a === 1 ? '' : fmt(a)}(${g.toFixed(4)})ᵗ\nThe rate of ${growth ? 'growth' : 'decay'} is about ${pct.toFixed(2)}%.` });
+};
+TEMPLATES.b62Continuous = (r) => {
+  const P = pick(r, [3224, 4856, 2500, 1200, 6000]), rr = pick(r, [0.05, 0.04, 0.035, 0.06, 0.025]), t = pick(r, [12, 10, 8, 5, 20]), A = P * Math.exp(rr * t);
+  return b6moneyQ(r, { topic: 'The natural base e', stem: `The balance A (in dollars) of an account that earns interest compounded continuously is A = ${P}${powT('e', `${fmt(rr)}t`)}, where t is the number of years. Find the balance after ${t} years.`, val: A, tol: 0.021, wrongs: [P * (1 + rr) ** t, P * Math.exp(rr) * t, P * (1 + rr * t)], solution: `A = ${P}e^(${fmt(rr)} · ${t}) = ${P}e^(${fmt(rr * t)}) ≈ ${b6money(Math.round(A * 100) / 100)}` });
+};
+
+// ---------- 6.3 Logarithms and Logarithmic Functions ----------
+TEMPLATES.b63Calc = (r) => {
+  const C = pick(r, [() => { const a = pick(r, [6, 12, 25, 0.6, 90]); return [`log ${fmt(a)}`, Math.log10(a)]; }, () => { const a = pick(r, [12, 7, 0.5, 30]); return [`ln ${fmt(a)}`, Math.log(a)]; }, () => { const d = pick(r, [3, 4, 7]); return [`ln (1/${d})`, -Math.log(d)]; },
+    () => { const [b, n, d] = pick(r, [[7, 2, 7], [5, 3, 4], [9, 1, 2]]); return [`${logT(b)} (${n}/${d})`, Math.log(n / d) / Math.log(b)]; }, () => { const c = pick(r, [3, 2, 5]), a = pick(r, [0.5, 1.5, 4]); return [`${c} ln ${fmt(a)}`, c * Math.log(a)]; }, () => { const a = pick(r, [0.6, 2, 45]), c = pick(r, [1, 2, 3]); return [`log ${fmt(a)} + ${c}`, Math.log10(a) + c]; }])();
+  return b6d3Q(r, { topic: 'Logarithms', stem: `Evaluate the logarithm using technology. Round your answer to three decimal places.   ${C[0]}`, val: C[1], wrongs: [Math.round(-C[1] * 1000) / 1000, Math.round(C[1] * Math.LN10 * 1000) / 1000, Math.round(C[1] / Math.LN10 * 1000) / 1000], solution: `${C[0]} ≈ ${d3(C[1])}` });
+};
+TEMPLATES.b63Simplify = (r) => {
+  const b = pick(r, [2, 3, 5, 7]), k = ri(r, 2, 9), c = ri(r, 2, 6);
+  const C = pick(r, [() => [`${b}^(${logT(b)} x)`, (x) => x, 'x', 'x'], () => [`${b}^(${logT(b)} ${k}x)`, (x) => k * x, `${k}x`, `${k}x`], () => [`e^(ln ${k})`, () => k, String(k), String(k)], () => [`10^(log ${k + 10})`, () => k + 10, String(k + 10), String(k + 10)],
+    () => [`${logT(b)} ${powT(String(b), `${k}x`)}`, (x) => k * x, `${k}x`, `${k}x`], () => [`${logT(2)} ${powT(String(2 ** c), 'x')}`, (x) => c * x, `${c}x`, `${c}x`], () => [`ln ${powT('e', '−x')}`, (x) => -x, '−x', '-x'], () => [`ln ${powT('e', `${c}+${k}x`)}`, (x) => c + k * x, `${c} + ${k}x`, `${c}+${k}x`]])();
+  const [given, truth, ans, key] = C;
+  const ok = (raw) => { const n0 = b6node(raw, truth); return !!n0 && !lgNodes(n0).some((t) => t.t === 'log' || (t.t === 'n' && t.e)); };
+  return { topic: 'Logarithms', stem: `Simplify the expression.   ${given}`, ...buildChoices(r, ans, [`${b}x`, `${logT(b)} ${ans}`, String(b), '1', `${k}`].filter((w) => w !== ans).slice(0, 3), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: '=' }], key: [key], display: ans, check: (v) => ok(v[0]) }, solution: `Logarithms and exponents with the same base undo each other: b^(log_b x) = x and log_b bˣ = x.\n${given} = ${ans}` };
+};
+TEMPLATES.b63Inverse = (r) => {
+  const b = pick(r, [2, 3, 4, 5, 6, 11]), c = ri(r, 2, 13), k = pick(r, [2, 3, 4]);
+  const C = pick(r, [() => [`f(x) = ${powT(String(b), 'x')}`, (x) => Math.log(x) / Math.log(b), `${logT(b)} x`, `\\log_{${b}}x`, [`${powT('x', String(b))}`, `${logT('x')} ${b}`, `${b}x`]],
+    () => [`f(x) = ${powT('(0.3)', 'x')}`, (x) => Math.log(x) / Math.log(0.3), 'log₀.₃ x', '\\log_{0.3}x', ['(0.3)ˣ', 'log x / 0.3', '−0.3ˣ']],
+    () => [`y = ${logT(b)} x`, (x) => b ** x, powT(String(b), 'x'), `${b}^{x}`, [`${powT('x', String(b))}`, `${logT(b)} x`, `${b}x`]],
+    () => [`y = ln(x − ${c})`, (x) => Math.exp(x) + c, `eˣ + ${c}`, `e^{x}+${c}`, [`eˣ − ${c}`, `${powT('e', `x+${c}`)}`, `ln(x + ${c})`]],
+    () => [`f(x) = ${powT('e', `${k}x`)}`, (x) => Math.log(x) / k, `(ln x)/${k}`, `\\frac{\\ln x}{${k}}`, [`ln(${k}x)`, `${k} ln x`, `ln(x/${k})`]],
+    () => [`y = ${powT(String(b), 'x')} − ${c}`, (x) => Math.log(x + c) / Math.log(b), `${logT(b)}(x + ${c})`, `\\log_{${b}}\\left(x+${c}\\right)`, [`${logT(b)}(x − ${c})`, `${logT(b)} x + ${c}`, `${logT(b)} x − ${c}`]],
+    () => [`y = ${c} + log x`, (x) => 10 ** (x - c), powT('10', `x−${c}`), `10^{x-${c}}`, [powT('10', `x+${c}`), `${powT('10', 'x')} − ${c}`, `log(x − ${c})`]],
+    () => [`y = ln ${k}x`, (x) => Math.exp(x) / k, `eˣ/${k}`, `\\frac{e^{x}}{${k}}`, [`${k}eˣ`, `${powT('e', `${k}x`)}`, `eˣ − ${k}`]]])();
+  const [given, truth, ans, key, wr] = C;
+  return { topic: 'Inverse functions', stem: `Find the inverse of the function.   ${given}`, ...buildChoices(r, `y = ${ans}`, wr.map((w) => `y = ${w}`), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: 'y =' }], key: [key], display: `y = ${ans}`, check: (v) => b6eq(v[0], truth, B6XBIG.concat(B6X)) }, solution: `Switch x and y, then solve for y.\nThe inverse is y = ${ans}.` };
+};
+TEMPLATES.b63Word = (r) => {
+  if (r() < 0.5) { const m = pick(r, [1, 3.2, 5, 2.5, 6.3]), e = ri(r, 2, 9), H = m * 10 ** -e, pH = -Math.log10(H);
+    return a1numQ(r, { topic: 'Logarithms', stem: `The pH value for a substance is given by pH = −log[H⁺], where [H⁺] is the hydrogen ion concentration (in moles per liter). Find the pH of a substance with [H⁺] = ${m === 1 ? '' : `${m} × `}10⁻${String(e).split('').map((d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]).join('')}. Round to two decimal places.`, val: Math.round(pH * 100) / 100, tol: 0.011, dec: true, wrongs: [e, Math.round(Math.log10(H) * 100) / 100, Math.round(-Math.log(H) * 100) / 100], solution: `pH = −log(${m === 1 ? '' : `${m} × `}10^(−${e})) ≈ ${pH.toFixed(2)}` }); }
+  const P = pick(r, [57000, 65000, 40000, 50000, 75000]), h = -8005 * Math.log(P / 101300);
+  return a1numQ(r, { topic: 'Logarithms', stem: `An altimeter estimates altitude h (in meters) above sea level from air pressure P (in pascals) by h = −8005 ln(P/101,300). What is the altitude when the air pressure is ${P.toLocaleString('en-US')} pascals? Round to the nearest meter.`, val: Math.round(h), tol: 1.01, unit: 'm', wrongs: [Math.round(-8005 * Math.log10(P / 101300)), Math.round(8005 * Math.log(P / 101300)), Math.round(-8005 * Math.log(101300 / P) * -1 + 1000)], solution: `h = −8005 ln(${P}/101,300) ≈ ${Math.round(h)} m` });
+};
+
+// ---------- 6.4 Transformations of Exponential and Logarithmic Functions ----------
+function b6trans(r, logs) {
+  const base = logs ? pick(r, [2, 4, 5, 'e', 10, 1 / 3]) : pick(r, [2, 3, 4, 5, 'e', 1 / 4, 0.5]), bT = base === 'e' ? 'e' : fracT(base), h = r() < 0.75 ? nz(r, -5, 5) : 0, k = r() < 0.75 ? nz(r, -9, 9) : 0, kind = pick(r, logs ? ['plain', 'refx', 'stretch'] : ['plain', 'refx', 'stretch', 'refy']);
+  const a = kind === 'stretch' ? pick(r, [2, 3, 4, 1 / 2, 1 / 3]) * (r() < 0.3 ? -1 : 1) : kind === 'refx' ? -1 : 1, refy = kind === 'refy';
+  const fT = logs ? `${logT(base === 1 / 3 ? '1/3' : base)} x` : powT(base === 'e' || Number.isInteger(base) ? bT : `(${bT})`, 'x'), aT = a === 1 ? '' : a === -1 ? '−' : Number.isInteger(a) ? String(a) : `(${fracT(a)})`;
+  const inX = `${refy ? '−' : ''}x${h ? `${refy ? (h < 0 ? '−' : '+') : h < 0 ? '+' : '−'}${Math.abs(h)}` : ''}`;
+  const core = logs ? `${logT(base === 1 / 3 ? '1/3' : base)}${h ? `(${inX.replace(/([+−])/, ' $1 ')})` : ` ${inX}`}` : powT(base === 'e' || (Number.isInteger(base) && (a === 1 || a === -1)) ? bT : `(${bT})`, inX);
+  const aK = a === 1 ? '' : a === -1 ? '-' : Number.isInteger(a) ? String(a) : `${a < 0 ? '-' : ''}\\frac{1}{${Math.round(1 / Math.abs(a))}}`, inK = inX.replace(/−/g, '-');
+  const coreK = logs ? (base === 'e' ? `\\ln\\left(${inK}\\right)` : base === 10 ? `\\log\\left(${inK}\\right)` : `\\log_{${base === 1 / 3 ? '\\frac{1}{3}' : base}}\\left(${inK}\\right)`) : `${base === 'e' ? 'e' : `\\left(${base === 0.5 ? '0.5' : fracL(base)}\\right)`}^{${inK}}`;
+  const gK = `${aK}${coreK}${k ? `${k < 0 ? '-' : '+'}${Math.abs(k)}` : ''}`;
+  const gT = `${aT}${core}${k ? ` ${k < 0 ? '−' : '+'} ${Math.abs(k)}` : ''}`;
+  const bv = base === 'e' ? Math.E : base, F = logs ? (x) => Math.log(x) / Math.log(bv) : (x) => bv ** x, G = (x) => a * F(refy ? -(x) + (h ? (refy ? -h : 0) : 0) : x - h) + k;
+  // g(x) = a f(±x − h) + k  (for refy: f(−x − h)?) keep refy without h
+  const parts = [];
+  if (refy) parts.push('a reflection in the y-axis');
+  if (h && !refy) parts.push(`a translation ${Math.abs(h)} unit${Math.abs(h) === 1 ? '' : 's'} ${h > 0 ? 'right' : 'left'}`);
+  if (a < 0) parts.push('a reflection in the x-axis');
+  if (Math.abs(a) !== 1) parts.push(`a vertical ${Math.abs(a) > 1 ? 'stretch' : 'shrink'} by a factor of ${fracT(Math.abs(a))}`);
+  if (k) parts.push(`a translation ${Math.abs(k)} unit${Math.abs(k) === 1 ? '' : 's'} ${k > 0 ? 'up' : 'down'}`);
+  if (!parts.length) return b6trans(r, logs);
+  return { fT, gT, gK, desc: parts.join(', followed by '), parts, h, k, a, refy, F, G: refy ? (x) => a * F(-x) + k : (x) => a * F(x - h) + k, logs };
+}
+TEMPLATES.b64Describe = (r) => {
+  let T; do { T = b6trans(r, r() < 0.4); } while (T.refy && T.h);
+  const flipH = (s) => s.replace(/(\d+ units?) right/, '$1 TMP').replace(/(\d+ units?) left/, '$1 right').replace('TMP', 'left'), flipK = (s) => s.replace(/(\d+ units?) up/, '$1 TMPU').replace(/(\d+ units?) down/, '$1 up').replace('TMPU', 'down');
+  const ans = T.desc, opts = [ans, flipH(ans), flipK(ans), flipH(flipK(ans)), ans.includes('reflection in the x-axis') ? ans.replace('reflection in the x-axis', 'reflection in the y-axis') : null, ans.includes('stretch') ? ans.replace('stretch', 'shrink') : null].filter((o, i, A) => o && A.indexOf(o) === i);
+  if (opts.length < 2) return TEMPLATES.b64Describe(r);
+  const use = [ans, ...shuffle(r, opts.slice(1)).slice(0, 3)];
+  return { topic: 'Transformations', stem: `Describe the transformation of f represented by g.   f(x) = ${T.fT},  g(x) = ${T.gT}`, ...buildChoices(r, ans, use.slice(1), () => null), fr: FR.select('Transformation:', shuffle(r, use), ans),
+    solution: `Compare g with f: ${T.refy ? 'x is replaced by −x; ' : T.h ? `x is replaced by x ${T.h > 0 ? '−' : '+'} ${Math.abs(T.h)}; ` : ''}${T.a !== 1 ? `the function is multiplied by ${fracT(T.a)}; ` : ''}${T.k ? `${Math.abs(T.k)} is ${T.k > 0 ? 'added' : 'subtracted'}; ` : ''}\nSo the graph of g is ${ans} of the graph of f.` };
+};
+TEMPLATES.b64Write = (r) => {
+  let T; do { T = b6trans(r, r() < 0.5); } while (T.refy && T.h);
+  const S = T.logs ? B6XBIG : B6X;
+  return { topic: 'Transformations', stem: `Write a rule for g that represents the indicated transformations of the graph of f.   f(x) = ${T.fT};  ${T.desc}`, ...buildChoices(r, `g(x) = ${T.gT}`, [], (i) => `g(x) = ${b6trans(r, T.logs).gT}`),
+    fr: { fields: [{ kind: 'expr', keys: 'logs', label: 'g(x) =' }], key: [T.gK], display: `g(x) = ${T.gT}`, check: (v) => b6eq(v[0], T.G, S) }, solution: `g(x) = ${T.gT}` };
+};
+
+// ---------- 6.5 Properties of Logarithms ----------
+TEMPLATES.b65Approx = (r) => {
+  const [b, p, q] = pick(r, [[7, 4, 12], [5, 2, 3], [6, 2, 5], [3, 2, 7]]), lp = Math.round(Math.log(p) / Math.log(b) * 1000) / 1000, lq = Math.round(Math.log(q) / Math.log(b) * 1000) / 1000;
+  let i, j; do { i = ri(r, -2, 3); j = ri(r, -1, 2); } while ((!i && !j) || (i === 1 && !j) || (j === 1 && !i));
+  const val = p ** i * q ** j, approx = Math.round((i * lp + j * lq) * 1000) / 1000;
+  const vT = fracT(val);
+  return b6d3Q(r, { topic: 'Properties of logarithms', stem: `Use ${logT(b)} ${p} ≈ ${lp} and ${logT(b)} ${q} ≈ ${lq} to evaluate the logarithm.   ${logT(b)} ${/\//.test(vT) ? `(${vT})` : vT}`, val: approx, tol: 0.0035, wrongs: [Math.round((i * lp - j * lq) * 1000) / 1000, Math.round(lp * lq * 1000) / 1000, Math.round((j * lp + i * lq) * 1000) / 1000],
+    solution: `${vT} = ${[i ? `${p}${i === 1 ? '' : powT('', String(i).replace('-', '−'))}` : '', j ? `${q}${j === 1 ? '' : powT('', String(j).replace('-', '−'))}` : ''].filter(Boolean).join(' · ')}, so ${logT(b)} ${vT} = ${[i ? `${i === 1 ? '' : fmt(i)}${logT(b)} ${p}` : '', j ? `${j === 1 ? '' : fmt(j)}${logT(b)} ${q}` : ''].filter(Boolean).join(' + ').replace(/\+ −/g, '− ')} ≈ ${fmt(approx)}` });
+};
+TEMPLATES.b65ChangeBase = (r) => {
+  const b = pick(r, [7, 9, 6, 8, 2, 4, 5, 3]), [a, aT] = pick(r, [[13, '13'], [15, '15'], [17, '17'], [22, '22'], [28, '28'], [3 / 16, '3/16'], [9 / 40, '9/40'], [5 / 8, '5/8'], [100, '100']]), v = Math.log(a) / Math.log(b);
+  return b6d3Q(r, { topic: 'Properties of logarithms', stem: `Use the change-of-base formula to evaluate the logarithm. Round to three decimal places.   ${logT(b)} ${/\//.test(aT) ? `(${aT})` : aT}`, val: v, wrongs: [Math.round(Math.log(b) / Math.log(a) * 1000) / 1000, Math.round(Math.log10(a) * 1000) / 1000, Math.round(a / b * 1000) / 1000], solution: `${logT(b)} ${aT} = log ${aT} / log ${b} ≈ ${d3(v)}` });
+};
+TEMPLATES.b65Decibel = (r) => {
+  const k = pick(r, [10, 100, 1000, 1000000, 2, 5, 3]), v = 10 * Math.log10(k);
+  return a1numQ(r, { topic: 'Properties of logarithms', stem: `The loudness L (in decibels) of a sound is L(I) = 10 log(I/I₀), where I is the intensity. The intensity of a sound is multiplied by ${k.toLocaleString('en-US')}. By how many decibels does the loudness increase? Round to two decimal places if necessary.`, val: Math.round(v * 100) / 100, tol: 0.011, dec: true, unit: 'dB', wrongs: [k, 10 * k, Math.round(Math.log10(k) * 100) / 100], solution: `L(${k}I) − L(I) = 10 log(${k}I/I₀) − 10 log(I/I₀) = 10 log ${k} ≈ ${fmt(Math.round(v * 100) / 100)} dB` });
+};
+
+// ---------- 6.6 Solving Exponential and Logarithmic Equations ----------
+TEMPLATES.b66Ineq = (r) => {
+  const b = pick(r, [2, 3, 4, 5, 10]), op = pick(r, ['<', '>', '≤', '≥']), kind = pick(r, ['exp', 'exp', 'exp2', 'log', 'logshift']);
+  let text, S, why;
+  if (kind === 'exp') { const k = ri(r, 1, 4); text = `${powT(String(b), 'x')} ${op} ${b ** k}`; S = a2S(op, k); why = `${b ** k} = ${powT(String(b), String(k))}, and ${b}ˣ is increasing, so x ${op} ${k}.`; }
+  else if (kind === 'exp2') { const [B, s] = pick(r, [[9, 3], [4, 2], [8, 2], [25, 5]]), k = pick(r, [3, 5, 1, 7]), e = Math.round(Math.log(B) / Math.log(s)); text = `${powT(String(B), 'x')} ${op} ${s ** k}`; S = a2S(op, k / e); why = `Write both sides with base ${s}: ${powT(String(s), `${e}x`)} ${op} ${powT(String(s), String(k))}, so ${e}x ${op} ${k} and x ${op} ${fracT(k / e)}.`; }
+  else if (kind === 'log') { const k = ri(r, 1, 3), L = b ** k; text = `${logT(b)} x ${op} ${k}`; S = op === '<' || op === '≤' ? [a2I(0, L, false, op === '≤')] : a2S(op, L); why = `Exponentiate: x ${op} ${b}^${k} = ${L}.${op === '<' || op === '≤' ? ' The argument of a logarithm must be positive, so x > 0.' : ''}`; }
+  else { const k = ri(r, 1, 2), c = nz(r, -4, 4), L = b ** k + c; text = `${logT(b)}(x ${c < 0 ? '+' : '−'} ${Math.abs(c)}) ${op} ${k}`; S = op === '<' || op === '≤' ? [a2I(c, L, false, op === '≤')] : a2S(op, L); why = `x ${c < 0 ? '+' : '−'} ${Math.abs(c)} ${op} ${b ** k}, so x ${op} ${L}.${op === '<' || op === '≤' ? ` Also x ${c < 0 ? '+' : '−'} ${Math.abs(c)} > 0, so x > ${c}.` : ''}`; }
+  return a2Q(r, { topic: 'Exponential and logarithmic inequalities', stem: `Solve the inequality.   ${text}`, v: 'x', S, wrongs: [a2rev(S), a2inc(S), S.length === 1 && isFinite(S[0].a) && isFinite(S[0].b) ? a2S(op, S[0].b) : a2S(op, 0)], solution: `${why}\nSolution: ${a2T('x', S)}` });
+};
+TEMPLATES.b66Word = (r) => {
+  const kind = pick(r, ['cool', 'radium', 'double', 'shark']);
+  if (kind === 'cool') { const T0 = pick(r, [280, 180, 350]), TR = pick(r, [80, 72, 70]), T = pick(r, [230, 100, 150].filter((x) => x < T0 && x > TR)), rr = pick(r, [0.0058, 0.067, 0.02]), t = -Math.log((T - TR) / (T0 - TR)) / rr;
+    return a1numQ(r, { topic: 'Solving exponential equations', stem: `Use Newton's Law of Cooling, T = (T₀ − T_R)e^(−rt) + T_R. An object is ${T0}°F and is placed in a room at ${TR}°F. Its cooling rate is r = ${rr}. How long (in minutes) until its temperature reaches ${T}°F? Round to two decimal places.`, val: Math.round(t * 100) / 100, tol: 0.011, dec: true, unit: 'min', wrongs: [Math.round(Math.log((T0 - TR) / (T - TR)) * 100) / 100, Math.round(-Math.log(T / T0) / rr * 100) / 100], solution: `${T} = (${T0} − ${TR})e^(−${rr}t) + ${TR}\n${T - TR} = ${T0 - TR}e^(−${rr}t)\nt = −ln(${T - TR}/${T0 - TR}) / ${rr} ≈ ${t.toFixed(2)} minutes` }); }
+  if (kind === 'radium') { const R0 = 100, g = pick(r, [5, 10, 25, 50]), k = 0.00043, t = Math.log(R0 / g) / k;
+    return a1numQ(r, { topic: 'Solving exponential equations', stem: `The amount R (in grams) of radium present after t years is R = 100e^(−0.00043t). After how many years will only ${g} grams be present? Round to the nearest year.`, val: Math.round(t), tol: 1.01, unit: 'years', wrongs: [Math.round(Math.log10(R0 / g) / k), Math.round((R0 - g) / k / 100)], solution: `${g} = 100e^(−0.00043t) → ln(${g}/100) = −0.00043t → t ≈ ${Math.round(t)} years` }); }
+  if (kind === 'shark') { const t0 = pick(r, [175, 200, 150]), t = -Math.log((266 - t0) / 219) / 0.05;
+    return a1numQ(r, { topic: 'Solving exponential equations', stem: `The length ℓ (in centimeters) of a scalloped hammerhead shark can be modeled by ℓ = 266 − 219e^(−0.05t), where t is the age (in years). How old is a shark that is ${t0} centimeters long? Round to two decimal places.`, val: Math.round(t * 100) / 100, tol: 0.011, dec: true, unit: 'years', wrongs: [Math.round(-Math.log(t0 / 266) / 0.05 * 100) / 100, Math.round(Math.log((266 - t0) / 219) / 0.05 * 100) / 100], solution: `${t0} = 266 − 219e^(−0.05t) → e^(−0.05t) = ${266 - t0}/219 → t = −ln(${266 - t0}/219)/0.05 ≈ ${t.toFixed(2)} years` }); }
+  const P = pick(r, [100, 500, 2000]), T = P * pick(r, [2, 10, 3]), rr = pick(r, [0.06, 0.05, 0.04]), t = Math.log(T / P) / (4 * Math.log(1 + rr / 4)), tc = Math.log(T / P) / rr;
+  return a1numQ(r, { topic: 'Solving exponential equations', stem: `You deposit $${P} in an account that pays ${fmt(rr * 100)}% annual interest compounded quarterly. How long will it take for the balance to reach $${T.toLocaleString('en-US')}? Round to two decimal places.`, val: Math.round(t * 100) / 100, tol: 0.011, dec: true, unit: 'years', wrongs: [Math.round(tc * 100) / 100, Math.round(Math.log(T / P) / Math.log(1 + rr) * 100) / 100], solution: `${T} = ${P}(1 + ${rr}/4)^(4t) → ${T / P} = (${1 + rr / 4})^(4t) → t = ln ${T / P} / (4 ln ${1 + rr / 4}) ≈ ${t.toFixed(2)} years` });
+};
+
+// ---------- 6.7 Modeling with Exponential and Logarithmic Functions ----------
+TEMPLATES.b67Type = (r) => {
+  const kind = pick(r, ['lin', 'exp', 'exp', 'neither']), x0 = pick(r, [0, 1, -2, 5]), dx = pick(r, [1, 3, 5]), X = [0, 1, 2, 3, 4].map((i) => x0 + i * dx);
+  let Y, ans, why;
+  if (kind === 'lin') { const m = nz(r, -11, 11), b = ri(r, -20, 20); Y = X.map((x) => m * x + b); ans = 'Linear'; why = `The y-values change by a constant amount (${fmt(m * dx)}) as x increases by ${dx}.`; }
+  else if (kind === 'exp') { const b = pick(r, [2, 4, 0.5, 3]), a = pick(r, [0.25, 1, 3, 16, 64]); Y = [0, 1, 2, 3, 4].map((i) => a * b ** i); ans = 'Exponential'; why = `The y-values are multiplied by a common ratio (${fmt(b)}) as x increases by ${dx}.`; }
+  else { const qa = pick(r, [1, 2, 3, -1]), qc = ri(r, -5, 9), sh = ri(r, 1, 3); Y = [0, 1, 2, 3, 4].map((i) => qa * (i - sh) ** 2 + qc); ans = 'Neither'; why = 'The y-values have neither a common difference nor a common ratio.'; }
+  if (Y.some((y) => !Number.isInteger(y * 4))) return TEMPLATES.b67Type(r);
+  return b6sel(r, 'Exponential models', 'Determine the type of function represented by the table.', ['Linear', 'Exponential', 'Neither'], ans, why, { draw: a9tableDraw([['x', ...X.map(fmt)], ['y', ...Y.map(fracT)]]), size: [440, 90] });
+};
+TEMPLATES.b67TwoPts = (r) => {
+  const [b, bT] = pick(r, [[2, '2'], [3, '3'], [4, '4'], [1 / 2, '1/2'], [1.5, '1.5'], [5, '5'], [0.2, '0.2']]), a = pick(r, [1, 3, 5, 0.5, 2, 6, 4]), x1 = ri(r, -2, 2), x2 = x1 + ri(r, 1, 3), P = [[x1, a * b ** x1], [x2, a * b ** x2]];
+  if (P.some((p) => !fracParts(p[1]) || fracParts(p[1])[1] > 64 || p[1] > 2000)) return TEMPLATES.b67TwoPts(r);
+  const ans = `y = ${fmt(a) === '1' ? '' : fmt(a)}${powT(`(${bT})`, 'x')}`, okA = (v) => lgOk(v, a), okB = (v) => lgOk(v, b);
+  return { topic: 'Exponential models', stem: `Write an exponential function y = abˣ whose graph passes through the given points.   (${fmt(x1)}, ${fracT(P[0][1])}), (${fmt(x2)}, ${fracT(P[1][1])})`, ...buildChoices(r, ans, [`y = ${fmt(b)}${powT(`(${fmt(a)})`, 'x')}`, `y = ${fmt(a * b)}${powT(`(${bT})`, 'x')}`, `y = ${fmt(a)}${powT(`(${fracT(1 / b)})`, 'x')}`].filter((w) => w !== ans), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'a =' }, { kind: 'expr', keys: 'num', label: 'b =' }], key: [String(a), fracL(b)], display: ans, check: (v) => okA(v[0]) && okB(v[1]), score: (v) => ((okA(v[0]) ? 1 : 0) + (okB(v[1]) ? 1 : 0)) / 2 },
+    solution: `Divide the equations: ${fracT(P[1][1])} / ${fracT(P[0][1])} = b^${x2 - x1}, so b^${x2 - x1} = ${fracT(P[1][1] / P[0][1])} and b = ${bT}.\nThen ${fracT(P[0][1])} = a(${bT})${x1 ? `^${x1}` : '⁰'}, so a = ${fmt(a)}.\n${ans}` };
+};
+
+// ---------- 6.8 Piecewise Functions ----------
+TEMPLATES.b68Eval = (r) => {
+  const c = ri(r, -3, 1), a = pick(r, [2, -1, 3]), p = nz(r, -3, 3), m = pick(r, [2, -3, 1]), q = nz(r, -5, 5), three = r() < 0.4, c2 = c + ri(r, 2, 3);
+  const quad = `${a === 1 ? '' : a === -1 ? '−' : a}x² ${p < 0 ? '−' : '+'} ${Math.abs(p)}`, lin = a1J([[m, 'x'], [q]]), name = pick(r, ['f', 'g']);
+  const P = three ? [[`${-pick(r, [3, 1, 2])}x`.replace('-1x', '−x').replace('-', '−'), `if x ≤ ${c}`, (x) => x <= c], [`${pick(r, [3, 2])}x`, `if ${c} < x < ${c2}`, (x) => x > c && x < c2], [quad, `if x ≥ ${c2}`, (x) => x >= c2]] : [[quad, `if x < ${c}`, (x) => x < c], [lin, `if x ≥ ${c}`, (x) => x >= c]];
+  const evalRule = (t, x) => lgConst(t.replace(/−/g, '-').replace(/x²/g, `(${x})^2`).replace(/x/g, `*(${x})`).replace(/^\*/, '').replace(/([-+ ])\*/g, '$1').replace(/^-\*/, '-'));
+  const x = pick(r, three ? [c, c - 1, c + 1, c2, c2 + 2] : [c, c - 2, c + 1, c + 3]), piece = P.find((pp) => pp[2](x)), val = evalRule(piece[0], x);
+  if (!isFinite(val)) return TEMPLATES.b68Eval(r);
+  return a1numQ(r, { topic: 'Piecewise functions', stem: `Find the indicated value.   ${name}(${fmt(x)})`, val, label: `${name}(${fmt(x)}) =`, draw: a39pwDraw(name, P.map((pp) => [pp[0], pp[1]])), size: [380, three ? 120 : 90], wrongs: P.filter((pp) => pp !== piece).map((pp) => evalRule(pp[0], x)).filter(isFinite),
+    solution: `${fmt(x)} satisfies "${piece[1].replace(/-/g, '−')}", so use ${piece[0]}: ${name}(${fmt(x)}) = ${fmt(val)}.` });
+};
+for (const name of Object.keys(TEMPLATES)) if (/^b6\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+// Algebra II names for matching Pre-Calculus question types (same generators)
+Object.assign(TEMPLATES, { b61Sketch: (r) => TEMPLATES.e51Sketch(r), b62ESketch: (r) => TEMPLATES.e51ESketch(r), b63ToExp: (r) => TEMPLATES.e2ToExp(r), b63ToLog: (r) => TEMPLATES.e2ToLog(r), b63Eval: (r) => TEMPLATES.e2Eval(r), b63Sketch: (r) => TEMPLATES.e52LogSketch(r),
+  b65Expand: (r) => TEMPLATES.e3Expand(r), b65Condense: (r) => TEMPLATES.e3Condense(r), b66ExpEq: (r) => TEMPLATES.e4ExpEq(r), b66LogEq: (r) => TEMPLATES.e4LogEq(r) });
+/* ==== ALGEBRA 2 CH6 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -19675,6 +19952,15 @@ Object.assign(SETS, {
   'alg2-5-5': { subject: 'algebra2', title: '5.5 Performing Function Operations', items: [['b55AddSub', 3], ['b55MulDiv', 4], ['b55Calc', 2], ['b55Domain', 1], ['b55Word', 1]] },
   'alg2-5-6': { subject: 'algebra2', title: '5.6 Composition of Functions', items: [['b56Compose', 3], ['b56Value', 3], ['b56Graph', 2], ['b56Table', 2], ['b56Word', 1], ['b56Pairs', 1]] },
   'alg2-5-7': { subject: 'algebra2', title: '5.7 Inverse of a Function', items: [['b57Inputs', 2], ['b57Linear', 3], ['b57Table', 1], ['b57Power', 4], ['b57Verify', 1], ['b57Word', 1], ['b57FromTable', 1], ['b57LinearSketch', 2], ['b57PowerSketch', 3]] },
+  // ----- Algebra II, Chapter 6: Exponential and Logarithmic Functions -----
+  'alg2-6-1': { subject: 'algebra2', title: '6.1 Exponential Growth and Decay Functions', items: [['b61Eval', 2], ['b61GrowDecay', 2], ['b61Sketch', 2], ['b61Base', 1], ['b61Rate', 2], ['b61Rewrite', 2], ['b61Compound', 2], ['b61Model', 1]] },
+  'alg2-6-2': { subject: 'algebra2', title: '6.2 The Natural Base e', items: [['b62Simplify', 3], ['b62GrowDecay', 2], ['b62ESketch', 2], ['b62Rate', 2], ['b62Continuous', 1]] },
+  'alg2-6-3': { subject: 'algebra2', title: '6.3 Logarithms and Logarithmic Functions', items: [['b63ToExp', 2], ['b63ToLog', 2], ['b63Eval', 2], ['b63Calc', 2], ['b63Simplify', 2], ['b63Inverse', 3], ['b63Sketch', 2], ['b63Word', 1]] },
+  'alg2-6-4': { subject: 'algebra2', title: '6.4 Transformations of Exponential and Logarithmic Functions', items: [['b64Describe', 4], ['b64Write', 4]] },
+  'alg2-6-5': { subject: 'algebra2', title: '6.5 Properties of Logarithms', items: [['b65Approx', 2], ['b65Expand', 3], ['b65Condense', 3], ['b65ChangeBase', 2], ['b65Decibel', 1]] },
+  'alg2-6-6': { subject: 'algebra2', title: '6.6 Solving Exponential and Logarithmic Equations', items: [['b66ExpEq', 4], ['b66LogEq', 4], ['b66Ineq', 2], ['b66Word', 2]] },
+  'alg2-6-7': { subject: 'algebra2', title: '6.7 Modeling with Exponential and Logarithmic Functions', items: [['b67Type', 3], ['b67TwoPts', 3]] },
+  'alg2-6-8': { subject: 'algebra2', title: '6.8 Piecewise Functions', items: [['b68Eval', 4]] },
   // ----- Geometry, Chapter 7: Quadrilaterals and Other Polygons -----
   'geo-7-1': { subject: 'geometry', title: '7.1 Angles of Polygons', items: [['g71Sum', 2], ['g71Sides', 2], ['g71FindX', 4], ['g71Ext', 3], ['g71Regular', 2]] },
   'geo-7-2': { subject: 'geometry', title: '7.2 Properties of Parallelograms', items: [['g72Vars', 3], ['g72Angle', 2], ['g72Diag', 3], ['g72Alg', 3], ['g72Coord', 2]] },
@@ -20096,6 +20382,41 @@ QUESTION_TYPES.push(
   { id: 'b57FromTable', subject: 'algebra2', section: '5.7 Inverse of a Function', label: 'f⁻¹ from a table', desc: '#53' },
   { id: 'b57LinearSketch', subject: 'algebra2', section: '5.7 Inverse of a Function', sketch: true, label: 'Inverse of a linear function, then graph both (students graph)', desc: '#9–16' },
   { id: 'b57PowerSketch', subject: 'algebra2', section: '5.7 Inverse of a Function', sketch: true, label: 'Inverse of a power or radical function, then graph both (students graph)', desc: '#19–24, 29–40' },
+  { id: 'b61Eval', subject: 'algebra2', section: '6.1 Exponential Growth and Decay Functions', label: 'Evaluate exponential expressions', desc: '#1–6' },
+  { id: 'b61GrowDecay', subject: 'algebra2', section: '6.1 Exponential Growth and Decay Functions', label: 'Growth or decay?', desc: '#7–16' },
+  { id: 'b61Sketch', subject: 'algebra2', section: '6.1 Exponential Growth and Decay Functions', sketch: true, label: 'Graph an exponential function (students graph)', desc: '#7–16' },
+  { id: 'b61Base', subject: 'algebra2', section: '6.1 Exponential Growth and Decay Functions', label: 'Find the base from a graph', desc: '#17–18' },
+  { id: 'b61Rate', subject: 'algebra2', section: '6.1 Exponential Growth and Decay Functions', label: 'Percent increase or decrease', desc: '#19–22' },
+  { id: 'b61Rewrite', subject: 'algebra2', section: '6.1 Exponential Growth and Decay Functions', label: 'Rewrite and find the rate', desc: '#27–34' },
+  { id: 'b61Compound', subject: 'algebra2', section: '6.1 Exponential Growth and Decay Functions', label: 'Compound interest', desc: '#35, 39–42' },
+  { id: 'b61Model', subject: 'algebra2', section: '6.1 Exponential Growth and Decay Functions', label: 'Write and use a model', desc: '#21–22' },
+  { id: 'b62Simplify', subject: 'algebra2', section: '6.2 The Natural Base e', label: 'Simplify expressions with e', desc: '#1–10' },
+  { id: 'b62GrowDecay', subject: 'algebra2', section: '6.2 The Natural Base e', label: 'Growth or decay?', desc: '#17–24' },
+  { id: 'b62ESketch', subject: 'algebra2', section: '6.2 The Natural Base e', sketch: true, label: 'Graph a natural exponential function (students graph)', desc: '#17–24' },
+  { id: 'b62Rate', subject: 'algebra2', section: '6.2 The Natural Base e', label: 'Rewrite and find the rate', desc: '#25–28' },
+  { id: 'b62Continuous', subject: 'algebra2', section: '6.2 The Natural Base e', label: 'Continuously compounded interest', desc: '#33' },
+  { id: 'b63ToExp', subject: 'algebra2', section: '6.3 Logarithms and Logarithmic Functions', label: 'Logarithmic to exponential form', desc: '#1–6' },
+  { id: 'b63ToLog', subject: 'algebra2', section: '6.3 Logarithms and Logarithmic Functions', label: 'Exponential to logarithmic form', desc: '#7–12' },
+  { id: 'b63Eval', subject: 'algebra2', section: '6.3 Logarithms and Logarithmic Functions', label: 'Evaluate logarithms', desc: '#13–20' },
+  { id: 'b63Calc', subject: 'algebra2', section: '6.3 Logarithms and Logarithmic Functions', label: 'Logarithms with technology', desc: '#23–28' },
+  { id: 'b63Simplify', subject: 'algebra2', section: '6.3 Logarithms and Logarithmic Functions', label: 'Simplify', desc: '#31–38' },
+  { id: 'b63Inverse', subject: 'algebra2', section: '6.3 Logarithms and Logarithmic Functions', label: 'Find the inverse', desc: '#43–52' },
+  { id: 'b63Sketch', subject: 'algebra2', section: '6.3 Logarithms and Logarithmic Functions', sketch: true, label: 'Graph a logarithmic function (students graph)', desc: '#55–60' },
+  { id: 'b63Word', subject: 'algebra2', section: '6.3 Logarithms and Logarithmic Functions', label: 'pH and altitude', desc: '#29–30' },
+  { id: 'b64Describe', subject: 'algebra2', section: '6.4 Transformations of Exponential and Logarithmic Functions', label: 'Describe the transformation', desc: '#5–28' },
+  { id: 'b64Write', subject: 'algebra2', section: '6.4 Transformations of Exponential and Logarithmic Functions', label: 'Write a rule for g', desc: '#35–42' },
+  { id: 'b65Approx', subject: 'algebra2', section: '6.5 Properties of Logarithms', label: 'Evaluate using given logarithms', desc: '#5–10' },
+  { id: 'b65Expand', subject: 'algebra2', section: '6.5 Properties of Logarithms', label: 'Expand', desc: '#11–18' },
+  { id: 'b65Condense', subject: 'algebra2', section: '6.5 Properties of Logarithms', label: 'Condense', desc: '#21–28' },
+  { id: 'b65ChangeBase', subject: 'algebra2', section: '6.5 Properties of Logarithms', label: 'Change-of-base formula', desc: '#29–36' },
+  { id: 'b65Decibel', subject: 'algebra2', section: '6.5 Properties of Logarithms', label: 'Loudness in decibels', desc: '#37–38' },
+  { id: 'b66ExpEq', subject: 'algebra2', section: '6.6 Solving Exponential and Logarithmic Equations', label: 'Exponential equations', desc: '#1–12' },
+  { id: 'b66LogEq', subject: 'algebra2', section: '6.6 Solving Exponential and Logarithmic Equations', label: 'Logarithmic equations', desc: '#17–34' },
+  { id: 'b66Ineq', subject: 'algebra2', section: '6.6 Solving Exponential and Logarithmic Equations', label: 'Inequalities', desc: '#41–52' },
+  { id: 'b66Word', subject: 'algebra2', section: '6.6 Solving Exponential and Logarithmic Equations', label: 'Real-life equations', desc: '#13–16, 37' },
+  { id: 'b67Type', subject: 'algebra2', section: '6.7 Modeling with Exponential and Logarithmic Functions', label: 'Linear, exponential, or neither?', desc: '#1–4' },
+  { id: 'b67TwoPts', subject: 'algebra2', section: '6.7 Modeling with Exponential and Logarithmic Functions', label: 'Exponential function through two points', desc: '#5–12' },
+  { id: 'b68Eval', subject: 'algebra2', section: '6.8 Piecewise Functions', label: 'Evaluate a piecewise function', desc: '#1–8' },
   { id: 'g71Sum', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Interior angle sum', desc: '#1–4' },
   { id: 'g71Sides', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Number of sides from the sum', desc: 'Classify the polygon (#5–8)' },
   { id: 'g71FindX', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Find x from interior angles', desc: '#9–14, 17–20' },
@@ -22154,7 +22475,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
