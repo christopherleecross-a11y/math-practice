@@ -21054,6 +21054,269 @@ TEMPLATES.b14LineFit = (r) => TEMPLATES.a45LineFit(r);
 TEMPLATES.b14Correlation = (r) => TEMPLATES.a46Correlation(r);
 TEMPLATES.b14Perp = (r) => TEMPLATES.a44PerpThrough(r);
 /* ==== ALGEBRA 2 CH1 END ==== */
+/* ==== ALGEBRA 2 CH2 BEGIN ==== */
+/* ---------- Algebra 2 (Big Ideas Learning 2025), Chapter 2: Quadratic Functions ---------- */
+KEYROWS_P.quadfn = [['x²', '^2'], ['( )', '\\left(#?\\right)'], ['a⁄b', '\\frac{#@}{#?}'], ['( , )', '\\left(#?,#?\\right)']];
+const b2co = (a) => (a === 1 ? '' : a === -1 ? MINUS : fracT(a).replace(/^(−?)(\d+)\/(\d+)$/, '$1($2/$3)'));
+const b2coL = (a) => (a === 1 ? '' : a === -1 ? '-' : fracL(a));
+const b2sq = (h, v = 'x') => (h === 0 ? `${v}²` : `(${v} ${h > 0 ? '−' : '+'} ${fracT(Math.abs(h))})²`);
+const b2sqL = (h, v = 'x') => (h === 0 ? `${v}^2` : `\\left(${v}${h > 0 ? '-' : '+'}${fracL(Math.abs(h))}\\right)^2`);
+const b2kT = (k) => (k === 0 ? '' : ` ${k > 0 ? '+' : '−'} ${fracT(Math.abs(k))}`);
+const b2kL = (k) => (k === 0 ? '' : `${k > 0 ? '+' : '-'}${fracL(Math.abs(k))}`);
+// a(x − h)² + k
+const b2VF = (a, h, k) => `${b2co(a)}${b2sq(h)}${b2kT(k)}`;
+const b2VFL = (a, h, k) => `${b2coL(a)}${b2sqL(h)}${b2kL(k)}`;
+const b2R = (x) => { const v = Math.round(x * 1e12) / 1e12, q = fracParts(v); return q ? q[0] / q[1] : Math.round(v * 1e9) / 1e9; };
+const b2fnOk = (raw, f) => pxEquiv(String(raw || '').replace(/^\s*[a-z]\s*(\\left)?\(\s*[a-z]\s*(\\right)?\)\s*=/, '').replace(/^\s*[a-z]\s*=/, ''), f, { lo: -9, hi: 9 });
+const b2xeq = (raw, c, v = 'x') => { const s = (pxPlain(raw) || '').replace(/\s+/g, ''); const m = new RegExp(`^${v}=(.+)$`).exec(s); return !!m && Math.abs(pxConst(m[1]) - c) < 1e-9; };
+const b2ptOk = (raw, P) => a3ptOk(raw, P);
+// a function-rule question
+function b2fnQ(r, { topic, stem, name = 'g', T, L, f, wrongs = [], solution, draw, size }) {
+  const lhs = name === 'y' ? 'y' : `${name}(x)`, c = `${lhs} = ${T}`, W = [...new Set(wrongs.filter((w) => w && w !== T).map((w) => `${lhs} = ${w}`))].filter((w) => w !== c);
+  return { topic, stem, draw, size, ...buildChoices(r, c, W, () => null), fr: { fields: [{ kind: 'expr', keys: 'quadfn', label: `${lhs} =` }], key: [L], display: c, check: (v) => b2fnOk(v[0], f) }, solution };
+}
+
+// ---------- 2.1 Transformations of Quadratic Functions ----------
+const b2parts = (a, h, k, hs = 1) => [h ? `a translation ${fracT(Math.abs(h))} unit${Math.abs(h) === 1 ? '' : 's'} ${h > 0 ? 'right' : 'left'}` : '', hs !== 1 ? `a horizontal ${hs > 1 ? 'stretch' : 'shrink'} by a factor of ${fracT(hs)}` : '', Math.abs(a) !== 1 ? `a vertical ${Math.abs(a) > 1 ? 'stretch' : 'shrink'} by a factor of ${fracT(Math.abs(a))}` : '', a < 0 ? 'a reflection in the x-axis' : '', k ? `a translation ${fracT(Math.abs(k))} unit${Math.abs(k) === 1 ? '' : 's'} ${k > 0 ? 'up' : 'down'}` : ''].filter(Boolean);
+const b2join = (p) => { const s = p.length > 1 ? `${p.slice(0, -1).join(', ')}${p.length > 2 ? ',' : ''} and ${p[p.length - 1]}` : p[0] || 'no transformation'; return s[0].toUpperCase() + s.slice(1); };
+TEMPLATES.b21Describe = (r) => {
+  for (let t = 0; t < 40; t++) {
+    const kind = pick(r, ['shift', 'shift', 'vert', 'horiz']), h = kind === 'shift' ? ri(r, -10, 10) : pick(r, [0, 0, ri(r, -5, 5)]), k = ri(r, -8, 8);
+    let a = 1, hs = 1, g;
+    if (kind === 'vert') { a = pick(r, [3, -1, 1 / 3, -2, 1 / 2, 4]); g = b2VF(a, h, k); }
+    else if (kind === 'horiz') { const c = pick(r, [2, 3, 1 / 2, 1 / 3]); hs = 1 / c; g = `(${fracT(c).replace(/^(\d+)\/(\d+)$/, '($1/$2)')}x)²${b2kT(k)}`; a = 1; if (h) continue; }
+    else g = b2VF(1, h, k);
+    if (!h && !k && a === 1 && hs === 1) continue;
+    const ans = b2join(b2parts(a, h, k, hs)), W = [b2join(b2parts(a, -h, k, hs)), b2join(b2parts(a, h, -k, hs)), b2join(b2parts(-a, h, k, hs)), b2join(b2parts(a, h, k, hs === 1 ? 1 : 1 / hs))].filter((w, i, A) => w !== ans && A.indexOf(w) === i);
+    if (W.length < 2) continue;
+    return { topic: 'Transformations of quadratic functions', stem: `Describe the transformation of f(x) = x² represented by g(x) = ${g}.`, ...buildChoices(r, ans, W, () => null), fr: FR.select('Choose:', shuffle(r, [ans, ...W.slice(0, 3)]), ans),
+      solution: `Compare g(x) = ${g} with f(x) = x²: ${ans.toLowerCase()}.` };
+  }
+};
+TEMPLATES.b21Vertex = (r) => {
+  const a = pick(r, [3, -4, -2, 1 / 2, 1, -1, 2]), h = nz(r, -6, 6), k = nz(r, -8, 8), g = b2VF(a, h, k), c = `(${fracT(h)}, ${fracT(k)})`;
+  return { topic: 'Transformations of quadratic functions', stem: `Describe the transformation of the graph of the parent quadratic function. Then identify the vertex.   f(x) = ${g}`, ...buildChoices(r, `${b2join(b2parts(a, h, k))}; vertex ${c}`, [`${b2join(b2parts(a, -h, k))}; vertex (${fracT(-h)}, ${fracT(k)})`, `${b2join(b2parts(a, h, -k))}; vertex (${fracT(h)}, ${fracT(-k)})`, `${b2join(b2parts(a, -h, -k))}; vertex (${fracT(-h)}, ${fracT(-k)})`].filter((w, i, A) => A.indexOf(w) === i), () => null),
+    fr: { frStem: `Identify the vertex of the graph of the function.   f(x) = ${g}`, fields: [{ kind: 'expr', keys: 'pts2', label: 'Vertex:' }], key: [`\\left(${fracL(h)},${fracL(k)}\\right)`], display: c, check: (v) => b2ptOk(v[0], [h, k]) },
+    solution: `f(x) = a(x − h)² + k has vertex (h, k).\n${b2join(b2parts(a, h, k))}. The vertex is ${c}.` };
+};
+TEMPLATES.b21Sketch = (r) => {
+  for (;;) {
+    const a = pick(r, [1, 1, -1, 2, -2, 1 / 2, -1 / 2]), h = ri(r, -4, 4), k = ri(r, -5, 5), dx = a === 1 / 2 || a === -1 / 2 ? 2 : 1, V = [h, k], P = [h + dx, k + a * dx * dx], T = (x) => a * (x - h) ** 2 + k;
+    const W = skWin([V, P, [h - dx, P[1]]]); if (!W || !skOk(W, [V, P])) continue;
+    return skQ({ topic: 'Transformations of quadratic functions', stem: `Graph the function: place the vertex, then one more point.   g(x) = ${b2VF(a, h, k)}`, family: 'quad', target: T, keyPts: [V, P], win: W, display: `Vertex (${fracT(h)}, ${fracT(k)}); through ${ptT(P)}`,
+      solution: `The vertex is (${fracT(h)}, ${fracT(k)}). Moving ${dx} unit${dx > 1 ? 's' : ''} right from the vertex, the graph goes ${a > 0 ? 'up' : 'down'} ${fracT(Math.abs(a * dx * dx))}: ${ptT(P)}.` });
+  }
+};
+// #29–32: write a rule for g; vertex-form state (a, h, k) under each transformation
+const b2apply = ({ a, h, k }, [kind, n]) => ({ vs: { a: b2R(a * n), h, k: b2R(k * n) }, hs: { a: b2R(a / (n * n)), h: b2R(h * n), k }, rx: { a: -a, h, k: -k }, ry: { a, h: -h, k }, up: { a, h, k: k + n }, down: { a, h, k: k - n }, left: { a, h: h - n, k }, right: { a, h: h + n, k } }[kind]);
+const b2tT = ([kind, n]) => ({ vs: `vertical ${n > 1 ? 'stretch' : 'shrink'} by a factor of ${fracT(n)}`, hs: `horizontal ${n > 1 ? 'stretch' : 'shrink'} by a factor of ${fracT(n)}`, rx: 'reflection in the x-axis', ry: 'reflection in the y-axis', up: `translation ${n} unit${n > 1 ? 's' : ''} up`, down: `translation ${n} unit${n > 1 ? 's' : ''} down`, left: `translation ${n} unit${n > 1 ? 's' : ''} left`, right: `translation ${n} unit${n > 1 ? 's' : ''} right` }[kind]);
+TEMPLATES.b21Write = (r) => {
+  for (let t = 0; t < 80; t++) {
+    const F = r() < 0.5 ? { a: 1, h: 0, k: 0 } : { a: pick(r, [8, 2, -1, 1 / 2]), h: ri(r, -6, 4), k: ri(r, -6, 6) };
+    const T1 = pick(r, [() => ['vs', pick(r, [2, 3, 4, 1 / 2, 1 / 3])], () => ['hs', pick(r, [2, 3, 1 / 2])], () => [pick(r, ['rx', 'ry']), 1]])(), T2 = pick(r, [() => [pick(r, ['up', 'down', 'left', 'right']), ri(r, 1, 6)], () => [pick(r, ['rx', 'ry']), 1]])();
+    if (T2[0] === T1[0] || (T1[0] === 'ry' && F.h === 0) || (T2[0] === 'ry' && F.h === 0 && T1[0] !== 'hs')) continue;
+    const G = b2apply(b2apply(F, T1), T2), f = (x) => G.a * (x - G.h) ** 2 + G.k;
+    const wr = [b2apply(b2apply(F, T2), T1), b2apply(F, T1), { ...G, h: -G.h }, { ...G, k: -G.k }, { ...G, a: -G.a }, { ...G, a: b2R(G.a * 2) }, { ...G, h: G.h + 1 }].map((Q) => b2VF(Q.a, Q.h, Q.k));
+    const fT = F.a === 1 && !F.h && !F.k ? 'x²' : b2VF(F.a, F.h, F.k);
+    return b2fnQ(r, { topic: 'Writing transformations', stem: `Write a rule for g described by the transformations of the graph of f.   f(x) = ${fT};  ${b2tT(T1)}, followed by a ${b2tT(T2)}`, T: b2VF(G.a, G.h, G.k), L: b2VFL(G.a, G.h, G.k), f, wrongs: wr,
+      solution: `After the ${b2tT(T1)}: ${b2VF(b2apply(F, T1).a, b2apply(F, T1).h, b2apply(F, T1).k)}.\nAfter the ${b2tT(T2)}: g(x) = ${b2VF(G.a, G.h, G.k)}.\nThe vertex is (${fracT(G.h)}, ${fracT(G.k)}).` });
+  }
+};
+TEMPLATES.b21Word = (r) => {
+  const d = pick(r, [20, 30, 40]), sh = pick(r, [2, 3, 5]), f = (x) => -(x - sh) * (x - sh) / d + (x - sh), T = `−(1/${d})(x − ${sh})² + (x − ${sh})`, L = `-\\frac{1}{${d}}\\left(x-${sh}\\right)^2+x-${sh}`;
+  return b2fnQ(r, { topic: 'Transformations in real life', name: 'g', stem: `The height (in inches) of a grasshopper during a jump can be modeled by h(x) = −(1/${d})x² + x, where x is the horizontal distance traveled (in inches). When the grasshopper jumps off a rock, it lands on the ground ${sh} inches farther away. Write a function g that models the new path of the jump (a translation ${sh} units right).`, T, L, f,
+    wrongs: [`−(1/${d})(x + ${sh})² + (x + ${sh})`, `−(1/${d})x² + x + ${sh}`, `−(1/${d})(x − ${sh})² + x`], solution: `A translation ${sh} units right replaces x with x − ${sh}: g(x) = h(x − ${sh}) = ${T}.` });
+};
+
+// ---------- 2.2 Characteristics of Quadratic Functions ----------
+TEMPLATES.b22VertexAxis = (r) => {
+  const a = pick(r, [1, -4, 4, -1 / 4, 1 / 2, 2, -2, 0.4, 0.75]), h = ri(r, -7, 7), k = ri(r, -6, 6), form = a === 0.4 || a === 0.75 ? 'dec' : '';
+  const g = form ? `${a}${b2sq(h)}${b2kT(k)}` : b2VF(a, h, k), ok1 = (v) => b2ptOk(v, [h, k]), ok2 = (v) => b2xeq(v, h), c = `vertex (${fracT(h)}, ${fracT(k)}); axis of symmetry x = ${fracT(h)}`;
+  return { topic: 'Characteristics of quadratic functions', stem: `Find the vertex and the axis of symmetry of the graph of the function.   y = ${g}`, ...buildChoices(r, c, [`vertex (${fracT(-h)}, ${fracT(k)}); axis of symmetry x = ${fracT(-h)}`, `vertex (${fracT(k)}, ${fracT(h)}); axis of symmetry x = ${fracT(k)}`, `vertex (${fracT(h)}, ${fracT(-k)}); axis of symmetry y = ${fracT(-k)}`].filter((w, i, A) => w !== c && A.indexOf(w) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'pts2', label: 'Vertex:' }, { kind: 'expr', keys: 'num', label: 'Axis of symmetry:' }], key: [`\\left(${fracL(h)},${fracL(k)}\\right)`, `x=${fracL(h)}`], display: c, check: (v) => ok1(v[0]) && ok2(v[1]), score: (v) => ((ok1(v[0]) ? 1 : 0) + (ok2(v[1]) ? 1 : 0)) / 2 },
+    solution: `y = a(x − h)² + k has vertex (h, k) and axis of symmetry x = h.\nVertex (${fracT(h)}, ${fracT(k)}); axis of symmetry x = ${fracT(h)}.` };
+};
+const b2std = (r) => { for (;;) { const a = pick(r, [1, -1, 3, -4, 2, -2, 0.5, -1.5, 1 / 4]), h = pick(r, [nz(r, -5, 5), nz(r, -5, 5) / 2]), k = ri(r, -9, 9), b = b2R(-2 * a * h), c = b2R(a * h * h + k); if (!Number.isInteger(b * 10) || !Number.isInteger(c * 100)) continue; return { a, b, c, h, k }; } };
+const b2stdT = ({ a, b, c }) => polyT([a, b, c]).replace(/(\d)\.(\d+)/g, (m) => m);
+TEMPLATES.b22Standard = (r) => {
+  const Q = b2std(r), { a, b, h, k } = Q, ok1 = (v) => b2ptOk(v, [h, k]), ok2 = (v) => b2xeq(v, h), c = `vertex (${fracT(h)}, ${fracT(k)}); axis of symmetry x = ${fracT(h)}`;
+  return { topic: 'Characteristics of quadratic functions', stem: `Find the vertex and the axis of symmetry of the graph of the function.   y = ${b2stdT(Q)}`, ...buildChoices(r, c, [`vertex (${fracT(-h)}, ${fracT(b2R(a * h * h + b * -h + Q.c))}); axis of symmetry x = ${fracT(-h)}`, `vertex (${fracT(h)}, ${fracT(Q.c)}); axis of symmetry x = ${fracT(h)}`, `vertex (${fracT(b2R(-b / a))}, ${fracT(b2R(a * (b / a) ** 2 - b * b / a + Q.c))}); axis of symmetry x = ${fracT(b2R(-b / a))}`].filter((w, i, A) => w !== c && A.indexOf(w) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'pts2', label: 'Vertex:' }, { kind: 'expr', keys: 'num', label: 'Axis of symmetry:' }], key: [`\\left(${fracL(h)},${fracL(k)}\\right)`, `x=${fracL(h)}`], display: c, check: (v) => ok1(v[0]) && ok2(v[1]), score: (v) => ((ok1(v[0]) ? 1 : 0) + (ok2(v[1]) ? 1 : 0)) / 2 },
+    solution: `x = −b/(2a) = −(${fmt(b)})/(2 · ${fmt(a)}) = ${fracT(h)}.\ny = ${fmt(a)}(${fracT(h)})² ${b < 0 ? '−' : '+'} ${fmt(Math.abs(b))}(${fracT(h)}) ${Q.c < 0 ? '−' : '+'} ${fmt(Math.abs(Q.c))} = ${fracT(k)}.\nVertex (${fracT(h)}, ${fracT(k)}); axis of symmetry x = ${fracT(h)}.`.replace(/\+ 0\(.*?\)/, '').replace(/ \+ 0\b/g, '') };
+};
+TEMPLATES.b22MinMax = (r) => {
+  const Q = b2std(r), { a, h, k } = Q, type = a > 0 ? 'Minimum' : 'Maximum', RS = a > 0 ? [{ a: k, b: Infinity, ca: true, cb: false }] : [{ a: -Infinity, b: k, ca: false, cb: true }], rT = `y ${a > 0 ? '≥' : '≤'} ${fracT(k)}`;
+  const ok0 = (v) => v === type, ok1 = (v) => numOk(String(v || '').replace(/^[a-z]\s*=/, ''), k), ok2 = (v) => setOk(v, RS);
+  const c = `${type} value ${fracT(k)}; domain: all real numbers; range: ${rT}; ${a > 0 ? 'decreasing' : 'increasing'} when x < ${fracT(h)} and ${a > 0 ? 'increasing' : 'decreasing'} when x > ${fracT(h)}`;
+  return { topic: 'Minimum and maximum values', stem: `Find the minimum value or maximum value of the function. Find the domain and range of the function, and when the function is increasing and decreasing.   y = ${b2stdT(Q)}`,
+    ...buildChoices(r, c, [`${a > 0 ? 'Maximum' : 'Minimum'} value ${fracT(k)}; domain: all real numbers; range: y ${a > 0 ? '≤' : '≥'} ${fracT(k)}; ${a > 0 ? 'increasing' : 'decreasing'} when x < ${fracT(h)} and ${a > 0 ? 'decreasing' : 'increasing'} when x > ${fracT(h)}`, `${type} value ${fracT(h)}; domain: all real numbers; range: y ${a > 0 ? '≥' : '≤'} ${fracT(h)}; ${a > 0 ? 'decreasing' : 'increasing'} when x < ${fracT(k)} and ${a > 0 ? 'increasing' : 'decreasing'} when x > ${fracT(k)}`, `${type} value ${fracT(k)}; domain: all real numbers; range: ${rT}; ${a > 0 ? 'increasing' : 'decreasing'} when x < ${fracT(h)} and ${a > 0 ? 'decreasing' : 'increasing'} when x > ${fracT(h)}`].filter((w) => w !== c), () => null),
+    fr: { frStem: `Find the minimum value or maximum value of the function, and the range.   y = ${b2stdT(Q)}`, fields: [{ kind: 'select', label: 'Type:', options: ['Minimum', 'Maximum'] }, { kind: 'expr', keys: 'num', label: 'Value:' }, { kind: 'expr', keys: 'ineq', label: 'Range:' }], key: [type, fracL(k), `y${a > 0 ? '\\ge ' : '\\le '}${fracL(k)}`], display: `${type} value ${fracT(k)}; range ${rT}`,
+      check: (v) => ok0(v[0]) && ok1(v[1]) && ok2(v[2]), score: (v) => ((ok0(v[0]) ? 1 : 0) + (ok1(v[1]) ? 1 : 0) + (ok2(v[2]) ? 1 : 0)) / 3 },
+    solution: `a = ${fmt(a)} ${a > 0 ? '> 0, so the parabola opens up and has a minimum' : '< 0, so the parabola opens down and has a maximum'}.\nx = −b/(2a) = ${fracT(h)}, and y = ${fracT(k)} there.\n${c}.` };
+};
+TEMPLATES.b22Intercept = (r) => {
+  for (;;) {
+    const a = pick(r, [1, 1, 3, 2, -1, -4, 1 / 2, -2]), p = ri(r, -7, 7), q = pick(r, [p, ri(r, -7, 7), ri(r, -7, 7)]); if ((p === q && r() < 0.8) || (p === 0 && q === 0)) continue;
+    const fT = p === q ? `${b2co(a)}(x ${p > 0 ? '−' : '+'} ${Math.abs(p)})²`.replace('(x + 0)', 'x').replace('(x − 0)', 'x') : `${b2co(a)}${p === 0 ? 'x' : `(x ${p > 0 ? '−' : '+'} ${Math.abs(p)})`}${q === 0 ? 'x' : `(x ${q > 0 ? '−' : '+'} ${Math.abs(q)})`}`;
+    const h = (p + q) / 2, k = b2R(a * (h - p) * (h - q)), Z = [...new Set([p, q])].sort((u, v) => u - v);
+    const ok1 = (v) => realListOk(v, Z), ok2 = (v) => b2ptOk(v, [h, k]), ok3 = (v) => b2xeq(v, h), c = `x-intercept${Z.length > 1 ? 's' : ''} ${Z.map(fracT).join(' and ')}; vertex (${fracT(h)}, ${fracT(k)}); axis of symmetry x = ${fracT(h)}`;
+    return { topic: 'Intercept form', stem: `Find the x-intercept(s), the vertex, and the axis of symmetry of the graph of the function.   y = ${fT}`,
+      ...buildChoices(r, c, [`x-intercept${Z.length > 1 ? 's' : ''} ${Z.map((z) => fracT(-z)).reverse().join(' and ')}; vertex (${fracT(-h)}, ${fracT(k)}); axis of symmetry x = ${fracT(-h)}`, `x-intercept${Z.length > 1 ? 's' : ''} ${Z.map(fracT).join(' and ')}; vertex (${fracT(h)}, ${fracT(-k)}); axis of symmetry x = ${fracT(h)}`, `x-intercept${Z.length > 1 ? 's' : ''} ${Z.map(fracT).join(' and ')}; vertex (${fracT(h)}, ${fracT(a * p * q)}); axis of symmetry x = ${fracT(h)}`].filter((w, i, A) => w !== c && A.indexOf(w) === i), () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'pts2', label: 'x-intercept(s):' }, { kind: 'expr', keys: 'pts2', label: 'Vertex:' }, { kind: 'expr', keys: 'pts2', label: 'Axis of symmetry:' }], key: [Z.map(fracL).join(','), `\\left(${fracL(h)},${fracL(k)}\\right)`, `x=${fracL(h)}`], display: c, check: (v) => ok1(v[0]) && ok2(v[1]) && ok3(v[2]), score: (v) => ((ok1(v[0]) ? 1 : 0) + (ok2(v[1]) ? 1 : 0) + (ok3(v[2]) ? 1 : 0)) / 3 },
+      solution: `y = a(x − p)(x − q) has x-intercepts p and q: ${Z.map(fracT).join(' and ')}.\nThe axis of symmetry is halfway between them: x = ${fracT(h)}.\ny = ${fT.replace(/x/g, `(${fracT(h)})`)} = ${fracT(k)}, so the vertex is (${fracT(h)}, ${fracT(k)}).` };
+  }
+};
+TEMPLATES.b22Sketch = (r) => {
+  for (;;) {
+    const Q = b2std(r), { a, h, k } = Q; if (!Number.isInteger(h) || !Number.isInteger(k) || !Number.isInteger(a) || Math.abs(a) > 2) continue;
+    const V = [h, k], P = [h + 1, k + a], W = skWin([V, P, [h - 1, P[1]]]); if (!W || !skOk(W, [V, P])) continue;
+    return skQ({ topic: 'Characteristics of quadratic functions', stem: `Graph the function: place the vertex, then one more point.   y = ${b2stdT(Q)}`, family: 'quad', target: (x) => a * (x - h) ** 2 + k, keyPts: [V, P], win: W, display: `Vertex (${h}, ${k}); axis x = ${h}`,
+      solution: `x = −b/(2a) = ${h}, and y = ${k}: the vertex is (${h}, ${k}). One unit right of the vertex, y = ${k + a}.` });
+  }
+};
+TEMPLATES.b22Word = (r) => {
+  const C = pick(r, [() => { const a = -pick(r, [0.02, 0.04]), b = 1, c = pick(r, [6, 5]); return [`The path of a basketball thrown at an angle of 45° can be modeled by y = ${a}x² + x + ${c}, where x is the horizontal distance (in feet) and y is the height (in feet).`, a, b, c, 'feet']; },
+    () => { const a = -0.01, b = pick(r, [0.7, 0.6, 0.8]), c = pick(r, [6, 5]); return [`The path of a shot put released at an angle of 35° can be modeled by y = −0.01x² + ${b}x + ${c}, where x is the horizontal distance (in feet) and y is the height (in feet).`, a, b, c, 'feet']; },
+    () => { const a = -9, b = 9, c = pick(r, [1, 3]); return [`The path of a diver is modeled by f(x) = −9x² + 9x + ${c}, where f(x) is the height of the diver (in meters) above the water and x is the horizontal distance (in meters) from the end of the diving board.`, a, b, c, 'meters']; }])();
+  const [txt, a, b, c, u] = C, h = b2R(-b / (2 * a)), k = Math.round((a * h * h + b * h + c) * 1000) / 1000, ok = (v) => { const s = (pxPlain(v) || '').replace(/\s+/g, '').replace(/^\(|\)$/g, '').split(','); return s.length === 2 && Math.abs(pxConst(s[0]) - h) < 0.011 && Math.abs(pxConst(s[1]) - k) < 0.011; };
+  const cT = `(${fmt(h)}, ${fmt(k)})`;
+  return { topic: 'Characteristics in real life', stem: `${txt} Find the coordinates of the vertex. What does the vertex represent?`, ...buildChoices(r, `${cT}: the maximum height is ${fmt(k)} ${u}, at a horizontal distance of ${fmt(h)} ${u}`, [`(${fmt(-h)}, ${fmt(k)}): the maximum height is ${fmt(k)} ${u}`, `(${fmt(h)}, ${fmt(c)}): the maximum height is ${fmt(c)} ${u}`, `${cT}: the ${u === 'meters' ? 'diver' : 'object'} lands ${fmt(h)} ${u} away`], () => null),
+    fr: { frStem: `${txt} Find the coordinates of the vertex.`, fields: [{ kind: 'expr', keys: 'pts2', label: 'Vertex:' }], key: [`\\left(${h},${k}\\right)`], display: cT, check: (v) => ok(v[0]) },
+    solution: `x = −b/(2a) = −(${fmt(b)})/(2(${fmt(a)})) = ${fmt(h)}.\ny = ${fmt(a)}(${fmt(h)})² + ${fmt(b)}(${fmt(h)}) + ${fmt(c)} = ${fmt(k)}.\nThe vertex ${cT} means the maximum height is ${fmt(k)} ${u}, reached ${fmt(h)} ${u} from the start.` };
+};
+TEMPLATES.b22SameAxis = (r) => {
+  const b = pick(r, [2, -4, 6, 4]), h = -b / 2, opts = [[2, 2 * b, 2], [-3, -3 * b, 2], [1, -b, 2], [-5, 5 * b, 2]], T = (q) => `y = ${polyT(q)}`;
+  const good = [opts[0], opts[1]].map(T), correct = good[pick(r, [0, 1])];
+  return b6sel(r, 'Characteristics of quadratic functions', `The graph of which function has the same axis of symmetry as the graph of y = ${polyT([1, b, 2])}?`, shuffle(r, [correct, T(opts[2]), T(opts[3]), T([3, b, 1])].filter((w, i, A) => A.indexOf(w) === i)), correct,
+    `The axis of y = ${polyT([1, b, 2])} is x = −b/(2a) = ${fracT(h)}. For ${correct}, x = −b/(2a) is also ${fracT(h)}.`);
+};
+
+// ---------- 2.3 Focus of a Parabola ----------
+// parabola y = x²/(4p) (vertical) or x = y²/(4p) (horizontal), vertex (h, k)
+const b2parT = (vert, p, h = 0, k = 0) => { const c = b2R(1 / (4 * p)); return vert ? `y = ${b2co(c)}${b2sq(h)}${b2kT(k)}` : `x = ${b2co(c)}${b2sq(k, 'y')}${b2kT(h)}`; };
+const b2parL = (vert, p, h = 0, k = 0) => { const c = b2R(1 / (4 * p)); return vert ? `y=${b2coL(c)}${b2sqL(h)}${b2kL(k)}` : `x=${b2coL(c)}${b2sqL(k, 'y')}${b2kL(h)}`; };
+// does the typed equation describe the same curve? (true on points of the parabola, false off it)
+function b2curveOk(raw, vert, p, h = 0, k = 0) {
+  const s = String(raw || ''), parts = s.split('='); if (parts.length !== 2) return false;
+  const L = pxParse(parts[0], ['x', 'y'], ''), R = pxParse(parts[1], ['x', 'y'], ''); if (!L || !R) return false;
+  const F = (x, y) => L({ x, y }) - R({ x, y }), on = [], off = [];
+  for (const t of [-3.3, -1.7, -0.6, 0.4, 1.9, 2.8]) { const u = t * Math.max(1, Math.abs(p)); const w = (u * u) / (4 * p); if (vert) { on.push([h + u, k + w]); off.push([h + u, k + w + 0.7 * Math.max(1, Math.abs(p))]); } else { on.push([h + w, k + u]); off.push([h + w + 0.7 * Math.max(1, Math.abs(p)), k + u]); } }
+  const sc = Math.max(...off.map(([x, y]) => Math.abs(F(x, y))));
+  if (!isFinite(sc) || sc < 1e-9) return false;
+  return on.every(([x, y]) => Math.abs(F(x, y)) < 1e-7 * Math.max(1, sc)) && off.every(([x, y]) => Math.abs(F(x, y)) > 1e-6 * sc);
+}
+function b2parQ(r, { topic, stem, vert, p, h = 0, k = 0, wrongs = [], solution }) {
+  const c = b2parT(vert, p, h, k), W = [...new Set(wrongs)].filter((w) => w !== c);
+  return { topic, stem, ...buildChoices(r, c, W, () => null), fr: { fields: [{ kind: 'expr', keys: 'quadfn', label: '' }], key: [b2parL(vert, p, h, k)], display: c, check: (v) => b2curveOk(v[0], vert, p, h, k) }, solution };
+}
+const B2P = [1, -1, 2, -2, 3, -3, 4, -4, 5, -6, 7, -10, 1 / 2, -3 / 2, 3 / 4, 2 / 3, -5 / 3];
+TEMPLATES.b23Write = (r) => {
+  const vert = r() < 0.65, p = pick(r, B2P), F = vert ? [0, p] : [p, 0], D = `${vert ? 'y' : 'x'} = ${fracT(-p)}`, kind = pick(r, ['FD', 'VD', 'VF']);
+  const given = kind === 'FD' ? `focus: (${fracT(F[0])}, ${fracT(F[1])});  directrix: ${D}` : kind === 'VD' ? `vertex: (0, 0);  directrix: ${D}` : `vertex: (0, 0);  focus: (${fracT(F[0])}, ${fracT(F[1])})`;
+  return b2parQ(r, { topic: 'Focus and directrix', stem: `Write an equation of the parabola.   ${given}`, vert, p, wrongs: [b2parT(vert, -p), b2parT(!vert, p), `${vert ? 'y' : 'x'} = ${b2co(4 * p)}${vert ? 'x²' : 'y²'}`],
+    solution: `The vertex is (0, 0) and the ${vert ? 'axis is vertical' : 'axis is horizontal'}, with p = ${fracT(p)} (the directed distance from the vertex to the focus).\n${vert ? 'y = x²/(4p)' : 'x = y²/(4p)'} = ${vert ? 'x²' : 'y²'}/(4 · ${fracT(p)}): ${b2parT(vert, p)}` });
+};
+TEMPLATES.b23Identify = (r) => {
+  const vert = r() < 0.6, p = pick(r, [2, -3, 1 / 2, -5, 4, 3, -1 / 3, 12, -12]), c = b2R(1 / (4 * p)), form = pick(r, ['std', 'std', 'alt']);
+  let shown = b2parT(vert, p);
+  if (form === 'alt') { const m = pick(r, [1, 2, 3, 6]), A = vert ? `${m === 1 ? '' : m}x²` : `${m === 1 ? '' : m}y²`, Bc = b2R(m / c); shown = `${A} ${Bc < 0 ? '+' : '−'} ${fracT(Math.abs(Bc)) === '1' ? '' : fracT(Math.abs(Bc))}${vert ? 'y' : 'x'} = 0`; }
+  const F = vert ? [0, p] : [p, 0], ok1 = (v) => b2ptOk(v, F), ok2 = (v) => b2xeq(v, -p, vert ? 'y' : 'x'), ok3 = (v) => b2xeq(v, 0, vert ? 'x' : 'y');
+  const cT = `focus (${fracT(F[0])}, ${fracT(F[1])}); directrix ${vert ? 'y' : 'x'} = ${fracT(-p)}; axis of symmetry ${vert ? 'x' : 'y'} = 0`;
+  return { topic: 'Focus and directrix', stem: `Identify the focus, directrix, and axis of symmetry of the parabola.   ${shown}`, ...buildChoices(r, cT, [`focus (${fracT(-F[0])}, ${fracT(-F[1])}); directrix ${vert ? 'y' : 'x'} = ${fracT(p)}; axis of symmetry ${vert ? 'x' : 'y'} = 0`, `focus (${fracT(F[1])}, ${fracT(F[0])}); directrix ${vert ? 'x' : 'y'} = ${fracT(-p)}; axis of symmetry ${vert ? 'y' : 'x'} = 0`, `focus (${vert ? 0 : fracT(c)}, ${vert ? fracT(c) : 0}); directrix ${vert ? 'y' : 'x'} = ${fracT(-c)}; axis of symmetry ${vert ? 'x' : 'y'} = 0`].filter((w, i, A) => w !== cT && A.indexOf(w) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'pts2', label: 'Focus:' }, { kind: 'expr', keys: 'num', label: 'Directrix:' }, { kind: 'expr', keys: 'num', label: 'Axis of symmetry:' }], key: [`\\left(${fracL(F[0])},${fracL(F[1])}\\right)`, `${vert ? 'y' : 'x'}=${fracL(-p)}`, `${vert ? 'x' : 'y'}=0`], display: cT, check: (v) => ok1(v[0]) && ok2(v[1]) && ok3(v[2]), score: (v) => ((ok1(v[0]) ? 1 : 0) + (ok2(v[1]) ? 1 : 0) + (ok3(v[2]) ? 1 : 0)) / 3 },
+    solution: `${form === 'alt' ? `Solve for ${vert ? 'y' : 'x'}: ${b2parT(vert, p)}.\n` : ''}${vert ? 'y' : 'x'} = (1/(4p))${vert ? 'x' : 'y'}², so 1/(4p) = ${fracT(c)} and p = ${fracT(p)}.\n${cT}.` };
+};
+TEMPLATES.b23Shift = (r) => {
+  const vert = r() < 0.6, p = pick(r, [-9, 3, -1, 2, 1 / 4, -5 / 2, 4]), h = ri(r, -7, 7), k = ri(r, -6, 6), kind = pick(r, ['VD', 'FD']);
+  const F = vert ? [h, k + p] : [h + p, k], D = vert ? `y = ${fracT(k - p)}` : `x = ${fracT(h - p)}`;
+  const given = kind === 'VD' ? `directrix: ${D};  vertex: (${fracT(h)}, ${fracT(k)})` : `focus: (${fracT(F[0])}, ${fracT(F[1])});  directrix: ${D}`;
+  return b2parQ(r, { topic: 'Focus and directrix', stem: `Write an equation of the parabola with the given characteristics.   ${given}`, vert, p, h, k, wrongs: [b2parT(vert, -p, h, k), b2parT(vert, p, -h, -k), b2parT(vert, p, k, h)],
+    solution: `${kind === 'FD' ? `The vertex is halfway between the focus and the directrix: (${fracT(h)}, ${fracT(k)}). ` : ''}p is the directed distance from the vertex to the focus: p = ${fracT(p)}.\n${vert ? 'y = (1/(4p))(x − h)² + k' : 'x = (1/(4p))(y − k)² + h'}: ${b2parT(vert, p, h, k)}` });
+};
+TEMPLATES.b23Transform = (r) => {
+  const vert = r() < 0.6, p = pick(r, [2, -1, 4, 1 / 4, -1 / 12, 3 / 4]), h = ri(r, -5, 5), k = ri(r, -5, 5), F = vert ? [h, k + p] : [h + p, k], dir = vert ? k - p : h - p;
+  const ok1 = (v) => b2ptOk(v, [h, k]), ok2 = (v) => b2ptOk(v, F), ok3 = (v) => b2xeq(v, dir, vert ? 'y' : 'x');
+  const cT = `vertex (${fracT(h)}, ${fracT(k)}); focus (${fracT(F[0])}, ${fracT(F[1])}); directrix ${vert ? 'y' : 'x'} = ${fracT(dir)}`;
+  return { topic: 'Focus and directrix', stem: `Identify the vertex, focus, and directrix of the parabola.   ${b2parT(vert, p, h, k)}`,
+    ...buildChoices(r, cT, [`vertex (${fracT(-h)}, ${fracT(k)}); focus (${fracT(vert ? -h : -h + p)}, ${fracT(vert ? k + p : k)}); directrix ${vert ? 'y' : 'x'} = ${fracT(vert ? k - p : -h - p)}`, `vertex (${fracT(h)}, ${fracT(k)}); focus (${fracT(vert ? h : h - p)}, ${fracT(vert ? k - p : k)}); directrix ${vert ? 'y' : 'x'} = ${fracT(vert ? k + p : h + p)}`, `vertex (${fracT(k)}, ${fracT(h)}); focus (${fracT(F[1])}, ${fracT(F[0])}); directrix ${vert ? 'y' : 'x'} = ${fracT(dir)}`].filter((w, i, A) => w !== cT && A.indexOf(w) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'pts2', label: 'Vertex:' }, { kind: 'expr', keys: 'pts2', label: 'Focus:' }, { kind: 'expr', keys: 'num', label: 'Directrix:' }], key: [`\\left(${fracL(h)},${fracL(k)}\\right)`, `\\left(${fracL(F[0])},${fracL(F[1])}\\right)`, `${vert ? 'y' : 'x'}=${fracL(dir)}`], display: cT, check: (v) => ok1(v[0]) && ok2(v[1]) && ok3(v[2]), score: (v) => ((ok1(v[0]) ? 1 : 0) + (ok2(v[1]) ? 1 : 0) + (ok3(v[2]) ? 1 : 0)) / 3 },
+    solution: `The coefficient is 1/(4p) = ${fracT(b2R(1 / (4 * p)))}, so p = ${fracT(p)}.\n${cT}.` };
+};
+TEMPLATES.b23Word = (r) => {
+  if (r() < 0.5) { const d = pick(r, [38, 20, 24, 48]), vert = r() < 0.6, p = d / 4;
+    return a1numQ(r, { topic: 'Focus and directrix in real life', stem: `The cross section (with units in inches) of a parabolic ${vert ? 'satellite dish' : 'spotlight'} can be modeled by the equation ${vert ? 'y' : 'x'} = (1/${d})${vert ? 'x' : 'y'}². How far is the focus from the vertex of the cross section?`, val: p, dec: true, unit: 'in.', wrongs: [d, d / 2, 1 / d, 4 / d],
+      solution: `${vert ? 'y' : 'x'} = (1/(4p))${vert ? 'x' : 'y'}², so 4p = ${d} and p = ${fmt(p)}. The focus is ${fmt(p)} inches from the vertex.` }); }
+  const f = pick(r, [1.3, 1.5, 2]), w = pick(r, [8, 6, 10]), depth = Math.round(((w / 2) ** 2 / (4 * f)) * 100) / 100;
+  return a1numQ(r, { topic: 'Focus and directrix in real life', stem: `A parabolic reflector has a focal length of ${f} inches and an aperture width of ${w} inches. The vertex is at (0, 0) and the reflector opens to the right, so its equation is x = (1/(4p))y². What is the depth of the reflector (the value of x at the edge of the aperture)? Round to the nearest hundredth.`, val: depth, dec: true, tol: 0.011, unit: 'in.', wrongs: [Math.round((w * w / (4 * f)) * 100) / 100, Math.round(((w / 2) / (4 * f)) * 100) / 100, Math.round(((w / 2) ** 2 / f) * 100) / 100],
+    solution: `p = ${f}, so x = y²/${fmt(4 * f)}. The edge of the aperture is at y = ${w / 2}: x = ${(w / 2) ** 2}/${fmt(4 * f)} ≈ ${fmt(depth)} inches.` });
+};
+
+// ---------- 2.4 Modeling with Quadratic Functions ----------
+TEMPLATES.b24VertexForm = (r) => {
+  for (;;) {
+    const a = pick(r, [1, -1, 2, -3, 1 / 2, -1 / 2, 4, 3]), h = ri(r, -6, 6), k = ri(r, -15, 14), x = h + pick(r, [-6, -3, -2, 2, 3, 4, 10]), y = a * (x - h) ** 2 + k;
+    if (!Number.isInteger(y)) continue;
+    return b2fnQ(r, { topic: 'Writing quadratic equations', name: 'y', stem: `Write an equation of the parabola in vertex form.   passes through (${x}, ${fracT(y)}) and has vertex (${h}, ${k})`.replace(/-(\d)/g, '−$1'), T: b2VF(a, h, k), L: b2VFL(a, h, k), f: (t) => a * (t - h) ** 2 + k, wrongs: [b2VF(a, -h, k), b2VF(-a, h, k), b2VF(a, h, -k), b2VF(b2R((y + k) / (x - h) ** 2), h, k)],
+      solution: `y = a(x − h)² + k = a${b2sq(h)}${b2kT(k)}.\nSubstitute (${x}, ${fracT(y)}): ${fracT(y)} = a(${x - h})²${b2kT(k)}, so ${fracT(y - k)} = ${(x - h) ** 2}a and a = ${fracT(a)}.\ny = ${b2VF(a, h, k)}` });
+  }
+};
+const b2IF = (a, p, q) => `${b2co(a)}${p === 0 ? 'x' : `(x ${p > 0 ? '−' : '+'} ${Math.abs(p)})`}${q === 0 ? 'x' : `(x ${q > 0 ? '−' : '+'} ${Math.abs(q)})`}`;
+const b2IFL = (a, p, q) => `${b2coL(a)}${p === 0 ? 'x' : `\\left(x${p > 0 ? '-' : '+'}${Math.abs(p)}\\right)`}${q === 0 ? 'x' : `\\left(x${q > 0 ? '-' : '+'}${Math.abs(q)}\\right)`}`;
+TEMPLATES.b24InterceptForm = (r) => {
+  for (;;) {
+    const a = pick(r, [1, -1, 2, -2, 1 / 4, 3, 1 / 2]), p = ri(r, -16, 12), q = ri(r, -9, 12); if (p === q || p === -q) continue;
+    const x = pick(r, [0, ri(r, -18, 14)]); if (x === p || x === q) continue; const y = a * (x - p) * (x - q); if (!Number.isInteger(y * 4)) continue;
+    return b2fnQ(r, { topic: 'Writing quadratic equations', name: 'y', stem: `Write an equation of the parabola in intercept form.   x-intercepts: ${p} and ${q}; passes through (${x}, ${fracT(y)})`.replace(/-(\d)/g, '−$1'), T: b2IF(a, p, q), L: b2IFL(a, p, q), f: (t) => a * (t - p) * (t - q), wrongs: [b2IF(a, -p, -q), b2IF(-a, p, q), b2IF(b2R(a * 2), p, q)],
+      solution: `y = a(x − p)(x − q) = a${p === 0 ? 'x' : `(x ${p > 0 ? '−' : '+'} ${Math.abs(p)})`}${q === 0 ? 'x' : `(x ${q > 0 ? '−' : '+'} ${Math.abs(q)})`}.\nSubstitute (${x}, ${fracT(y)}): ${fracT(y)} = a(${x - p})(${x - q}), so a = ${fracT(a)}.\ny = ${b2IF(a, p, q)}` });
+  }
+};
+TEMPLATES.b24Graph = (r) => {
+  for (let t = 0; t < 80; t++) {
+    const vertexForm = r() < 0.5, a = pick(r, [1, -1, 2, -2, 1 / 2, -1 / 2]);
+    if (vertexForm) { const h = ri(r, -4, 4), k = ri(r, -5, 5), x = h + pick(r, [-2, 1, 2]), y = a * (x - h) ** 2 + k; if (!Number.isInteger(y) || Math.abs(y) > 7) continue;
+      return b2fnQ(r, { topic: 'Writing quadratic equations', name: 'y', stem: 'Write an equation of the parabola in vertex form.', T: b2VF(a, h, k), L: b2VFL(a, h, k), f: (u) => a * (u - h) ** 2 + k, wrongs: [b2VF(a, -h, k), b2VF(-a, h, k), b2VF(a, h, -k)],
+        draw: plotQ({ xr: [-8, 8], yr: [-8, 8], curves: [{ f: (u) => a * (u - h) ** 2 + k }], pts: [{ p: [h, k], label: ptT([h, k]) }, { p: [x, y], label: ptT([x, y]) }] }), size: [320, 320], solution: `The vertex is ${ptT([h, k])}: y = a${b2sq(h)}${b2kT(k)}.\nUse ${ptT([x, y])} to find a = ${fracT(a)}.\ny = ${b2VF(a, h, k)}` }); }
+    const p = ri(r, -6, 3), q = p + ri(r, 2, 6), x = pick(r, [(p + q) / 2, p + 1, q - 1, q + 1]), y = a * (x - p) * (x - q); if (!Number.isInteger(y * 2) || Math.abs(y) > 7 || x === p || x === q || p === -q) continue;
+    return b2fnQ(r, { topic: 'Writing quadratic equations', name: 'y', stem: 'Write an equation of the parabola in intercept form.', T: b2IF(a, p, q), L: b2IFL(a, p, q), f: (u) => a * (u - p) * (u - q), wrongs: [b2IF(a, -p, -q), b2IF(-a, p, q), b2IF(b2R(2 * a), p, q)],
+      draw: plotQ({ xr: [-8, 8], yr: [-8, 8], curves: [{ f: (u) => a * (u - p) * (u - q) }], pts: [{ p: [p, 0], label: ptT([p, 0]) }, { p: [q, 0], label: ptT([q, 0]) }, { p: [x, y], label: ptT([x, y]) }] }), size: [320, 320], solution: `The x-intercepts are ${p} and ${q}: y = a${b2IF(1, p, q)}.\nUse ${ptT([x, y])} to find a = ${fracT(a)}.\ny = ${b2IF(a, p, q)}` });
+  }
+};
+// #21–22, 25: three points (a table) → quadratic, then evaluate
+TEMPLATES.b24Table = (r) => {
+  for (;;) {
+    const C = pick(r, [() => { const a = pick(r, [180, 120]); return ['Every rope has a safe working load. The table shows the safe working loads S (in pounds) for ropes with circumferences C (in inches).', 'Circumference, C', 'Safe working load, S', [0, 1, 2, 3], (x) => a * x * x, pick(r, [10, 8, 5]), 'S', 'C', 'pounds']; },
+      () => { const a = -pick(r, [16, 12]), b = pick(r, [36, 40]), c = pick(r, [6, 4]); return ['A baseball is thrown up in the air. The table shows the heights y (in feet) of the baseball after x seconds.', 'Time, x', 'Baseball height, y', [0.5, 1, 1.5, 2], (x) => a * x * x + b * x + c, pick(r, [1.7, 1.25, 0.75]), 'y', 'x', 'feet']; },
+      () => { const a = pick(r, [1, 2, -1]), b = ri(r, -4, 4), c = ri(r, -5, 5); return ['The table shows values of a quadratic function.', 'x', 'y', [-1, 0, 1, 2], (x) => a * x * x + b * x + c, pick(r, [5, -3, 4]), 'y', 'x', '']; }])();
+    const [txt, xl, yl, xs, f, x0, yv, xv, u] = C, ys = xs.map(f), A = (ys[2] - 2 * ys[1] + ys[0]) / (2 * (xs[1] - xs[0]) ** 2), x1 = xs[0], x2 = xs[1], B = (ys[1] - ys[0]) / (x2 - x1) - A * (x1 + x2), Cc = ys[0] - A * x1 * x1 - B * x1, val = b2R(f(x0)), fn = (x) => A * x * x + B * x + Cc;
+    const T = polyT([b2R(A), b2R(B), b2R(Cc)]), ok1 = (v) => b2fnOk(String(v || '').replace(new RegExp(`^\\s*${yv}\\s*=`), '').replace(new RegExp(xv, 'g'), 'x'), fn), ok2 = (v) => numOk(String(v || '').replace(/^[a-z]\s*=/i, ''), val);
+    const c = `${yv} = ${T.replace(/x/g, xv)};  ${fmt(val)}${u ? ` ${u}` : ''}`;
+    return { topic: 'Modeling with quadratic functions', stem: `${txt} Write a quadratic equation that models the data. Then find ${yv} when ${xv} = ${fmt(x0)}.`, draw: a9tableDraw([[xl, ...xs.map(fmt)], [yl, ...ys.map(fmt)]]), size: [440, 80],
+      ...buildChoices(r, c, [`${yv} = ${T.replace(/x/g, xv)};  ${fmt(b2R(fn(x0 + 1)))}${u ? ` ${u}` : ''}`, `${yv} = ${polyT([b2R(-A), b2R(B), b2R(Cc)]).replace(/x/g, xv)};  ${fmt(b2R(-A * x0 * x0 + B * x0 + Cc))}${u ? ` ${u}` : ''}`, `${yv} = ${polyT([b2R(B), b2R(Cc)]).replace(/x/g, xv)};  ${fmt(b2R(B * x0 + Cc))}${u ? ` ${u}` : ''}`].filter((w) => w !== c), () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'quadfn', label: `${yv} =` }, { kind: 'expr', keys: 'num', label: `${yv}(${fmt(x0)}) =` }], key: [T.replace(/x/g, xv).replace(/−/g, '-').replace(/²/g, '^2').replace(/\s+/g, ''), String(val)], display: c, check: (v) => ok1(v[0]) && ok2(v[1]), score: (v) => ((ok1(v[0]) ? 1 : 0) + (ok2(v[1]) ? 1 : 0)) / 2 },
+      solution: `Substitute three points into ${yv} = a${xv}² + b${xv} + c and solve the system (or use technology): a = ${fmt(b2R(A))}, b = ${fmt(b2R(B))}, c = ${fmt(b2R(Cc))}.\n${yv} = ${T.replace(/x/g, xv)}\nWhen ${xv} = ${fmt(x0)}: ${yv} = ${fmt(val)}${u ? ` ${u}` : ''}.` };
+  }
+};
+TEMPLATES.b24Diff = (r) => {
+  const kind = pick(r, ['linear', 'quadratic', 'quadratic', 'neither']); let xs = [0, 1, 2, 3, 4], f, T, ans;
+  if (kind === 'linear') { const m = nz(r, -6, 6), b = ri(r, 10, 60); f = (x) => m * x + b; T = polyT([m, b]); ans = 'Linear'; }
+  else if (kind === 'quadratic') { const a = pick(r, [-2, 2, -1, 3, -8]), b = ri(r, -10, 30), c = ri(r, 100, 470), s = pick(r, [1, 5]); xs = xs.map((x) => x * s); f = (x) => a * x * x + b * x + c; T = polyT([a, b, c]); ans = 'Quadratic'; }
+  else { const a = pick(r, [2, 3]), c = pick(r, [2, 1]); xs = [1, 2, 3, 4, 5]; f = (x) => c * a ** x; T = ''; ans = 'Neither'; }
+  const ys = xs.map(f), d1 = ys.slice(1).map((y, i) => y - ys[i]), d2 = d1.slice(1).map((d, i) => d - d1[i]);
+  const ok0 = (v) => v === ans, ok1 = (v) => ans === 'Neither' || b2fnOk(v, f);
+  return { topic: 'Finite differences', stem: 'Analyze the differences in the outputs to determine whether the data are linear, quadratic, or neither. If the data are linear or quadratic, write a function that models the data.', draw: a9tableDraw([['x', ...xs.map(fmt)], ['y', ...ys.map(fmt)]]), size: [420, 80],
+    ...buildChoices(r, ans === 'Neither' ? 'Neither' : `${ans}: y = ${T}`, [ans === 'Neither' ? 'Quadratic' : 'Neither', ans === 'Linear' ? `Quadratic: y = ${polyT([1, d1[0] - 1, ys[0]])}` : ans === 'Quadratic' ? `Linear: y = ${polyT([d1[0] / (xs[1] - xs[0]), ys[0]])}` : `Linear: y = ${polyT([d1[0], ys[0] - d1[0] * xs[0]])}`, ans === 'Quadratic' ? `Quadratic: y = ${polyT([-(d2[0] / 2) / (xs[1] - xs[0]) ** 2, 0, ys[0]])}` : 'Linear'].filter((w, i, A) => A.indexOf(w) === i), () => null),
+    fr: { fields: [{ kind: 'select', label: 'The data are', options: ['Linear', 'Quadratic', 'Neither'] }, { kind: 'expr', keys: 'quadfn', label: 'y = (leave blank if neither)' }], key: [ans, ans === 'Neither' ? '' : T.replace(/−/g, '-').replace(/²/g, '^2').replace(/\s+/g, '')], display: ans === 'Neither' ? 'Neither' : `${ans}: y = ${T}`,
+      answered: (v) => Array.isArray(v) && !!v[0] && (v[0] === 'Neither' || String(v[1] || '').trim() !== ''), check: (v) => ok0(v[0]) && ok1(v[1]), score: (v) => (ok0(v[0]) ? (ans === 'Neither' ? 1 : 0.5) : 0) + (ok0(v[0]) && ans !== 'Neither' && ok1(v[1]) ? 0.5 : 0) },
+    solution: `First differences: ${d1.map(fmt).join(', ')}.${kind === 'linear' ? ' They are constant, so the data are linear.' : `\nSecond differences: ${d2.map(fmt).join(', ')}.${kind === 'quadratic' ? ' They are constant, so the data are quadratic.' : ' Neither the first nor the second differences are constant, so the data are neither linear nor quadratic.'}`}${T ? `\ny = ${T}` : ''}` };
+};
+TEMPLATES.b24Area = (r) => {
+  const P = pick(r, [14, 20, 28, 40]), half = P / 2, w = half / 2, A = w * w;
+  return a1numQ(r, { topic: 'Modeling with quadratic functions', stem: `A rectangle has a perimeter of ${P} meters, so its area is A(w) = w(${half} − w), where w is the width (in meters). What is the maximum possible area of the rectangle?`, val: A, dec: true, unit: 'square meters', wrongs: [half * half, w * half, A / 2],
+    solution: `A(w) = w(${half} − w) has x-intercepts 0 and ${half}, so the vertex is at w = ${fmt(w)}.\nA(${fmt(w)}) = ${fmt(w)}(${fmt(half - w)}) = ${fmt(A)} square meters (a ${fmt(w)}-meter by ${fmt(w)}-meter square).` });
+};
+for (const name of Object.keys(TEMPLATES)) if (/^b2\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+TEMPLATES.b23Match = (r) => TEMPLATES.a2Match(r);
+/* ==== ALGEBRA 2 CH2 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -21485,6 +21748,10 @@ Object.assign(SETS, {
   'alg2-1-6': { subject: 'algebra2', title: '1.6 Solving Linear Systems Using Technology', items: [['b16Augment', 3], ['b16Solve', 3], ['b16Word', 1]] },
   'alg2-1-7': { subject: 'algebra2', title: '1.7 Basic Matrix Operations', items: [['b17AddSub', 3], ['b17Scalar', 2], ['b17Expr', 2], ['b17Solve', 2], ['b17FindX', 2], ['b17Word', 1]] },
   'alg2-1-8': { subject: 'algebra2', title: '1.8 Systems of Linear Inequalities', items: [['b18IsSol', 2], ['b18Graph', 2], ['b18Write', 2], ['b18Point', 2], ['b18Which', 1], ['b18Word', 1]] },
+  'alg2-2-1': { subject: 'algebra2', title: '2.1 Transformations of Quadratic Functions', items: [['b21Describe', 3], ['b21Vertex', 2], ['b21Sketch', 2], ['b21Write', 3], ['b21Word', 1]] },
+  'alg2-2-2': { subject: 'algebra2', title: '2.2 Characteristics of Quadratic Functions', items: [['b22VertexAxis', 2], ['b22Standard', 2], ['b22Sketch', 2], ['b22MinMax', 3], ['b22Intercept', 2], ['b22Word', 1], ['b22SameAxis', 1]] },
+  'alg2-2-3': { subject: 'algebra2', title: '2.3 Focus of a Parabola', items: [['b23Write', 3], ['b23Identify', 3], ['b23Shift', 2], ['b23Transform', 2], ['b23Match', 1], ['b23Word', 1]] },
+  'alg2-2-4': { subject: 'algebra2', title: '2.4 Modeling with Quadratic Functions', items: [['b24VertexForm', 2], ['b24InterceptForm', 2], ['b24Graph', 2], ['b24Table', 2], ['b24Diff', 2], ['b24Area', 1]] },
   'alg2-3-1': { subject: 'algebra2', title: '3.1 Factoring ax² + bx + c', items: [['b31GCF', 2], ['b31Factor', 4], ['b31Solve', 3], ['b31Intercepts', 1], ['b31Word', 2]] },
   'alg2-3-2': { subject: 'algebra2', title: '3.2 Factoring Special Products', items: [['b32DiffSq', 3], ['b32Mental', 1], ['b32PerfSq', 3], ['b32Mixed', 2], ['b32Solve', 2], ['b32Word', 1]] },
   'alg2-3-3': { subject: 'algebra2', title: '3.3 Solving Quadratic Equations', items: [['b33SqRoot', 3], ['b33Factor', 3], ['b33Zeros', 2], ['b33Any', 2], ['b33Revenue', 1], ['b33GraphSolve', 3]] },
@@ -21865,6 +22132,30 @@ QUESTION_TYPES.push(
   { id: 'b18Point', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Graph a system and identify a solution', desc: '#9–18' },
   { id: 'b18Which', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Which system matches the graph?', desc: '#26' },
   { id: 'b18Word', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Systems of inequalities in real life', desc: '#28' },
+  { id: 'b21Describe', subject: 'algebra2', section: '2.1 Transformations of Quadratic Functions', label: 'Describe a transformation of f(x) = x²', desc: '#1–10, 15–22' },
+  { id: 'b21Vertex', subject: 'algebra2', section: '2.1 Transformations of Quadratic Functions', label: 'Transformations and the vertex', desc: '#25–28' },
+  { id: 'b21Sketch', subject: 'algebra2', section: '2.1 Transformations of Quadratic Functions', label: 'Graph a transformed quadratic', desc: '#1–10' },
+  { id: 'b21Write', subject: 'algebra2', section: '2.1 Transformations of Quadratic Functions', label: 'Write a rule for transformations', desc: '#29–32' },
+  { id: 'b21Word', subject: 'algebra2', section: '2.1 Transformations of Quadratic Functions', label: 'Transformations in real life', desc: '#41' },
+  { id: 'b22VertexAxis', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Vertex and axis (vertex form)', desc: '#1–12' },
+  { id: 'b22Standard', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Vertex and axis (standard form)', desc: '#17–26' },
+  { id: 'b22Sketch', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Graph a quadratic in standard form', desc: '#17–26' },
+  { id: 'b22MinMax', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Minimum or maximum, domain and range', desc: '#31–40' },
+  { id: 'b22Intercept', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Intercept form: intercepts and vertex', desc: '#45–56' },
+  { id: 'b22Word', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Vertex in real life', desc: '#29, 30, 43' },
+  { id: 'b22SameAxis', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Same axis of symmetry', desc: '#59' },
+  { id: 'b23Write', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Equation from focus, directrix, or vertex', desc: '#3–8, 25–32' },
+  { id: 'b23Identify', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Focus, directrix, and axis', desc: '#9–16' },
+  { id: 'b23Shift', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Equation with vertex not at the origin', desc: '#37–40' },
+  { id: 'b23Transform', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Vertex, focus, and directrix', desc: '#41–46' },
+  { id: 'b23Match', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Match a parabola to its equation', desc: '#33–36' },
+  { id: 'b23Word', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Focus in real life', desc: '#19, 20, 47' },
+  { id: 'b24VertexForm', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: 'Write an equation in vertex form', desc: '#3–6' },
+  { id: 'b24InterceptForm', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: 'Write an equation in intercept form', desc: '#9–12' },
+  { id: 'b24Graph', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: 'Write an equation from a graph', desc: '#1, 2, 7, 8' },
+  { id: 'b24Table', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: 'Model data with a quadratic', desc: '#21, 22' },
+  { id: 'b24Diff', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: 'Linear, quadratic, or neither?', desc: '#29–32' },
+  { id: 'b24Area', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: 'Maximum area', desc: '#20, 61' },
   { id: 'b31GCF', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: 'Factor out the GCF', desc: 'Then factor the trinomial (#1–6)' },
   { id: 'b31Factor', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: 'Factor ax² + bx + c', desc: 'Including a < 0 (#7–20)' },
   { id: 'b31Solve', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: 'Solve by factoring', desc: '#25–28' },
@@ -24187,7 +24478,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
