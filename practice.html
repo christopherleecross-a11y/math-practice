@@ -19828,6 +19828,775 @@ TEMPLATES.b75Word = (r) => {
 for (const name of Object.keys(TEMPLATES)) if (/^b7\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 TEMPLATES.b74Rewrite = (r) => TEMPLATES.b72Rewrite(r);
 /* ==== ALGEBRA 2 CH7 END ==== */
+/* ==== ALGEBRA 2 CH8 BEGIN ==== */
+/* ---------- Algebra 2 (Big Ideas Learning 2025), Chapter 8: Sequences and Series ---------- */
+KEYROWS_P.seqlist = [[',', ','], ['a⁄b', '\\frac{#@}{#?}'], ['xⁿ', '^{#?}'], ['( )', '\\left(#?\\right)']];
+KEYROWS_P.rec = [['aₙ₋₁', 'a_{n-1}'], ['aₙ₋₂', 'a_{n-2}'], ['xⁿ', '^{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['( )', '\\left(#?\\right)']];
+KEYROWS_P.sig = [['∞', '\\infty'], ['xⁿ', '^{#?}'], ['a⁄b', '\\frac{#@}{#?}'], ['( )', '\\left(#?\\right)']];
+KEYROWS_P.dne = [['a⁄b', '\\frac{#@}{#?}'], ['xⁿ', '^{#?}'], ['( )', '\\left(#?\\right)'], ['does not exist', '\\text{does not exist}']];
+const B8SUBC = { 0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉', '=': '₌', '-': '₋', '−': '₋', '+': '₊', i: 'ᵢ', k: 'ₖ', n: 'ₙ', j: 'ⱼ' };
+const B8SUPC = { ...SUPC, i: 'ⁱ', k: 'ᵏ', ' ': '' };
+const b8sub = (s) => [...String(s)].map((c) => B8SUBC[c] || c).join('');
+const b8sup = (s) => [...String(s)].map((c) => B8SUPC[c] || c).join('');
+const b8a = (k) => `a${b8sub(k)}`;
+const b8sig = (v, lo, hi, body) => `∑${b8sub(`${v}=${lo}`)}${hi === Infinity ? '^∞' : b8sup(hi)} ${body}`;
+const b8r = (v) => Math.round(v * 1e9) / 1e9;
+const b8T = (v, dec) => (dec ? fmt(b8r(v)) : fracT(b8r(v)));
+const b8L = (v, dec) => (dec ? String(b8r(v)) : fracL(b8r(v)));
+const b8vT = (v, dec) => (dec ? fmt(b8r(v)) : fracParts(v) ? fracT(b8r(v)) : d3(v));
+const b8list = (vals, dec, more = true) => vals.map((v) => b8T(v, dec)).join(', ') + (more ? ', …' : '');
+const b8series = (vals, dec, more = false) => vals.map((v, i) => (i === 0 ? b8T(v, dec) : `${v < 0 ? ' − ' : ' + '}${b8T(Math.abs(v), dec)}`)).join('') + (more ? ' + ⋯' : '');
+// d·n + c as text / LaTeX
+const b8coef = (d, dec, v = 'n') => (d === 1 ? v : d === -1 ? `${MINUS}${v}` : dec || Number.isInteger(d) ? `${b8T(d, dec)}${v}` : `(${b8T(d, dec)})${v}`);
+const b8linT = (d, c, dec) => (d === 0 ? b8T(c, dec) : `${b8coef(d, dec)}${c === 0 ? '' : ` ${c < 0 ? '−' : '+'} ${b8T(Math.abs(c), dec)}`}`);
+const b8linL = (d, c, dec) => (d === 0 ? b8L(c, dec) : `${d === 1 ? '' : d === -1 ? '-' : b8L(d, dec)}n${c === 0 ? '' : (c < 0 ? '-' : '+') + b8L(Math.abs(c), dec)}`);
+// a·r^(n−1) as text / LaTeX
+const b8geoT = (a, r, dec, ex = 'n−1') => { const rT = b8T(r, dec), aT = b8T(a, dec), frac = (t) => /\//.test(t);
+  if (a === 1) return `${r > 0 && Number.isInteger(r) ? rT : `(${rT})`}${b8sup(ex)}`;
+  return `${a === -1 ? MINUS : frac(aT) ? `(${aT})` : aT}(${rT})${b8sup(ex)}`; };
+const b8geoL = (a, r, dec, ex = 'n-1') => `${a === 1 ? '' : a === -1 ? '-' : b8L(a, dec)}\\left(${b8L(r, dec)}\\right)^{${ex}}`;
+// ---- readers ----
+// a typed rule as plain text with a_{n-1} → p and a_{n-2} → q, left side removed
+function b8norm(raw) {
+  let s = String(raw || '').replace(/\\left|\\right/g, '').replace(/_\{\s*n\s*\}/g, '_n').replace(/aₙ₋₁/g, 'a_{n-1}').replace(/aₙ₋₂/g, 'a_{n-2}').replace(/aₙ/g, 'a_n')
+    .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁻⁺ⁱᵏ]+/g, (m) => `^{${[...m].map((c) => ({ ⁿ: 'n', '⁻': '-', '⁺': '+', ⁱ: 'i', ᵏ: 'k' })[c] || '⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(c)).join('')}}`);
+  s = pxPlain(s); if (s == null) return null;
+  s = s.replace(/\s+/g, '').replace(/[−–]/g, '-');
+  s = s.replace(/(?:a_?\(n-1\)|a_n-1(?!\d)|f\(n-1\))/g, '(p)').replace(/(?:a_?\(n-2\)|a_n-2(?!\d)|f\(n-2\))/g, '(q)');
+  s = s.replace(/^[^=]*=/, '');
+  return s;
+}
+// explicit rule in n
+function b8ruleOk(raw, f, N = 8, n0 = 1) {
+  const s = b8norm(raw); if (!s || /[pq]/.test(s)) return false;
+  const F = pxParse(s, ['n'], ''); if (!F) return false;
+  for (let n = n0; n < n0 + N; n++) { const t = f(n), a = F({ n }); if (!isFinite(a) || Math.abs(a - t) > 1e-6 * Math.max(1, Math.abs(t))) return false; }
+  return true;
+}
+// recursive rule: g(p = previous term, q = term before that, n)
+function b8recOk(raw, g) {
+  const s = b8norm(raw); if (!s || !/p/.test(s)) return false;
+  const F = pxParse(s, ['p', 'q', 'n'], ''); if (!F) return false;
+  for (const p of [-3.7, 1.3, 2.9, 6.1]) for (const q of [0.7, -2.2, 4.4]) for (const n of [3, 5, 8]) { const t = g(p, q, n), a = F({ p, q, n }); if (!isFinite(a) || Math.abs(a - t) > 1e-6 * Math.max(1, Math.abs(t))) return false; }
+  return true;
+}
+const b8num = (raw) => String(raw || '').replace(/^[^=]*=/, '');
+const b8numOk = (raw, v) => numOk(b8num(raw), v);
+// a comma-separated list of terms, in order
+function b8split(raw) {
+  const s = String(raw || '').replace(/\\[lc]?dots|\\dotsc|…|⋯|\.\.\./g, '').replace(/\\left|\\right/g, '');
+  const parts = []; let d = 0, cur = '';
+  for (const c of s) { if ('({['.includes(c)) d++; else if (')}]'.includes(c)) d--; if (c === ',' && d === 0) { parts.push(cur); cur = ''; } else cur += c; }
+  parts.push(cur);
+  return parts.map((p) => p.trim()).filter((p) => p && !/^[\s,]*$/.test(p));
+}
+const b8listOk = (raw, vals) => { const P = b8split(raw); return P.length === vals.length && P.every((p, i) => numOk(p, vals[i])); };
+const b8listScore = (raw, vals) => { const P = b8split(raw); return vals.filter((v, i) => P[i] != null && numOk(P[i], v)).length / vals.length; };
+// "list the terms" question
+function b8termsQ(r, { topic, stem, vals, dec, wrongs = [], solution }) {
+  const c = b8list(vals, dec, false);
+  return { topic, stem, ...buildChoices(r, c, [...new Set(wrongs.map((w) => b8list(w, dec, false)))].filter((w) => w !== c), (i) => b8list(vals.map((v) => v + i + 1), dec, false)),
+    fr: { fields: [{ kind: 'expr', keys: 'seqlist', label: '' }], key: [vals.map((v) => b8L(v, dec)).join(',')], display: c, check: (v) => b8listOk(v[0], vals), score: (v) => b8listScore(v[0], vals) }, solution };
+}
+// "write a rule for the nth term" question (optionally with a second numeric field)
+function b8ruleQ(r, { topic, stem, f, ruleT, ruleL, wrongs = [], solution, extra, name = 'aₙ', n0 = 1, draw, size }) {
+  const c = `${name} = ${ruleT}${extra ? `;  ${extra.label} ${extra.text}` : ''}`;
+  const fields = [{ kind: 'expr', keys: 'poly', label: `${name} =` }], key = [ruleL];
+  if (extra) { fields.push({ kind: 'expr', keys: 'poly', label: extra.label }); key.push(extra.latex); }
+  const ok1 = (v) => b8ruleOk(v[0], f, 8, n0), ok2 = (v) => !extra || (extra.check ? extra.check(v[1]) : b8numOk(v[1], extra.val));
+  return { topic, stem, draw, size, ...buildChoices(r, c, [...new Set(wrongs.filter(Boolean))].filter((w) => w !== c), () => null),
+    fr: { fields, key, display: c, check: (v) => ok1(v) && ok2(v), score: extra ? (v) => ((ok1(v) ? 1 : 0) + (ok2(v) ? 1 : 0)) / 2 : undefined }, solution };
+}
+// "write a recursive rule" question: firsts = [a₁] or [a₁, a₂]; g(p, q, n)
+function b8recQ(r, { topic, stem, firsts, g, recT, recL, wrongs = [], solution, dec, sym = 'a', i0 = 1 }) {
+  const nm = (k) => (sym === 'a' ? b8a(k) : `f(${k})`), c = `${firsts.map((v, i) => `${nm(i0 + i)} = ${b8T(v, dec)}`).join(', ')}, ${sym === 'a' ? 'aₙ' : 'f(n)'} = ${recT}`;
+  const fields = firsts.map((v, i) => ({ kind: 'expr', keys: 'rec', label: `${nm(i0 + i)} =` })).concat([{ kind: 'expr', keys: 'rec', label: `${sym === 'a' ? 'aₙ' : 'f(n)'} =` }]);
+  const oks = (v) => firsts.map((a, i) => b8numOk(v[i], a)).concat([b8recOk(v[firsts.length], g)]);
+  return { topic, stem, ...buildChoices(r, c, [...new Set(wrongs.filter(Boolean))].filter((w) => w !== c), () => null),
+    fr: { fields, key: firsts.map((v) => b8L(v, dec)).concat([recL]), display: c, check: (v) => oks(v).every(Boolean), score: (v) => oks(v).filter(Boolean).length / (firsts.length + 1) }, solution };
+}
+// a number that may be an exact fraction or a decimal rounded to three places
+const b8exT = (v) => { const p = fracParts(v); return p && p[1] <= 400 ? fracT(v) : `≈ ${d3(v)}`; };
+const b8exL = (v) => { const p = fracParts(v); return p && p[1] <= 400 ? fracL(v) : d3(v).replace(MINUS, '-'); };
+function b8exQ(r, { topic, stem, val, wrongs = [], solution, label = '' }) {
+  const c = b8exT(val), W = [...new Set(wrongs.filter((w) => isFinite(w) && Math.abs(w - val) > 0.02).map(b8exT))].filter((w) => w !== c);
+  return { topic, stem, ...buildChoices(r, c, W, (i) => b8exT(val + i + 1)),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label }], key: [b8exL(val)], display: c, check: (v) => (Number.isInteger(val) && Math.abs(val) > 999 ? Math.abs(pxConst(b8num(v[0])) - val) < 1e-6 : exOrRoundOk(b8num(v[0]).replace(/\\approx|≈/g, ''), val, 3)) }, solution };
+}
+// scatter plot of (n, aₙ) with its own vertical scale
+const b8dots = (pts, { label = true, dec } = {}) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h; c.clearRect(0, 0, W, H);
+  const ys = pts.map((p) => p[1]), mn = Math.min(0, ...ys), mx = Math.max(0, ...ys), span = mx - mn || 1;
+  const step = [1, 2, 4, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000].find((s) => span / s <= 7) || 10000;
+  const y0 = Math.floor(mn / step) * step - (mn < 0 ? 0 : step * 0.6), y1 = Math.ceil(mx / step) * step + step * 0.6, nMax = Math.max(...pts.map((p) => p[0])) + 1;
+  const L = 46, R = 16, T = 18, B = 26, X = (n) => L + ((n + 0.6) / (nMax + 0.6)) * (W - L - R), Y = (y) => T + ((y1 - y) / (y1 - y0)) * (H - T - B);
+  c.strokeStyle = '#e4e1d9'; c.lineWidth = 1;
+  for (let n = 0; n <= nMax; n++) { c.beginPath(); c.moveTo(X(n), Y(y0)); c.lineTo(X(n), Y(y1)); c.stroke(); }
+  for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) { c.beginPath(); c.moveTo(X(-0.6), Y(y)); c.lineTo(X(nMax), Y(y)); c.stroke(); }
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(X(-0.6), Y(0)); c.lineTo(X(nMax), Y(0)); c.moveTo(X(0), Y(y0)); c.lineTo(X(0), Y(y1)); c.stroke();
+  c.fillStyle = '#1d1d1b'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top';
+  for (let n = 1; n <= nMax; n++) c.fillText(String(n), X(n), Y(0) + 3);
+  c.font = 'italic 13px system-ui, sans-serif'; c.fillText('n', X(nMax) - 4, Y(0) + 3); c.textBaseline = 'middle'; c.textAlign = 'left'; c.fillText('aₙ', X(0) + 5, Y(y1) + 6);
+  c.font = '12px system-ui, sans-serif'; c.textAlign = 'right';
+  for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) if (y) c.fillText(fmt(y), X(0) - 4, Y(y));
+  pts.forEach(([n, y]) => { c.fillStyle = '#2b5fad'; c.beginPath(); c.arc(X(n), Y(y), 4.5, 0, 2 * Math.PI); c.fill();
+    if (label) { c.fillStyle = '#1d1d1b'; c.textAlign = 'left'; c.textBaseline = 'bottom'; c.font = '12px system-ui, sans-serif'; c.fillText(`(${n}, ${b8T(y, dec)})`, X(n) + 6, Y(y) - 3); } });
+};
+// arithmetic / geometric terms
+const b8arith = (a1, d) => (n) => b8r(a1 + d * (n - 1));
+const b8geo = (a1, q) => (n) => b8r(a1 * q ** (n - 1));
+const b8seqVals = (f, k = 4, n0 = 1) => Array.from({ length: k }, (_, i) => f(n0 + i));
+
+// ---------- 8.1 Defining and Using Sequences and Series ----------
+TEMPLATES.b81Terms = (r) => {
+  const c = ri(r, 1, 6), b = pick(r, [2, 3, 4]);
+  const G = pick(r, [
+    () => [`aₙ = n + ${c}`, (n) => n + c], () => [`aₙ = ${c + 4} − n`, (n) => c + 4 - n], () => ['aₙ = n²', (n) => n * n], () => [`f(n) = n³ + ${c}`, (n) => n ** 3 + c],
+    () => [`f(n) = ${b}${b8sup('n−1')}`, (n) => b ** (n - 1)], () => ['aₙ = −n²', (n) => -n * n], () => [`aₙ = n² − ${c}`, (n) => n * n - c], () => [`aₙ = (n + ${c})²`, (n) => (n + c) ** 2],
+    () => ['f(n) = 2n/(n + 2)', (n) => (2 * n) / (n + 2)], () => ['f(n) = n/(2n − 1)', (n) => n / (2 * n - 1)], () => [`aₙ = ${b}n − ${c}`, (n) => b * n - c], () => [`aₙ = (−1)ⁿ · ${b}n`, (n) => (-1) ** n * b * n]])();
+  const [rule, f] = G, vals = b8seqVals(f, 6);
+  return b8termsQ(r, { topic: 'Writing terms of sequences', stem: `Write the first six terms of the sequence.   ${rule}`, vals, wrongs: [b8seqVals(f, 6, 0), b8seqVals(f, 6, 2), vals.map((v) => -v)],
+    solution: vals.map((v, i) => `${rule.split(' =')[0].replace(/n/, String(i + 1)).replace('aₙ', b8a(i + 1))} = ${b8T(v)}`).join('\n') });
+};
+// the six terms' names: a₁ = …  or  f(1) = …
+TEMPLATES.b81Rule = (r) => {
+  const G = pick(r, [
+    () => { const a = ri(r, 1, 15), d = pick(r, [2, 3, 4, 5, 7, 8, -3, -4]); return { f: b8arith(a, d), T: b8linT(d, a - d), L: b8linL(d, a - d), why: `Each term is ${d > 0 ? d + ' more' : -d + ' less'} than the previous term.` }; },
+    () => { const c = pick(r, [0, 0, 1, -1, 3]); return { f: (n) => n * n + c, T: `n²${c ? (c < 0 ? ' − ' : ' + ') + Math.abs(c) : ''}`, L: `n^2${c ? (c < 0 ? '-' : '+') + Math.abs(c) : ''}`, why: `Each term is the square of its position${c ? ` ${c < 0 ? 'minus' : 'plus'} ${Math.abs(c)}` : ''}.` }; },
+    () => { const [a, q] = pick(r, [[1, 2], [3, 3], [2, 2], [1, 3], [4, 2], [1, -2], [5, 2]]); return { f: b8geo(a, q), T: b8geoT(a, q), L: b8geoL(a, q), why: `Each term is ${q} times the previous term.` }; },
+    () => { const c = pick(r, [1, 2]); return { f: (n) => n ** 3 + c, T: `n³ + ${c}`, L: `n^3+${c}`, why: `Each term is the cube of its position plus ${c}.` }; },
+    () => { const k = pick(r, [4, 5, 6]); return { f: (n) => n / k, T: `n/${k}`, L: `\\frac{n}{${k}}`, disp: (n) => `${n}/${k}`, why: `Each numerator is the position n and each denominator is ${k}.` }; },
+    () => ({ f: (n) => (2 * n - 1) / (10 * n), T: '(2n − 1)/(10n)', L: '\\frac{2n-1}{10n}', disp: (n) => `${2 * n - 1}/${10 * n}`, why: 'The numerators are the odd numbers 2n − 1 and the denominators are multiples of 10.' }),
+    () => { const [k, m] = pick(r, [[2, 3], [2, 5], [3, 5], [3, 4]]); return { f: (n) => k / (m * n), T: `${k}/(${m}n)`, L: `\\frac{${k}}{${m}n}`, disp: (n) => `${k}/${m * n}`, why: `Each numerator is ${k} and the denominators are multiples of ${m}.` }; },
+    () => ({ f: (n) => (2 * n) / (n + 2), T: '2n/(n + 2)', L: '\\frac{2n}{n+2}', disp: (n) => `${2 * n}/${n + 2}`, why: 'The numerators are the even numbers 2n and the denominators are n + 2.' }),
+    () => { const a = pick(r, [3.1, 4.2, 1.5, 2.3]), d = pick(r, [0.7, -1.6, 0.4, -0.8]); return { f: b8arith(a, d), T: b8linT(d, b8r(a - d), true), L: b8linL(d, b8r(a - d), true), dec: true, why: `Each term is ${fmt(Math.abs(d))} ${d > 0 ? 'more' : 'less'} than the previous term.` }; },
+    () => { const c = pick(r, [0.2, 0.5]); return { f: (n) => b8r(n * n + c), T: `n² + ${c}`, L: `n^2+${c}`, dec: true, why: `Each term is the square of its position plus ${c}.` }; }])();
+  const disp = G.disp || ((n) => b8T(G.f(n), G.dec)), next = G.f(5);
+  return b8ruleQ(r, { topic: 'Writing rules for sequences', stem: `Describe the pattern, write the next term, and write a rule for the nth term of the sequence.   ${[1, 2, 3, 4].map(disp).join(', ')}, …`, f: G.f, ruleT: G.T, ruleL: G.L,
+    extra: { label: 'a₅ =', text: disp(5), latex: b8L(next, G.dec), val: next }, wrongs: [`aₙ = ${G.T};  a₅ = ${b8T(G.f(6), G.dec)}`, `aₙ = ${G.T};  a₅ = ${b8T(G.f(4) * 2 - G.f(2), G.dec) === disp(5) ? b8T(G.f(5) + 1, G.dec) : b8T(G.f(4) * 2 - G.f(2), G.dec)}`, `aₙ = ${G.T.replace(/n/g, '(n + 1)')};  a₅ = ${b8T(G.f(6), G.dec)}`],
+    solution: `${G.why}\nNext term: a₅ = ${disp(5)}\nRule: aₙ = ${G.T}` });
+};
+// #25–32: write the series using summation notation
+TEMPLATES.b81Sigma = (r) => {
+  const G = pick(r, [
+    () => { const d = pick(r, [2, 3, 5, 6]), a = ri(r, 1, 9), k = ri(r, 4, 6); return { f: (i) => a + d * (i - 1), k, body: b8linT(d, a - d).includes(' ') ? `(${b8linT(d, a - d).replace(/n/g, 'i')})` : b8linT(d, a - d).replace(/n/g, 'i'), L: b8linL(d, a - d).replace(/n/g, 'i') }; },
+    () => { const a = pick(r, [4, 5, 7]), d = pick(r, [5, 3, 4]); return { f: (i) => a + d * (i - 1), k: Infinity, body: b8linT(d, a - d).includes(' ') ? `(${b8linT(d, a - d).replace(/n/g, 'i')})` : b8linT(d, a - d).replace(/n/g, 'i'), L: b8linL(d, a - d).replace(/n/g, 'i') }; },
+    () => { const c = pick(r, [0, 1, -2]); return { f: (i) => i * i + c, k: ri(r, 4, 6), body: c ? `(i² ${c < 0 ? '−' : '+'} ${Math.abs(c)})` : 'i²', L: `i^2${c ? (c < 0 ? '-' : '+') + Math.abs(c) : ''}` }; },
+    () => { const q = pick(r, [2, 3]); return { f: (i) => 1 / q ** i, k: Infinity, body: `(1/${q})${b8sup('i')}`, L: `\\left(\\frac{1}{${q}}\\right)^{i}`, frac: true }; },
+    () => ({ f: (i) => i / (i + 3), k: Infinity, body: 'i/(i + 3)', L: '\\frac{i}{i+3}', disp: (i) => `${i}/${i + 3}`, frac: true }),
+    () => { const a = pick(r, [3, 2]), k = ri(r, 5, 6); return { f: (i) => (-1) ** i * (i + a - 1), k, body: `(−1)${b8sup('i')}(i + ${a - 1})`, L: `\\left(-1\\right)^{i}\\left(i+${a - 1}\\right)`, alt: true }; },
+    () => { const k = ri(r, 4, 6); return { f: (i) => (-1) ** i * 2 ** i, k, body: `(−2)${b8sup('i')}`, L: '\\left(-2\\right)^{i}', alt: true }; }])();
+  const shown = Math.min(G.k, G.k === Infinity ? 4 : G.k), vals = b8seqVals(G.f, shown), disp = G.disp || ((i) => b8T(G.f(i)));
+  const seriesT = G.disp ? vals.map((v, i) => disp(i + 1)).join(' + ') + (G.k === Infinity ? ' + ⋯' : '') : b8series(vals, false, G.k === Infinity);
+  const c = b8sig('i', 1, G.k, G.body), hiT = G.k === Infinity ? '\\infty' : String(G.k);
+  const hiOk = (raw) => (G.k === Infinity ? /\\infty|∞|infinity|inf/.test(String(raw || '').toLowerCase()) : numOk(raw, G.k));
+  const check = (v) => { const lo = pxConst(b8num(v[0])); if (!Number.isInteger(lo) || !hiOk(v[1])) return false; if (G.k !== Infinity && pxConst(v[1]) - lo + 1 !== G.k) return false;
+    const F = pxParse(b8num(v[2]), ['x'], 'iknj'); if (!F) return false; for (let t = 0; t < Math.min(G.k, 8); t++) { const want = G.f(t + 1), got = F({ x: lo + t }); if (!isFinite(got) || Math.abs(got - want) > 1e-6 * Math.max(1, Math.abs(want))) return false; } return true; };
+  const W = G.k === Infinity ? [b8sig('i', 1, 4, G.body), b8sig('i', 0, Infinity, G.body)] : [b8sig('i', 1, G.k + 1, G.body), b8sig('i', 0, G.k, G.body), b8sig('i', 1, Infinity, G.body)];
+  return { topic: 'Summation notation', stem: `Write the series using summation notation.   ${seriesT}`, ...buildChoices(r, c, W.filter((w) => w !== c), () => null),
+    fr: { frStem: 'Enter the lower limit of the index, the upper limit, and the expression for the ith term.', fields: [{ kind: 'expr', keys: 'sig', label: 'Lower limit:  i =' }, { kind: 'expr', keys: 'sig', label: 'Upper limit:' }, { kind: 'expr', keys: 'sig', label: 'ith term:' }], key: ['1', hiT, G.L], display: c, check },
+    solution: `${G.alt ? 'The signs alternate, so use a power of −1 (or of a negative base). ' : ''}The ith term is ${G.body.replace(/^\((.*)\)$/, '$1')}, starting with i = 1${G.k === Infinity ? ' and continuing without end' : ` and ending with i = ${G.k}`}.\n${c}` };
+};
+TEMPLATES.b81Sum = (r) => {
+  const G = pick(r, [
+    () => { const k = pick(r, [2, 7, 4]), N = ri(r, 5, 7); return [b8sig('i', 1, N, `${k}i`), 1, N, (i) => k * i]; },
+    () => { const N = ri(r, 4, 5); return [b8sig('n', 0, N, 'n³'), 0, N, (n) => n ** 3]; },
+    () => { const N = ri(r, 4, 5); return [b8sig('k', 1, N, '3k²'), 1, N, (k) => 3 * k * k]; },
+    () => { const lo = ri(r, 2, 3), hi = lo + ri(r, 3, 4); return [b8sig('k', lo, hi, '(5k − 2)'), lo, hi, (k) => 5 * k - 2]; },
+    () => { const N = ri(r, 5, 6); return [b8sig('n', 1, N, '(n² − 1)'), 1, N, (n) => n * n - 1]; },
+    () => { const hi = pick(r, [5, 6]); return [b8sig('i', 2, hi, '2/i'), 2, hi, (i) => 2 / i]; },
+    () => { const lo = 2, hi = pick(r, [4, 5]); return [b8sig('k', lo, hi, 'k/(k + 1)'), lo, hi, (k) => k / (k + 1)]; },
+    () => { const N = pick(r, [35, 20, 42]); return [b8sig('i', 1, N, '1'), 1, N, () => 1]; },
+    () => { const lo = pick(r, [10, 5]), hi = lo + pick(r, [10, 15]); return [b8sig('i', lo, hi, 'i'), lo, hi, (i) => i]; },
+    () => { const N = pick(r, [16, 12, 20]); return [b8sig('n', 1, N, 'n'), 1, N, (n) => n]; },
+    () => { const N = pick(r, [10, 12, 18]); return [b8sig('n', 1, N, 'n²'), 1, N, (n) => n * n]; }])();
+  const [txt, lo, hi, f] = G; let s = 0; const parts = []; for (let i = lo; i <= hi; i++) { s += f(i); parts.push(f(i)); }
+  const val = b8r(s), big = hi - lo > 8;
+  return a1numQ(r, { topic: 'Summation notation', stem: `Find the sum.   ${txt}`, val, wrongs: [b8r(s - f(hi)), b8r(s + f(hi + 1)), b8r(s - f(lo) + f(hi + 1))],
+    solution: big ? `Use a formula: ${/n²/.test(txt) ? `∑ n² = N(N + 1)(2N + 1)/6` : /\s1$/.test(txt) ? '∑ 1 = (number of terms)' : '∑ i = N(N + 1)/2 (subtract the terms that are not included)'}.\n${txt} = ${fracT(val)}` : `${txt} = ${b8series(parts.map(b8r))} = ${fracT(val)}` });
+};
+TEMPLATES.b81Word = (r) => {
+  const kind = pick(r, ['tables', 'salary', 'squares', 'dots']);
+  if (kind === 'tables') { const per = pick(r, [2, 3]), k = ri(r, 6, 12), f = (n) => 2 * per * n + 2;
+    return b8ruleQ(r, { topic: 'Sequences in real life', stem: `Rectangular tables are placed end to end along their short edges. Each table seats ${per} people along each long side and 1 person at each end; when tables are joined, only the two ends of the whole row have seats. Write a rule for the number of people who can be seated around n tables arranged in this manner. Then find how many people can be seated around ${k} tables.`,
+      f, ruleT: `${2 * per}n + 2`, ruleL: `${2 * per}n+2`, extra: { label: `a${b8sub(k)} =`, text: String(f(k)), latex: String(f(k)), val: f(k) }, wrongs: [`aₙ = ${2 * per + 2}n;  a${b8sub(k)} = ${(2 * per + 2) * k}`, `aₙ = ${per}n + 2;  a${b8sub(k)} = ${per * k + 2}`, `aₙ = ${2 * per}n;  a${b8sub(k)} = ${2 * per * k}`],
+      solution: `1 table: ${f(1)}, 2 tables: ${f(2)}, 3 tables: ${f(3)}, … Each table adds ${2 * per} seats along the sides, and there are always 2 seats at the ends.\naₙ = ${2 * per}n + 2, so a${b8sub(k)} = ${2 * per}(${k}) + 2 = ${f(k)}.` }); }
+  if (kind === 'salary') { const s = pick(r, [33000, 41000, 38500]), d = pick(r, [2400, 1800, 1500]), k = ri(r, 5, 10), f = (n) => s + d * (n - 1);
+    return b8ruleQ(r, { topic: 'Sequences in real life', stem: `An employee at a company earns $${s.toLocaleString('en-US')} for the first year of employment. Employees receive raises of $${d.toLocaleString('en-US')} each year. Write a rule for the salary aₙ (in dollars) of the employee in year n. Then find the salary in year ${k}.`,
+      f, ruleT: `${d}n + ${s - d}`, ruleL: `${d}n+${s - d}`, extra: { label: `a${b8sub(k)} = $`, text: `$${f(k).toLocaleString('en-US')}`, latex: String(f(k)), check: (raw) => b8numOk(String(raw || '').replace(/,|\\\$|\$/g, ''), f(k)) },
+      wrongs: [`aₙ = ${d}n + ${s};  a${b8sub(k)} = $${(s + d * k).toLocaleString('en-US')}`, `aₙ = ${s}n + ${d};  a${b8sub(k)} = $${(s * k + d).toLocaleString('en-US')}`, `aₙ = ${d}n + ${s - d};  a${b8sub(k)} = $${(s + d * k).toLocaleString('en-US')}`],
+      solution: `aₙ = ${s} + ${d}(n − 1) = ${d}n + ${s - d}\na${b8sub(k)} = ${d}(${k}) + ${s - d} = ${f(k)}, so the salary is $${f(k).toLocaleString('en-US')}.` }); }
+  if (kind === 'squares') { const f = (n) => (n * (n + 1)) / 2;
+    return b8ruleQ(r, { topic: 'Sequences in real life', stem: 'A staircase pattern is made of small squares. Figure 1 has 1 square, Figure 2 has 3 squares, Figure 3 has 6 squares, and Figure 4 has 10 squares (each figure adds a new column one square taller than the last). Write a rule for the total number of small squares aₙ in the nth figure.',
+      f, ruleT: 'n(n + 1)/2', ruleL: '\\frac{n\\left(n+1\\right)}{2}', wrongs: ['aₙ = 3n − 3', 'aₙ = 4n − 5', 'aₙ = n', 'aₙ = n²'], solution: 'Figure n has 1 + 2 + ⋯ + n squares, which is n(n + 1)/2.\nCheck: n = 4 gives 4(5)/2 = 10. ✓\naₙ = n(n + 1)/2' }); }
+  const k = pick(r, [3, 4]), f = (n) => k * n * n;
+  return b8ruleQ(r, { topic: 'Sequences in real life', stem: `A pattern of dots is built from squares: Figure n is made of ${k} square arrays, each n dots by n dots. The numbers of dots are ${[1, 2, 3, 4].map(f).join(', ')}, … Write a rule for the number of dots aₙ in the nth figure.`, f, ruleT: `${k}n²`, ruleL: `${k}n^2`, wrongs: [`aₙ = ${k}n`, `aₙ = (${k}n)²`, `aₙ = n² + ${k}`], solution: `Each figure has ${k} groups of n² dots, so aₙ = ${k}n².` });
+};
+
+// ---------- 8.2 Analyzing Arithmetic Sequences and Series ----------
+TEMPLATES.b82Is = (r) => {
+  const yes = r() < 0.5; let dec = r() < 0.25, vals, why;
+  if (yes) { const a = dec ? pick(r, [2.3, 11.7, 0.5]) : ri(r, -10, 40), d = dec ? pick(r, [-0.8, 0.6, -0.9]) : pick(r, [3, 5, 7, -3, -6, 2, 12]); vals = b8seqVals(b8arith(a, d), 5); why = `The differences are all ${b8T(d, dec)}, so the sequence is arithmetic with common difference ${b8T(d, dec)}.`; }
+  else { const C = pick(r, [() => [1, -1, -3, -7, -9], () => [5, 8, 13, 20, 29], () => [36, 18, 9, 4.5, 2.25], () => [3, 5, 9, 15, 23], () => [81, 27, 9, 3, 1], () => [11.7, 10.8, 9.9, 9.9, 9.8]])(); vals = C;
+    const ds = vals.slice(1).map((v, i) => b8r(v - vals[i])); why = `The differences are ${ds.map((x) => fmt(x)).join(', ')}. They are not all the same, so the sequence is not arithmetic.`; dec = true; }
+  return b6sel(r, 'Arithmetic sequences', `Determine whether the sequence is arithmetic.   ${b8list(vals, dec)}`, ['Arithmetic', 'Not arithmetic'], yes ? 'Arithmetic' : 'Not arithmetic', why);
+};
+const b8arithGen = (r) => pick(r, [() => ({ a: ri(r, -5, 51), d: pick(r, [3, 5, 8, 9, -2, -5, -7, 6]) }), () => ({ a: ri(r, 50, 90), d: -pick(r, [3, 6, 7, 9]) }),
+  () => ({ a: pick(r, [-1, -2, 1]), d: pick(r, [2 / 3, -3 / 4, 1 / 2, 3 / 2]) }), () => ({ a: pick(r, [2.3, 11.7, 4.5]), d: pick(r, [-0.8, -0.9, 0.6]), dec: true })])();
+TEMPLATES.b82Rule = (r) => {
+  const { a, d, dec } = b8arithGen(r), f = b8arith(a, d), c = b8r(a - d), a20 = f(20), vals = b8seqVals(f, 4);
+  return b8ruleQ(r, { topic: 'Arithmetic sequences', stem: `Write a rule for the nth term of the sequence. Then find a₂₀.   ${b8list(vals, dec)}`, f, ruleT: b8linT(d, c, dec), ruleL: b8linL(d, c, dec), extra: { label: 'a₂₀ =', text: b8T(a20, dec), latex: b8L(a20, dec), val: a20 },
+    wrongs: [`aₙ = ${b8linT(d, a, dec)};  a₂₀ = ${b8T(a + 20 * d, dec)}`, `aₙ = ${b8linT(-d, b8r(a + d), dec)};  a₂₀ = ${b8T(a - 19 * d, dec)}`, `aₙ = ${b8linT(a, d, dec)};  a₂₀ = ${b8T(20 * a + d, dec)}`],
+    solution: `a₁ = ${b8T(a, dec)} and d = ${b8T(d, dec)}.\naₙ = a₁ + (n − 1)d = ${b8T(a, dec)} + (n − 1)(${b8T(d, dec)}) = ${b8linT(d, c, dec)}\na₂₀ = ${b8linT(d, c, dec).replace('n', '(20)')} = ${b8T(a20, dec)}` });
+};
+TEMPLATES.b82FromTerm = (r) => {
+  const k = pick(r, [11, 13, 15, 17, 20, 21]), d = pick(r, [5, 4, -3, -2, -5, 3, -1 / 2, -3 / 2]), ak = ri(r, -40, 45), a1 = b8r(ak - (k - 1) * d), f = b8arith(a1, d), c = b8r(a1 - d);
+  return b8ruleQ(r, { topic: 'Arithmetic sequences', stem: `Write a rule for the nth term of the arithmetic sequence.   ${b8a(k)} = ${fracT(ak)}, d = ${fracT(d)}`, f, ruleT: b8linT(d, c), ruleL: b8linL(d, c),
+    wrongs: [`aₙ = ${b8linT(d, ak)}`, `aₙ = ${b8linT(d, b8r(ak + (k - 1) * d - d))}`, `aₙ = ${b8linT(-d, b8r(ak + (k - 1) * d + d))}`].map((t) => t),
+    solution: `Use aₙ = a₁ + (n − 1)d to find a₁:\n${fracT(ak)} = a₁ + ${k - 1}(${fracT(d)}), so a₁ = ${fracT(a1)}.\naₙ = ${fracT(a1)} + (n − 1)(${fracT(d)}) = ${b8linT(d, c)}` });
+};
+TEMPLATES.b82TwoTerms = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const d = pick(r, [6, 8, -3, -4, 5, -7, 2]), a1 = ri(r, -20, 25), i = ri(r, 2, 12), j = i + ri(r, 3, 15), f = b8arith(a1, d), c = a1 - d;
+    if (Math.abs(f(j)) > 120) continue;
+    return b8ruleQ(r, { topic: 'Arithmetic sequences', stem: `Write a rule for the nth term of the arithmetic sequence.   ${b8a(i)} = ${fracT(f(i))}, ${b8a(j)} = ${fracT(f(j))}`, f, ruleT: b8linT(d, c), ruleL: b8linL(d, c),
+      wrongs: [`aₙ = ${b8linT(-d, a1 + d)}`, `aₙ = ${b8linT(d, f(i))}`, `aₙ = ${b8linT(d, c + d)}`],
+      solution: `${b8a(j)} − ${b8a(i)} = ${j - i}d, so ${fracT(f(j))} − (${fracT(f(i))}) = ${j - i}d and d = ${fracT(d)}.\n${fracT(f(i))} = a₁ + ${i - 1}(${fracT(d)}), so a₁ = ${fracT(a1)}.\naₙ = ${fracT(a1)} + (n − 1)(${fracT(d)}) = ${b8linT(d, c)}` });
+  }
+};
+TEMPLATES.b82Graph = (r) => {
+  const graph = r() < 0.55;
+  if (graph) { const a = nz(r, -8, 9), d = pick(r, [2, 3, -2, -3, 4, -5, 5]), f = b8arith(a, d), pts = [1, 2, 3, 4].map((n) => [n, f(n)]);
+    return b8ruleQ(r, { topic: 'Arithmetic sequences', stem: 'Write a rule for the arithmetic sequence with the given terms.', draw: b8dots(pts), size: [320, 300], f, ruleT: b8linT(d, a - d), ruleL: b8linL(d, a - d),
+      wrongs: [`aₙ = ${b8linT(d, a)}`, `aₙ = ${b8linT(-d, a + d)}`, `aₙ = ${b8linT(a, d)}`], solution: `From the graph, a₁ = ${fracT(a)} and d = ${fracT(f(2))} − (${fracT(a)}) = ${fracT(d)}.\naₙ = ${fracT(a)} + (n − 1)(${fracT(d)}) = ${b8linT(d, a - d)}` }); }
+  const a = ri(r, 1, 30), d = pick(r, [4, 6, 8, 3, -4]), f = b8arith(a, d), ns = [4, 5, 6, 7, 8]; if (!f(4)) return TEMPLATES.b82Graph(r);
+  return b8ruleQ(r, { topic: 'Arithmetic sequences', stem: 'Write a rule for the arithmetic sequence with the given terms.', draw: a9tableDraw([['n', ...ns], ['aₙ', ...ns.map((n) => fracT(f(n)))]]), size: [420, 80], f, ruleT: b8linT(d, a - d), ruleL: b8linL(d, a - d),
+    wrongs: [`aₙ = ${b8linT(d, f(4))}`, `aₙ = ${b8linT(d, f(4) - d)}`, `aₙ = ${b8linT(-d, a + d)}`], solution: `d = ${fracT(f(5))} − ${fracT(f(4))} = ${fracT(d)}. Use a₄ = ${fracT(f(4))}: ${fracT(f(4))} = a₁ + 3(${fracT(d)}), so a₁ = ${fracT(a)}.\naₙ = ${fracT(a)} + (n − 1)(${fracT(d)}) = ${b8linT(d, a - d)}` });
+};
+TEMPLATES.b82Sum = (r) => {
+  const dec = r() < 0.3, N = pick(r, [20, 26, 33, 31, 41, 39, 25]), m = dec ? pick(r, [0.1, 0.4, -0.2]) : pick(r, [2, 4, -2, -4, 3, 5]), b = dec ? pick(r, [-2.3, -4.1, 1.5]) : nz(r, -9, 9);
+  const f = (i) => b8r(m * i + b), a1 = f(1), aN = f(N), S = b8r((N * (a1 + aN)) / 2); if (!aN || !a1) return TEMPLATES.b82Sum(r);
+  const body = dec ? `(${fmt(b)} ${m < 0 ? '−' : '+'} ${fmt(Math.abs(m))}i)` : `(${b8linT(m, b).replace('n', 'i')})`;
+  return a1numQ(r, { topic: 'Arithmetic series', stem: `Find the sum.   ${b8sig('i', 1, N, body)}`, val: S, dec: true, wrongs: [b8r(N * (a1 + aN)), b8r(((N - 1) * (a1 + aN)) / 2), b8r(N * aN)],
+    solution: `a₁ = ${fmt(a1)} and a${b8sub(N)} = ${fmt(aN)}.\nS${b8sub(N)} = ${N}((${fmt(a1)} + ${aN < 0 ? `(${fmt(aN)})` : fmt(aN)})/2) = ${fmt(S)}` });
+};
+TEMPLATES.b82SumSeq = (r) => {
+  const a = ri(r, -5, 20), d = pick(r, [-7, -8, 3, 5, -3, 4]), N = pick(r, [19, 22, 15, 25, 30]), f = b8arith(a, d), S = (N * (a + f(N))) / 2;
+  return a1numQ(r, { topic: 'Arithmetic series', stem: `Find the sum of the first ${N} terms of the arithmetic sequence ${b8list(b8seqVals(f, 4))}`, val: S, wrongs: [N * (a + f(N)), ((N - 1) * (a + f(N - 1))) / 2, (N * (a + f(N + 1))) / 2],
+    solution: `a₁ = ${fracT(a)}, d = ${fracT(d)}, so a${b8sub(N)} = ${fracT(a)} + ${N - 1}(${fracT(d)}) = ${fracT(f(N))}.\nS${b8sub(N)} = ${N}((${fracT(a)} + ${fracT(f(N))})/2) = ${fracT(S)}` });
+};
+TEMPLATES.b82Word = (r) => {
+  const kind = pick(r, ['band', 'honey', 'theater']);
+  if (kind === 'band') { const a = pick(r, [3, 4, 5]), d = 2, k = ri(r, 6, 9), f = b8arith(a, d), S = (k * (a + f(k))) / 2;
+    return b8ruleQ(r, { topic: 'Arithmetic series in real life', stem: `A marching band is arranged in rows. The first row has ${a} band members, and each subsequent row has ${d} more band members than the previous row. Write a rule for the number of band members in the nth row. Then find how many band members are in a formation with ${k} rows.`, f, ruleT: b8linT(d, a - d), ruleL: b8linL(d, a - d),
+      extra: { label: 'Total:', text: String(S), latex: String(S), val: S }, wrongs: [`aₙ = ${b8linT(d, a)};  Total: ${S + k * d}`, `aₙ = ${b8linT(d, a - d)};  Total: ${f(k)}`, `aₙ = ${b8linT(a, d)};  Total: ${k * (a + a * k + d) / 2}`],
+      solution: `aₙ = ${a} + (n − 1)(${d}) = ${b8linT(d, a - d)}\na${b8sub(k)} = ${f(k)}, so S${b8sub(k)} = ${k}((${a} + ${f(k)})/2) = ${S} band members.` }); }
+  if (kind === 'honey') { const k = ri(r, 5, 10), T = 1 + 3 * k * (k + 1);
+    return b8ruleQ(r, { topic: 'Arithmetic series in real life', stem: `Bees build a honeycomb starting with a single hexagonal cell, then forming ring after ring of hexagonal cells around it. The first ring has 6 cells, the second ring has 12 cells, the third ring has 18 cells, and so on. Write a rule for the number of cells in the nth ring. Then find how many cells are in the honeycomb (including the initial cell) after the ${['', '', '', '', '', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'][k]} ring is formed.`, f: (n) => 6 * n, ruleT: '6n', ruleL: '6n',
+      extra: { label: 'Total cells:', text: String(T), latex: String(T), val: T }, wrongs: [`aₙ = 6n;  Total cells: ${T - 1}`, `aₙ = 6n + 1;  Total cells: ${T + k}`, `aₙ = 6n;  Total cells: ${6 * k + 1}`],
+      solution: `The rings form an arithmetic sequence with a₁ = 6 and d = 6, so aₙ = 6n.\nRings: S${b8sub(k)} = ${k}((6 + ${6 * k})/2) = ${T - 1}. Add the initial cell: ${T - 1} + 1 = ${T}.` }); }
+  const a = pick(r, [20, 18, 22]), d = pick(r, [2, 3]), k = pick(r, [15, 20, 25]), f = b8arith(a, d), S = (k * (a + f(k))) / 2;
+  return b8ruleQ(r, { topic: 'Arithmetic series in real life', stem: `A theater has ${a} seats in the first row. Each row after the first has ${d} more seats than the row in front of it. Write a rule for the number of seats in row n. Then find the total number of seats in the first ${k} rows.`, f, ruleT: b8linT(d, a - d), ruleL: b8linL(d, a - d),
+    extra: { label: 'Total seats:', text: String(S), latex: String(S), val: S }, wrongs: [`aₙ = ${b8linT(d, a)};  Total seats: ${S + k * d}`, `aₙ = ${b8linT(d, a - d)};  Total seats: ${f(k)}`, `aₙ = ${b8linT(d, a - d)};  Total seats: ${k * a + d * k}`],
+    solution: `aₙ = ${a} + (n − 1)(${d}) = ${b8linT(d, a - d)}\na${b8sub(k)} = ${f(k)}, so S${b8sub(k)} = ${k}((${a} + ${f(k)})/2) = ${S} seats.` });
+};
+
+// ---------- 8.3 Analyzing Geometric Sequences and Series ----------
+TEMPLATES.b83Is = (r) => {
+  const yes = r() < 0.5; let vals, why, dec = true;
+  if (yes) { const [a, q] = pick(r, [[96, 0.5], [729, 1 / 3], [0.2, 16], [0.3, -5], [2, 3], [5, 4], [1.3, -3], [4, 1.5]]); vals = b8seqVals(b8geo(a, q), 5); dec = !(q === 1 / 3);
+    why = `The ratios of consecutive terms are all ${fracT(q)}, so the sequence is geometric with common ratio ${fracT(q)}.`; }
+  else { vals = pick(r, [[2, 4, 6, 8, 10], [5, 20, 35, 50, 65], [3, 6, 12, 20, 30], [1, 4, 9, 16, 25], [100, 50, 20, 10, 5]]); const rs = vals.slice(1).map((v, i) => b8r(v / vals[i]));
+    why = `The ratios are ${rs.map((x) => fracT(x)).join(', ')}. They are not all the same, so the sequence is not geometric.`; }
+  return b6sel(r, 'Geometric sequences', `Determine whether the sequence is geometric.   ${b8list(vals, dec)}`, ['Geometric', 'Not geometric'], yes ? 'Geometric' : 'Not geometric', why);
+};
+const b8geoGen = (r) => pick(r, [() => ({ a: pick(r, [4, 2, 3, 5]), q: pick(r, [5, 2, 3, 4]) }), () => ({ a: pick(r, [192, 448, 320]), q: 1 / 2 }), () => ({ a: pick(r, [486, 729]), q: 1 / 3 }), () => ({ a: pick(r, [375, 625]), q: 1 / 5 }),
+  () => ({ a: pick(r, [1.3, 1.5, 2.5]), q: pick(r, [-3, -5, -2]), dec: true }), () => ({ a: pick(r, [4, 2]), q: 3 / 2 })])();
+TEMPLATES.b83Rule = (r) => {
+  const { a, q, dec } = b8geoGen(r), f = b8geo(a, q), a7 = f(7), vals = b8seqVals(f, 4);
+  const dvals = q === 3 / 2 ? vals.map((v) => b8T(v)) : vals.map((v) => b8T(v, dec));
+  return b8ruleQ(r, { topic: 'Geometric sequences', stem: `Write a rule for the nth term of the sequence. Then find a₇.   ${dvals.join(', ')}, …`, f, ruleT: b8geoT(a, q, dec), ruleL: b8geoL(a, q, dec), extra: { label: 'a₇ =', text: b8T(a7, dec), latex: b8L(a7, dec), val: a7 },
+    wrongs: [`aₙ = ${b8geoT(a, q, dec, 'n')};  a₇ = ${b8vT(f(8), dec)}`, `aₙ = ${b8geoT(a, -q, dec)};  a₇ = ${b8vT(a7, dec)}`, `aₙ = ${b8geoT(a, q, dec)};  a₇ = ${b8vT(f(6), dec)}`],
+    solution: `a₁ = ${b8T(a, dec)} and r = ${b8T(f(2), dec)}/${b8T(a, dec)} = ${fracT(q)}.\naₙ = a₁rⁿ⁻¹ = ${b8geoT(a, q, dec)}\na₇ = ${b8T(a, dec)}(${fracT(q)})⁶ = ${b8T(a7, dec)}` });
+};
+TEMPLATES.b83FromTerm = (r) => {
+  const [a, q] = pick(r, [[4, 2], [27 / 9, 3], [256, 1 / 4], [-24, 1 / 2], [-5, 5], [-4, 5], [81, -1 / 3], [2, -3], [32, 3 / 2]]), k = pick(r, [3, 4, 5, 2]), f = b8geo(a, q), ak = f(k);
+  return b8ruleQ(r, { topic: 'Geometric sequences', stem: `Write a rule for the nth term of the geometric sequence.   ${b8a(k)} = ${fracT(ak)}, r = ${fracT(q)}`, f, ruleT: b8geoT(a, q), ruleL: b8geoL(a, q),
+    wrongs: [`aₙ = ${b8geoT(ak, q)}`, `aₙ = ${b8geoT(b8r(ak * q ** (k - 1)), q)}`, `aₙ = ${b8geoT(a, q, false, 'n')}`],
+    solution: `${fracT(ak)} = a₁(${fracT(q)})${b8sup(k - 1)}, so a₁ = ${fracT(ak)} ÷ ${fracT(q ** (k - 1))} = ${fracT(a)}.\naₙ = ${b8geoT(a, q)}` });
+};
+TEMPLATES.b83TwoTerms = (r) => {
+  const [a, q, i, j] = pick(r, [[7, 4, 2, 5], [-6, -3, 1, 5], [-5, 2, 2, 6], [64, 1 / 4, 2, 5], [-1, 3, 3, 6], [-96, -1 / 2, 3, 6], [2, -3, 2, 5], [3, 2, 2, 7], [-1, -2, 4, 7]]), f = b8geo(a, q);
+  return b8ruleQ(r, { topic: 'Geometric sequences', stem: `Write a rule for the nth term of the geometric sequence.   ${b8a(i)} = ${fracT(f(i))}, ${b8a(j)} = ${fracT(f(j))}`, f, ruleT: b8geoT(a, q), ruleL: b8geoL(a, q),
+    wrongs: [`aₙ = ${b8geoT(f(i), q)}`, `aₙ = ${b8geoT(a, -q)}`, `aₙ = ${b8geoT(a, q, false, 'n')}`],
+    solution: `${b8a(j)}/${b8a(i)} = r${b8sup(j - i)}: ${fracT(f(j))}/${fracT(f(i))} = ${fracT(q ** (j - i))}, so r = ${fracT(q)}.\n${fracT(f(i))} = a₁(${fracT(q)})${b8sup(i - 1)}, so a₁ = ${fracT(a)}.\naₙ = ${b8geoT(a, q)}` });
+};
+TEMPLATES.b83Graph = (r) => {
+  if (r() < 0.5) { const [a, q] = pick(r, [[5, 3], [48, 1 / 4], [3, 2], [64, 1 / 2], [1, 3], [2, 2]]), f = b8geo(a, q), pts = [1, 2, 3, 4].map((n) => [n, f(n)]);
+    return b8ruleQ(r, { topic: 'Geometric sequences', stem: 'Write a rule for the geometric sequence with the given terms.', draw: b8dots(pts), size: [320, 300], f, ruleT: b8geoT(a, q), ruleL: b8geoL(a, q),
+      wrongs: [`aₙ = ${b8geoT(a, q, false, 'n')}`, `aₙ = ${b8geoT(q, a)}`, `aₙ = ${b8linT(f(2) - a, 2 * a - f(2))}`], solution: `From the graph, a₁ = ${fracT(a)} and r = ${fracT(f(2))}/${fracT(a)} = ${fracT(q)}.\naₙ = ${b8geoT(a, q)}` }); }
+  const [a, q] = pick(r, [[-3, 2], [7, -3], [1.5, 4], [-1, -2]]), f = b8geo(a, q), ns = [2, 3, 4, 5, 6], dec = !Number.isInteger(a);
+  return b8ruleQ(r, { topic: 'Geometric sequences', stem: 'Write a rule for the geometric sequence with the given terms.', draw: a9tableDraw([['n', ...ns], ['aₙ', ...ns.map((n) => b8T(f(n), dec))]]), size: [420, 80], f, ruleT: b8geoT(a, q, dec), ruleL: b8geoL(a, q, dec),
+    wrongs: [`aₙ = ${b8geoT(f(2), q, dec)}`, `aₙ = ${b8geoT(a, q, dec, 'n')}`, `aₙ = ${b8geoT(a, -q, dec)}`], solution: `r = ${b8T(f(3), dec)}/${b8T(f(2), dec)} = ${fracT(q)}. Use a₂ = ${b8T(f(2), dec)}: ${b8T(f(2), dec)} = a₁(${fracT(q)}), so a₁ = ${b8T(a, dec)}.\naₙ = ${b8geoT(a, q, dec)}` });
+};
+TEMPLATES.b83Sum = (r) => {
+  const [a, q, N, lo] = pick(r, [[6, 7, 9, 1], [7, 4, 10, 1], [4, 3 / 4, 10, 1], [5, 1 / 3, 8, 1], [8, -2 / 3, 8, 0], [9, -3 / 4, 9, 0], [3, 2, 8, 1], [2, -3, 7, 1]]);
+  const ex = lo === 0 ? 'i' : 'i−1', f = (i) => a * q ** (lo === 0 ? i : i - 1); let S = 0; for (let i = lo; i <= N; i++) S += f(i); S = b8r(S);
+  const n = N - lo + 1, a1 = f(lo);
+  return b8exQ(r, { topic: 'Geometric series', stem: `Find the sum. Give an exact answer or round to three decimal places.   ${b8sig('i', lo, N, `${a}(${fracT(q)})${b8sup(ex)}`)}`, val: S,
+    wrongs: [S - f(N), S + f(N + 1), b8r((a1 * (1 - q ** (n + 1))) / (1 - q))], solution: `a₁ = ${fracT(a1)}, r = ${fracT(q)}, and there are ${n} terms.\nS${b8sub(n)} = a₁(1 − rⁿ)/(1 − r) = ${fracT(a1)}(1 − (${fracT(q)})${b8sup(n)})/(1 − ${fracT(q)}) ${fracParts(S) && fracParts(S)[1] <= 400 ? '=' : '≈'} ${b8exT(S).replace('≈ ', '')}` });
+};
+TEMPLATES.b83SumSeq = (r) => {
+  const [a, q, N] = pick(r, [[-12, 4, 8], [-14, 3, 9], [3, 2, 10], [5, 3, 7], [64, 1 / 2, 8], [2, -2, 9]]), f = b8geo(a, q), S = b8r((a * (1 - q ** N)) / (1 - q));
+  return a1numQ(r, { topic: 'Geometric series', stem: `Find the sum of the first ${N} terms of the geometric sequence ${b8list(b8seqVals(f, 4))}`, val: S, wrongs: [b8r(S - f(N)), b8r(S + f(N + 1)), b8r((a * (1 - q ** N)) / (q - 1))],
+    solution: `a₁ = ${fracT(a)} and r = ${fracT(q)}.\nS${b8sub(N)} = a₁(1 − rⁿ)/(1 − r) = ${fracT(a)}(1 − (${fracT(q)})${b8sup(N)})/(1 − ${fracT(q)}) = ${fracT(S)}` });
+};
+TEMPLATES.b83Loan = (r) => {
+  const C = pick(r, [() => ['You are buying a used car. You take out a', pick(r, [5, 4]), pick(r, [15000, 12000, 18500]), pick(r, [4, 5.5, 6])], () => ['You take out a', pick(r, [3, 2]), pick(r, [1300, 2500, 1800]), pick(r, [4.5, 6, 7])]])();
+  const [lead, yrs, L, rate] = C, i = rate / 100 / 12, t = 12 * yrs, M = (L * i) / (1 - (1 + i) ** -t);
+  return b6moneyQ(r, { topic: 'Geometric series in real life', stem: `${lead} ${yrs}-year loan for $${L.toLocaleString('en-US')}. The annual interest rate of the loan is ${rate}%, compounded monthly. Calculate the monthly payment. (Use L = M/(1 + i) + M/(1 + i)² + ⋯ + M/(1 + i)ᵗ, where i is the monthly rate and t is the number of payments.)`, val: M, tol: 0.02,
+    wrongs: [L / t, (L * (1 + rate / 100 * yrs)) / t, (L * rate / 100) / (1 - (1 + rate / 100) ** -yrs) / 12], solution: `i = ${rate / 100}/12 ≈ ${i.toFixed(5)} and t = ${t}.\nThe sum is geometric with a₁ = M/(1 + i) and r = 1/(1 + i), so L = M(1 − (1 + i)⁻ᵗ)/i.\nM = Li/(1 − (1 + i)⁻ᵗ) = ${L}(${i.toFixed(6)})/(1 − (1 + ${i.toFixed(6)})⁻${b8sup(t).replace('⁻', '')}) ≈ ${b6money(Math.round(M * 100) / 100)}` });
+};
+TEMPLATES.b83Word = (r) => {
+  const kind = pick(r, ['link', 'kick', 'hatch']);
+  if (kind === 'link') { const k = pick(r, [3, 2, 4]), R = pick(r, [5, 6]); let S = 0; for (let i = 1; i <= R; i++) S += k ** i;
+    return a1numQ(r, { topic: 'Geometric series in real life', stem: `You share a link for a movie trailer in a chat. ${k} of your friends repost the link, then ${k} of each of their friends repost the link, and so on. Find the total number of people who reposted the link after the ${R === 5 ? 'fifth' : 'sixth'} round.`, val: S, wrongs: [k ** R, S + 1, S - k ** R], solution: `The rounds give ${b8series([1, 2, 3].map((i) => k ** i))} + ⋯ + ${k}${b8sup(R)}, a geometric series with a₁ = ${k}, r = ${k}, n = ${R}.\nS = ${k}(1 − ${k}${b8sup(R)})/(1 − ${k}) = ${S} people` }); }
+  if (kind === 'kick') { const pay = pick(r, [5, 10]), k = 2, R = pick(r, [4, 5]); let S = 0; for (let i = 1; i <= R; i++) S += pay * k ** i;
+    return b6moneyQ(r, { topic: 'Geometric series in real life', stem: `An electronics repair store offers a $${pay} kickback reward per referral. You refer two of your friends (earning you $${2 * pay}), then each of them refers two of their friends, and so on, and you earn $${pay} for every referral in the chain. What is the total amount of the kickback rewards distributed after ${R} rounds of referrals?`, val: S, wrongs: [pay * k ** R, S / 2, S + pay], solution: `Referrals per round: 2, 4, 8, …, 2${b8sup(R)}. Total referrals: 2(1 − 2${b8sup(R)})/(1 − 2) = ${S / pay}.\nTotal rewards: ${S / pay} × $${pay} = ${b6money(S)}` }); }
+  const E = pick(r, [6400, 12800, 25600]), p = 0.25, d = pick(r, [3, 4, 5]), left = E * (1 - p) ** d;
+  return a1numQ(r, { topic: 'Geometric sequences in real life', stem: `A hatchery raises trout for creek restocking. There are ${E.toLocaleString('en-US')} unhatched eggs at first. Each day, this number decreases by 25% as the eggs hatch. How many days will it be until only ${left.toLocaleString('en-US')} unhatched eggs remain?`, val: d, unit: 'days', wrongs: [d + 1, d - 1, d + 2], solution: `After n days, aₙ = ${E}(0.75)ⁿ.\n${E}(0.75)${b8sup(d)} = ${left}, so it takes ${d} days.` });
+};
+
+// ---------- 8.4 Finding Sums of Infinite Geometric Series ----------
+const b8dne = (raw) => /doesnotexist|dne|nosum|none|diverg|undefined|nosolution/.test(pxWords(raw));
+TEMPLATES.b84Sum = (r) => {
+  const G = pick(r, [[8, 1 / 5], [2 / 3, 5 / 3], [11 / 3, 3 / 8], [-6, 3 / 2], [2, 3 / 4], [-5, -4 / 5], [3, 5 / 6], [1 / 2, -5 / 3], [7, 1 / 2], [12, -1 / 3], [1, 7 / 2], [4, 2 / 5]]);
+  const [a, q] = G, ok = Math.abs(q) < 1, S = ok ? b8r(a / (1 - q)) : null, sig = r() < 0.5;
+  const aT = fracT(a), stem = sig ? b8sig('n', 1, Infinity, `${/\//.test(aT) ? `(${aT})` : aT === '1' ? '' : aT}(${fracT(q)})${b8sup('n−1')}`) : b8series(b8seqVals(b8geo(a, q), 4), false, true);
+  const c = ok ? fracT(S) : 'The sum does not exist.';
+  return { topic: 'Infinite geometric series', stem: `Find the sum of the infinite geometric series, if it exists.   ${stem}`, ...buildChoices(r, c, [ok ? 'The sum does not exist.' : fracT(b8r(a / (1 - q))), ok ? fracT(b8r(a / (1 + q))) : fracT(b8r(a / (1 + q))), ok ? fracT(b8r(a * q / (1 - q))) : fracT(b8r(a / (q - 1)))].filter((w) => w !== c), (i) => fracT((S || a) + i + 1)),
+    fr: { fields: [{ kind: 'expr', keys: 'dne', label: 'Sum:' }], key: [ok ? fracL(S) : '\\text{does not exist}'], display: c, check: (v) => (ok ? !b8dne(v[0]) && numOk(b8num(v[0]), S) : b8dne(v[0])) },
+    solution: `a₁ = ${aT} and r = ${fracT(q)}. ${ok ? `|r| < 1, so the sum exists.\nS = a₁/(1 − r) = ${aT}/(1 − (${fracT(q)})) = ${fracT(S)}` : '|r| ≥ 1, so the series has no sum.'}` };
+};
+TEMPLATES.b84Partial = (r) => {
+  const [a, q] = pick(r, [[1 / 2, 1 / 3], [2 / 3, 1 / 2], [8, 1 / 2], [5, 1 / 5], [6, 1 / 3], [3, 1 / 2], [9, 1 / 3]]), f = b8geo(a, q), S5 = b8r((a * (1 - q ** 5)) / (1 - q)), S = b8r(a / (1 - q));
+  const s5 = (v) => (/≈/.test(b8exT(v)) ? `S₅ ${b8exT(v)}` : `S₅ = ${b8exT(v)}`), c = `${s5(S5)};  Sₙ approaches ${fracT(S)}`, ok1 = (raw) => exOrRoundOk(b8num(raw).replace(/\\approx|≈/g, ''), S5, 3), ok2 = (raw) => numOk(b8num(raw), S);
+  return { topic: 'Partial sums', stem: `Consider the infinite geometric series ${b8series(b8seqVals(f, 4), false, true)}  Find the partial sum S₅. Then find the value that Sₙ approaches as n increases.`, ...buildChoices(r, c, [`${s5(b8r(S5 - f(5)))};  Sₙ approaches ${fracT(S)}`, `${s5(S5)};  Sₙ increases without bound`, `${s5(S5)};  Sₙ approaches ${fracT(b8r(a / (1 + q)))}`].filter((w) => w !== c), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'S₅ =' }, { kind: 'expr', keys: 'num', label: 'Sₙ approaches' }], key: [b8exL(S5), fracL(S)], display: c, check: (v) => ok1(v[0]) && ok2(v[1]), score: (v) => ((ok1(v[0]) ? 1 : 0) + (ok2(v[1]) ? 1 : 0)) / 2 },
+    solution: `S₅ = ${b8series(b8seqVals(f, 5))} ${/≈/.test(b8exT(S5)) ? '' : '= '}${b8exT(S5)}\nr = ${fracT(q)} and |r| < 1, so Sₙ approaches a₁/(1 − r) = ${fracT(a)}/(1 − ${fracT(q)}) = ${fracT(S)}.` };
+};
+TEMPLATES.b84Repeat = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const L = pick(r, [1, 2, 2, 3]), I = pick(r, [0, 0, 0, ri(r, 1, 140)]), B = L === 1 ? ri(r, 1, 8) : L === 2 ? ri(r, 10, 98) : ri(r, 101, 989);
+    if (L === 2 && B % 11 === 0) continue; if (L === 3 && B % 111 === 0) continue;
+    const den0 = 10 ** L - 1, num0 = I * den0 + B, g = gcd(num0, den0), N = num0 / g, D = den0 / g, bs = String(B).padStart(L, '0'), txt = `${I}.${bs.repeat(L === 1 ? 3 : L === 2 ? 3 : 3)}…`;
+    if (D === 1) continue;
+    const okForm = (raw) => { const s = (pxPlain(b8num(raw)) || '').replace(/[()\s]/g, ''); const m = /^(\d+)\/(\d+)$/.exec(s); return !m || gcd(+m[1], +m[2]) === 1; };
+    return { topic: 'Repeating decimals', stem: `Write the repeating decimal as a fraction in simplest form.   ${txt}`, ...buildChoices(r, `${N}/${D}`, [`${B}/${10 ** L}`, `${num0}/${10 ** L}`, `${I * 10 ** L + B}/${10 ** L}`, `${N + D}/${D}`].filter((w, i, A) => w !== `${N}/${D}` && A.indexOf(w) === i), (i) => `${N + i + 1}/${D}`),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: '' }], key: [`\\frac{${N}}{${D}}`], display: `${N}/${D}`, check: (v) => numOk(b8num(v[0]), N / D) && okForm(v[0]) },
+      solution: `${I ? `${I} + ` : ''}0.${bs}${bs}… = ${I ? `${I} + ` : ''}${B}/${10 ** L} + ${B}/${10 ** (2 * L)} + ⋯\nThe repeating part is an infinite geometric series with a₁ = ${B}/${10 ** L} and r = 1/${10 ** L}, so its sum is (${B}/${10 ** L})/(1 − 1/${10 ** L}) = ${B}/${den0}.\n${I ? `${I} + ${B}/${den0} = ` : ''}${num0}/${den0} = ${N}/${D}` };
+  }
+};
+TEMPLATES.b84Word = (r) => {
+  const kind = pick(r, ['swing', 'ball', 'pend']);
+  if (kind === 'ball') { const h = pick(r, [3, 4, 6, 10]), p = pick(r, [0.6, 0.5, 0.75, 0.8]), T = b8r(h + (2 * h * p) / (1 - p));
+    return a1numQ(r, { topic: 'Infinite geometric series in real life', stem: `A ball is allowed to bounce freely after reaching a height of ${h} feet on its first bounce. On each successive bounce, the ball bounces to ${p * 100}% of its previous height. Starting with the first bounce, what is the total vertical distance the ball travels? (Consider the distance the ball travels up and down on each bounce.)`, val: T, dec: true, unit: 'ft', wrongs: [b8r(h / (1 - p)), b8r((2 * h) / (1 - p)), b8r(h + (h * p) / (1 - p))],
+      solution: `The ball falls ${h} ft once. Every rebound goes up and back down: 2(${h})(${p}) + 2(${h})(${p})² + ⋯, an infinite geometric series with a₁ = ${fmt(2 * h * p)} and r = ${p}, so its sum is ${fmt(2 * h * p)}/(1 − ${p}) = ${fmt(b8r((2 * h * p) / (1 - p)))}.\nTotal: ${h} + ${fmt(b8r((2 * h * p) / (1 - p)))} = ${fmt(T)} ft`}); }
+  const d = kind === 'swing' ? pick(r, [14, 12, 16, 10]) : pick(r, [30, 24, 18]), p = kind === 'swing' ? pick(r, [0.75, 0.8, 0.6]) : pick(r, [0.9, 0.85, 0.8]), T = b8r(d / (1 - p));
+  const what = kind === 'swing' ? `You push a tire swing one time and then allow it to swing freely. On the first swing, the tire travels a distance of ${d} feet. On each successive swing, the tire travels ${p * 100}% of the distance of the previous swing. What is the total distance the tire travels?` : `A pendulum swings ${d} inches on its first swing. Each swing after that is ${p * 100}% as long as the previous swing. What total distance does the pendulum swing before coming to rest?`;
+  return a1numQ(r, { topic: 'Infinite geometric series in real life', stem: what, val: T, dec: true, unit: kind === 'swing' ? 'ft' : 'in.', wrongs: [b8r(d * p / (1 - p)), b8r(d / p), b8r(2 * d / (1 - p))], solution: `The distances form an infinite geometric series with a₁ = ${d} and r = ${p}.\nS = ${d}/(1 − ${p}) = ${fmt(T)} ${kind === 'swing' ? 'ft' : 'in.'}` });
+};
+
+// ---------- 8.5 Using Recursive Rules with Sequences ----------
+TEMPLATES.b85Terms = (r) => {
+  const c = ri(r, 2, 5), G = pick(r, [
+    () => { const a = ri(r, -2, 4); return [`a₁ = ${a}, aₙ = aₙ₋₁ + ${c}`, [a], (p) => p + c, 1, 6]; },
+    () => { const a = ri(r, 1, 6); return [`a₁ = ${a}, aₙ = aₙ₋₁ − ${c}`, [a], (p) => p - c, 1, 6]; },
+    () => { const a = ri(r, 1, 5); return [`f(0) = ${a}, f(n) = 2 · f(n − 1)`, [a], (p) => 2 * p, 0, 6]; },
+    () => { const a = pick(r, [16, 10, 32]); return [`f(0) = ${a}, f(n) = (1/2) · f(n − 1)`, [a], (p) => p / 2, 0, 6]; },
+    () => [`a₁ = 1, aₙ = (aₙ₋₁)² + 1`, [1], (p) => p * p + 1, 1, 5],
+    () => [`a₁ = 1, aₙ = (aₙ₋₁)² − 2`, [1], (p) => p * p - 2, 1, 6],
+    () => { const a = ri(r, 1, 3), b = ri(r, 3, 5); return [`f(0) = ${a}, f(1) = ${b}, f(n) = f(n − 1) − f(n − 2)`, [a, b], (p, q) => p - q, 0, 6]; },
+    () => [`f(1) = 2, f(2) = 3, f(n) = f(n − 1) · f(n − 2)`, [2, 3], (p, q) => p * q, 1, 6],
+    () => { const a = ri(r, 1, 3), b = ri(r, 1, 4); return [`a₁ = ${a}, a₂ = ${b}, aₙ = aₙ₋₂ + aₙ₋₁`, [a, b], (p, q) => p + q, 1, 6]; }])();
+  const [rule, firsts, g, n0, K] = G, vals = firsts.slice(); while (vals.length < K) vals.push(g(vals[vals.length - 1], vals[vals.length - 2]));
+  const nm = (n) => (/^f/.test(rule) ? `f(${n})` : b8a(n));
+  return b8termsQ(r, { topic: 'Evaluating recursive rules', stem: `Write the first ${K === 6 ? 'six' : 'five'} terms of the sequence.   ${rule}`, vals, wrongs: [vals.slice(1).concat([g(vals[K - 1], vals[K - 2])]), [firsts[0], ...vals.slice(0, K - 1)], vals.map((v, i) => (i < firsts.length ? v : v + 1))],
+    solution: vals.map((v, i) => `${nm(n0 + i)} = ${fracT(v)}`).join('\n') });
+};
+TEMPLATES.b85WriteRec = (r) => {
+  const kind = pick(r, ['arith', 'arith', 'geo', 'geo', 'fib', 'fibd', 'mul', 'addn']);
+  if (kind === 'arith') { const a = ri(r, -10, 60), d = pick(r, [-7, -9, 4, 6, 7, 5, -3]); const vals = b8seqVals(b8arith(a, d), 5);
+    return b8recQ(r, { topic: 'Writing recursive rules', stem: `Write a recursive rule for the sequence.   ${b8list(vals)}`, firsts: [a], g: (p) => p + d, recT: `aₙ₋₁ ${d < 0 ? '−' : '+'} ${Math.abs(d)}`, recL: `a_{n-1}${d < 0 ? '-' : '+'}${Math.abs(d)}`,
+      wrongs: [`a₁ = ${a}, aₙ = aₙ₋₁ ${d < 0 ? '+' : '−'} ${Math.abs(d)}`, `a₁ = ${a}, aₙ = ${d}aₙ₋₁`.replace('-', MINUS), `a₁ = ${a + d}, aₙ = aₙ₋₁ ${d < 0 ? '−' : '+'} ${Math.abs(d)}`], solution: `The sequence is arithmetic with first term a₁ = ${a} and common difference d = ${d}.\na₁ = ${a}, aₙ = aₙ₋₁ ${d < 0 ? '−' : '+'} ${Math.abs(d)}`.replace(/-(\d)/g, '−$1') }); }
+  if (kind === 'geo') { const [a, q] = pick(r, [[3, 4], [4, -3], [1, 6], [2, 5], [768, 1 / 4], [1125, 1 / 5], [-1, 2], [44, 1 / 4]]), vals = b8seqVals(b8geo(a, q), 5), qT = fracT(q), qc = /\//.test(qT) || q < 0 ? `(${qT})` : qT;
+    return b8recQ(r, { topic: 'Writing recursive rules', stem: `Write a recursive rule for the sequence.   ${b8list(vals)}`, firsts: [a], g: (p) => q * p, recT: `${qc}aₙ₋₁`, recL: `${fracL(q)}a_{n-1}`,
+      wrongs: [`a₁ = ${fracT(a)}, aₙ = aₙ₋₁ + ${fracT(b8r(a * q - a))}`, `a₁ = ${fracT(a)}, aₙ = ${fracT(b8r(1 / q))}aₙ₋₁`, `a₁ = ${fracT(b8r(a * q))}, aₙ = ${qc}aₙ₋₁`].map((t) => t.replace('+ −', '− ')), solution: `The sequence is geometric with first term a₁ = ${fracT(a)} and common ratio r = ${qT}.\na₁ = ${fracT(a)}, aₙ = ${qc}aₙ₋₁` }); }
+  if (kind === 'fib' || kind === 'fibd') { let vals; const sum = kind === 'fib';
+    for (;;) { const a = ri(r, 1, 6), b = ri(r, 1, 9); if (a === b) continue; vals = [a, b]; while (vals.length < 5) { const n = vals.length; vals.push(sum ? vals[n - 2] + vals[n - 1] : vals[n - 2] - vals[n - 1]); } if (sum || vals.every((v, i) => v && (i < 2 || v !== vals[i - 1]))) break; }
+    return b8recQ(r, { topic: 'Writing recursive rules', stem: `Write a recursive rule for the sequence.   ${b8list(vals)}`, firsts: vals.slice(0, 2), g: sum ? (p, q) => p + q : (p, q) => q - p, recT: sum ? 'aₙ₋₂ + aₙ₋₁' : 'aₙ₋₂ − aₙ₋₁', recL: sum ? 'a_{n-2}+a_{n-1}' : 'a_{n-2}-a_{n-1}',
+      wrongs: [`a₁ = ${vals[0]}, a₂ = ${vals[1]}, aₙ = ${sum ? 'aₙ₋₁ − aₙ₋₂' : 'aₙ₋₂ + aₙ₋₁'}`, `a₁ = ${vals[0]}, a₂ = ${vals[1]}, aₙ = aₙ₋₁ ${vals[1] - vals[0] < 0 ? '−' : '+'} ${Math.abs(vals[1] - vals[0])}`, `a₁ = ${vals[0]}, a₂ = ${vals[1]}, aₙ = ${sum ? 'aₙ₋₂ · aₙ₋₁' : 'aₙ₋₁ − aₙ₋₂'}`].map((t) => t.replace(/-(\d)/g, '−$1')),
+      solution: `The sequence is neither arithmetic nor geometric. Beginning with the third term, each term is the ${sum ? 'sum' : 'difference'} of the two previous terms${sum ? '' : ' (aₙ₋₂ − aₙ₋₁)'}: ${vals[2]} = ${vals[0]} ${sum ? '+' : '−'} ${vals[1]}.\na₁ = ${vals[0]}, a₂ = ${vals[1]}, aₙ = ${sum ? 'aₙ₋₂ + aₙ₋₁' : 'aₙ₋₂ − aₙ₋₁'}`.replace(/-(\d)/g, '−$1') }); }
+  if (kind === 'mul') { const a = pick(r, [6, 2, 3, 5]), vals = [a]; while (vals.length < 5) vals.push((vals.length + 1) * vals[vals.length - 1]);
+    return b8recQ(r, { topic: 'Writing recursive rules', stem: `Write a recursive rule for the sequence.   ${b8list(vals)}`, firsts: [a], g: (p, q, n) => n * p, recT: 'n · aₙ₋₁', recL: 'n\\cdot a_{n-1}', wrongs: [`a₁ = ${a}, aₙ = 2aₙ₋₁`, `a₁ = ${a}, aₙ = (n − 1) · aₙ₋₁`, `a₁ = ${a}, aₙ = aₙ₋₁ + ${vals[1] - a}`],
+      solution: `Each term is n times the previous term: ${vals[1]} = 2 · ${a}, ${vals[2]} = 3 · ${vals[1]}, ${vals[3]} = 4 · ${vals[2]}, …\na₁ = ${a}, aₙ = n · aₙ₋₁` }); }
+  const a = ri(r, -4, 3), vals = [a]; while (vals.length < 5) vals.push(vals[vals.length - 1] + vals.length);
+  return b8recQ(r, { topic: 'Writing recursive rules', stem: `Write a recursive rule for the sequence.   ${b8list(vals)}`, firsts: [a], g: (p, q, n) => p + n - 1, recT: 'aₙ₋₁ + (n − 1)', recL: 'a_{n-1}+n-1', wrongs: [`a₁ = ${a}, aₙ = aₙ₋₁ + n`, `a₁ = ${a}, aₙ = aₙ₋₁ + 2`, `a₁ = ${a}, aₙ = 2aₙ₋₁ + 1`].map((t) => t.replace(/-(\d)/g, '−$1')),
+    solution: `The differences are 1, 2, 3, 4, …: the nth term is the previous term plus (n − 1).\na₁ = ${a}, aₙ = aₙ₋₁ + (n − 1)`.replace(/-(\d)/g, '−$1') });
+};
+TEMPLATES.b85ExpToRec = (r) => {
+  if (r() < 0.5) { const d = pick(r, [4, -10, -5, 0.6, 0.5, -8, 7]), c = pick(r, [3, 12, 9, -2, 2.5, -1.4]), dec = !Number.isInteger(d) || !Number.isInteger(c), a1 = b8r(c + d);
+    return b8recQ(r, { topic: 'Translating between rules', stem: `Write a recursive rule for the sequence.   aₙ = ${b8T(c, dec)} ${d < 0 ? '−' : '+'} ${b8coef(Math.abs(d), dec)}`, firsts: [a1], dec, g: (p) => p + d, recT: `aₙ₋₁ ${d < 0 ? '−' : '+'} ${b8T(Math.abs(d), dec)}`, recL: `a_{n-1}${d < 0 ? '-' : '+'}${b8L(Math.abs(d), dec)}`,
+      wrongs: [`a₁ = ${b8T(c, dec)}, aₙ = aₙ₋₁ ${d < 0 ? '−' : '+'} ${b8T(Math.abs(d), dec)}`, `a₁ = ${b8T(a1, dec)}, aₙ = aₙ₋₁ ${d < 0 ? '+' : '−'} ${b8T(Math.abs(d), dec)}`, `a₁ = ${b8T(a1, dec)}, aₙ = ${b8T(d, dec)}aₙ₋₁`],
+      solution: `The explicit rule is linear, so the sequence is arithmetic with d = ${b8T(d, dec)}.\na₁ = ${b8T(c, dec)} ${d < 0 ? '−' : '+'} ${b8T(Math.abs(d), dec)}(1) = ${b8T(a1, dec)}\na₁ = ${b8T(a1, dec)}, aₙ = aₙ₋₁ ${d < 0 ? '−' : '+'} ${b8T(Math.abs(d), dec)}` }); }
+  const [a, q] = pick(r, [[12, 11], [-7, 6], [-1 / 2, 1 / 4], [-1 / 4, 5], [5, 3], [2, -4]]), qT = fracT(q), qc = /\//.test(qT) || q < 0 ? `(${qT})` : qT;
+  return b8recQ(r, { topic: 'Translating between rules', stem: `Write a recursive rule for the sequence.   aₙ = ${b8geoT(a, q)}`, firsts: [a], g: (p) => q * p, recT: `${qc}aₙ₋₁`, recL: `${fracL(q)}a_{n-1}`,
+    wrongs: [`a₁ = ${fracT(b8r(a * q))}, aₙ = ${qc}aₙ₋₁`, `a₁ = ${fracT(a)}, aₙ = aₙ₋₁ + ${qc}`, `a₁ = ${fracT(q)}, aₙ = ${fracT(a)}aₙ₋₁`], solution: `The sequence is geometric with a₁ = ${fracT(a)} and r = ${qT}.\na₁ = ${fracT(a)}, aₙ = ${qc}aₙ₋₁` });
+};
+TEMPLATES.b85RecToExp = (r) => {
+  if (r() < 0.5) { const a = ri(r, -12, 16), d = pick(r, [-6, 7, 9.1, -1 / 3, 4, -8, 5]), dec = d === 9.1, f = b8arith(a, d), c = b8r(a - d);
+    return b8ruleQ(r, { topic: 'Translating between rules', stem: `Write an explicit rule for the sequence.   a₁ = ${a}, aₙ = aₙ₋₁ ${d < 0 ? '−' : '+'} ${b8T(Math.abs(d), dec)}`.replace(/= -(\d)/, '= −$1'), f, ruleT: b8linT(d, c, dec), ruleL: b8linL(d, c, dec),
+      wrongs: [`aₙ = ${b8linT(d, a, dec)}`, `aₙ = ${b8linT(a, d, dec)}`, `aₙ = ${b8linT(-d, b8r(a + d), dec)}`], solution: `The sequence is arithmetic with a₁ = ${b8T(a, dec)} and d = ${b8T(d, dec)}.\naₙ = ${b8T(a, dec)} + (n − 1)(${b8T(d, dec)}) = ${b8linT(d, c, dec)}` }); }
+  const [a, q] = pick(r, [[-2, 3], [13, 4], [-4, 0.65], [5, -1 / 3], [16, 1 / 2], [3, -6]]), dec = q === 0.65, f = b8geo(a, q), qT = b8T(q, dec);
+  return b8ruleQ(r, { topic: 'Translating between rules', stem: `Write an explicit rule for the sequence.   a₁ = ${b8T(a, dec)}, aₙ = ${/\//.test(qT) || q < 0 ? `(${qT})` : qT}aₙ₋₁`, f, ruleT: b8geoT(a, q, dec), ruleL: b8geoL(a, q, dec),
+    wrongs: [`aₙ = ${b8geoT(a, q, dec, 'n')}`, `aₙ = ${b8geoT(q, a, dec)}`, `aₙ = ${b8linT(q, a, dec)}`], solution: `The sequence is geometric with a₁ = ${b8T(a, dec)} and r = ${qT}.\naₙ = ${b8geoT(a, q, dec)}` });
+};
+TEMPLATES.b85Word = (r) => {
+  const kind = pick(r, ['cans', 'stream', 'trees', 'chlorine', 'loan']);
+  if (kind === 'cans') { const a = pick(r, [20, 24, 30]), d = 2, f = b8arith(a, -d);
+    return b8ruleQ(r, { topic: 'Recursive rules in real life', stem: `A grocer arranges cans in a pyramid-shaped display with ${a} cans in the bottom row and two fewer cans in each subsequent row going up. The number of cans in each row is represented by the recursive rule a₁ = ${a}, aₙ = aₙ₋₁ − 2. Write an explicit rule for the number of cans in row n.`, f, ruleT: b8linT(-d, a + d), ruleL: b8linL(-d, a + d),
+      wrongs: [`aₙ = ${a} − 2n`, `aₙ = ${a}(−2)ⁿ⁻¹`, `aₙ = 2n + ${a - 2}`], solution: `The sequence is arithmetic with a₁ = ${a} and d = −2.\naₙ = ${a} + (n − 1)(−2) = ${b8linT(-d, a + d)}` }); }
+  if (kind === 'loan') { const L = pick(r, [2000, 3000]), rate = 9, yrs = 2, i = rate / 1200, M = Math.round(((L * i) / (1 - (1 + i) ** -(12 * yrs))) * 100) / 100, k = pick(r, [3, 4, 5]); let b = L; for (let j = 0; j < k; j++) b = b * (1 + i) - M;
+    return b6moneyQ(r, { topic: 'Recursive rules in real life', stem: `You borrow $${L.toLocaleString('en-US')} to travel. The loan has a ${rate}% annual interest rate that is compounded monthly for ${yrs} years. The monthly payment is $${M}. Use the recursive rule a₀ = ${L}, aₙ = (1 + ${rate / 100}/12)aₙ₋₁ − ${M} to find the balance after the ${['', '', '', 'third', 'fourth', 'fifth'][k]} payment.`, val: b, tol: 0.03,
+      wrongs: [L - k * M, b - M, b + M], solution: `1 + 0.09/12 = 1.0075\n${Array.from({ length: k }, (_, j) => j + 1).map((j) => { let x = L; for (let t = 0; t < j; t++) x = x * 1.0075 - M; return `a${b8sub(j)} ≈ ${b6money(Math.round(x * 100) / 100)}`; }).join('\n')}` }); }
+  if (kind === 'chlorine') { const a = pick(r, [34, 30, 40]), keep = pick(r, [0.6, 0.5]), add = 16, k = pick(r, [3, 4]); let v = a; for (let j = 1; j < k; j++) v = keep * v + add; v = b8r(v);
+    return a1numQ(r, { topic: 'Recursive rules in real life', stem: `You add chlorine to a swimming pool. You add ${a} ounces of chlorine the first week and ${add} ounces every week thereafter. Each week, ${Math.round((1 - keep) * 100)}% of the chlorine in the pool evaporates. A recursive rule for the amount of chlorine in the pool at the start of the nth week is a₁ = ${a}, aₙ = ${keep}aₙ₋₁ + ${add}. Find the amount of chlorine in the pool at the start of week ${k}.`, val: v, dec: true, unit: 'oz', tol: 0.011, wrongs: [b8r(v + add), b8r(keep * v), b8r(a + add * (k - 1))],
+      solution: Array.from({ length: k }, (_, j) => { let x = a; for (let t = 1; t <= j; t++) x = keep * x + add; return `a${b8sub(j + 1)} = ${fmt(b8r(x))}`; }).join('\n') + ' ounces' }); }
+  const S = kind === 'stream' ? { a: pick(r, [50000, 40000]), keep: 0.8, add: 5000, txt: (a) => `A music streaming service initially has ${a.toLocaleString('en-US')} members. Each year, the company loses 20% of its current members and gains 5000 new members.`, who: 'members', when: 'year' }
+    : { a: pick(r, [9000, 8000]), keep: 0.9, add: 800, txt: (a) => `A tree farm initially has ${a.toLocaleString('en-US')} trees. Each year, 10% of the trees are harvested and 800 seedlings are planted.`, who: 'trees', when: 'year' };
+  const k = pick(r, [3, 4, 5]); let v = S.a; for (let j = 1; j < k; j++) v = S.keep * v + S.add; v = Math.round(v);
+  return a1numQ(r, { topic: 'Recursive rules in real life', stem: `${S.txt(S.a)} The number of ${S.who} at the start of the nth year is given by a₁ = ${S.a}, aₙ = ${S.keep}aₙ₋₁ + ${S.add}. Find the number of ${S.who} at the start of year ${k}.`, val: v, tol: 0.5, wrongs: [Math.round(S.keep * v + S.add), Math.round((v - S.add) / S.keep), S.a + (k - 1) * S.add],
+    solution: Array.from({ length: k }, (_, j) => { let x = S.a; for (let t = 1; t <= j; t++) x = S.keep * x + S.add; return `a${b8sub(j + 1)} = ${fmt(Math.round(x))}`; }).join('\n') + ` ${S.who}` });
+};
+for (const name of Object.keys(TEMPLATES)) if (/^b8\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== ALGEBRA 2 CH8 END ==== */
+/* ==== ALGEBRA 2 CH9 BEGIN ==== */
+/* ---------- Algebra 2 (Big Ideas Learning 2025), Chapter 9: Data Analysis and Statistics ---------- */
+const B9BAND = [0.0015, 0.0235, 0.135, 0.34, 0.34, 0.135, 0.0235, 0.0015]; // (−∞,−3), (−3,−2), …, (3, ∞)
+// area between a and b (in standard deviations; ±Infinity allowed)
+const b9area = (a, b) => { let s = 0; for (let k = -4; k <= 3; k++) { const lo = k === -4 ? -Infinity : k, hi = k === 3 ? Infinity : k + 1; if (lo >= a && hi <= b) s += B9BAND[k + 4]; } return Math.round(s * 10000) / 10000; };
+const b9pct = (p) => `${fmt(Math.round(p * 10000) / 100)}%`;
+const b9sig = (k) => (k === 0 ? 'μ' : `μ ${k < 0 ? '−' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}σ`);
+// a probability typed as a decimal, a fraction, or a percent
+const b9probOk = (raw, p, tol = 0.0006) => { const s = String(raw || '').replace(/^[^=]*=/, ''), pc = /%/.test(s), v = pxConst(s.replace(/\\%|%/g, '')); return isFinite(v) && Math.abs((pc ? v / 100 : v) - p) <= tol; };
+function b9probQ(r, { topic, stem, p, wrongs = [], solution, draw, size }) {
+  const T = (x) => String(Math.round(x * 10000) / 10000), c = T(p);
+  return { topic, stem, draw, size, ...buildChoices(r, c, [...new Set(wrongs.filter((w) => isFinite(w) && w >= 0 && w <= 1 && Math.abs(w - p) > 1e-6).map(T))].filter((w) => w !== c), (i) => T(Math.min(1, p + 0.05 * (i + 1)))),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Probability:' }], key: [String(Math.round(p * 10000) / 10000)], display: c, check: (v) => b9probOk(v[0], p) }, solution };
+}
+// a percent answer
+function b9pctQ(r, { topic, stem, p, wrongs = [], solution, draw, size, tol = 0.0006, label = '' }) {
+  const T = (x) => b9pct(x), c = T(p);
+  return { topic, stem, draw, size, ...buildChoices(r, c, [...new Set(wrongs.filter((w) => isFinite(w) && w >= 0 && w <= 1 && Math.abs(w - p) > 1e-6).map(T))].filter((w) => w !== c), (i) => T(Math.min(1, p + 0.05 * (i + 1)))),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label, suffix: '%' }], key: [String(Math.round(p * 10000) / 100)], display: c, check: (v) => { const s = String(v[0] || '').replace(/\\%|%/g, '').replace(/^[^=]*=/, ''), x = pxConst(s); return isFinite(x) && (Math.abs(x / 100 - p) <= tol || (x <= 1 && p > 0.02 && Math.abs(x - p) <= tol)); } }, solution };
+}
+// normal curve: shade = [[a, b]] in σ units; ticks = {k: label}; notes = [[k, text]] (text above the curve at k σ)
+const b9normDraw = ({ shade = [], ticks = {}, notes = [], axis = '' } = {}) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h; c.clearRect(0, 0, W, H);
+  const L = 20, R = W - 20, B = H - 34, T = 22, X = (z) => L + ((z + 3.6) / 7.2) * (R - L), f = (z) => Math.exp(-z * z / 2), Y = (z) => B - (B - T) * f(z);
+  shade.forEach(([a, b]) => { const lo = Math.max(a, -3.6), hi = Math.min(b, 3.6); c.fillStyle = 'rgba(80,140,210,0.35)'; c.beginPath(); c.moveTo(X(lo), B); for (let z = lo; z <= hi + 1e-9; z += 0.02) c.lineTo(X(z), Y(z)); c.lineTo(X(hi), B); c.closePath(); c.fill(); });
+  c.strokeStyle = '#8a867c'; c.setLineDash([4, 3]); c.lineWidth = 1; for (let k = -3; k <= 3; k++) { c.beginPath(); c.moveTo(X(k), B); c.lineTo(X(k), Y(k)); c.stroke(); } c.setLineDash([]);
+  c.strokeStyle = '#2b5fad'; c.lineWidth = 2; c.beginPath(); for (let z = -3.6; z <= 3.6; z += 0.02) (z === -3.6 ? c.moveTo(X(z), Y(z)) : c.lineTo(X(z), Y(z))); c.stroke();
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(L - 6, B); c.lineTo(R + 6, B); c.stroke();
+  c.fillStyle = '#1d1d1b'; c.font = '12px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top';
+  for (let k = -3; k <= 3; k++) { c.beginPath(); c.moveTo(X(k), B - 4); c.lineTo(X(k), B + 4); c.stroke(); if (ticks[k] != null) c.fillText(String(ticks[k]), X(k), B + 7); }
+  if (axis) { c.textAlign = 'right'; c.fillText(axis, R + 6, B + 7); }
+  c.textBaseline = 'bottom'; c.font = '600 12px system-ui, sans-serif'; notes.forEach(([z, t]) => { c.textAlign = 'center'; c.fillText(t, X(z), Math.min(Y(z) - 4, B - 6)); });
+};
+const B9SIGT = { '-3': 'μ − 3σ', '-2': 'μ − 2σ', '-1': 'μ − σ', 0: 'μ', 1: 'μ + σ', 2: 'μ + 2σ', 3: 'μ + 3σ' };
+// bar graph / histogram: vals = numbers; labels under each bar; show = print the values on top
+const b9barDraw = ({ labels, vals, title = '', ylab = 'Frequency', xlab = '', show = false, gap = 6, rot = false, yfmt = null, brk = false } = {}) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h; c.clearRect(0, 0, W, H);
+  const L = 58, R = W - 14, T = title ? 34 : 14, B = H - (rot ? 66 : 44) - (xlab ? 4 : 0), mx = Math.max(...vals), rel = mx <= 1;
+  const step = rel ? [0.02, 0.04, 0.05, 0.1, 0.2].find((s) => mx / s <= 6) : [1, 2, 3, 4, 5, 10, 20, 25, 50].find((s) => mx / s <= 6), top = Math.ceil(mx / step + 0.3) * step, Y = (v) => B - ((B - T) * v) / top, bw = (R - L) / vals.length;
+  if (title) { c.fillStyle = '#1d1d1b'; c.font = '600 14px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.fillText(title, (L + R) / 2, 18); }
+  c.font = '12px system-ui, sans-serif'; c.textAlign = 'right'; c.textBaseline = 'middle';
+  for (let v = 0; v <= top + 1e-9; v += step) { c.strokeStyle = '#e4e1d9'; c.beginPath(); c.moveTo(L, Y(v)); c.lineTo(R, Y(v)); c.stroke(); c.fillStyle = '#1d1d1b'; c.fillText(yfmt ? yfmt(v) : rel ? String(Math.round(v * 100) / 100) : fmt(v), L - 5, Y(v)); }
+  if (brk) { c.strokeStyle = '#1d1d1b'; c.fillStyle = '#fff'; const yb = Y(step * 0.5); c.fillRect(L - 6, yb - 6, 12, 10); c.beginPath(); c.moveTo(L - 6, yb + 2); c.lineTo(L + 6, yb - 2); c.moveTo(L - 6, yb + 6); c.lineTo(L + 6, yb + 2); c.stroke(); }
+  vals.forEach((v, i) => { const x0 = L + i * bw + gap / 2; c.fillStyle = '#e8dcc0'; c.fillRect(x0, Y(v), bw - gap, B - Y(v)); c.strokeStyle = '#8a867c'; c.strokeRect(x0, Y(v), bw - gap, B - Y(v));
+    c.fillStyle = '#1d1d1b'; c.font = '11px system-ui, sans-serif'; if (show && v) { c.textAlign = 'center'; c.textBaseline = 'bottom'; c.fillText(fmt(v), x0 + (bw - gap) / 2, Y(v) - 2); }
+    if (labels[i] != null && labels[i] !== '') { c.save(); c.translate(x0 + (bw - gap) / 2, B + 5); if (rot) { c.rotate(-Math.PI / 3); c.textAlign = 'right'; c.textBaseline = 'middle'; } else { c.textAlign = 'center'; c.textBaseline = 'top'; } c.fillText(String(labels[i]), 0, 0); c.restore(); } });
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(L, T - 4); c.lineTo(L, B); c.lineTo(R, B); c.stroke();
+  c.font = '13px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom'; if (xlab) c.fillText(xlab, (L + R) / 2, H - 2);
+  c.save(); c.translate(13, (T + B) / 2); c.rotate(-Math.PI / 2); c.textBaseline = 'middle'; c.fillText(ylab, 0, 0); c.restore();
+};
+// double dot plot
+const b9dotDraw = (A, Bv, lo, hi, step, names = ['Control group', 'Treatment group'], dec = 1) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h; c.clearRect(0, 0, W, H);
+  const L = 24, R = W - 120, X = (v) => L + ((v - lo) / (hi - lo)) * (R - L), rows = [[A, H / 2 - 18], [Bv, H - 30]];
+  rows.forEach(([D, y], j) => {
+    c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(L - 8, y); c.lineTo(R + 8, y); c.stroke();
+    c.fillStyle = '#1d1d1b'; c.font = '11px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top';
+    for (let v = lo; v <= hi + 1e-9; v += step) { const t = Math.round(v * 100) / 100; c.beginPath(); c.moveTo(X(t), y - 4); c.lineTo(X(t), y + 4); c.stroke(); c.fillText(t.toFixed(dec), X(t), y + 6); }
+    const cnt = {}; D.forEach((v) => { const k = v.toFixed(3); cnt[k] = (cnt[k] || 0) + 1; c.fillStyle = j ? '#c2412d' : '#2b5fad'; c.beginPath(); c.arc(X(v), y - 9 - (cnt[k] - 1) * 10, 4, 0, 2 * Math.PI); c.fill(); });
+    c.fillStyle = j ? '#c2412d' : '#2b5fad'; c.font = '600 12px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(names[j], R + 14, y - 6);
+  });
+};
+const b9pm = (q) => { if (q.choices) q.choices = q.choices.map((c) => (c.startsWith('±') ? c : `±${c.replace(' %', '%')}`)); const f = q.fr.check; q.fr.check = (v) => f([String(v[0] || '').replace(/±|\\pm|\\%|%/g, '')]); return q; };
+const b9mean = (D) => D.reduce((s, x) => s + x, 0) / D.length;
+const b9bank = (r, bank) => pick(r, bank);
+
+// ---------- 9.1 Using Normal Distributions ----------
+const B9REG = [[-1, 3.6], [-3.6, -1], [-3, -1], [-1, 1], [-2, 2], [0, 2], [-2, 0], [1, 3.6], [-3.6, 2], [-2, 1], [1, 2], [-3, 3], [0, 1], [2, 3.6], [-1, 2]];
+TEMPLATES.b91Shade = (r) => {
+  const [a, b] = pick(r, B9REG), A = a <= -3.6 ? -Infinity : a, Bb = b >= 3.6 ? Infinity : b, p = b9area(A, Bb), ticks = {}; [-3, -2, -1, 0, 1, 2, 3].forEach((k) => { if (r() < 0.45 || k === 0) ticks[k] = B9SIGT[k]; });
+  const parts = []; for (let k = -4; k <= 3; k++) { const lo = k === -4 ? -Infinity : k, hi = k === 3 ? Infinity : k + 1; if (lo >= A && hi <= Bb) parts.push(b9pct(B9BAND[k + 4])); }
+  return b9pctQ(r, { topic: 'Normal distributions', stem: 'Give the percent of the area under the normal curve represented by the shaded region.', draw: b9normDraw({ shade: [[a, b]], ticks }), size: [440, 200], p,
+    wrongs: [1 - p, p - 0.135, p + 0.135, p + 0.34, Math.round(p * 2 * 10000) / 10000], solution: `Use the 68-95-99.7 rule: 34% in each band from μ to σ, 13.5% from σ to 2σ, 2.35% from 2σ to 3σ, and 0.15% beyond 3σ.\nShaded region: ${parts.join(' + ')} = ${b9pct(p)}` });
+};
+TEMPLATES.b91MeanSD = (r) => {
+  const mu = pick(r, [26, 40, 72, 15, 150, 18]), sd = pick(r, [2, 3, 4, 5, 8, 10]), k = pick(r, [1, 2, 3]), side = pick(r, [1, -1]), ticks = { 0: mu, [side * k]: mu + side * k * sd };
+  const notes = k === 2 ? [[1.5, '13.5%'], [-1.5, '13.5%']] : k === 1 ? [[0.5, '34%'], [-0.5, '34%']] : [[2.5, '2.35%'], [-2.5, '2.35%']], shade = k === 2 ? [[1, 2], [-2, -1]] : k === 1 ? [[-1, 1]] : [[2, 3], [-3, -2]];
+  const ok0 = (raw) => numOk(raw, mu), ok1 = (raw) => numOk(raw, sd), c = `mean ${mu}, standard deviation ${sd}`;
+  return { topic: 'Normal distributions', stem: `The normal curve for a distribution is shown. The vertical dashed lines are one standard deviation apart. Find the mean and standard deviation of the data.`, draw: b9normDraw({ shade, ticks, notes, axis: 'x' }), size: [440, 210],
+    ...buildChoices(r, c, [`mean ${mu}, standard deviation ${k * sd}`, `mean ${mu + side * k * sd}, standard deviation ${sd}`, `mean ${mu}, standard deviation ${sd * 2}`, `mean ${(2 * mu + side * k * sd) / 2}, standard deviation ${(k * sd) / 2}`].filter((w, i, A) => w !== c && A.indexOf(w) === i), () => null),
+    fr: { fields: [{ kind: 'number', label: 'Mean μ =' }, { kind: 'number', label: 'Standard deviation σ =' }], key: [String(mu), String(sd)], display: c, check: (v) => ok0(v[0]) && ok1(v[1]), score: (v) => ((ok0(v[0]) ? 1 : 0) + (ok1(v[1]) ? 1 : 0)) / 2 },
+    solution: `The mean is at the center of the curve: μ = ${mu}.\n${mu + side * k * sd} is ${k} standard deviation${k > 1 ? 's' : ''} from the mean, so ${k === 1 ? '' : `${k}`}σ = |${mu + side * k * sd} − ${mu}| = ${k * sd}${k > 1 ? ` and σ = ${sd}` : ''}.` };
+};
+TEMPLATES.b91Prob = (r) => {
+  const C = pick(r, [[-Infinity, -1, 'P(x ≤ μ − σ)'], [-1, Infinity, 'P(x ≥ μ − σ)'], [2, Infinity, 'P(x ≥ μ + 2σ)'], [-Infinity, 1, 'P(x ≤ μ + σ)'], [-1, 1, 'P(μ − σ ≤ x ≤ μ + σ)'], [-3, 0, 'P(μ − 3σ ≤ x ≤ μ)'], [-2, 1, 'P(μ − 2σ ≤ x ≤ μ + σ)'], [-Infinity, -2, 'P(x ≤ μ − 2σ)'], [0, 2, 'P(μ ≤ x ≤ μ + 2σ)'], [1, Infinity, 'P(x ≥ μ + σ)']]);
+  const [a, b, t] = C, p = b9area(a, b);
+  return b9probQ(r, { topic: 'Normal distributions', stem: `A normal distribution has mean μ and standard deviation σ. Find the indicated probability for a randomly selected x-value from the distribution.   ${t}`, p, wrongs: [1 - p, p / 2, p + 0.135, Math.round((p - 0.135) * 10000) / 10000],
+    solution: `Add the areas of the bands in the interval (0.34, 0.135, 0.0235, 0.0015 moving away from the mean).\n${t} = ${fmt(p)}` });
+};
+TEMPLATES.b91Interval = (r) => {
+  const mu = pick(r, [33, 25, 50, 80, 12]), sd = pick(r, [4, 2, 5, 3]), C = pick(r, [() => { const a = pick(r, [-1, -2, 0]), b = pick(r, [1, 2, 3]); return [a, b, `between ${mu + a * sd} and ${mu + b * sd}`]; },
+    () => { const a = pick(r, [-2, -1, 1, 2]); return [a, Infinity, `at least ${mu + a * sd}`]; }, () => { const b = pick(r, [-3, -2, 1, 2]); return [-Infinity, b, `at most ${mu + b * sd}`]; }])();
+  const [a, b, t] = C, p = b9area(a, b);
+  return b9probQ(r, { topic: 'Normal distributions', stem: `A normal distribution has a mean of ${mu} and a standard deviation of ${sd}. Find the probability that a randomly selected x-value from the distribution is ${t}.`, p, wrongs: [1 - p, p / 2, p + 0.135, Math.round((p - 0.0235) * 10000) / 10000],
+    solution: `${t.replace(/^\w+/, (w) => w[0].toUpperCase() + w.slice(1))}: ${a === -Infinity ? '' : `${mu + a * sd} is ${a === 0 ? 'the mean' : `${b9sig(a)}`}`}${a !== -Infinity && b !== Infinity ? ' and ' : ''}${b === Infinity ? '' : `${mu + b * sd} is ${b9sig(b)}`}.\nAdd the bands in that interval: P = ${fmt(p)}` });
+};
+TEMPLATES.b91Word = (r) => {
+  const C = pick(r, [() => { const mu = pick(r, [142, 120, 95]), sd = pick(r, [32, 20, 15]), k = pick(r, [1, 2, 3]); return [`The daily amounts of time Internet users spend on social networking platforms are normally distributed with a mean of ${mu} minutes and a standard deviation of ${sd} minutes. About what percent of Internet users spend more than ${mu + k * sd} minutes on social networking platforms each day?`, k, Infinity]; },
+    () => { const mu = pick(r, [6, 8, 7]), sd = 1, k = pick(r, [2, 1, -1]); return [`The times a fire department takes to arrive at the scene of an emergency are normally distributed with a mean of ${mu} minutes and a standard deviation of ${sd} minute. For about what percent of emergencies does the fire department arrive at the scene in ${mu + k} minutes or less?`, -Infinity, k]; },
+    () => { const mu = pick(r, [64, 70, 66]), sd = pick(r, [2.5, 3, 2]), k = pick(r, [1, 2]); return [`The heights of adult women in a region are normally distributed with a mean of ${mu} inches and a standard deviation of ${sd} inches. About what percent of the women are between ${fmt(mu - k * sd)} and ${fmt(mu + k * sd)} inches tall?`, -k, k]; },
+    () => { const mu = pick(r, [500, 1000]), sd = pick(r, [100, 50]), k = pick(r, [-1, -2]); return [`The scores on a test are normally distributed with a mean of ${mu} and a standard deviation of ${sd}. About what percent of the test takers scored at least ${mu + k * sd}?`, k, Infinity]; }])();
+  const [stem, a, b] = C, p = b9area(a, b);
+  return b9pctQ(r, { topic: 'Normal distributions', stem, p, wrongs: [1 - p, p / 2, p + 0.135, p - 0.135], solution: `Locate the value(s) in standard deviations from the mean, then add the bands in the interval.\nPercent ≈ ${b9pct(p)}` });
+};
+TEMPLATES.b91Hist = (r) => {
+  const yes = r() < 0.5, k = pick(r, [10, 11, 9]), lo = pick(r, [40, 20, 60]);
+  const shapes = yes ? [[1, 3, 2, 5, 6, 7, 5, 5, 3, 2, 1], [1, 2, 4, 6, 8, 6, 4, 2, 1], [1, 2, 3, 5, 7, 7, 5, 3, 2, 1]] : [[8, 2.4, 3, 0.5, 0.2, 0.6], [1, 1, 2, 2, 3, 4, 6, 8, 7], [7, 8, 6, 4, 3, 2, 2, 1, 1], [5, 5, 5, 6, 5, 5, 6, 5]];
+  const vals = pick(r, shapes), labels = vals.map((_, i) => lo + i), skew = !yes && vals[0] > vals[vals.length - 1] + 2 ? 'right' : !yes && vals[vals.length - 1] > vals[0] + 2 ? 'left' : '';
+  return b6sel(r, 'Normal distributions', 'Determine whether the histogram has a normal distribution.', ['Normal distribution', 'Not a normal distribution'], yes ? 'Normal distribution' : 'Not a normal distribution',
+    yes ? 'The histogram is bell-shaped and fairly symmetric about its center, so it is approximately a normal distribution.' : `The histogram is not bell-shaped${skew ? ` — it is skewed ${skew}` : ' — it is roughly flat'}, so it is not a normal distribution.`, { draw: b9barDraw({ labels, vals, title: pick(r, ['Time to Complete an Exam', 'Data Set A', 'Test Scores']), xlab: 'Value', gap: 0 }), size: [440, 250] });
+};
+TEMPLATES.b91Skew = (r) => {
+  const med = pick(r, [80, 45, 120, 12]), d = pick(r, [10, 6, -10, -6, 0]), mean = med + d, ans = d > 0 ? 'Skewed right' : d < 0 ? 'Skewed left' : 'Symmetric';
+  return b6sel(r, 'Describing distributions', `A data set has a median of ${med} and a mean of ${mean}. What is the most likely shape of the distribution?`, ['Skewed left', 'Skewed right', 'Symmetric'], ans,
+    d > 0 ? 'The mean is greater than the median: a long tail of large values pulls the mean up, so the distribution is most likely skewed right.' : d < 0 ? 'The mean is less than the median: a long tail of small values pulls the mean down, so the distribution is most likely skewed left.' : 'The mean equals the median, so the distribution is most likely symmetric.');
+};
+
+// ---------- 9.2 Populations, Samples, and Hypotheses ----------
+const B9PS = [['the number of high school students in the United States', 'Population', 'Every high school student in the country is counted.'], ['the color of every third car in a parking lot', 'Sample', 'Only some of the cars (every third one) are recorded.'], ['a survey of 100 spectators at a sporting event with 1800 spectators', 'Sample', 'Only 100 of the 1800 spectators are surveyed.'], ['the age of each dentist in the United States', 'Population', 'Every dentist in the country is included.'],
+  ['the grade point average of every student in your school', 'Population', 'Data are collected from every student in the school.'], ['the heights of 50 randomly chosen trees in a forest', 'Sample', 'Only 50 of the trees in the forest are measured.'], ['the test scores of all students in a chemistry class (for that class)', 'Population', 'Every member of the group of interest is included.'], ['the opinions of 500 voters surveyed before a statewide election', 'Sample', 'Only part of the state’s voters are surveyed.']];
+TEMPLATES.b92PopSample = (r) => { const [t, a, why] = pick(r, B9PS); return b6sel(r, 'Populations and samples', `Determine whether the data are collected from a population or a sample.   ${t}`, ['Population', 'Sample'], a, why); };
+const B9ID = [['In the United States, a survey of 1152 adults ages 18 and over found that 403 of them occasionally pretend to use their smartphones to avoid talking to someone.', 'All adults ages 18 and over in the United States', 'The 1152 adults surveyed'],
+  ['In the United States, a survey of 1222 consumers found that 978 of them prefer to use a credit or debit card as their primary payment method.', 'All consumers in the United States', 'The 1222 consumers surveyed'],
+  ['To estimate the battery life of tablets sold on a website, a team tests 6 tablets and finds they have an average battery life of 9.1 hours.', 'All tablets sold on the website', 'The 6 tablets tested'],
+  ['In the United States, a survey of 743 teenagers ages 13–17 found that 193 of them never post selfies on social media websites.', 'All teenagers ages 13–17 in the United States', 'The 743 teenagers surveyed'],
+  ['A survey of 1270 students at a high school found that 965 students felt added stress because of their workload.', 'All students at the high school', 'The 1270 students surveyed'],
+  ['A researcher measures the weights of 40 randomly chosen salmon from a river to estimate the average weight of salmon in the river.', 'All salmon in the river', 'The 40 salmon weighed']];
+const b9lc = (t) => t[0].toLowerCase() + t.slice(1);
+TEMPLATES.b92Identify = (r) => {
+  const [t, pop, smp] = pick(r, B9ID), c = `Population: ${b9lc(pop)}; sample: ${smp.toLowerCase()}`, W = [`Population: ${smp.toLowerCase()}; sample: ${pop.toLowerCase()}`, `Population: ${pop.toLowerCase()}; sample: the people or items in the sample who answered “yes”`, `Population: everyone in the world; sample: ${smp.toLowerCase()}`];
+  return { topic: 'Populations and samples', stem: `Identify the population and the sample.   ${t}`, ...buildChoices(r, c, W, () => null), fr: FR.select('Choose:', shuffle(r, [c, ...W]), c), solution: `The population is the entire group you want information about: ${pop.toLowerCase()}.\nThe sample is the part of the population that is actually studied: ${smp.toLowerCase()}.` };
+};
+const B9PAR = [['The average cost of admission to some amusement parks in a state is $36.93.', 'Statistic', 'The value describes only some of the amusement parks (a sample).'], ['In a recent year, 54% of the seats in the United States House of Representatives were held by Democrats.', 'Parameter', 'Every seat in the House is counted, so the value describes the whole population.'],
+  ['Two percent of all active volcanoes in the United States have had a significant eruption in the past ten years.', 'Parameter', 'The value describes all active volcanoes in the United States (the population).'], ['In the United States, a survey of 2007 adults found that 8% have serious doubt about the safety and effectiveness of vaccines.', 'Statistic', 'The value describes only the 2007 adults surveyed (a sample).'],
+  ['Each visitor to a website receives a survey. The mean age of the people who respond is 26 years.', 'Statistic', 'Only the people who respond are included, so this is a sample, and 26 is a statistic.'], ['The mean height of all 24 players on a team roster is 74 inches.', 'Parameter', 'Every player on the roster is included, so the value describes the population.'], ['A poll of 800 likely voters shows 47% support a ballot measure.', 'Statistic', 'The value comes from a sample of 800 voters.']];
+TEMPLATES.b92Param = (r) => { const [t, a, why] = pick(r, B9PAR); return b6sel(r, 'Parameters and statistics', `Determine whether the numerical value is a parameter or a statistic.   ${t}`, ['Parameter', 'Statistic'], a, why); };
+TEMPLATES.b92Prop = (r) => {
+  if (r() < 0.5) { const n = pick(r, [25, 40, 50]), h = ri(r, Math.round(n * 0.35), Math.round(n * 0.65)), t = n - h, which = pick(r, ['heads', 'tails']), k = which === 'heads' ? h : t;
+    return b9probQ(r, { topic: 'Simulations', stem: `You use technology to simulate flipping a coin ${n} times. The results are shown in the bar graph. What proportion of the ${n} flips resulted in ${which}?`, draw: b9barDraw({ labels: ['Heads', 'Tails'], vals: [h, t], title: `Simulation: Flipping a Coin ${n} Times`, show: true, gap: 60 }), size: [380, 240], p: k / n, wrongs: [(n - k) / n, k / 100, 0.5],
+      solution: `${which[0].toUpperCase() + which.slice(1)}: ${k} out of ${n}.\nProportion = ${k}/${n} = ${String(Math.round((k / n) * 10000) / 10000)}` }); }
+  let cnt; const n = pick(r, [50, 60]); do { cnt = [...Array(5)].map(() => ri(r, 4, 14)); cnt.push(n - cnt.reduce((t, x) => t + x, 0)); } while (cnt[5] < 2 || cnt[5] > 16);
+  const Q = pick(r, [['a 6', [6]], ['a number less than 3', [1, 2]], ['a prime number', [2, 3, 5]], ['an even number', [2, 4, 6]], ['a number greater than 4', [5, 6]]]), k = Q[1].reduce((s, f) => s + cnt[f - 1], 0);
+  return b9probQ(r, { topic: 'Simulations', stem: `You use technology to simulate rolling a die ${n} times. The results are shown in the bar graph. What proportion of the ${n} rolls resulted in ${Q[0]}?`, draw: b9barDraw({ labels: [1, 2, 3, 4, 5, 6], vals: cnt, title: `Simulation: Rolling a Die ${n} Times`, xlab: 'Number rolled', show: true }), size: [420, 260], p: k / n, wrongs: [Q[1].length / 6, (n - k) / n, k / 100],
+    solution: `${Q[0][0].toUpperCase() + Q[0].slice(1)}: ${Q[1].map((f) => cnt[f - 1]).join(' + ')} = ${k} rolls.\nProportion = ${k}/${n} = ${String(Math.round((k / n) * 10000) / 10000)}` });
+};
+// binomial pmf
+const b9pmf = (n, p) => { const out = []; let c = 1; for (let k = 0; k <= n; k++) { out.push(c * p ** k * (1 - p) ** (n - k)); c = (c * (n - k)) / (k + 1); } return out; };
+TEMPLATES.b92Conclude = (r) => {
+  const C = pick(r, [['coin', 'You suspect a coin favors heads. The coin maker claims that the coin does not favor heads or tails. You use technology to simulate 200 random samples of flipping a fair coin', 50, 0.5, 'heads', 'flips that result in heads'], ['spinner', 'A spinner has four equal sections: red, blue, yellow, and green. You suspect the spinner favors red. The maker claims that the spinner does not favor any color. You use technology to simulate 200 random samples of spinning the spinner', 100, 0.25, 'red', 'spins that result in red']]);
+  const [, txt, n, p0, word, xl] = C, pm = b9pmf(n, p0), sd = Math.sqrt(n * p0 * (1 - p0)), lo = Math.max(0, Math.round(n * p0 - 3.2 * sd)), hi = Math.min(n, Math.round(n * p0 + 3.2 * sd));
+  const binsK = []; for (let k = lo; k <= hi; k += 2) binsK.push(k);
+  const vals = binsK.map((k) => Math.round(((pm[k] || 0) + (pm[k + 1] || 0)) * 100) / 100);
+  const far = r() < 0.5, z = far ? pick(r, [2.6, 3, -2.6]) : pick(r, [0.4, 0.8, -0.6, 1.1]), kObs = Math.round(n * p0 + z * sd), ans = far ? 'Reject the claim' : 'Do not reject the claim';
+  return b6sel(r, 'Hypothesis testing', `${txt} ${n} times. The histogram shows the relative frequencies of the proportions. What should you conclude when you test the actual ${C[0]} ${n} times and get ${word} ${kObs} times?`, ['Reject the claim', 'Do not reject the claim'], ans,
+    `The sample proportion is ${kObs}/${n} = ${fmt(kObs / n)}. ${far ? `Proportions this ${z > 0 ? 'high' : 'low'} almost never occur in the simulation when the claim is true, so the result is unlikely; you should reject the maker's claim.` : 'Proportions like this occur often in the simulation when the claim is true, so you should not reject the maker’s claim.'}`,
+    { draw: b9barDraw({ labels: binsK.map((k, i) => (i % 2 ? '' : (k / n).toFixed(2))), vals, title: `Simulation: ${n} ${C[0] === 'coin' ? 'Flips' : 'Spins'}`, ylab: 'Relative frequency', xlab: `Proportion of ${n} ${xl}`, gap: 0, rot: true }), size: [440, 280] });
+};
+
+// ---------- 9.3 Collecting Data ----------
+const B9TYPES = ['Random', 'Stratified', 'Cluster', 'Systematic', 'Convenience', 'Self-selected'];
+const B9TY = [['A local politician wants to know how people will vote in an upcoming election. The politician conducts telephone surveys and uses only the results from the people who agree to participate.', 'Self-selected', 'Members of the population choose whether to participate.'],
+  ['A ride-sharing company wants to know if its customers are satisfied. Drivers survey every tenth customer during the day.', 'Systematic', 'A rule (every tenth customer) is used to select the sample.'],
+  ['Each employee in a company writes their name on a card and places it in a hat. The employees whose names are on the first two cards drawn each win a gift card.', 'Random', 'Every employee has an equal chance of being selected.'],
+  ['The owner of a community pool divides patrons into four age groups, and a sample is randomly surveyed from each age group.', 'Stratified', 'The population is divided into groups (strata), and members are randomly selected from each group.'],
+  ['A town council wants to know whether residents support an off-leash dog area in the park. Eighty dog owners are surveyed at the park.', 'Convenience', 'Only people who are easy to reach (at the park) are surveyed.'],
+  ['School officials want feedback on teacher performance. They mail surveys to all parents and use the surveys that are returned.', 'Self-selected', 'Parents choose whether to return the survey.'],
+  ['You want to find out whether booth holders at a convention are pleased with their locations. You divide the convention center into six sections and survey every booth holder in the fifth section.', 'Cluster', 'The population is divided into groups, and every member of one group is surveyed.'],
+  ['You want to determine whether students in your school support a renovation of the auditorium. You ask all of the students in your homeroom.', 'Convenience', 'Only students who are easy to reach (your homeroom) are surveyed.'],
+  ['Surveys are mailed to every other household in a neighborhood. Each survey that is returned is used.', 'Self-selected', 'Even though surveys are sent systematically, only households that choose to return the survey are used.'],
+  ['A teacher assigns each student a number and uses a random number generator to choose 10 students.', 'Random', 'Every student has an equal chance of being chosen.'],
+  ['A factory inspects every 50th item that comes off the assembly line.', 'Systematic', 'A rule (every 50th item) is used to select the sample.'],
+  ['A school randomly selects five students from each grade to complete a survey.', 'Stratified', 'The students are divided by grade and randomly selected from each grade.']];
+TEMPLATES.b93Type = (r) => { const [t, a, why] = pick(r, B9TY); return b6sel(r, 'Types of samples', `Identify the type of sample described.   ${t}`, B9TYPES, a, `${a} sample: ${why}`); };
+const B9BIAS = [['Your school principal randomly selects five students from each grade to complete a survey about classroom participation.', 'Not biased', 'The students are randomly selected from every grade, so the sample represents the school.'],
+  ['A governor wants to know whether voters in the state support building a highway through a state forest. Business owners in a town near the proposed highway are randomly surveyed.', 'Biased', 'Business owners near the highway are likely to favor it; they do not represent all voters in the state.'],
+  ['To assess customers’ experiences making online purchases, a rating company e-mails purchasers and asks that they click on a link and complete a survey.', 'Biased', 'Customers choose whether to respond (self-selected), so people with strong opinions are overrepresented.'],
+  ['Every third person who enters an athletic event is asked whether they support the use of instant replay in officiating the event.', 'Not biased', 'Systematic selection of people attending the event gives a sample that represents the population of attendees.'],
+  ['A researcher wants to know whether the U.S. workforce supports raising the minimum wage. Fifty high school students chosen at random are surveyed.', 'Biased', 'High school students do not represent the entire workforce, even though they were chosen at random.'],
+  ['A city randomly selects 400 registered voters from its voter list and asks them about a proposed tax.', 'Not biased', 'Every registered voter has an equal chance of being selected.'],
+  ['To learn about the exercise habits of adults in a city, a researcher surveys people leaving a gym.', 'Biased', 'People leaving a gym exercise more than typical adults, so they are overrepresented.']];
+TEMPLATES.b93Biased = (r) => { const [t, a, why] = pick(r, B9BIAS); return b6sel(r, 'Bias in sampling', `Determine whether the sample is biased.   ${t}`, ['Biased', 'Not biased'], a, why); };
+const B9METH = [['A researcher uses technology to estimate the damage that will be done if a volcano erupts.', 'Simulation', 'A model is used to reproduce the conditions of a real-life situation.'], ['An online seller asks 20 customers whether they are satisfied with their purchases.', 'Survey', 'Responses to questions are gathered from people.'],
+  ['A store manager records whether customers choose to use the regular checkout or the self-checkout.', 'Observational study', 'Individuals are observed without being influenced.'], ['A researcher places two of the bacteria samples in two different climates and measures the bacteria growth in each sample after 3 days.', 'Experiment', 'A treatment (climate) is imposed and the response is measured.'],
+  ['A biologist counts the number of birds that visit a feeder each day without changing anything.', 'Observational study', 'The birds are observed without any treatment being applied.'], ['A company gives half of its volunteers a new energy drink and half a placebo, and then measures their reaction times.', 'Experiment', 'A treatment is imposed on one group and the results are compared with a control group.'],
+  ['A game designer uses a computer to model 10,000 games to estimate the chance of winning.', 'Simulation', 'A computer model reproduces the situation many times.'], ['A school asks parents to fill out a questionnaire about lunch options.', 'Survey', 'Questions are used to gather information from people.']];
+TEMPLATES.b93Method = (r) => { const [t, a, why] = pick(r, B9METH); return b6sel(r, 'Methods of collecting data', `Identify the method of data collection described.   ${t}`, ['Experiment', 'Observational study', 'Simulation', 'Survey'], a, why); };
+const B9Q = [['“Isn’t it true that the budget of our city should be cut?”', 'Biased', 'The question encourages a “yes” answer. Ask instead: “Do you think the city budget should be cut?”'],
+  ['“Would you rather watch the latest award-winning movie or just read some book?”', 'Biased', 'The wording makes the movie sound better than the book. Ask: “Would you rather watch a movie or read a book?”'],
+  ['A child asks, “Do you support the construction of a new children’s hospital?”', 'Biased', 'People may not want to say “no” to a child. Have a neutral adult ask the question.'],
+  ['“Are you satisfied with the selection of colors and the quality of the clothing?”', 'Biased', 'It asks two questions at once. Ask about the colors and the quality separately.'],
+  ['“Should the city build a skate park?”', 'Not biased', 'The question is neutral and does not suggest an answer.'],
+  ['“Do you support making necessary renovations to the old town hall?”', 'Biased', 'The word “necessary” suggests that the renovations must be done, encouraging a “yes” answer.'],
+  ['A police officer asks mall visitors, “Do you wear your seat belt regularly?”', 'Biased', 'People may not answer honestly when a police officer asks about following the law.'],
+  ['“Do you favor government funding to help prevent acid rain?”', 'Not biased', 'The question is neutral and does not encourage a particular answer.'],
+  ['“What is your favorite school subject?”', 'Not biased', 'The question is neutral and does not suggest an answer.']];
+TEMPLATES.b93Question = (r) => { const [t, a, why] = pick(r, B9Q); return b6sel(r, 'Bias in survey questions', `Determine whether the survey question may be biased or otherwise introduce bias into the survey.   ${t}`, ['Biased', 'Not biased'], a, why); };
+TEMPLATES.b93Misleading = (r) => {
+  if (r() < 0.5) { const base = pick(r, [99.5, 49.5, 199.5]), vals = [0.4, 1.2, 2.4, 3.1].map((d) => Math.round((base + d) * 10) / 10);
+    const c = 'The vertical axis has a break, so the differences between the bars look much larger than they are.', W = ['The years on the horizontal axis are not in order.', 'The bars have different widths.', 'The graph is not misleading.'];
+    return { topic: 'Misleading graphs', stem: 'Describe how the graph is misleading.', draw: b9barDraw({ labels: [2017, 2018, 2019, 2020], vals: vals.map((v) => Math.round((v - base + 1) * 10) / 10), title: 'Annual Sales', ylab: 'Sales (millions of dollars)', xlab: 'Year', gap: 30, yfmt: (v) => (v ? fmt(base + v - 1) : '0'), brk: true }), size: [420, 260],
+      ...buildChoices(r, c, W, () => null), fr: FR.select('Choose:', shuffle(r, [c, ...W]), c), solution: `${c} Someone might think sales in 2020 were many times greater than sales in 2017, when they increased by only about ${fmt(Math.round((vals[3] - vals[0]) * 10) / 10)} million dollars.` }; }
+  const c = 'The intervals on the horizontal axis have different widths (0–29, 30–59, 60–119), so the last bar looks too large.', W = ['The vertical axis has no labels.', 'The bars are in the wrong order.', 'The graph is not misleading.'];
+  return { topic: 'Misleading graphs', stem: 'Describe how the graph is misleading.', draw: b9barDraw({ labels: ['0–29', '30–59', '60–119'], vals: [11, 14, 19], title: 'Bicycling', xlab: 'Minutes', gap: 0 }), size: [420, 250], ...buildChoices(r, c, W, () => null), fr: FR.select('Choose:', shuffle(r, [c, ...W]), c),
+    solution: `${c} The last interval covers 60 minutes while the others cover 30, so someone might think many more people bicycle for long periods than actually do.` };
+};
+
+// ---------- 9.4 Experimental Design ----------
+const B9RCE = [['To test a new drug for insomnia, a company randomly selected and divided 200 adults into two groups. One group received the drug and one group received a placebo.', 'Yes', 'The subjects are randomly assigned to a treatment group (the drug) and a control group (the placebo).'],
+  ['At a high school, students can choose to drink milk or other beverages at lunch. Seventy-five students who chose milk were monitored for one year, as were 75 students who chose other beverages.', 'No', 'The students chose their own groups, so they were not randomly assigned. This is an observational study, and other factors could explain any difference.'],
+  ['A company’s researchers monitor the hair quality of 30 randomly selected people given the regular conditioner and 30 randomly selected people given a new shea butter conditioner.', 'Yes', 'People are randomly assigned to a treatment group (the new conditioner) and a control group (the regular conditioner).'],
+  ['Fifty adults volunteer to read novels every day for a year, and fifty other adults volunteer not to read novels. Their IQ scores are compared.', 'No', 'The adults chose their own groups (volunteers), so the groups were not randomly assigned.'],
+  ['A farmer randomly assigns 40 strawberry plants to receive a new fertilizer and 40 to receive no fertilizer, then compares the fruit weights.', 'Yes', 'The plants are randomly assigned to a treatment group and a control group.']];
+TEMPLATES.b94Randomized = (r) => { const [t, a, why] = pick(r, B9RCE); return b6sel(r, 'Randomized comparative experiments', `Determine whether the study is a randomized comparative experiment.   ${t}`, ['Yes', 'No'], a, why); };
+const B9EO = [['A researcher wants to compare the body mass index of smokers and nonsmokers.', 'Observational study', 'It would be unethical to assign people to smoke, so observe smokers and nonsmokers.'], ['A researcher wants to know if listening to jazz music improves a person’s ability to memorize a list.', 'Experiment', 'Randomly assign people to listen to jazz (treatment) or no music (control) while memorizing.'],
+  ['A farmer wants to know if a new fertilizer affects the weight of the fruit produced by strawberry plants.', 'Experiment', 'Randomly assign plants to receive the fertilizer or not and compare the fruit weights.'], ['You want to know if homes that are close to parks or schools have higher property values.', 'Observational study', 'You cannot assign homes to locations, so compare existing homes.'],
+  ['A doctor wants to know whether people who drink coffee daily have higher blood pressure.', 'Observational study', 'Compare people who already drink coffee daily with people who do not.'], ['A teacher wants to know whether a new study app improves quiz scores.', 'Experiment', 'Randomly assign students to use the app or not, then compare quiz scores.']];
+TEMPLATES.b94ExpOrObs = (r) => { const [t, a, why] = pick(r, B9EO); return b6sel(r, 'Experiments and observational studies', `Determine whether the research topic is best investigated through an experiment or an observational study.   ${t}`, ['Experiment', 'Observational study'], a, why); };
+const B9PROB = [['A company randomly selects 250 athletes. Half receive a nutritional supplement and their heart rates are monitored while they run on a treadmill. The other half receive a placebo and their heart rates are monitored while they lift weights.', 'The groups are not treated the same way except for the treatment', 'The groups do different exercises, so the activity, not the supplement, could cause the difference. Have both groups do the same exercise.'],
+  ['To test whether a nutritional supplement affects heart rate while exercising, a company randomly selects 1000 athletes, divides them into age groups, and within each group randomly assigns the supplement or a placebo. Heart rates are monitored while they run on a treadmill.', 'No problem; the design is sound', 'The subjects are randomly assigned, both groups do the same activity, and the sample is large.'],
+  ['Fifty adults volunteer to read novels every day for a year, and fifty other adults volunteer not to read novels. Those who read raised their IQ scores more.', 'The subjects were not randomly assigned', 'The adults chose their own groups. Randomly assign the adults to the reading and non-reading groups.'],
+  ['To test a new allergy medicine, a researcher gives the medicine to 4 people and a placebo to 4 people.', 'The sample size is too small', 'With only 8 people, the results may be due to chance. Use a larger number of randomly assigned subjects.'],
+  ['A researcher tests a new teaching method on one class while another class uses the old method; the new-method class has a different teacher.', 'The groups are not treated the same way except for the treatment', 'The teacher could cause a difference. Use the same teacher or randomly assign students and teachers.']];
+TEMPLATES.b94Problem = (r) => { const [t, a, why] = pick(r, B9PROB); return b6sel(r, 'Experimental design', `Identify a potential problem, if any, with the experimental design.   ${t}`, ['The groups are not treated the same way except for the treatment', 'The subjects were not randomly assigned', 'The sample size is too small', 'No problem; the design is sound'], a, why); };
+const B9TC = [['To test a new drug for insomnia, 200 adults are randomly divided into two groups. One group receives the drug and the other receives a placebo.', 'receiving the drug', 'adults who receive the drug', 'adults who receive the placebo'], ['To study the effect of adding shea butter to a hair conditioner, 60 people are randomly divided: 30 use the new conditioner and 30 use the regular conditioner.', 'using the new shea butter conditioner', 'people who use the new conditioner', 'people who use the regular conditioner'],
+  ['To test whether music therapy affects anxiety scores, 16 students are randomly divided: 8 receive music therapy and 8 do not.', 'receiving music therapy', 'students who receive music therapy', 'students who do not receive music therapy']];
+TEMPLATES.b94Identify = (r) => {
+  const [t, tr, tg, cg] = pick(r, B9TC), c = `Treatment group: ${tg}; control group: ${cg}`, W = [`Treatment group: ${cg}; control group: ${tg}`, `Treatment group: ${tg}; control group: people who use neither`, `Treatment group: all of the subjects; control group: none`];
+  return { topic: 'Randomized comparative experiments', stem: `Identify the treatment group and the control group.   ${t}`, ...buildChoices(r, c, W, () => null), fr: FR.select('Choose:', shuffle(r, [c, ...W]), c), solution: `The treatment is ${tr}. The treatment group receives the treatment (${tg}); the control group is compared with it (${cg}).` };
+};
+
+// ---------- 9.5 Making Inferences from Sample Surveys ----------
+// a plain grid of numbers (no header cells)
+const b9gridDraw = (rows, title = '') => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, nc = rows[0].length, cw = Math.min(64, (W - 20) / nc), rh = 28, x0 = (W - cw * nc) / 2, y0 = title ? 30 : 6; c.clearRect(0, 0, W, H);
+  c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#1d1d1b';
+  if (title) { c.font = '600 14px system-ui, sans-serif'; c.fillText(title, W / 2, 14); }
+  c.font = '14px system-ui, sans-serif'; c.strokeStyle = '#8a867c'; c.lineWidth = 1;
+  rows.forEach((row, i) => row.forEach((t, j) => { c.fillStyle = '#fff'; c.fillRect(x0 + j * cw, y0 + i * rh, cw, rh); c.strokeRect(x0 + j * cw, y0 + i * rh, cw, rh); c.fillStyle = '#1d1d1b'; c.fillText(String(t), x0 + j * cw + cw / 2, y0 + i * rh + rh / 2); }));
+};
+const b9table = (D, cols) => { const rows = []; for (let i = 0; i < D.length; i += cols) rows.push(D.slice(i, i + cols)); return rows; };
+TEMPLATES.b95Mean = (r) => {
+  const C = pick(r, [['The numbers of text messages sent and received in one day by a random sample of 30 teen cell phone users are shown. Estimate the population mean μ.', 30, 5, 35, 97, 'Number of Text Messages'], ['The heart rates (in beats per minute) for a random sample of 36 blue whales are shown. Estimate the population mean μ.', 36, 6, 5, 13, 'Blue Whale Heart Rates'], ['The prices (in dollars) of a random sample of 9 solar balloons are shown. Estimate the population mean μ.', 9, 3, 15, 30, 'Solar Balloon Prices'], ['The times (in minutes) that a random sample of 20 students spent on homework one night are shown. Estimate the population mean μ.', 20, 5, 10, 90, 'Homework Times']]);
+  const [stem, n, cols, lo, hi, title] = C, D = [...Array(n)].map(() => ri(r, lo, hi)), m = b9mean(D), mv = Math.round(m * 10) / 10;
+  return a1numQ(r, { topic: 'Estimating population parameters', stem: `${stem} Round to the nearest tenth if necessary.`, draw: b9gridDraw(b9table(D, cols), title), size: [Math.max(360, 64 * cols + 40), 28 * (n / cols) + 44], val: mv, tol: 0.051, dec: true, wrongs: [Math.round(((Math.min(...D) + Math.max(...D)) / 2) * 10) / 10, Math.round((m * n / (n - 1)) * 10) / 10, a8med(D)],
+    solution: `x̄ = (sum of the data)/${n} = ${D.reduce((s, x) => s + x, 0)}/${n} ${Number.isInteger(m * 10) ? '=' : '≈'} ${fmt(mv)}\nThe sample mean is the best estimate of μ, so μ ≈ ${fmt(mv)}.` });
+};
+TEMPLATES.b95Prop = (r) => {
+  const n = pick(r, [30, 36, 25]), cols = n === 36 ? 6 : 5, lo = pick(r, [30, 5]), hi = lo === 30 ? 98 : 14, D = [...Array(n)].map(() => ri(r, lo, hi)), more = r() < 0.5, k0 = lo === 30 ? pick(r, [50, 70, 80]) : pick(r, [8, 10, 12]);
+  const cnt = D.filter((x) => (more ? x > k0 : x < k0)).length, what = lo === 30 ? `teen cell phone users who send and receive ${more ? 'more' : 'fewer'} than ${k0} text messages each day` : `blue whales that have a heart rate ${more ? 'greater' : 'less'} than ${k0} beats per minute`;
+  return b9probQ(r, { topic: 'Estimating population parameters', stem: `The table shows data from a random sample of ${n} ${lo === 30 ? 'teen cell phone users (number of text messages in one day)' : 'blue whales (heart rate in beats per minute)'}. Estimate the population proportion p of ${what}.`, draw: b9gridDraw(b9table(D, cols), lo === 30 ? 'Number of Text Messages' : 'Blue Whale Heart Rates'), size: [Math.max(360, 64 * cols + 40), 28 * (n / cols) + 44], p: cnt / n,
+    wrongs: [(n - cnt) / n, D.filter((x) => (more ? x >= k0 : x <= k0)).length / n, cnt / 100], solution: `${cnt} of the ${n} values are ${more ? 'greater' : 'less'} than ${k0}.\np̂ = ${cnt}/${n} ${Number.isInteger((cnt / n) * 10000) ? '=' : '≈'} ${String(Math.round((cnt / n) * 10000) / 10000)}, so p ≈ ${String(Math.round((cnt / n) * 10000) / 10000)}.` });
+};
+TEMPLATES.b95Margin = (r) => {
+  const n = pick(r, [260, 1000, 2024, 6400, 3275, 750, 400, 1500, 900, 2500]), E = 1 / Math.sqrt(n), v = Math.round(E * 1000) / 10;
+  return b9pm(a1numQ(r, { topic: 'Margin of error', stem: `Find the margin of error for a survey that has a sample size of ${n}. Round your answer to the nearest tenth of a percent.`, val: v, dec: true, tol: 0.051, unit: '%', text: `±${fmt(v)}%`, wrongs: [Math.round(1000 / n * 10) / 10 || 0.1, Math.round((2 / Math.sqrt(n)) * 1000) / 10, Math.round(Math.sqrt(n) / 10) / 10],
+    solution: `Margin of error = ±1/√n = ±1/√${n} ≈ ±${E.toFixed(4)} ≈ ±${fmt(v)}%` }));
+};
+TEMPLATES.b95Interval = (r) => {
+  const C = pick(r, [[920, 81, 'U.S. teenagers', 'said that helping others who are in need will be very important to them as adults'], [2000, 70, 'U.S. adults', 'said that they would support a national policy requiring rooftop solar panels on all new homes'], [1600, 45, 'voters', 'said they support a new city park'], [625, 62, 'students', 'said they prefer a later school start time'], [400, 35, 'shoppers', 'said they shop online at least once a week']]);
+  const [n, p, who, what] = C, E = 100 / Math.sqrt(n), lo = Math.round((p - E) * 10) / 10, hi = Math.round((p + E) * 10) / 10, ok = (raw, v) => { const x = pxConst(String(raw || '').replace(/\\%|%/g, '').replace(/^[^=]*=/, '')); return isFinite(x) && Math.abs(x - v) <= 0.15; };
+  const c = `between ${fmt(lo)}% and ${fmt(hi)}%`, W = [`between ${fmt(Math.round((p - E / 2) * 10) / 10)}% and ${fmt(Math.round((p + E / 2) * 10) / 10)}%`, `between ${fmt(Math.round((p - 2 * E) * 10) / 10)}% and ${fmt(Math.round((p + 2 * E) * 10) / 10)}%`, `between ${p - 1}% and ${p + 1}%`];
+  return { topic: 'Margin of error', stem: `In a survey of ${n.toLocaleString('en-US')} ${who}, ${p}% ${what}. Use the margin of error to give an interval that is likely to contain the exact percentage of all ${who}. Round to the nearest tenth of a percent.`, ...buildChoices(r, c, W, () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Between', suffix: '%' }, { kind: 'expr', keys: 'num', label: 'and', suffix: '%' }], key: [String(lo), String(hi)], display: c, check: (v) => ok(v[0], lo) && ok(v[1], hi), score: (v) => ((ok(v[0], lo) ? 1 : 0) + (ok(v[1], hi) ? 1 : 0)) / 2 },
+    solution: `Margin of error = ±1/√${n} ≈ ±${(1 / Math.sqrt(n)).toFixed(4)} ≈ ±${fmt(Math.round(E * 10) / 10)}%\n${p}% − ${fmt(Math.round(E * 10) / 10)}% ≈ ${fmt(lo)}% and ${p}% + ${fmt(Math.round(E * 10) / 10)}% ≈ ${fmt(hi)}%` };
+};
+TEMPLATES.b95Size = (r) => {
+  for (let t = 0; t < 100; t++) {
+    const n0 = pick(r, [453, 400, 625, 1111, 278, 816]), E = Math.round((100 / Math.sqrt(n0)) * 10) / 10, mid = ri(r, 30, 70) + pick(r, [0, 0.5]), lo = Math.round((mid - E) * 10) / 10, hi = Math.round((mid + E) * 10) / 10, n = Math.round(1 / (E / 100) ** 2);
+    return a1numQ(r, { topic: 'Margin of error', stem: `A developer claims that the percentage of city residents who favor a new project is likely between ${fmt(lo)}% and ${fmt(hi)}%. About how many residents were surveyed?`, val: n, tol: Math.max(3, n * 0.01), unit: 'residents', wrongs: [Math.round(1 / ((hi - lo) / 100) ** 2), Math.round(100 / E), Math.round(n / 2)],
+      solution: `The margin of error is half the width of the interval: (${fmt(hi)} − ${fmt(lo)})/2 = ${fmt(E)}% = ${fmt(E / 100)}.\n1/√n = ${fmt(E / 100)}, so √n = ${fmt(Math.round((100 / E) * 100) / 100)} and n ≈ ${n}.` });
+  }
+};
+TEMPLATES.b95SDMargin = (r) => {
+  const sd = pick(r, [0.05, 0.08, 0.02, 0.03, 0.04]), m = 2 * sd, p = pick(r, [0.17, 0.54, 0.32, 0.6]);
+  return b9pm(a1numQ(r, { topic: 'Margin of error', stem: `A distribution of sample proportions simulated for a claim that p = ${p} has a standard deviation of about ${sd}. Find the margin of error (as a percent) for about 95% of the sample proportions.`, val: Math.round(m * 1000) / 10, dec: true, tol: 0.051, unit: '%', text: `±${fmt(Math.round(m * 1000) / 10)}%`, wrongs: [sd * 100, 3 * sd * 100, sd * 50],
+    solution: `About 95% of the data lie within 2 standard deviations of the mean, so the margin of error is about ±2σ = ±2(${sd}) = ±${fmt(m)}, or ±${fmt(Math.round(m * 1000) / 10)}%. About 95% of samples should have proportions between ${fmt(Math.round((p - m) * 100) / 100)} and ${fmt(Math.round((p + m) * 100) / 100)}.` }));
+};
+TEMPLATES.b95Claim = (r) => {
+  const p = pick(r, [0.17, 0.54, 0.4, 0.25]), n = pick(r, [100, 40, 64]), E = 1 / Math.sqrt(n), far = r() < 0.5, ph = far ? Math.round((p + pick(r, [1, -1]) * (E + 0.05 + r() * 0.05)) * n) / n : Math.round((p + (r() - 0.5) * E) * n) / n;
+  if (ph <= 0 || ph >= 1) return TEMPLATES.b95Claim(r);
+  const k = Math.round(ph * n), lo = ph - E, hi = ph + E, inside = p >= lo && p <= hi, ans = inside ? 'The claim is plausible' : 'The claim is probably not accurate';
+  return b6sel(r, 'Testing claims with surveys', `A national polling company claims that ${Math.round(p * 100)}% of a population has a certain trait. You survey a random sample of ${n} people and ${k} of them have the trait. Using the margin of error, what can you conclude about the accuracy of the claim?`, ['The claim is plausible', 'The claim is probably not accurate'], ans,
+    `p̂ = ${k}/${n} = ${fmt(Math.round(ph * 1000) / 1000)}. Margin of error = ±1/√${n} = ±${fmt(Math.round(E * 1000) / 1000)}.\nInterval: ${fmt(Math.round(lo * 1000) / 1000)} to ${fmt(Math.round(hi * 1000) / 1000)}. The claimed ${p} is ${inside ? 'inside' : 'outside'} this interval, so ${inside ? 'the claim is plausible' : 'the claim is probably not accurate'}.`);
+};
+
+// ---------- 9.6 Making Inferences from Experiments ----------
+TEMPLATES.b96Diff = (r) => {
+  const dec = r() < 0.5, base = dec ? pick(r, [7.5, 6]) : pick(r, [45, 30, 60]), eff = dec ? pick(r, [0.4, -0.3, 0.6]) : pick(r, [-5, -4, 6, 3]), sp = dec ? 0.7 : 3;
+  const g = (m) => [...Array(8)].map(() => (dec ? Math.round((m + (r() - 0.5) * 2 * sp) * 10) / 10 : Math.round(m + (r() - 0.5) * 2 * sp))), Cg = g(base), Tg = g(base + eff), d = Math.round((b9mean(Tg) - b9mean(Cg)) * 1000) / 1000;
+  const what = dec ? ['whether a software update affects the satisfaction scores of teen cell phone users', 'Satisfaction Score'] : ['whether music therapy affects the anxiety scores of high school students', 'Anxiety Score'];
+  return a1numQ(r, { topic: 'Experimental difference', stem: `A randomized comparative experiment tests ${what[0]}. The control group and the treatment group each have eight subjects. Find the experimental difference x̄(treatment) − x̄(control). Round to the nearest hundredth if necessary.`, draw: a9tableDraw([[what[1], '', '', '', '', '', '', '', ''], ['Control', ...Cg.map(fmt)], ['Treatment', ...Tg.map(fmt)]]), size: [560, 120],
+    val: Math.round(d * 100) / 100, tol: 0.011, dec: true, wrongs: [-Math.round(d * 100) / 100, Math.round((b9mean(Tg) + b9mean(Cg)) * 100) / 100, Math.round(d * 800) / 100],
+    solution: `x̄(treatment) = ${fmt(Math.round(b9mean(Tg) * 1000) / 1000)} and x̄(control) = ${fmt(Math.round(b9mean(Cg) * 1000) / 1000)}.\nExperimental difference = ${fmt(Math.round(b9mean(Tg) * 1000) / 1000)} − ${fmt(Math.round(b9mean(Cg) * 1000) / 1000)} ≈ ${fmt(Math.round(d * 100) / 100)}` });
+};
+TEMPLATES.b96Sign = (r) => {
+  const kind = pick(r, ['Positive', 'Negative', 'Zero']), s = kind === 'Positive' ? 0.75 : kind === 'Negative' ? -0.75 : 0;
+  const C = [0.75, 1.0, 1.5, 1.5, 1.5, 1.75, 1.75, 2.25].map((x) => x + 0.25), T = C.map((x, i) => Math.round((kind === 'Zero' ? C[(i * 3) % 8] : x + s) * 4) / 4).map((x) => Math.min(3, Math.max(0.5, x)));
+  const realK = b9mean(T) - b9mean(C) > 0.2 ? 'Positive' : b9mean(T) - b9mean(C) < -0.2 ? 'Negative' : 'Zero';
+  return b6sel(r, 'Experimental difference', 'Without calculating, determine whether the experimental difference x̄(treatment) − x̄(control) is positive, negative, or zero.', ['Positive', 'Negative', 'Zero'], realK,
+    realK === 'Zero' ? 'The two groups have the same values, just in a different order, so their means are equal: the difference is zero.' : `The treatment group’s dots are generally to the ${realK === 'Positive' ? 'right' : 'left'} of the control group’s, so x̄(treatment) is ${realK === 'Positive' ? 'greater' : 'less'} than x̄(control) and the difference is ${realK.toLowerCase()}.`,
+    { draw: b9dotDraw(C, T, 0.5, 3, 0.5), size: [480, 190] });
+};
+TEMPLATES.b96Conclude = (r) => {
+  const sd = pick(r, [1.4, 0.3]), w = sd > 1 ? 0.5 : 0.1, centers = []; for (let k = -8; k <= 8; k++) centers.push(Math.round(k * w * 100) / 100);
+  const pdf = centers.map((c) => Math.exp(-(c * c) / (2 * sd * sd))), tot = pdf.reduce((s, x) => s + x, 0), counts = pdf.map((x) => Math.round((200 * x) / tot)), sig = r() < 0.5;
+  const d = Math.round((sig ? pick(r, [1, -1]) * (2.6 + r() * 0.6) * sd : (r() - 0.5) * 1.6 * sd) * 100) / 100, ans = sig ? 'Reject the hypothesis' : 'Do not reject the hypothesis';
+  const topic = sd > 1 ? ['Music therapy has no effect on the anxiety score.', 'music therapy'] : ['The software update has no effect on the satisfaction score.', 'the software update'];
+  return b6sel(r, 'Resampling and hypotheses', `The histogram shows the results of 200 resamplings of the data in a randomized comparative experiment. Hypothesis: “${topic[0]}” The experimental difference is x̄(treatment) − x̄(control) = ${fmt(d)}. What can you conclude about the hypothesis?`, ['Reject the hypothesis', 'Do not reject the hypothesis'], ans,
+    sig ? `The experimental difference ${fmt(d)} is far out in a tail of the histogram: almost none of the resampling differences are that extreme. The difference is significant, so reject the hypothesis that ${topic[1]} has no effect.` : `Many resampling differences are as extreme as ${fmt(d)}, so the difference could be due to chance. Do not reject the hypothesis.`,
+    { draw: b9barDraw({ labels: centers.map((c, i) => (i % 2 ? '' : c.toFixed(sd > 1 ? 1 : 2))), vals: counts, title: 'Mean Difference from 200 Resamplings', xlab: 'Mean difference, x̄(new treatment) − x̄(new control)', show: true, gap: 0, rot: true }), size: [460, 300] });
+};
+TEMPLATES.b96Count = (r) => {
+  const [a, b] = pick(r, [[8, 8], [6, 6], [5, 5], [4, 4], [5, 7], [10, 10]]); let c = 1; for (let i = 1; i <= a; i++) c = (c * (a + b - a + i)) / i; c = Math.round(c);
+  return a1numQ(r, { topic: 'Resampling', stem: `A randomized comparative experiment has a control group of ${a} subjects and a treatment group of ${b} subjects. How many different resamplings of the treatment and control groups are theoretically possible?`, val: c, wrongs: [(a + b) * (a + b - 1), 2 ** (a + b), c * 2], solution: `A resampling chooses which ${a} of the ${a + b} data values go into the control group (the rest form the treatment group).\n${a + b}C${a} = ${c}` });
+};
+for (const name of Object.keys(TEMPLATES)) if (/^b9\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== ALGEBRA 2 CH9 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -20291,6 +21060,17 @@ Object.assign(SETS, {
   'alg2-7-3': { subject: 'algebra2', title: '7.3 Multiplying and Dividing Rational Expressions', items: [['b73Simplify', 3], ['b73Mono', 2], ['b73MultDiv', 4]] },
   'alg2-7-4': { subject: 'algebra2', title: '7.4 Adding and Subtracting Rational Expressions', items: [['b74Like', 2], ['b74LCM', 2], ['b74AddDiff', 4], ['b74Rewrite', 1], ['b74Complex', 3], ['b74Word', 1]] },
   'alg2-7-5': { subject: 'algebra2', title: '7.5 Solving Rational Equations', items: [['b75Cross', 3], ['b75LCD', 3], ['b75Word', 2], ['b75Inverse', 2]] },
+  'alg2-8-1': { subject: 'algebra2', title: '8.1 Defining and Using Sequences and Series', items: [['b81Terms', 2], ['b81Rule', 3], ['b81Sigma', 2], ['b81Sum', 3], ['b81Word', 2]] },
+  'alg2-8-2': { subject: 'algebra2', title: '8.2 Analyzing Arithmetic Sequences and Series', items: [['b82Is', 2], ['b82Rule', 2], ['b82FromTerm', 1], ['b82TwoTerms', 2], ['b82Graph', 1], ['b82Sum', 2], ['b82SumSeq', 1], ['b82Word', 1]] },
+  'alg2-8-3': { subject: 'algebra2', title: '8.3 Analyzing Geometric Sequences and Series', items: [['b83Is', 2], ['b83Rule', 2], ['b83FromTerm', 1], ['b83TwoTerms', 2], ['b83Graph', 1], ['b83Sum', 2], ['b83SumSeq', 1], ['b83Loan', 1], ['b83Word', 1]] },
+  'alg2-8-4': { subject: 'algebra2', title: '8.4 Finding Sums of Infinite Geometric Series', items: [['b84Partial', 2], ['b84Sum', 4], ['b84Repeat', 3], ['b84Word', 2]] },
+  'alg2-8-5': { subject: 'algebra2', title: '8.5 Using Recursive Rules with Sequences', items: [['b85Terms', 3], ['b85WriteRec', 3], ['b85ExpToRec', 2], ['b85RecToExp', 2], ['b85Word', 2]] },
+  'alg2-9-1': { subject: 'algebra2', title: '9.1 Using Normal Distributions', items: [['b91Shade', 2], ['b91MeanSD', 1], ['b91Prob', 3], ['b91Interval', 3], ['b91Word', 2], ['b91Hist', 1], ['b91Skew', 1]] },
+  'alg2-9-2': { subject: 'algebra2', title: '9.2 Populations, Samples, and Hypotheses', items: [['b92PopSample', 2], ['b92Identify', 2], ['b92Param', 2], ['b92Prop', 2], ['b92Conclude', 2]] },
+  'alg2-9-3': { subject: 'algebra2', title: '9.3 Collecting Data', items: [['b93Type', 3], ['b93Biased', 2], ['b93Method', 2], ['b93Question', 2], ['b93Misleading', 1]] },
+  'alg2-9-4': { subject: 'algebra2', title: '9.4 Experimental Design', items: [['b94Randomized', 2], ['b94Identify', 2], ['b94ExpOrObs', 2], ['b94Problem', 2]] },
+  'alg2-9-5': { subject: 'algebra2', title: '9.5 Making Inferences from Sample Surveys', items: [['b95Mean', 1], ['b95Prop', 2], ['b95Margin', 3], ['b95Interval', 2], ['b95SDMargin', 1], ['b95Claim', 2], ['b95Size', 1]] },
+  'alg2-9-6': { subject: 'algebra2', title: '9.6 Making Inferences from Experiments', items: [['b96Diff', 2], ['b96Sign', 2], ['b96Conclude', 2], ['b96Count', 1]] },
   // ----- Geometry, Chapter 7: Quadrilaterals and Other Polygons -----
   'geo-7-1': { subject: 'geometry', title: '7.1 Angles of Polygons', items: [['g71Sum', 2], ['g71Sides', 2], ['g71FindX', 4], ['g71Ext', 3], ['g71Regular', 2]] },
   'geo-7-2': { subject: 'geometry', title: '7.2 Properties of Parallelograms', items: [['g72Vars', 3], ['g72Angle', 2], ['g72Diag', 3], ['g72Alg', 3], ['g72Coord', 2]] },
@@ -20767,6 +21547,69 @@ QUESTION_TYPES.push(
   { id: 'b75LCD', subject: 'algebra2', section: '7.5 Solving Rational Equations', label: 'Solve using the LCD', desc: '#17–28' },
   { id: 'b75Word', subject: 'algebra2', section: '7.5 Solving Rational Equations', label: 'Real-life rational equations', desc: '#9–12, 33' },
   { id: 'b75Inverse', subject: 'algebra2', section: '7.5 Solving Rational Equations', label: 'Inverse of a rational function', desc: '#35–42' },
+  { id: 'b81Terms', subject: 'algebra2', section: '8.1 Defining and Using Sequences and Series', label: 'Write terms of a sequence', desc: '#1–10' },
+  { id: 'b81Rule', subject: 'algebra2', section: '8.1 Defining and Using Sequences and Series', label: 'Describe the pattern and write a rule', desc: '#11–22' },
+  { id: 'b81Sigma', subject: 'algebra2', section: '8.1 Defining and Using Sequences and Series', label: 'Write a series in summation notation', desc: '#25–32' },
+  { id: 'b81Sum', subject: 'algebra2', section: '8.1 Defining and Using Sequences and Series', label: 'Find the sum (summation notation)', desc: '#33–44' },
+  { id: 'b81Word', subject: 'algebra2', section: '8.1 Defining and Using Sequences and Series', label: 'Sequences in real life', desc: '#23, 24, 45' },
+  { id: 'b82Is', subject: 'algebra2', section: '8.2 Analyzing Arithmetic Sequences and Series', label: 'Is the sequence arithmetic?', desc: '#1–8' },
+  { id: 'b82Rule', subject: 'algebra2', section: '8.2 Analyzing Arithmetic Sequences and Series', label: 'Rule for an arithmetic sequence; find a₂₀', desc: '#11–18' },
+  { id: 'b82FromTerm', subject: 'algebra2', section: '8.2 Analyzing Arithmetic Sequences and Series', label: 'Rule from a term and the common difference', desc: '#21–26' },
+  { id: 'b82TwoTerms', subject: 'algebra2', section: '8.2 Analyzing Arithmetic Sequences and Series', label: 'Rule from two terms', desc: '#27–34' },
+  { id: 'b82Graph', subject: 'algebra2', section: '8.2 Analyzing Arithmetic Sequences and Series', label: 'Rule from a graph or table', desc: '#35–40' },
+  { id: 'b82Sum', subject: 'algebra2', section: '8.2 Analyzing Arithmetic Sequences and Series', label: 'Sum of an arithmetic series', desc: '#41–46' },
+  { id: 'b82SumSeq', subject: 'algebra2', section: '8.2 Analyzing Arithmetic Sequences and Series', label: 'Sum of the first n terms', desc: '#47, 48' },
+  { id: 'b82Word', subject: 'algebra2', section: '8.2 Analyzing Arithmetic Sequences and Series', label: 'Arithmetic sequences in real life', desc: '#49, 50' },
+  { id: 'b83Is', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: 'Is the sequence geometric?', desc: '#1–8' },
+  { id: 'b83Rule', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: 'Rule for a geometric sequence; find a₇', desc: '#11–18' },
+  { id: 'b83FromTerm', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: 'Rule from a term and the common ratio', desc: '#19–26' },
+  { id: 'b83TwoTerms', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: 'Rule from two terms', desc: '#29–36' },
+  { id: 'b83Graph', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: 'Rule from a graph or table', desc: '#37–40' },
+  { id: 'b83Sum', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: 'Sum of a geometric series', desc: '#41–46' },
+  { id: 'b83SumSeq', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: 'Sum of the first n terms', desc: '#47, 48' },
+  { id: 'b83Loan', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: 'Monthly loan payment', desc: '#51, 52' },
+  { id: 'b83Word', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: 'Geometric sequences in real life', desc: '#49, 50, 53' },
+  { id: 'b84Partial', subject: 'algebra2', section: '8.4 Finding Sums of Infinite Geometric Series', label: 'Partial sums', desc: '#1–4' },
+  { id: 'b84Sum', subject: 'algebra2', section: '8.4 Finding Sums of Infinite Geometric Series', label: 'Sum of an infinite geometric series', desc: '#5–12' },
+  { id: 'b84Repeat', subject: 'algebra2', section: '8.4 Finding Sums of Infinite Geometric Series', label: 'Repeating decimal as a fraction', desc: '#17–22' },
+  { id: 'b84Word', subject: 'algebra2', section: '8.4 Finding Sums of Infinite Geometric Series', label: 'Infinite series in real life', desc: '#15, 16' },
+  { id: 'b85Terms', subject: 'algebra2', section: '8.5 Using Recursive Rules with Sequences', label: 'Terms from a recursive rule', desc: '#1–8' },
+  { id: 'b85WriteRec', subject: 'algebra2', section: '8.5 Using Recursive Rules with Sequences', label: 'Write a recursive rule', desc: '#9–20' },
+  { id: 'b85ExpToRec', subject: 'algebra2', section: '8.5 Using Recursive Rules with Sequences', label: 'Explicit rule to recursive rule', desc: '#25–34' },
+  { id: 'b85RecToExp', subject: 'algebra2', section: '8.5 Using Recursive Rules with Sequences', label: 'Recursive rule to explicit rule', desc: '#37–44' },
+  { id: 'b85Word', subject: 'algebra2', section: '8.5 Using Recursive Rules with Sequences', label: 'Recursive rules in real life', desc: '#45, 46, 49, 50, 53, 55' },
+  { id: 'b91Shade', subject: 'algebra2', section: '9.1 Using Normal Distributions', label: 'Percent of area under the normal curve', desc: '#1, 2, 27' },
+  { id: 'b91MeanSD', subject: 'algebra2', section: '9.1 Using Normal Distributions', label: 'Mean and standard deviation from a normal curve', desc: '#3, 24' },
+  { id: 'b91Prob', subject: 'algebra2', section: '9.1 Using Normal Distributions', label: 'Probabilities in terms of μ and σ', desc: '#5–10' },
+  { id: 'b91Interval', subject: 'algebra2', section: '9.1 Using Normal Distributions', label: 'Probability for an interval', desc: '#11–16, 25' },
+  { id: 'b91Word', subject: 'algebra2', section: '9.1 Using Normal Distributions', label: 'Normal distributions in real life', desc: '#17, 18' },
+  { id: 'b91Hist', subject: 'algebra2', section: '9.1 Using Normal Distributions', label: 'Is the histogram normal?', desc: '#21, 22' },
+  { id: 'b91Skew', subject: 'algebra2', section: '9.1 Using Normal Distributions', label: 'Mean, median, and skew', desc: '#23' },
+  { id: 'b92PopSample', subject: 'algebra2', section: '9.2 Populations, Samples, and Hypotheses', label: 'Population or sample?', desc: '#1–4' },
+  { id: 'b92Identify', subject: 'algebra2', section: '9.2 Populations, Samples, and Hypotheses', label: 'Identify the population and sample', desc: '#5–8, 13' },
+  { id: 'b92Param', subject: 'algebra2', section: '9.2 Populations, Samples, and Hypotheses', label: 'Parameter or statistic?', desc: '#9–12, 14' },
+  { id: 'b92Prop', subject: 'algebra2', section: '9.2 Populations, Samples, and Hypotheses', label: 'Proportions from a simulation', desc: '#17–20' },
+  { id: 'b92Conclude', subject: 'algebra2', section: '9.2 Populations, Samples, and Hypotheses', label: 'Test a claim with a simulation', desc: '#21–24' },
+  { id: 'b93Type', subject: 'algebra2', section: '9.3 Collecting Data', label: 'Type of sample', desc: '#1–4, 13' },
+  { id: 'b93Biased', subject: 'algebra2', section: '9.3 Collecting Data', label: 'Is the sample biased?', desc: '#5–12, 14' },
+  { id: 'b93Method', subject: 'algebra2', section: '9.3 Collecting Data', label: 'Method of data collection', desc: '#17–20' },
+  { id: 'b93Question', subject: 'algebra2', section: '9.3 Collecting Data', label: 'Biased survey questions', desc: '#21–28' },
+  { id: 'b93Misleading', subject: 'algebra2', section: '9.3 Collecting Data', label: 'Misleading graphs', desc: '#31, 32' },
+  { id: 'b94Randomized', subject: 'algebra2', section: '9.4 Experimental Design', label: 'Randomized comparative experiment?', desc: '#1, 2, 4' },
+  { id: 'b94Identify', subject: 'algebra2', section: '9.4 Experimental Design', label: 'Treatment and control groups', desc: '#1, 3' },
+  { id: 'b94ExpOrObs', subject: 'algebra2', section: '9.4 Experimental Design', label: 'Experiment or observational study?', desc: '#5–8' },
+  { id: 'b94Problem', subject: 'algebra2', section: '9.4 Experimental Design', label: 'Problems in experimental design', desc: '#9, 10' },
+  { id: 'b95Mean', subject: 'algebra2', section: '9.5 Making Inferences from Sample Surveys', label: 'Estimate a population mean', desc: '#1, 2' },
+  { id: 'b95Prop', subject: 'algebra2', section: '9.5 Making Inferences from Sample Surveys', label: 'Estimate a population proportion', desc: '#3, 4' },
+  { id: 'b95Margin', subject: 'algebra2', section: '9.5 Making Inferences from Sample Surveys', label: 'Margin of error from sample size', desc: '#13–18' },
+  { id: 'b95Interval', subject: 'algebra2', section: '9.5 Making Inferences from Sample Surveys', label: 'Interval likely to contain the population percent', desc: '#19, 20' },
+  { id: 'b95SDMargin', subject: 'algebra2', section: '9.5 Making Inferences from Sample Surveys', label: 'Margin of error from a simulation', desc: '#11, 12, 22' },
+  { id: 'b95Claim', subject: 'algebra2', section: '9.5 Making Inferences from Sample Surveys', label: 'Accuracy of a claim', desc: '#9, 10' },
+  { id: 'b95Size', subject: 'algebra2', section: '9.5 Making Inferences from Sample Surveys', label: 'Sample size from an interval', desc: '#23' },
+  { id: 'b96Diff', subject: 'algebra2', section: '9.6 Making Inferences from Experiments', label: 'Experimental difference of means', desc: '#1, 2' },
+  { id: 'b96Sign', subject: 'algebra2', section: '9.6 Making Inferences from Experiments', label: 'Sign of the difference from a dot plot', desc: '#8' },
+  { id: 'b96Conclude', subject: 'algebra2', section: '9.6 Making Inferences from Experiments', label: 'Analyze a hypothesis with resampling', desc: '#5, 6' },
+  { id: 'b96Count', subject: 'algebra2', section: '9.6 Making Inferences from Experiments', label: 'Number of possible resamplings', desc: '#9' },
   { id: 'g71Sum', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Interior angle sum', desc: '#1–4' },
   { id: 'g71Sides', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Number of sides from the sum', desc: 'Classify the polygon (#5–8)' },
   { id: 'g71FindX', subject: 'geometry', section: '7.1 Angles of Polygons', label: 'Find x from interior angles', desc: '#9–14, 17–20' },
@@ -22825,7 +23668,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
