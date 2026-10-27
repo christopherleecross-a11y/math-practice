@@ -21035,8 +21035,8 @@ TEMPLATES.b18Point = (r) => {
   const inside = []; for (let x = -5; x <= 5; x++) for (let y = -5; y <= 5; y++) if (L.every((I) => b1sat(I, x, y) && Math.abs(y - (I.m * x + I.b)) > 0.1)) inside.push([x, y]);
   const outside = []; for (let x = -5; x <= 5; x++) for (let y = -5; y <= 5; y++) if (!L.every((I) => b1sat(I, x, y))) outside.push([x, y]);
   const P = pick(r, inside), W = shuffle(r, outside).slice(0, 3).map(ptT);
-  return { topic: 'Systems of linear inequalities', stem: `Graph the system. Then identify a solution.   ${L.map(b1ineqT).join(',   ')}`, ...buildChoices(r, ptT(P), W, () => null),
-    fr: { frStem: `Graph the system on your paper or in your work space. Then identify any one solution (x, y).   ${L.map(b1ineqT).join(',   ')}`, fields: [{ kind: 'expr', keys: 'pts2', label: '(x, y) =' }], key: [`\\left(${P[0]},${P[1]}\\right)`], display: `any point in the overlap, such as ${ptT(P)}`, check: (v) => ok(v[0]) },
+  return { topic: 'Systems of linear inequalities', stem: `Identify a solution of the system of linear inequalities.   ${L.map(b1ineqT).join(',   ')}`, ...buildChoices(r, ptT(P), W, () => null),
+    fr: { frStem: `Identify any one solution (x, y) of the system of linear inequalities.   ${L.map(b1ineqT).join(',   ')}`, fields: [{ kind: 'expr', keys: 'pts2', label: '(x, y) =' }], key: [`\\left(${P[0]},${P[1]}\\right)`], display: `any point in the overlap, such as ${ptT(P)}`, check: (v) => ok(v[0]) },
     solution: `Graph both boundary lines (${L.map((I) => `${I.op === '<' || I.op === '>' ? 'dashed' : 'solid'} y = ${lineText(I.m, I.b).slice(4)}`).join(' and ')}) and shade the overlap of the two half-planes.\nOne solution is ${ptT(P)}: ${L.map((I) => b1ineqT(I).replace(/x/g, `(${fracT(P[0])})`).replace(/^y/, fracT(P[1]))).join(' and ')} are both true.` };
 };
 TEMPLATES.b18Which = (r) => {
@@ -21048,6 +21048,54 @@ TEMPLATES.b18Word = (r) => {
   const ok = x >= min1 && x + y <= cap && p1 * x + p2 * y >= goal;
   return b6sel(r, 'Systems of linear inequalities', `You earn $${p1} per hour working at a grocery store and must work there at least ${min1} hours per week. You also teach music lessons for $${p2} per hour. Between the two jobs, you need to earn at least $${goal} per week and work no more than ${cap} hours per week. The system x ≥ ${min1}, x + y ≤ ${cap}, ${p1}x + ${p2}y ≥ ${goal} represents the situation, where x is grocery hours and y is music hours. Can you work ${x} hours at the grocery store and ${y} hours teaching lessons?`, ['Yes', 'No'], ok ? 'Yes' : 'No',
     `x ≥ ${min1}: ${x} ≥ ${min1} is ${x >= min1}.\nx + y ≤ ${cap}: ${x + y} ≤ ${cap} is ${x + y <= cap}.\n${p1}x + ${p2}y ≥ ${goal}: ${p1 * x + p2 * y} ≥ ${goal} is ${p1 * x + p2 * y >= goal}.\n${ok ? 'All three are true, so yes.' : 'At least one is false, so no.'}`);
+};
+
+// ---- graphing versions (the book says "graph") ----
+// #7–24: graph g, then describe the transformation of the parent function
+TEMPLATES.b12Graph = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const fam = pick(r, ['lin', 'quad', 'abs']), k = ri(r, 1, 5), c = pick(r, [2, 3, 1 / 2, 1 / 3, 3 / 4]), cT = fracT(c);
+    const C = pick(r, [['up', 1, 0, k], ['down', 1, 0, -k], ...(fam === 'lin' ? [] : [['left', 1, -k, 0], ['right', 1, k, 0]]), ['vs', c, 0, 0], ['rx', -1, 0, 0]]);
+    const [kind, a, h, kk] = C, P = { lin: (u) => u, quad: (u) => u * u, abs: Math.abs }[fam], T = (x) => a * P(x - h) + kk;
+    const inner = h === 0 ? 'x' : `x ${h > 0 ? '−' : '+'} ${Math.abs(h)}`, base = { lin: inner, quad: h ? `(${inner})²` : 'x²', abs: `|${inner}|` }[fam];
+    const g = `${a === 1 ? '' : a === -1 ? '−' : b2coA(a)}${base}${kk ? ` ${kk > 0 ? '+' : '−'} ${Math.abs(kk)}` : ''}`;
+    const ans = { up: `translation ${k} unit${k > 1 ? 's' : ''} up`, down: `translation ${k} unit${k > 1 ? 's' : ''} down`, left: `translation ${k} unit${k > 1 ? 's' : ''} left`, right: `translation ${k} unit${k > 1 ? 's' : ''} right`, vs: `vertical ${c > 1 ? 'stretch' : 'shrink'} by a factor of ${cT}`, rx: 'reflection in the x-axis' }[kind];
+    const pool = [`translation ${k} unit${k > 1 ? 's' : ''} up`, `translation ${k} unit${k > 1 ? 's' : ''} down`, `translation ${k} unit${k > 1 ? 's' : ''} left`, `translation ${k} unit${k > 1 ? 's' : ''} right`, `vertical stretch by a factor of ${c > 1 ? cT : fracT(1 / c)}`, `vertical shrink by a factor of ${c < 1 ? cT : fracT(1 / c)}`, 'reflection in the x-axis', 'reflection in the y-axis'];
+    const opts = shuffle(r, [ans, ...shuffle(r, pool.filter((q) => q !== ans)).slice(0, 3)]);
+    let dx = 1; for (const d of [1, 2, 3, 4]) { if (Number.isInteger(a * P(d))) { dx = d; break; } }
+    const V = [h, kk], Q = [h + dx, kk + a * P(dx)], family = fam === 'lin' ? 'line' : fam, W = skWin([V, Q, [h - dx, fam === 'lin' ? kk - a * dx : Q[1]], [0, 0]]); if (!W || !skOk(W, [V, Q]) || !Number.isInteger(Q[1])) continue;
+    const par = { lin: 'f(x) = x', quad: 'f(x) = x²', abs: 'f(x) = |x|' }[fam];
+    const fr = skFRplus({ family, target: T, keyPts: [V, Q], win: W, display: `${fam === 'lin' ? `Line through ${ptT(V)} and ${ptT(Q)}` : `Vertex ${ptT(V)}; through ${ptT(Q)}`}; ${ans}`, more: { fields: [{ kind: 'select', label: 'Transformation:', options: opts }], key: [ans], check: (v) => v[0] === ans } });
+    fr._target = T;
+    return { topic: 'Transformations of parent functions', sketch: true, stem: `Graph g(x) = ${g} (${fam === 'lin' ? 'place two points on the line' : 'place the vertex, then one more point'}). Then describe the transformation of the parent function ${par}.`, fr, choices: null, answer: -1,
+      solution: `${fam === 'lin' ? `The line passes through ${ptT(V)} and ${ptT(Q)}` : `The vertex is ${ptT(V)}, and ${ptT(Q)} is on the graph`}.\nCompared with ${par}, the graph of g is a ${ans}.` };
+  }
+};
+const b2coA = (a) => fracT(a).replace(/^(−?)(\d+)\/(\d+)$/, '$1($2/$3)');
+// #9–18: graph the system (two boundary lines and shading), then identify a solution
+function b1ineqField(I) {
+  const A = -I.m, B = 1, C = I.b, op = I.op, on = [], cand = [];
+  for (let d = 0; d <= 7; d++) for (let x = -d; x <= d; x++) for (let y = -d; y <= d; y++) if (Math.max(Math.abs(x), Math.abs(y)) === d) cand.push([x, y]);
+  for (const [x, y] of cand) if (Math.abs(A * x + B * y - C) < 1e-9 && on.length < 2 && (!on.length || Math.hypot(x - on[0][0], y - on[0][1]) >= 2)) on.push([x, y]);
+  const sh = cand.find(([x, y]) => { const v = A * x + B * y; return Math.abs(v - C) >= 1 && a6test(op, v, C); });
+  if (on.length < 2 || !sh || on.some(([x, y]) => Math.abs(x) > 7 || Math.abs(y) > 7)) return null;
+  const solid = op === '≤' || op === '≥', win = { xr: [-8, 8], yr: [-8, 8], ineq: [A, B, C, op] };
+  return { win, key: [...on, sh].map((q) => q.join(',')).join(';') + '|' + (solid ? 'solid' : 'dashed'), text: `${solid ? 'solid' : 'dashed'} boundary through ${skText(on)}, shading the side containing ${ptT(sh)}` };
+}
+TEMPLATES.b18GraphSys = (r) => {
+  for (let t = 0; t < 100; t++) {
+    const L = b1sysPick(r); if (!L || L.some((I) => !Number.isInteger(I.m * 2))) continue;
+    const G = L.map(b1ineqField); if (G.some((g) => !g)) continue;
+    const inside = []; for (let x = -5; x <= 5; x++) for (let y = -5; y <= 5; y++) if (L.every((I) => b1sat(I, x, y) && Math.abs(y - (I.m * x + I.b)) > 0.1)) inside.push([x, y]);
+    const P = pick(r, inside), okP = (raw) => { const s2 = (pxPlain(raw) || '').replace(/\s+/g, '').replace(/^\(|\)$/g, '').split(','); if (s2.length !== 2) return false; const q = s2.map(pxConst); return q.every(isFinite) && L.every((I) => b1sat(I, ...q)); };
+    const gOk = (v, i) => skMatch('ineq', skParse(v), null, G[i].win, skStyle(v));
+    const fr = { fields: [{ kind: 'graph', family: 'ineq', win: G[0].win, label: `Graph ${b1ineqT(L[0])}:` }, { kind: 'graph', family: 'ineq', win: G[1].win, label: `Graph ${b1ineqT(L[1])}:` }, { kind: 'expr', keys: 'pts2', label: 'A solution (x, y) =' }],
+      key: [G[0].key, G[1].key, `\\left(${P[0]},${P[1]}\\right)`], display: `${b1ineqT(L[0])}: ${G[0].text}. ${b1ineqT(L[1])}: ${G[1].text}. One solution: ${ptT(P)} (any point in the overlap)`,
+      answered: (a) => Array.isArray(a) && [0, 1].every((i) => skParse(a[i]).length === 3 && !!skStyle(a[i])) && String(a[2] || '').trim() !== '',
+      check: (v) => gOk(v[0], 0) && gOk(v[1], 1) && okP(v[2]), score: (v) => ((gOk(v[0], 0) ? 1 : 0) + (gOk(v[1], 1) ? 1 : 0) + (okP(v[2]) ? 1 : 0)) / 3 };
+    return { topic: 'Systems of linear inequalities', sketch: true, stem: `Graph the system. Graph ${b1ineqT(L[0])} on the first grid and ${b1ineqT(L[1])} on the second grid (two points on the boundary line, a point in the region to shade, and solid or dashed). The solution region is where both shadings overlap. Then identify a solution.   ${L.map(b1ineqT).join(',   ')}`, fr, choices: null, answer: -1,
+      solution: `${L.map((I, i) => `${b1ineqT(I)}: ${G[i].text}.`).join('\n')}\nThe solution region is where the shadings overlap. One solution is ${ptT(P)}.` };
+  }
 };
 for (const name of Object.keys(TEMPLATES)) if (/^b1\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 TEMPLATES.b14LineFit = (r) => TEMPLATES.a45LineFit(r);
@@ -21313,6 +21361,52 @@ TEMPLATES.b24Area = (r) => {
   const P = pick(r, [14, 20, 28, 40]), half = P / 2, w = half / 2, A = w * w;
   return a1numQ(r, { topic: 'Modeling with quadratic functions', stem: `A rectangle has a perimeter of ${P} meters, so its area is A(w) = w(${half} − w), where w is the width (in meters). What is the maximum possible area of the rectangle?`, val: A, dec: true, unit: 'square meters', wrongs: [half * half, w * half, A / 2],
     solution: `A(w) = w(${half} − w) has x-intercepts 0 and ${half}, so the vertex is at w = ${fmt(w)}.\nA(${fmt(w)}) = ${fmt(w)}(${fmt(half - w)}) = ${fmt(A)} square meters (a ${fmt(w)}-meter by ${fmt(w)}-meter square).` });
+};
+
+// ---- graphing versions (the book says "graph ... label the vertex and axis of symmetry") ----
+const b2pt = (P) => `\\left(${fracL(P[0])},${fracL(P[1])}\\right)`;
+function b2graphQ({ topic, stem, T, V, Q, win, display, fields, key, checks, solution, family = 'quad', extraWin }) {
+  if (extraWin) Object.assign(win, extraWin);
+  const fr = skFRplus({ family, target: T, keyPts: [V, Q], win, display, more: { fields, key, check: (v) => checks.every((c, i) => c(v[i])) } });
+  const g = (v) => skMatch(family, skParse(v[0]), T, win);
+  fr.score = (v) => ((g(v) ? 1 : 0) + checks.filter((c, i) => c(v[i + 1])).length) / (checks.length + 1);
+  fr._target = T;
+  return { topic, sketch: true, stem, fr, choices: null, answer: -1, solution };
+}
+TEMPLATES.b22VertexGraph = (r) => {
+  for (;;) {
+    const a = pick(r, [1, -1, 2, -2, 1 / 2, -1 / 2, -4, 1 / 4]), h = ri(r, -5, 5), k = ri(r, -6, 6), dx = Math.abs(a) < 1 ? (Math.abs(a) === 1 / 4 ? 2 : 2) : 1, V = [h, k], Q = [h + dx, k + a * dx * dx], T = (x) => a * (x - h) ** 2 + k;
+    if (!Number.isInteger(Q[1])) continue; const W = skWin([V, Q, [h - dx, Q[1]]]); if (!W || !skOk(W, [V, Q])) continue;
+    return b2graphQ({ topic: 'Characteristics of quadratic functions', stem: `Graph the function: place the vertex, then one more point. Then give the vertex and the axis of symmetry.   ${['f(x)', 'g(x)', 'y'][ri(r, 0, 2)]} = ${b2VF(a, h, k)}`, T, V, Q, win: W, display: `Vertex ${ptT(V)}; axis of symmetry x = ${h}; through ${ptT(Q)}`,
+      fields: [{ kind: 'expr', keys: 'pts2', label: 'Vertex:' }, { kind: 'expr', keys: 'num', label: 'Axis of symmetry:' }], key: [b2pt(V), `x=${h}`], checks: [(v) => b2ptOk(v, V), (v) => b2xeq(v, h)],
+      solution: `Vertex form a(x − h)² + k: the vertex is ${ptT(V)} and the axis of symmetry is x = ${h}.\nThe point ${ptT(Q)} is on the graph (and so is ${ptT([h - dx, Q[1]])} by symmetry).` });
+  }
+};
+TEMPLATES.b22InterceptGraph = (r) => {
+  for (;;) {
+    const a = pick(r, [1, -1, 2, -2, 1 / 2, -1 / 2, 3]), p = ri(r, -7, 4), q = p + 2 * ri(r, 1, 4), h = (p + q) / 2, k = a * (h - p) * (h - q), V = [h, k], Q = [q, 0], T = (x) => a * (x - p) * (x - q);
+    if (!Number.isInteger(k) || Math.abs(k) > 12) continue; const W = skWin([V, Q, [p, 0]]); if (!W || !skOk(W, [V, Q, [p, 0]])) continue;
+    const fT = `${b2co(a)}${p === 0 ? 'x' : `(x ${p > 0 ? '−' : '+'} ${Math.abs(p)})`}${q === 0 ? 'x' : `(x ${q > 0 ? '−' : '+'} ${Math.abs(q)})`}`;
+    return b2graphQ({ topic: 'Intercept form', stem: `Graph the function: place the vertex, then an x-intercept. Then give the x-intercepts, the vertex, and the axis of symmetry.   y = ${fT}`, T, V, Q, win: W, display: `x-intercepts ${p} and ${q}; vertex ${ptT(V)}; axis of symmetry x = ${h}`,
+      fields: [{ kind: 'expr', keys: 'pts2', label: 'x-intercepts:' }, { kind: 'expr', keys: 'pts2', label: 'Vertex:' }, { kind: 'expr', keys: 'num', label: 'Axis of symmetry:' }], key: [`${p},${q}`, b2pt(V), `x=${h}`], checks: [(v) => realListOk(v, [p, q]), (v) => b2ptOk(v, V), (v) => b2xeq(v, h)],
+      solution: `The x-intercepts are ${p} and ${q}. The axis of symmetry is halfway between them: x = ${h}.\ny = ${fT.replace(/x/g, `(${h})`)} = ${k}, so the vertex is ${ptT(V)}.` });
+  }
+};
+TEMPLATES.b23Graph = (r) => {
+  for (;;) {
+    const vert = r() < 0.6, p = pick(r, [1, -1, 2, -2, 1 / 2, -1 / 2, 3, -3, 4, -4, 1 / 4]);
+    let d = 0, e = 0; for (let t = 1; t <= 7; t++) { const u = (t * t) / (4 * p); if (Number.isInteger(Math.round(u * 1e9) / 1e9) && Math.abs(u) <= 7) { d = t; e = Math.round(u); break; } }
+    if (!d) continue;
+    const V = [0, 0], Q = vert ? [d, e] : [e, d], F = vert ? [0, p] : [p, 0], W = skWin([V, Q, F, vert ? [-d, e] : [e, -d], vert ? [0, -p] : [-p, 0]]); if (!W || !skOk(W, [V, Q])) continue;
+    const T = vert ? (x) => (x * x) / (4 * p) : (x) => { const u = 4 * p * x; return u >= 0 ? Math.sqrt(u) : NaN; };
+    if (!vert) { W.edge = 0; W.mirrorK = 0; }
+    const shown = b2parT(vert, p);
+    return b2graphQ({ topic: 'Focus and directrix', family: vert ? 'quad' : 'sidepar', stem: `Identify the focus, directrix, and axis of symmetry of the parabola. Then graph it: place the vertex, then one more point.   ${shown}`, T, V, Q, win: W,
+      display: `focus ${ptT(F)}; directrix ${vert ? 'y' : 'x'} = ${fracT(-p)}; axis of symmetry ${vert ? 'x' : 'y'} = 0; through ${ptT(Q)}`,
+      fields: [{ kind: 'expr', keys: 'pts2', label: 'Focus:' }, { kind: 'expr', keys: 'num', label: 'Directrix:' }, { kind: 'expr', keys: 'num', label: 'Axis of symmetry:' }], key: [b2pt(F), `${vert ? 'y' : 'x'}=${fracL(-p)}`, `${vert ? 'x' : 'y'}=0`],
+      checks: [(v) => b2ptOk(v, F), (v) => b2xeq(v, -p, vert ? 'y' : 'x'), (v) => b2xeq(v, 0, vert ? 'x' : 'y')],
+      solution: `${vert ? 'y = x²/(4p)' : 'x = y²/(4p)'} with 1/(4p) = ${fracT(1 / (4 * p))}, so p = ${fracT(p)}.\nFocus ${ptT(F)}; directrix ${vert ? 'y' : 'x'} = ${fracT(-p)}; axis of symmetry ${vert ? 'x' : 'y'} = 0.\nThe point ${ptT(Q)} is on the parabola, and so is ${ptT(vert ? [-d, e] : [e, -d])}.` });
+  }
 };
 for (const name of Object.keys(TEMPLATES)) if (/^b2\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 TEMPLATES.b23Match = (r) => TEMPLATES.a2Match(r);
@@ -21741,16 +21835,16 @@ Object.assign(SETS, {
   'alg1-9-7': { subject: 'algebra1', title: '9.7 Binomial Distributions', items: [['a97Dist', 2], ['a97Read', 2], ['a97Coin', 3], ['a97Binom', 3]] },
   // ----- Algebra II, Chapter 3: Quadratic Equations and Complex Numbers -----
   'alg2-1-1': { subject: 'algebra2', title: '1.1 Interval Notation and Set Notation', items: [['b11ToInterval', 3], ['b11FromGraph', 2], ['b11ToSetBuilder', 3], ['b11Graph', 2], ['b11Word', 1]] },
-  'alg2-1-2': { subject: 'algebra2', title: '1.2 Parent Functions and Transformations', items: [['b12Family', 2], ['b12Describe', 3], ['b12Multi', 3], ['b12DomainRange', 2], ['b12Figure', 1]] },
+  'alg2-1-2': { subject: 'algebra2', title: '1.2 Parent Functions and Transformations', items: [['b12Family', 2], ['b12Describe', 3], ['b12Multi', 3], ['b12DomainRange', 2], ['b12Figure', 1], ['b12Graph', 2]] },
   'alg2-1-3': { subject: 'algebra2', title: '1.3 Transformations of Linear and Absolute Value Functions', items: [['b13Translate', 3], ['b13Reflect', 2], ['b13Stretch', 2], ['b13Combo', 2], ['b13Graph', 2], ['b13Word', 1]] },
   'alg2-1-4': { subject: 'algebra2', title: '1.4 Modeling with Linear Functions', items: [['b14Graph', 2], ['b14Table', 1], ['b14Temp', 1], ['b14LineFit', 2], ['b14Correlation', 1], ['b14Perp', 1]] },
   'alg2-1-5': { subject: 'algebra2', title: '1.5 Solving Linear Systems', items: [['b15Elim', 4], ['b15Subst', 2], ['b15Word', 2]] },
   'alg2-1-6': { subject: 'algebra2', title: '1.6 Solving Linear Systems Using Technology', items: [['b16Augment', 3], ['b16Solve', 3], ['b16Word', 1]] },
   'alg2-1-7': { subject: 'algebra2', title: '1.7 Basic Matrix Operations', items: [['b17AddSub', 3], ['b17Scalar', 2], ['b17Expr', 2], ['b17Solve', 2], ['b17FindX', 2], ['b17Word', 1]] },
-  'alg2-1-8': { subject: 'algebra2', title: '1.8 Systems of Linear Inequalities', items: [['b18IsSol', 2], ['b18Graph', 2], ['b18Write', 2], ['b18Point', 2], ['b18Which', 1], ['b18Word', 1]] },
+  'alg2-1-8': { subject: 'algebra2', title: '1.8 Systems of Linear Inequalities', items: [['b18IsSol', 2], ['b18Graph', 2], ['b18Write', 2], ['b18Point', 2], ['b18Which', 1], ['b18Word', 1], ['b18GraphSys', 2]] },
   'alg2-2-1': { subject: 'algebra2', title: '2.1 Transformations of Quadratic Functions', items: [['b21Describe', 3], ['b21Vertex', 2], ['b21Sketch', 2], ['b21Write', 3], ['b21Word', 1]] },
-  'alg2-2-2': { subject: 'algebra2', title: '2.2 Characteristics of Quadratic Functions', items: [['b22VertexAxis', 2], ['b22Standard', 2], ['b22Sketch', 2], ['b22MinMax', 3], ['b22Intercept', 2], ['b22Word', 1], ['b22SameAxis', 1]] },
-  'alg2-2-3': { subject: 'algebra2', title: '2.3 Focus of a Parabola', items: [['b23Write', 3], ['b23Identify', 3], ['b23Shift', 2], ['b23Transform', 2], ['b23Match', 1], ['b23Word', 1]] },
+  'alg2-2-2': { subject: 'algebra2', title: '2.2 Characteristics of Quadratic Functions', items: [['b22VertexAxis', 2], ['b22Standard', 2], ['b22Sketch', 2], ['b22MinMax', 3], ['b22Intercept', 2], ['b22Word', 1], ['b22SameAxis', 1], ['b22VertexGraph', 2], ['b22InterceptGraph', 2]] },
+  'alg2-2-3': { subject: 'algebra2', title: '2.3 Focus of a Parabola', items: [['b23Write', 3], ['b23Identify', 3], ['b23Shift', 2], ['b23Transform', 2], ['b23Match', 1], ['b23Word', 1], ['b23Graph', 2]] },
   'alg2-2-4': { subject: 'algebra2', title: '2.4 Modeling with Quadratic Functions', items: [['b24VertexForm', 2], ['b24InterceptForm', 2], ['b24Graph', 2], ['b24Table', 2], ['b24Diff', 2], ['b24Area', 1]] },
   'alg2-3-1': { subject: 'algebra2', title: '3.1 Factoring ax² + bx + c', items: [['b31GCF', 2], ['b31Factor', 4], ['b31Solve', 3], ['b31Intercepts', 1], ['b31Word', 2]] },
   'alg2-3-2': { subject: 'algebra2', title: '3.2 Factoring Special Products', items: [['b32DiffSq', 3], ['b32Mental', 1], ['b32PerfSq', 3], ['b32Mixed', 2], ['b32Solve', 2], ['b32Word', 1]] },
@@ -22102,6 +22196,7 @@ QUESTION_TYPES.push(
   { id: 'b12Multi', subject: 'algebra2', section: '1.2 Parent Functions and Transformations', label: 'Describe several transformations', desc: '#25–32' },
   { id: 'b12DomainRange', subject: 'algebra2', section: '1.2 Parent Functions and Transformations', label: 'Function family, domain, and range', desc: '#37–42' },
   { id: 'b12Figure', subject: 'algebra2', section: '1.2 Parent Functions and Transformations', label: 'Transform a figure', desc: '#35, 36' },
+  { id: 'b12Graph', subject: 'algebra2', section: '1.2 Parent Functions and Transformations', label: 'Graph and describe a transformation', desc: '#7–24' },
   { id: 'b13Translate', subject: 'algebra2', section: '1.3 Transformations of Linear and Absolute Value Functions', label: 'Write a translation', desc: '#1–4' },
   { id: 'b13Reflect', subject: 'algebra2', section: '1.3 Transformations of Linear and Absolute Value Functions', label: 'Write a reflection', desc: '#9–14' },
   { id: 'b13Stretch', subject: 'algebra2', section: '1.3 Transformations of Linear and Absolute Value Functions', label: 'Write a stretch or shrink', desc: '#15–20' },
@@ -22132,6 +22227,7 @@ QUESTION_TYPES.push(
   { id: 'b18Point', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Graph a system and identify a solution', desc: '#9–18' },
   { id: 'b18Which', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Which system matches the graph?', desc: '#26' },
   { id: 'b18Word', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Systems of inequalities in real life', desc: '#28' },
+  { id: 'b18GraphSys', subject: 'algebra2', section: '1.8 Systems of Linear Inequalities', label: 'Graph a system of inequalities', desc: '#9–18' },
   { id: 'b21Describe', subject: 'algebra2', section: '2.1 Transformations of Quadratic Functions', label: 'Describe a transformation of f(x) = x²', desc: '#1–10, 15–22' },
   { id: 'b21Vertex', subject: 'algebra2', section: '2.1 Transformations of Quadratic Functions', label: 'Transformations and the vertex', desc: '#25–28' },
   { id: 'b21Sketch', subject: 'algebra2', section: '2.1 Transformations of Quadratic Functions', label: 'Graph a transformed quadratic', desc: '#1–10' },
@@ -22144,12 +22240,15 @@ QUESTION_TYPES.push(
   { id: 'b22Intercept', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Intercept form: intercepts and vertex', desc: '#45–56' },
   { id: 'b22Word', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Vertex in real life', desc: '#29, 30, 43' },
   { id: 'b22SameAxis', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Same axis of symmetry', desc: '#59' },
+  { id: 'b22VertexGraph', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Graph from vertex form; label vertex and axis', desc: '#1–12' },
+  { id: 'b22InterceptGraph', subject: 'algebra2', section: '2.2 Characteristics of Quadratic Functions', label: 'Graph from intercept form', desc: '#45–52' },
   { id: 'b23Write', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Equation from focus, directrix, or vertex', desc: '#3–8, 25–32' },
   { id: 'b23Identify', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Focus, directrix, and axis', desc: '#9–16' },
   { id: 'b23Shift', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Equation with vertex not at the origin', desc: '#37–40' },
   { id: 'b23Transform', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Vertex, focus, and directrix', desc: '#41–46' },
   { id: 'b23Match', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Match a parabola to its equation', desc: '#33–36' },
   { id: 'b23Word', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Focus in real life', desc: '#19, 20, 47' },
+  { id: 'b23Graph', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: 'Focus, directrix, and graph', desc: '#9–16' },
   { id: 'b24VertexForm', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: 'Write an equation in vertex form', desc: '#3–6' },
   { id: 'b24InterceptForm', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: 'Write an equation in intercept form', desc: '#9–12' },
   { id: 'b24Graph', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: 'Write an equation from a graph', desc: '#1, 2, 7, 8' },
