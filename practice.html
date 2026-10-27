@@ -15914,7 +15914,7 @@ function skMatch(family, pts, T, win, style) {
     const same = (S, f) => { if (!S) return false; let n = 0; for (let j = 0; j <= 40; j++) { const x = win.xr[0] + ((win.xr[1] - win.xr[0]) * j) / 40, a = S(x), b = f(x); if (isFinite(a) !== isFinite(b)) return false; if (!isFinite(b)) continue; if (Math.abs(a - b) > 1e-6 * (1 + Math.abs(b))) return false; n++; } return n >= 3; };
     return same(b1.fit(pts.slice(0, n1)), T[0]) && same(b2.fit(pts.slice(n1)), T[1]);
   }
-  if (SKETCH[family] && SKETCH[family].match) return SKETCH[family].match(pts, T, win);
+  if (SKETCH[family] && SKETCH[family].match) return SKETCH[family].match(pts, T, win, style);
   if (family === 'pt') { const tl = (win.tol || 0) + 1e-9; return pts.length === 1 && Math.abs(pts[0][0] - win.pt[0]) <= tl && Math.abs(pts[0][1] - win.pt[1]) <= tl; }
   if (family === 'exp' && win.loose) { // base e: points to the nearest grid point
     if (pts.length !== 3 || Math.abs(pts[0][1] - win.asym) > 1e-9 || pts[1][0] === pts[2][0]) return false;
@@ -15944,10 +15944,10 @@ function skFR({ family, target, keyPts, win, display }) {
 }
 // a graph field followed by ordinary answer fields
 function skFRplus({ family, target, keyPts, win, display, more }) {
-  const F = SKETCH[family], key = keyPts.map((p) => p.join(',')).join(';'), g = (v) => skMatch(family, skParse(v[0]), target, win);
+  const F = SKETCH[family], key = keyPts.map((p) => p.join(',')).join(';'), g = (v) => skMatch(family, skParse(v[0]), target, win, F.style ? skStyle(v[0]) : undefined);
   return { fields: [{ kind: 'graph', family, win, label: '' }, ...more.fields], key: [key, ...more.key], display,
     check: (v) => g(v) && more.check(v.slice(1)), score: (v) => (g(v) ? 0.5 : 0) + (more.check(v.slice(1)) ? 0.5 : 0),
-    answered: (a) => Array.isArray(a) && skParse(a[0]).length === F.roles.length && more.fields.every((_, k) => String(a[k + 1] || '').trim() !== '') };
+    answered: (a) => Array.isArray(a) && skParse(a[0]).length === F.roles.length && (!F.style || !!skStyle(a[0])) && more.fields.every((_, k) => String(a[k + 1] || '').trim() !== '') };
 }
 function skTransform(cv, win) {
   const W = cv._w, H = cv._h, [x0, x1] = win.xr, [y0, y1] = win.yr, m = 26, sc = Math.min((W - 2 * m) / (x1 - x0), (H - 2 * m) / (y1 - y0));
@@ -16055,10 +16055,10 @@ function graphInput(q, i, f, k, vals, reveal, save) {
     const good = skMatch(f.family, pts, q.fr._target, f.win, F.style ? style : undefined) || (!!q.fr._alt && skMatch(f.family, pts, q.fr._alt, f.win));
     skDraw(cv, f, pts, showKey && !good ? (f.family === 'vec' || f.family === 'ineq' ? skParse(q.fr.key[0]) : q.fr._target || null) : null, style);
     if (styleBtns) styleBtns.forEach(([b, v]) => { b.style.background = style === v ? 'var(--accent)' : '#fff'; b.style.color = style === v ? '#fff' : 'var(--accent)'; });
-    msg.textContent = reveal ? (state.teacher ? 'Correct graph.' : good ? '' : 'Your graph is blue; the correct graph is light green.') : pts.length < F.roles.length ? `Click to place ${F.roles[pts.length]}.${pts.length ? ' Drag a point to move it.' : ''}` : F.style && !style ? 'Now choose Solid line or Dashed line.' : 'Drag a point to move it, or use Undo.';
+    msg.textContent = reveal ? (state.teacher ? 'Correct graph.' : good ? '' : 'Your graph is blue; the correct graph is light green.') : pts.length < F.roles.length ? `Click to place ${F.roles[pts.length]}.${pts.length ? ' Drag a point to move it.' : ''}` : F.style && !style ? (F.styleMsg || 'Now choose Solid line or Dashed line.') : 'Drag a point to move it, or use Undo.';
   };
   const commit = () => { vals[k] = pts.map((p) => p.join(',')).join(';') + (F.style && style ? '|' + style : ''); save(); redraw(); };
-  const styleBtns = F.style ? [['Solid line', 'solid'], ['Dashed line', 'dashed']].map(([t, v]) => [el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:5px 12px;font-size:14px', onclick: () => { if (!reveal) { style = v; commit(); } } }, t), v]) : null;
+  const styleBtns = F.style ? (F.styleOpts || [['Solid line', 'solid'], ['Dashed line', 'dashed']]).map(([t, v]) => [el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:5px 12px;font-size:14px', onclick: () => { if (!reveal) { style = v; commit(); } } }, t), v]) : null;
   if (!reveal) {
     let drag = -1, moved = false;
     const at = (e) => { const r = cv.getBoundingClientRect(), T = skTransform(cv, f.win); const px = ((e.clientX - r.left) * cv._w) / r.width, py = ((e.clientY - r.top) * cv._h) / r.height; const [sx, sy] = f.win.snap ? f.win.snap(T.ix(px), T.iy(py)) : [Math.round(T.ix(px)), Math.round(T.iy(py))]; return [sx, sy, px, py, T]; };
@@ -17897,6 +17897,936 @@ TEMPLATES.a97Binom = (r) => {
 };
 for (const name of Object.keys(TEMPLATES)) if (/^a9\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 /* ==== ALGEBRA 1 CH9 END ==== */
+/* ==== ALGEBRA 1 CH1 BEGIN ==== */
+/* ---------- Algebra 1 (Big Ideas Learning 2025), Chapter 1: Solving Linear Equations ---------- */
+// coefficient text: fractions as ½, ⅔ … (or (7/10)); dec = show decimals as decimals
+const a1co = (a, dec) => { if (dec || Math.abs(a * 1000 - Math.round(a * 1000)) < 1e-9 && !Number.isInteger(a) && !fracParts(a)) return fmt(a); const t = fracT(a); return t.includes('/') ? B3VF[t] || `(${t})` : t; };
+// terms [[coef, 'x'], [coef, '']] → "3x − 4y + 2"
+function a1J(T, dec = false) {
+  let s = '';
+  for (const [c, v = ''] of T) { if (!c) continue; const a = Math.abs(c), body = v ? (a === 1 ? v : a1co(a, dec) + v) : dec ? fmt(a) : fracT(a); s += s ? (c < 0 ? ` ${MINUS} ` : ' + ') + body : (c < 0 ? MINUS : '') + body; }
+  return s || '0';
+}
+const a1P = (c, dec) => (c < 0 ? `(${MINUS}${a1co(-c, dec)})` : a1co(c, dec)); // a number in parentheses when negative
+const a1V = (r) => pick(r, ['x', 'x', 'n', 'm', 'p', 'w', 'y', 'k', 'z', 't', 'g', 'h']);
+const a1V2 = (r) => pick(r, ['x', 'n', 'm', 'p', 'w', 'k', 'g', 'h', 'b', 'c']);
+const a1near = (v, k) => (Number.isInteger(v) ? v + k : Math.round((v + k * 0.5) * 100) / 100);
+// a numeric answer (exact fraction, or decimal when dec / tol)
+function a1numQ(r, { topic, stem, val, wrongs = [], solution, label = '', unit = '', tol, dec = false, draw, size, frStem, keys = 'num', text }) {
+  const T = (x) => (dec ? fmt(x) : fracT(x)) + (unit ? ` ${unit}` : ''), correct = text || T(val);
+  const W = [...new Set(wrongs.filter((w) => isFinite(w) && Math.abs(w - val) > (tol || 1e-9)).map(T))].filter((w) => w !== correct);
+  const ok = (s0) => { const s = String(s0 || '').replace(/\\frac\{(-?[\d.]+)\s*[a-z]+\}\{[a-z]+\}/i, '$1').replace(/\\text\{[^}]*\}/g, '').replace(/\$|\\\$/g, '').replace(/(\d)\s*[a-z°²³.\/ ]+$/i, '$1').replace(/^\s*[a-z]+\s*=/i, ''); if (tol == null) return numOk(s, val); const v = pxConst(String(s || '').replace(/^\s*[a-z]\s*=/i, '')); return isFinite(v) && Math.abs(v - val) <= tol; };
+  return { topic, stem, draw, size, frStem, ...buildChoices(r, correct, W, (i) => T(a1near(val, i % 2 ? -(i + 1) : i + 1))),
+    fr: { fields: [{ kind: 'expr', keys, label, suffix: unit ? ` ${unit}` : '' }], key: [dec ? String(val) : fracL(val)], display: correct, check: (v) => ok(v[0]) }, solution };
+}
+// an equation's solution: one value, no solution, or all real numbers
+function a1solQ(r, { v = 'x', eq, val, kind = 'one', wrongs = [], solution, topic, stem, text, latex, dec = false, frStem }) {
+  const T = (w) => (typeof w === 'string' ? w : `${v} = ${dec ? fmt(w) : fracT(w)}`);
+  const correct = kind === 'none' ? 'No solution' : kind === 'all' ? 'All real numbers' : text ? `${v} = ${text}` : T(val);
+  const cands = wrongs.filter((w) => typeof w === 'string' || (isFinite(w) && (kind !== 'one' || Math.abs(w - val) > 1e-9))).map(T).filter((w) => w !== correct);
+  if (kind === 'one') cands.push('No solution'); else cands.push(kind === 'none' ? 'All real numbers' : 'No solution', `${v} = 0`);
+  const check = (x) => { const w = pxWords(x[0]); if (/nosolution|none|nosol/.test(w)) return kind === 'none'; if (/allreal|infinitely|everyreal|allnumbers|identity/.test(w)) return kind === 'all'; if (kind !== 'one') return false; return numOk(String(x[0] || '').replace(new RegExp(`^\\s*${v}\\s*=`), ''), val); };
+  return { topic, stem: stem || `Solve the equation.   ${eq}`, frStem, ...buildChoices(r, correct, [...new Set(cands)], (i) => T(a1near(val || 0, i + 2))),
+    fr: { fields: [{ kind: 'expr', keys: 'words', label: `${v} =` }], key: [kind === 'none' ? '\\text{no solution}' : kind === 'all' ? '\\text{all real numbers}' : latex || (dec ? String(val) : fracL(val))], display: correct, check }, solution };
+}
+// a solution set of real numbers (absolute value equations)
+function a1setQ(r, { v = 'x', eq, vals, wrongs = [], solution, topic, stem }) {
+  const S = [...new Set(vals.map((x) => Math.round(x * 1e9) / 1e9))].sort((a, b) => a - b);
+  const T = (L) => (!L.length ? 'No solution' : `${v} = ${L.map(fracT).join(' and ')}`), correct = T(S);
+  const cands = wrongs.map((L) => T([...new Set(L.map((x) => Math.round(x * 1e9) / 1e9))].sort((a, b) => a - b))).filter((w) => w !== correct);
+  if (S.length) cands.push('No solution');
+  return { topic, stem: stem || `Solve the equation.   ${eq}`, ...buildChoices(r, correct, [...new Set(cands)], (i) => T(S.length ? S.map((x) => x + i + 1) : [i + 2, -(i + 2)])),
+    fr: { fields: [{ kind: 'expr', keys: 'words', label: `${v} =` }], key: [S.length ? S.map(fracL).join(',') : '\\text{no solution}'], display: correct, check: (x) => realListOk(String(x[0] || '').replace(/\\text\{\s*and\s*\}|\\land|\\wedge|and|or/g, ','), S) }, solution };
+}
+// ---------- 1.1 Evaluating Algebraic Expressions ----------
+// #1–6
+TEMPLATES.a11Eval = (r) => {
+  const v = a1V2(r), kind = pick(r, ['lin', 'abs', 'div', 'sqrt', 'absdec', 'frac']);
+  let x, ex, val, why, wr = [];
+  if (kind === 'lin') { const a = pick(r, [-1, 2, 3, -4, 5, -3]), b = nz(r, -12, 12); x = nz(r, -9, 9); ex = a1J([[a, v], [b]]); val = a * x + b; why = `${a === -1 ? MINUS : a === 1 ? '' : fmt(a)}(${fmt(x)}) ${b < 0 ? MINUS : '+'} ${Math.abs(b)} = ${fmt(a * x)} ${b < 0 ? MINUS : '+'} ${Math.abs(b)} = ${fmt(val)}`; wr = [-a * x + b, a * x - b, a + x + b]; }
+  else if (kind === 'abs') { const a = pick(r, [2, 3, 4, -2]), b = nz(r, -9, 9); x = nz(r, -8, 8); if (a * x + b >= 0) x = -x; ex = `|${a1J([[a, v], [b]])}|`; val = Math.abs(a * x + b); why = `|${fmt(a * x)} ${b < 0 ? MINUS : '+'} ${Math.abs(b)}| = |${fmt(a * x + b)}| = ${fmt(val)}`; wr = [a * x + b, Math.abs(a * x) + Math.abs(b)]; }
+  else if (kind === 'div') { const c = pick(r, [6, 8, 12, 18, 24, 30]); const ds = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15].filter((d) => c % d === 0); x = pick(r, ds) * pick(r, [1, -1]); ex = `${v} ${MINUS} ${c} ÷ ${v}`; val = x - c / x; why = `Divide first: ${fmt(x)} ${MINUS} ${c} ÷ ${a1P(x)} = ${fmt(x)} ${MINUS} ${a1P(c / x)} = ${fmt(val)}`; wr = [(x - c) / x, x + c / x]; }
+  else if (kind === 'sqrt') { const k = ri(r, 2, 12), b = nz(r, -9, 9); x = k * k; ex = `√${v} ${b < 0 ? MINUS : '+'} ${Math.abs(b)}`; val = k + b; why = `√${x} ${b < 0 ? MINUS : '+'} ${Math.abs(b)} = ${k} ${b < 0 ? MINUS : '+'} ${Math.abs(b)} = ${fmt(val)}`; wr = [x / 2 + b, -k + b, k - b]; }
+  else if (kind === 'absdec') { const b = ri(r, 11, 49) / 10; x = -ri(r, 5, 39) / 10; ex = `|${v}| + ${fmt(b)}`; val = Math.round((Math.abs(x) + b) * 10) / 10; why = `|${fmt(x)}| + ${fmt(b)} = ${fmt(-x)} + ${fmt(b)} = ${fmt(val)}`; wr = [Math.round((x + b) * 10) / 10]; return a1numQ(r, { topic: 'Evaluating expressions', stem: `Evaluate the expression when ${v} = ${fmt(x)}.   ${ex}`, val, wrongs: wr, solution: why, dec: true }); }
+  else { const d = pick(r, [2, 3, 4]), n = pick(r, [1, 3, 5, 7].filter((q) => gcd(q, d) === 1)), c = ri(r, 1, 9); x = n / d; ex = `${v} ${MINUS} ${c}`; val = x - c; why = `${fracT(x)} ${MINUS} ${c} = ${fracT(x * d)}/${d}`.replace(/.*/, `${fracT(x)} ${MINUS} ${c} = ${n}/${d} ${MINUS} ${c * d}/${d} = ${fracT(val)}`); wr = [c - x, x + c, (n - c) / d]; }
+  return a1numQ(r, { topic: 'Evaluating expressions', stem: `Evaluate the expression when ${v} = ${fracT(x)}.   ${ex}`, val, wrongs: wr, solution: why });
+};
+// #7–12: two variables
+TEMPLATES.a11TwoVar = (r) => {
+  const kind = pick(r, ['lin', 'abs', 'quot', 'frac']);
+  let x = nz(r, -6, 6), y = nz(r, -6, 6), ex, val, why, wr = [];
+  if (kind === 'lin') { const a = pick(r, [2, 3, 4, 5]), b = pick(r, [-6, -3, 2, 6, 8, -5]); ex = a1J([[a, 'x'], [b, 'y']]); val = a * x + b * y; why = `${a}(${fmt(x)}) ${b < 0 ? MINUS : '+'} ${Math.abs(b)}(${fmt(y)}) = ${fmt(a * x)} ${b * y < 0 ? MINUS : '+'} ${Math.abs(b * y)} = ${fmt(val)}`; wr = [a * x - b * y, a * y + b * x]; }
+  else if (kind === 'abs') { const a = pick(r, [2, 3]), b = pick(r, [3, 2, 4]); ex = `${a}x + |${b}y|`; val = a * x + Math.abs(b * y); why = `${a}(${fmt(x)}) + |${b}(${fmt(y)})| = ${fmt(a * x)} + ${Math.abs(b * y)} = ${fmt(val)}`; wr = [a * x + b * y, Math.abs(a * x + b * y)]; }
+  else if (kind === 'quot') { const a = pick(r, [1, 2]), b = pick(r, [2, 3, -1]), c = pick(r, [3, 2]), d = pick(r, [4, 1, 5]); if (c * x - d === 0) x += 1; ex = `(${a1J([[a, 'x'], [b, 'y']])}) / (${a1J([[c, 'x'], [-d]])})`; val = (a * x + b * y) / (c * x - d); why = `Numerator: ${fmt(a * x + b * y)}. Denominator: ${fmt(c * x - d)}.\n${fmt(a * x + b * y)} ÷ ${a1P(c * x - d)} = ${fracT(val)}`; wr = [(a * x + b * y) / (c * x + d), -val]; }
+  else { x = pick(r, [3, 1, 5]) / 4; const a = pick(r, [4, 8, 12]), b = pick(r, [2, 6, 3]); ex = a1J([[a, 'x'], [-b, 'y']]); val = a * x - b * y; why = `${a}(${fracT(x)}) ${MINUS} ${b}(${fmt(y)}) = ${fmt(a * x)} ${-b * y < 0 ? MINUS : '+'} ${Math.abs(b * y)} = ${fmt(val)}`; wr = [a * x + b * y, a * x - y]; }
+  return a1numQ(r, { topic: 'Evaluating expressions', stem: `Evaluate the expression when x = ${fracT(x)} and y = ${fmt(y)}.   ${ex}`, val, wrongs: wr, solution: why });
+};
+// #13–16: several variables
+TEMPLATES.a11Multi = (r) => {
+  const kind = pick(r, ['sq', 'absq', 'root', 'mix']);
+  if (kind === 'sq') { const k = pick(r, [2, 3]), x = nz(r, -4, 4), y = nz(r, -4, 4), z = nz(r, -5, 5), val = k * (x * x + y * y - 5 * z);
+    return a1numQ(r, { topic: 'Evaluating expressions', stem: `Evaluate the expression when x = ${fmt(x)}, y = ${fmt(y)}, and z = ${fmt(z)}.   ${k} × (x² + y² ${MINUS} 5z)`, val, wrongs: [k * (2 * x + 2 * y - 5 * z), k * (x * x + y * y + 5 * z), k * x * x + y * y - 5 * z], solution: `${k} × (${x * x} + ${y * y} ${MINUS} 5(${fmt(z)})) = ${k} × (${fmt(x * x + y * y - 5 * z)}) = ${fmt(val)}` }); }
+  if (kind === 'absq') { const n = nz(r, -6, 6), m = n * nz(r, -5, 5), l = ri(r, 2, 9), val = Math.abs(m / n) - 3 * l;
+    return a1numQ(r, { topic: 'Evaluating expressions', stem: `Evaluate the expression when ℓ = ${l}, m = ${fmt(m)}, and n = ${fmt(n)}.   |m ÷ n| ${MINUS} 3ℓ`, val, wrongs: [m / n - 3 * l, Math.abs(m / n - 3 * l)], solution: `|${fmt(m)} ÷ ${a1P(n)}| ${MINUS} 3(${l}) = |${fmt(m / n)}| ${MINUS} ${3 * l} = ${fmt(val)}` }); }
+  if (kind === 'root') { const a = nz(r, -5, 5), b = ri(r, -9, 9), s = 2 * a * a - (b - 2 * a), k = Math.max(1, Math.ceil(Math.sqrt(Math.max(s, 1)))) + ri(r, 0, 3), c = k * k - s;
+    if (!c || b === 2 * a) return TEMPLATES.a11Multi(r);
+    return a1numQ(r, { topic: 'Evaluating expressions', stem: `Evaluate the expression when a = ${fmt(a)}, b = ${fmt(b)}, and c = ${fmt(c)}.   √(2a² + c ${MINUS} (b ${MINUS} 2a))`, val: k, wrongs: [-k, k + 2, Math.sqrt(Math.abs(2 * a * a + c - b - 2 * a))].filter(Number.isInteger), solution: `2(${a * a}) + ${a1P(c)} ${MINUS} (${fmt(b)} ${MINUS} ${a1P(2 * a)}) = ${2 * a * a} ${c < 0 ? MINUS : '+'} ${Math.abs(c)} ${MINUS} ${a1P(b - 2 * a)} = ${k * k}\n√${k * k} = ${k}` }); }
+  const p = pick(r, [1, 4, 9, 16]), q = nz(r, -8, 8), rr = nz(r, -4, 4), val = Math.abs(4 * rr) - Math.sqrt(p) + (q + 6 * Math.sqrt(p) * 0 + 6 * p) ** 2;
+  if (Math.abs(q + 6 * p) > 12 || q + 6 * p === 0) return TEMPLATES.a11Multi(r);
+  return a1numQ(r, { topic: 'Evaluating expressions', stem: `Evaluate the expression when p = ${p}, q = ${fmt(q)}, and r = ${fmt(rr)}.   |4r| ${MINUS} √p + (q + 6p)²`, val, wrongs: [4 * rr - Math.sqrt(p) + (q + 6 * p) ** 2, Math.abs(4 * rr) - Math.sqrt(p) + q * q + 36 * p * p], solution: `|4(${fmt(rr)})| ${MINUS} √${p} + (${fmt(q)} + ${6 * p})² = ${Math.abs(4 * rr)} ${MINUS} ${Math.sqrt(p)} + ${(q + 6 * p) ** 2} = ${fmt(val)}` });
+};
+// #17–18: real-life expressions
+TEMPLATES.a11Word = (r) => {
+  if (r() < 0.5) { const pa = pick(r, [9.5, 12, 10.75, 8.5]), pc = pick(r, [5.25, 6, 4.5, 5.75]), ps = pick(r, [7, 6.5, 7.25]), a = ri(r, 2, 6), c = ri(r, 2, 8), s = ri(r, 1, 3), val = Math.round((pa * a + pc * c + ps * s) * 100) / 100, $ = (x) => `$${x.toFixed(2)}`;
+    return { topic: 'Evaluating expressions', stem: `The cost for a adults, c children, and s seniors to attend a performance is ${pa.toFixed(2)}a + ${pc.toFixed(2)}c + ${ps.toFixed(2)}s. What is the cost for ${a} adults, ${c} children, and ${s} senior${s > 1 ? 's' : ''}?`,
+      ...buildChoices(r, $(val), [$(pa * c + pc * a + ps * s), $(pa + pc + ps), $(val + ps)].filter((t) => t !== $(val)), (i) => $(val + 5 * (i + 1))),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: '$' }], key: [val.toFixed(2)], display: $(val), check: (v) => numOk(String(v[0] || '').replace(/\$|\\\$/g, ''), val, 0.0001) },
+      solution: `${pa.toFixed(2)}(${a}) + ${pc.toFixed(2)}(${c}) + ${ps.toFixed(2)}(${s}) = ${(pa * a).toFixed(2)} + ${(pc * c).toFixed(2)} + ${(ps * s).toFixed(2)} = ${$(val)}` };
+  }
+  const C = [['Kim’s Kitchen', 15.75, 14.9, 1.25], ['Savory Eats', 13.89, 13.89, 1.75], ['Bon Appetit', 16.2, 12.15, 1.35]].map(([n, a, b, c]) => [n, Math.round((a + ri(r, -80, 80) / 100) * 100) / 100, Math.round((b + ri(r, -80, 80) / 100) * 100) / 100, c]);
+  const nr = pick(r, [75, 60, 80]), nv = pick(r, [25, 20, 30]), cost = (k) => Math.round((nr * (C[k][1] + C[k][3]) + nv * (C[k][2] + C[k][3])) * 100) / 100, k = ri(r, 0, 2), $ = (x) => `$${x.toFixed(2)}`;
+  const tb = a9tableDraw([['Caterer', 'r ($)', 'v ($)', 'd ($)'], ...C.map(([n, a, b, c]) => [n, a.toFixed(2), b.toFixed(2), c.toFixed(2)])]);
+  return { topic: 'Evaluating expressions', stem: `A party planner is comparing prices. The expression ${nr}(r + d) + ${nv}(v + d) is the total cost, where r is the price of a regular meal, v is the price of a vegetarian meal, and d is the price of a drink. Find the total cost for ${C[k][0]}.`, draw: tb, size: [460, 140],
+    ...buildChoices(r, $(cost(k)), C.map((_, j) => $(cost(j))).concat([$(nr * C[k][1] + nv * C[k][2] + C[k][3])]).filter((t) => t !== $(cost(k))), (i) => $(cost(k) + 10 * (i + 1))),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: '$' }], key: [cost(k).toFixed(2)], display: $(cost(k)), check: (v) => numOk(String(v[0] || '').replace(/\$|\\\$/g, ''), cost(k), 0.0001) },
+    solution: `${nr}(${C[k][1].toFixed(2)} + ${C[k][3].toFixed(2)}) + ${nv}(${C[k][2].toFixed(2)} + ${C[k][3].toFixed(2)}) = ${(nr * (C[k][1] + C[k][3])).toFixed(2)} + ${(nv * (C[k][2] + C[k][3])).toFixed(2)} = ${$(cost(k))}` };
+};
+
+// ---------- 1.2 Finding Cube Roots ----------
+const a1cube = (lab) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, s = Math.min(W * 0.5, (H - 70) / 1.4), d = s * 0.4, x0 = (W - s - d) / 2, y0 = 34;
+  c.clearRect(0, 0, W, H); c.fillStyle = '#d8ebe0'; c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.5;
+  const P = (x, y) => [x0 + x, y0 + y], F = [P(0, d), P(s, d), P(s, d + s), P(0, d + s)], B = [P(d, 0), P(d + s, 0), P(d + s, s), P(d, s)];
+  const poly = (Q, fill) => { c.beginPath(); Q.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); if (fill) c.fill(); c.stroke(); };
+  poly([F[0], B[0], B[1], F[1]], true); poly([F[1], B[1], B[2], F[2]], true); poly(F, true);
+  c.setLineDash([5, 4]); c.beginPath(); c.moveTo(...B[3]); c.lineTo(...B[0]); c.moveTo(...B[3]); c.lineTo(...B[2]); c.moveTo(...B[3]); c.lineTo(...F[3]); c.stroke(); c.setLineDash([]);
+  c.fillStyle = '#1d1d1b'; c.font = 'italic 16px Georgia, serif'; c.textAlign = 'center'; c.fillText('s', x0 + s / 2, y0 + d + s + 20); c.fillText('s', x0 - 12, y0 + d + s / 2); c.fillText('s', x0 + s + d / 2 + 12, y0 + s + d / 2 + 8);
+  c.font = '15px Georgia, serif'; c.fillText(lab, W / 2, 18);
+};
+// #1–4, 25–26
+TEMPLATES.a12Edge = (r) => {
+  const kind = pick(r, ['int', 'int', 'frac', 'dec', 'word', 'area']), u = pick(r, ['in.', 'ft', 'm', 'cm']);
+  if (kind === 'frac') { const k = pick(r, [2, 3, 4, 5]), V = `1/${k ** 3}`; return a1numQ(r, { topic: 'Cube roots', stem: `Find the edge length s of the cube.   Volume = ${V} ${u}³`, val: 1 / k, unit: u, wrongs: [1 / (k * k), 1 / (3 * k ** 3)], solution: `s³ = ${V}, so s = ∛(${V}) = 1/${k}.`, draw: a1cube(`Volume = ${V} ${u}³`), size: [300, 270] }); }
+  if (kind === 'dec') { const k = pick(r, [2, 3, 4, 5, 6]), V = k ** 3 / 1000, Vt = V.toFixed(3); return a1numQ(r, { topic: 'Cube roots', stem: `Find the edge length s of the cube.   Volume = ${Vt} ${u}³`, val: k / 10, unit: u, dec: true, wrongs: [k / 100, V / 3], solution: `s = ∛${Vt} = ${fmt(k / 10)}, because (${fmt(k / 10)})³ = ${Vt}.`, draw: a1cube(`Volume = ${Vt} ${u}³`), size: [300, 270] }); }
+  const k = pick(r, [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 30, 40, 50]), V = k ** 3;
+  if (kind === 'word') return a1numQ(r, { topic: 'Cube roots', stem: `The volume of a plastic storage cube is ${V.toLocaleString('en-US')} cubic ${u === 'in.' ? 'inches' : u === 'ft' ? 'feet' : u === 'm' ? 'meters' : 'centimeters'}. What is the edge length of the storage cube?`, val: k, unit: u, wrongs: [Math.round(V / 3), Math.round(Math.sqrt(V))], solution: `s = ∛${V} = ${k} ${u}` });
+  if (kind === 'area') return a1numQ(r, { topic: 'Cube roots', stem: `The volume of a cube of ice is ${V.toLocaleString('en-US')} cubic inches. What is the surface area of the cube?`, val: 6 * k * k, unit: 'in.²', wrongs: [k * k, 4 * k * k, 6 * k], solution: `Edge: ∛${V} = ${k} in. Surface area: 6s² = 6(${k})² = ${6 * k * k} in.²` });
+  return a1numQ(r, { topic: 'Cube roots', stem: `Find the edge length s of the cube.   Volume = ${V.toLocaleString('en-US')} ${u}³`, val: k, unit: u, wrongs: [Math.round(V / 3), V / 6 > 50 ? 0 : V / 6], draw: a1cube(`Volume = ${V.toLocaleString('en-US')} ${u}³`), size: [300, 270], solution: `s³ = ${V}, so s = ∛${V} = ${k} ${u}.` });
+};
+// #5–10
+TEMPLATES.a12Cube = (r) => {
+  const kind = pick(r, ['pos', 'neg', 'unit', 'frac']); let s, val;
+  if (kind === 'pos') { const k = ri(r, 2, 12); s = `∛${k ** 3}`; val = k; }
+  else if (kind === 'neg') { const k = ri(r, 2, 10); s = `∛(${MINUS}${k ** 3})`; val = -k; }
+  else if (kind === 'unit') { const k = ri(r, 2, 9), sg = pick(r, [1, -1]); s = `∛(${sg < 0 ? MINUS : ''}1/${k ** 3})`; val = sg / k; }
+  else { let a, b; do { a = ri(r, 2, 7); b = ri(r, 2, 9); } while (gcd(a, b) !== 1); s = `∛(${a ** 3}/${b ** 3})`; val = a / b; }
+  return a1numQ(r, { topic: 'Cube roots', stem: `Find the cube root.   ${s}`, val, wrongs: [-val, val * 3, 1 / val], solution: `(${fracT(val)})³ = ${fracT(val ** 3)}, so ${s} = ${fracT(val)}.` });
+};
+// #11–16
+TEMPLATES.a12Expr = (r) => {
+  const kind = pick(r, ['cubed', 'fracCubed', 'coef', 'twice', 'plus']);
+  if (kind === 'cubed') { const a = ri(r, 10, 40), k = ri(r, 2, 4); return a1numQ(r, { topic: 'Cube roots', stem: `Evaluate the expression.   ${a} ${MINUS} (∛${k ** 3})³`, val: a - k ** 3, wrongs: [a - k, a - 3 * k], solution: `(∛${k ** 3})³ = ${k ** 3}, so ${a} ${MINUS} ${k ** 3} = ${fmt(a - k ** 3)}.` }); }
+  if (kind === 'fracCubed') { const d = pick(r, [8, 27, 64]), w = ri(r, 1, 4), f = pick(r, [[3, 4], [1, 2], [2, 3]]); return a1numQ(r, { topic: 'Cube roots', stem: `Evaluate the expression.   (∛(${MINUS}1/${d}))³ + ${w}${B3VF[`${f[0]}/${f[1]}`]}`, val: -1 / d + w + f[0] / f[1], wrongs: [1 / d + w + f[0] / f[1], -1 / Math.cbrt(d) + w + f[0] / f[1]], solution: `(∛(${MINUS}1/${d}))³ = ${MINUS}1/${d}. Then ${MINUS}1/${d} + ${w}${B3VF[`${f[0]}/${f[1]}`]} = ${fracT(-1 / d + w + f[0] / f[1])}.` }); }
+  if (kind === 'coef') { const c = ri(r, 2, 6), k = ri(r, 3, 10), b = ri(r, 5, 30); return a1numQ(r, { topic: 'Cube roots', stem: `Evaluate the expression.   ${c}∛${k ** 3} ${MINUS} ${b}`, val: c * k - b, wrongs: [Math.cbrt(c * k ** 3) - b, c * k + b], solution: `${c}(${k}) ${MINUS} ${b} = ${fmt(c * k - b)}` }); }
+  if (kind === 'twice') { const k = pick(r, [2, 3, 4, 5, 6]), a = pick(r, [[1, 4], [1, 2], [1, 3]]), c = pick(r, [2, 3]); return a1numQ(r, { topic: 'Cube roots', stem: `Evaluate the expression.   ${a[0]}/${a[1]} ${MINUS} ${c}∛(${MINUS}1/${k ** 3})`, val: a[0] / a[1] + c / k, wrongs: [a[0] / a[1] - c / k], solution: `∛(${MINUS}1/${k ** 3}) = ${MINUS}1/${k}, so ${a[0]}/${a[1]} ${MINUS} ${c}(${MINUS}1/${k}) = ${a[0]}/${a[1]} + ${fracT(c / k)} = ${fracT(a[0] / a[1] + c / k)}.` }); }
+  const k = ri(r, 4, 20), a = ri(r, 20, 80); return a1numQ(r, { topic: 'Cube roots', stem: `Evaluate the expression.   ${a} + ∛(${MINUS}${k ** 3})`, val: a - k, wrongs: [a + k, a - k * k], solution: `∛(${MINUS}${k ** 3}) = ${MINUS}${k}, so ${a} + (${MINUS}${k}) = ${a - k}.` });
+};
+// #17–24: evaluate with a cube root of a variable expression
+TEMPLATES.a12Var = (r) => {
+  const v = pick(r, ['w', 'd', 'a', 'n', 'y', 'k']);
+  for (let t = 0; t < 400; t++) {
+    const c = pick(r, [2, 3, 4, 5, 6, 9, 12, 18, 45, -45, -6, -12]), e = pick(r, [0, 0, 0, ri(r, -60, 60)]), p = pick(r, [1, 2, -1, 3]);
+    const k = nz(r, -15, 15), num = k ** 3 - e; if (num % c) continue; const x = num / c; if (!x || Math.abs(x) > 400) continue;
+    const inside = a1J([[c, v], [e]]), lead = p === 1 ? v : p === -1 ? `${MINUS}${v}` : `${p}${v}`, plus = r() < 0.5;
+    const val = p * x + (plus ? k : -k);
+    return a1numQ(r, { topic: 'Cube roots', stem: `Evaluate the expression when ${v} = ${fmt(x)}.   ${lead} ${plus ? '+' : MINUS} ∛(${inside})`, val, wrongs: [p * x + (plus ? -k : k), p * x + (plus ? 1 : -1) * Math.round(c * x / 3)],
+      solution: `${inside.replace(new RegExp(v, 'g'), `(${fmt(x)})`)} = ${fmt(k ** 3)}, and ∛${a1P(k ** 3)} = ${fmt(k)}.\n${fmt(p * x)} ${plus ? '+' : MINUS} ${a1P(k)} = ${fmt(val)}` });
+  }
+  return TEMPLATES.a12Cube(r);
+};
+// #27–30: <, >, or =
+TEMPLATES.a12Compare = (r) => {
+  const L = pick(r, [() => { const k = pick(r, [2, 3, 5]), q = pick(r, [5, 4, 6]); return [`∛(${MINUS}${k ** 3}/${q ** 3})`, -k / q]; }, () => { const k = pick(r, [1, 2, 3]); return [`∛${fmt(k ** 3 / 1000)}`, k / 10]; }, () => { const k = pick(r, [2, 3, 4, 5]); return [`∛${k ** 6}`, k * k]; }, () => { const k = ri(r, 2, 9); return [`∛${k ** 3}`, k]; }])();
+  const R = pick(r, [() => { const x = Math.round((L[1] + (Number.isInteger(L[1]) ? pick(r, [-1, 1, 0]) : pick(r, [-0.05, 0.05, 0]))) * 1000) / 1000, p = fracParts(x); return [p && p[1] <= 20 ? fracT(x) : fmt(x), x]; }, () => { const k = ri(r, 2, 8); return [`√${k * k}`, k]; }, () => { const k = nz(r, -6, 6); return [`∛${k < 0 ? `(${MINUS}${(-k) ** 3})` : k ** 3}`, k]; }, () => [fracT(L[1]), L[1]]])();
+  const rv = R[1] == null ? pxConst(R[0].replace(MINUS, '-')) : R[1], ans = Math.abs(L[1] - rv) < 1e-9 ? '=' : L[1] < rv ? '<' : '>';
+  return { topic: 'Cube roots', stem: `Complete the statement with <, >, or =.   ${L[0]}  ___  ${R[0]}`, ...buildChoices(r, ans, ['<', '>', '='].filter((x) => x !== ans), () => null), fr: FR.select(`${L[0]}  ___  ${R[0]}:`, ['<', '>', '='], ans),
+    solution: `${L[0]} = ${fracT(L[1])} and ${R[0]} = ${fracT(rv)}, so ${L[0]} ${ans} ${R[0]}.` };
+};
+// #31: drag race velocity
+TEMPLATES.a12Race = (r) => {
+  const p = ri(r, 900, 1600), w = ri(r, 2200, 3400), val = Math.round(234 * Math.cbrt(p / w));
+  return a1numQ(r, { topic: 'Cube roots', stem: `The estimated velocity v (in miles per hour) of a car at the end of a drag race is v = 234∛(p/w), where p is the horsepower and w is the weight (in pounds). A car has ${p} horsepower and weighs ${w} pounds. Find its velocity at the end of the race, rounded to the nearest whole number.`, val, tol: 1.01, unit: 'mi/h', wrongs: [Math.round(234 * p / w), Math.round(234 * Math.sqrt(p / w)), Math.round(234 * Math.cbrt(w / p))], solution: `v = 234∛(${p}/${w}) ≈ 234(${(Math.cbrt(p / w)).toFixed(4)}) ≈ ${val} mi/h` });
+};
+
+// ---------- 1.3 Solving Simple Equations ----------
+TEMPLATES.a13AddSub = (r) => {
+  const v = a1V(r), kind = pick(r, ['plus', 'minus', 'rev', 'dec', 'frac']);
+  if (kind === 'dec') { const x = ri(r, -60, 60) / 10, a = ri(r, 5, 45) / 10, rev = r() < 0.5, b = Math.round((x + a) * 10) / 10;
+    return a1solQ(r, { v, dec: true, val: x, eq: rev ? `${fmt(b)} = ${v} + ${fmt(a)}` : `${v} + ${fmt(a)} = ${fmt(b)}`, wrongs: [Math.round((b + a) * 10) / 10, -x], topic: 'Solving simple equations', solution: `Subtract ${fmt(a)} from each side: ${v} = ${fmt(b)} ${MINUS} ${fmt(a)} = ${fmt(x)}` }); }
+  if (kind === 'frac') { const [a, b] = pick(r, [[3 / 4, -1 / 3], [3 / 2, 1 / 2], [1 / 4, 2 / 3], [2 / 5, -1 / 2], [5 / 6, 1 / 3]]), x = b + a;
+    return a1solQ(r, { v, val: x, eq: `${v} ${MINUS} ${fracT(a)} = ${fracT(b)}`, wrongs: [b - a, -x], topic: 'Solving simple equations', solution: `Add ${fracT(a)} to each side: ${v} = ${fracT(b)} + ${fracT(a)} = ${fracT(x)}` }); }
+  const x = nz(r, -20, 20), a = ri(r, 2, 15);
+  if (kind === 'plus') return a1solQ(r, { v, val: x, eq: `${v} + ${a} = ${fmt(x + a)}`, wrongs: [x + 2 * a, -x], topic: 'Solving simple equations', solution: `Subtract ${a} from each side: ${v} = ${fmt(x + a)} ${MINUS} ${a} = ${fmt(x)}` });
+  if (kind === 'minus') return a1solQ(r, { v, val: x, eq: `${v} ${MINUS} ${a} = ${fmt(x - a)}`, wrongs: [x - 2 * a, -x], topic: 'Solving simple equations', solution: `Add ${a} to each side: ${v} = ${fmt(x - a)} + ${a} = ${fmt(x)}` });
+  return a1solQ(r, { v, val: x, eq: `${fmt(x - a)} = ${v} ${MINUS} ${a}`, wrongs: [x - 2 * a, -x], topic: 'Solving simple equations', solution: `Add ${a} to each side: ${fmt(x - a)} + ${a} = ${v}, so ${v} = ${fmt(x)}` });
+};
+TEMPLATES.a13MulDiv = (r) => {
+  const v = a1V(r), kind = pick(r, ['mul', 'mul', 'div', 'negdiv', 'dec', 'pi', 'pidiv']);
+  if (kind === 'pi') { const a = nz(r, 2, 12), x = nz(r, -12, 12); return a1solQ(r, { v, val: x, eq: `${fmt(a * x)}π = ${a}π${v}`, wrongs: [a * x, x * Math.PI], topic: 'Solving simple equations', solution: `Divide each side by ${a}π: ${v} = ${fmt(a * x)}π ÷ ${a}π = ${fmt(x)}` }); }
+  if (kind === 'pidiv') { const a = ri(r, 2, 6), c = ri(r, 2, 9); return a1solQ(r, { v, val: a * c * Math.PI, text: `${a * c}π`, latex: `${a * c}\\pi`, eq: `${c} = ${v} / (${a}π)`, wrongs: [`${v} = ${a * c}`, `${v} = ${fracT(c / a)}π`], topic: 'Solving simple equations', solution: `Multiply each side by ${a}π: ${v} = ${c}(${a}π) = ${a * c}π` }); }
+  const k = nz(r, -9, 9) || 2, x = nz(r, -15, 15);
+  if (kind === 'mul') { if (Math.abs(k) === 1) return TEMPLATES.a13MulDiv(r); return a1solQ(r, { v, val: x, eq: r() < 0.5 ? `${fmt(k)}${v} = ${fmt(k * x)}` : `${fmt(k * x)} = ${fmt(k)}${v}`, wrongs: [k * x - k, -x, k * k * x], topic: 'Solving simple equations', solution: `Divide each side by ${a1P(k)}: ${v} = ${fmt(k * x)} ÷ ${a1P(k)} = ${fmt(x)}` }); }
+  if (kind === 'div') { const d = ri(r, 2, 9), q = nz(r, -9, 9); return a1solQ(r, { v, val: d * q, eq: `${v} ÷ ${d} = ${fmt(q)}`, wrongs: [q / d, q + d], topic: 'Solving simple equations', solution: `Multiply each side by ${d}: ${v} = ${fmt(q)} · ${d} = ${fmt(d * q)}` }); }
+  if (kind === 'negdiv') { const d = ri(r, 2, 9), q = nz(r, -9, 9); return a1solQ(r, { v, val: -d * q, eq: `${v}/(${MINUS}${d}) = ${fmt(q)}`, wrongs: [d * q, -q / d], topic: 'Solving simple equations', solution: `Multiply each side by ${MINUS}${d}: ${v} = ${fmt(q)}(${MINUS}${d}) = ${fmt(-d * q)}` }); }
+  const d = ri(r, 2, 8), q = ri(r, 2, 40) / 10 * pick(r, [1, -1]); return a1solQ(r, { v, dec: true, val: Math.round(-d * q * 100) / 100, eq: `${MINUS}${v}/${d} = ${fmt(q)}`, wrongs: [Math.round(d * q * 100) / 100, Math.round(-q / d * 100) / 100], topic: 'Solving simple equations', solution: `Multiply each side by ${MINUS}${d}: ${v} = ${fmt(q)}(${MINUS}${d}) = ${fmt(-d * q)}` });
+};
+// #23–32: fractions and mixed numbers
+TEMPLATES.a13Frac = (r) => {
+  const v = a1V(r), kind = pick(r, ['coef', 'coef', 'int', 'mixed']);
+  if (kind === 'coef') { const [n, d] = pick(r, [[2, 5], [3, 7], [3, 4], [2, 3], [5, 6], [4, 9]]), sg = pick(r, [1, -1]), x = d * nz(r, -6, 6), rhs = sg * n * x / d;
+    return a1solQ(r, { v, val: x, eq: `${sg < 0 ? MINUS : ''}(${n}/${d})${v} = ${fmt(rhs)}`, wrongs: [rhs * n / d * sg, -x, rhs * sg * n / d + d], topic: 'Solving simple equations', solution: `Multiply each side by the reciprocal, ${sg < 0 ? MINUS : ''}${d}/${n}: ${v} = ${fmt(rhs)} · ${sg < 0 ? `(${MINUS}${d}/${n})` : `${d}/${n}`} = ${fmt(x)}` }); }
+  if (kind === 'int') { const k = nz(r, -6, 6), q = pick(r, [[1, 5], [2, 3], [3, 4], [-1, 2]]), b = q[0] / q[1];
+    return a1solQ(r, { v, val: b / k, eq: `${fmt(k)}${v} = ${fracT(b)}`, wrongs: [b * k, k / b], topic: 'Solving simple equations', solution: `Divide each side by ${a1P(k)}: ${v} = ${fracT(b)} ÷ ${a1P(k)} = ${fracT(b / k)}` }); }
+  const w = ri(r, 1, 4), f = pick(r, [[1, 6], [1, 2], [1, 3], [3, 4]]), g = pick(r, [[2, 3], [1, 4], [5, 6]]), L = -(w + f[0] / f[1]), x = L + g[0] / g[1];
+  return a1solQ(r, { v, val: x, eq: `${MINUS}${w}${B3VF[`${f[0]}/${f[1]}`]} = ${v} ${MINUS} ${g[0]}/${g[1]}`, wrongs: [L - g[0] / g[1], -x], topic: 'Solving simple equations', solution: `Add ${g[0]}/${g[1]} to each side: ${v} = ${fracT(L)} + ${g[0]}/${g[1]} = ${fracT(x)}` });
+};
+// #11–12, 37, 39–42: real-life equations
+TEMPLATES.a13Word = (r) => {
+  const kind = pick(r, ['ticket', 'swim', 'flag', 'temp', 'balance', 'cartons']);
+  if (kind === 'ticket') { const off = ri(r, 800, 1600) / 100, d = ri(r, 3000, 5000) / 100, p = Math.round((off + d) * 100) / 100;
+    return a1numQ(r, { topic: 'Solving simple equations', stem: `An amusement park offers a ticket for $${off.toFixed(2)} off the original price p. The discounted price is $${d.toFixed(2)}. Write and solve an equation to find the original price.`, val: p, dec: true, label: 'p = $', wrongs: [Math.round((d - off) * 100) / 100, off], solution: `p ${MINUS} ${off.toFixed(2)} = ${d.toFixed(2)}, so p = ${d.toFixed(2)} + ${off.toFixed(2)} = $${p.toFixed(2)}` }); }
+  if (kind === 'swim') { const t = ri(r, 2200, 3200) / 100, val = Math.round(50 / t * 100) / 100;
+    return a1numQ(r, { topic: 'Solving simple equations', stem: `A swimmer wins the 50-yard freestyle with a time of ${t.toFixed(2)} seconds. Find the swimmer's average speed, to the nearest hundredth of a yard per second.`, val, tol: 0.011, label: 'Speed:', unit: 'yd/s', wrongs: [Math.round(t / 50 * 100) / 100, Math.round(50 * t) / 100], dec: true, solution: `${t.toFixed(2)}r = 50, so r = 50 ÷ ${t.toFixed(2)} ≈ ${val.toFixed(2)} yd/s` }); }
+  if (kind === 'flag') { const w = ri(r, 3, 9) * pick(r, [1, 0.5]), m = 1.9, L = Math.round(w * m * 100) / 100;
+    return a1numQ(r, { topic: 'Solving simple equations', stem: `The length of an American flag is 1.9 times its width. The flag is ${fmt(L)} feet long. What is the width of the flag?`, val: w, dec: true, unit: 'ft', wrongs: [Math.round(L * 1.9 * 100) / 100, Math.round((L - 1.9) * 100) / 100], solution: `1.9w = ${fmt(L)}, so w = ${fmt(L)} ÷ 1.9 = ${fmt(w)} ft` }); }
+  if (kind === 'temp') { const a = ri(r, 5, 30), b = -ri(r, 2, 15), fall = a - b;
+    return a1numQ(r, { topic: 'Solving simple equations', stem: `The temperature at 5 P.M. is ${a}°F. The temperature at 10 P.M. is ${fmt(b)}°F. How many degrees did the temperature fall?`, val: fall, unit: '°F', wrongs: [a + b, a], solution: `${a} ${MINUS} d = ${fmt(b)}, so d = ${a} ${MINUS} (${fmt(b)}) = ${fall}°F` }); }
+  if (kind === 'balance') { const now = ri(r, 300000, 600000) / 100, g = ri(r, 20000, 60000) / 100, then = Math.round((now - g) * 100) / 100;
+    return a1numQ(r, { topic: 'Solving simple equations', stem: `The balance of an investment account is $${g.toFixed(2)} greater than the balance 4 years ago. The current balance is $${now.toFixed(2)}. What was the balance 4 years ago?`, val: then, dec: true, label: '$', wrongs: [Math.round((now + g) * 100) / 100, Math.round(now / 4 * 100) / 100], solution: `b + ${g.toFixed(2)} = ${now.toFixed(2)}, so b = $${then.toFixed(2)}` }); }
+  const per = pick(r, [12, 18, 24, 30]), n = ri(r, 4, 15), tot = per * n, ans = `${per}x = ${tot}`;
+  return { topic: 'Solving simple equations', stem: `A baker orders ${tot} eggs. Each carton contains ${per} eggs. Which equation can you use to find the number x of cartons?`, ...buildChoices(r, ans, [`${tot}x = ${per}`, `x/${per} = ${tot}`, `x + ${per} = ${tot}`], () => null),
+    fr: { fields: [{ kind: 'number', label: 'Number of cartons:' }], key: [String(n)], display: `${ans}; x = ${n}`, check: (v) => numOk(v[0], n) }, frStem: `A baker orders ${tot} eggs. Each carton contains ${per} eggs. Write and solve an equation to find the number x of cartons.`, solution: `${ans}, so x = ${tot} ÷ ${per} = ${n} cartons.` };
+};
+// #35–36, 50: angle sums and percents
+TEMPLATES.a13Sum = (r) => {
+  if (r() < 0.6) { const n = pick(r, [3, 4]), S = (n - 2) * 180; let A; do { A = [...Array(n - 1)].map(() => ri(r, 40, 150)); } while (S - a8sum(A) < 20 || S - a8sum(A) > 160);
+    const x = S - a8sum(A); return a1solQ(r, { v: 'x', val: x, stem: `The sum of the angle measures of a ${n === 3 ? 'triangle is 180°' : 'quadrilateral is 360°'}. The angle measures are ${A.map((a) => a + '°').join(', ')}, and x°. Write and solve an equation to find x.`, wrongs: [S - a8sum(A) + 10, 360 - a8sum(A) - (n === 3 ? 0 : 10), 180 - A[0]], topic: 'Solving simple equations', solution: `${A.join(' + ')} + x = ${S}\n${a8sum(A)} + x = ${S}, so x = ${x}` }); }
+  const P = [ri(r, 3, 12), ri(r, 3, 12), ri(r, 2, 9), ri(r, 30, 50)], x = 100 - a8sum(P), names = ['Hamster', 'Rabbit', 'Bird', 'Dog'];
+  return a1solQ(r, { v: 'x', val: x, stem: `A circle graph shows adoptions from an animal shelter in 1 year: ${names.map((n, i) => `${n} ${P[i]}%`).join(', ')}, and Cat x%. Use the equation ${P.join(' + ')} + x = 100 to find the percent of adoptions that were cats.`, wrongs: [100 - P[3], x + 10], topic: 'Solving simple equations', solution: `${a8sum(P)} + x = 100, so x = ${x}. ${x}% of the adoptions were cats.` });
+};
+
+// ---------- 1.4 Solving Multi-Step Equations ----------
+TEMPLATES.a14Two = (r) => {
+  const v = a1V(r), kind = pick(r, ['ax+b', 'ax+b', 'rev', 'over', 'sumover', 'like', 'dec', 'frac']), x = nz(r, -10, 10);
+  if (kind === 'ax+b' || kind === 'rev') { const a = nz(r, -9, 9) === 1 ? 3 : pick(r, [2, 3, 4, 5, -2, -3, 6, 7]), b = nz(r, -15, 15), c = a * x + b;
+    if (kind === 'rev') return a1solQ(r, { v, val: x, eq: `${fmt(c)} = ${a1J([[b], [a, v]])}`, wrongs: [(c + b) / a, -x], topic: 'Multi-step equations', solution: `Subtract ${a1P(b)}: ${fmt(c - b)} = ${a1J([[a, v]])}. Divide by ${a1P(a)}: ${v} = ${fmt(x)}` });
+    return a1solQ(r, { v, val: x, eq: `${a1J([[a, v], [b]])} = ${fmt(c)}`, wrongs: [(c + b) / a, c / a - b, -x], topic: 'Multi-step equations', solution: `${b < 0 ? 'Add' : 'Subtract'} ${Math.abs(b)}: ${a1J([[a, v]])} = ${fmt(c - b)}. Divide by ${a1P(a)}: ${v} = ${fmt(x)}` }); }
+  if (kind === 'over') { const d = pick(r, [-4, 3, -3, 5, 2]), q = x, b = nz(r, -6, 6), c = q + b, X = q * d;
+    return a1solQ(r, { v, val: X, eq: `${v}/${a1P(d)} ${b < 0 ? MINUS : '+'} ${Math.abs(b)} = ${fmt(c)}`, wrongs: [(c + b) * d, c * d - b, -X], topic: 'Multi-step equations', solution: `${b < 0 ? 'Add' : 'Subtract'} ${Math.abs(b)}: ${v}/${a1P(d)} = ${fmt(q)}. Multiply by ${a1P(d)}: ${v} = ${fmt(X)}` }); }
+  if (kind === 'sumover') { const d = pick(r, [5, -2, 3, 4]), b = nz(r, -8, 8), q = ri(r, -5, 5), X = q * d - b;
+    return a1solQ(r, { v, val: X, eq: `(${a1J([[1, v], [b]])})/${a1P(d)} = ${fmt(q)}`, wrongs: [q * d + b, q / d - b], topic: 'Multi-step equations', solution: `Multiply by ${a1P(d)}: ${a1J([[1, v], [b]])} = ${fmt(q * d)}. ${b < 0 ? 'Add' : 'Subtract'} ${Math.abs(b)}: ${v} = ${fmt(X)}` }); }
+  if (kind === 'like') { const a = ri(r, 2, 12), b = nz(r, -10, 10) || 3, c = nz(r, -20, 20), A = a + b; if (!A) return TEMPLATES.a14Two(r); const d = A * x + c;
+    return a1solQ(r, { v, val: x, eq: `${a1J([[a, v], [b, v], [c]])} = ${fmt(d)}`, wrongs: [(d - c) / a, (d + c) / A, -x], topic: 'Multi-step equations', solution: `Combine like terms: ${a1J([[A, v], [c]])} = ${fmt(d)}. ${c < 0 ? 'Add' : 'Subtract'} ${Math.abs(c)}: ${a1J([[A, v]])} = ${fmt(d - c)}. ${v} = ${fmt(x)}` }); }
+  if (kind === 'dec') { const a = ri(r, 11, 49) / 10, b = ri(r, 11, 69) / 10, c = ri(r, 1, 9), X = pick(r, [0.5, 1.5, 2, -0.5, 1, 3]), d = Math.round(((a + b) * X - c) * 100) / 100;
+    return a1solQ(r, { v, dec: true, val: X, eq: `${fmt(a)}${v} + ${fmt(b)}${v} ${MINUS} ${c} = ${fmt(d)}`, wrongs: [Math.round((d - c) / (a + b) * 100) / 100, Math.round((d + c) / a * 100) / 100], topic: 'Multi-step equations', solution: `Combine like terms: ${fmt(a + b)}${v} ${MINUS} ${c} = ${fmt(d)}. Add ${c}: ${fmt(a + b)}${v} = ${fmt(d + c)}. Divide: ${v} = ${fmt(X)}` }); }
+  const [p, q] = pick(r, [[7 / 10, 1 / 2], [3 / 4, 1 / 2], [5 / 6, 1 / 3], [2 / 3, 1 / 6]]), b = ri(r, 2, 10), k = p - q, X = Math.round((x * k * (1 / k)) * 1) * (1 / k) / (1 / k) * 1, XX = x / k * k === x ? Math.round(x / k) * 1 : x, val = Math.round(x * (1 / k)) * 1, d = k * val - b;
+  return a1solQ(r, { v, val, eq: `${fracT(p)}${v} ${MINUS} ${b} ${MINUS} ${fracT(q)}${v} = ${fracT(d)}`.replace(/(\d+)\/(\d+)([a-z])/g, '($1/$2)$3'), wrongs: [(d - b) / k, (d + b) / (p + q)], topic: 'Multi-step equations', solution: `Combine like terms: ${fracT(k)}${v} ${MINUS} ${b} = ${fracT(d)}. Add ${b}: ${fracT(k)}${v} = ${fracT(d + b)}. Multiply by ${fracT(1 / k)}: ${v} = ${fracT(val)}`.replace(/(\d+)\/(\d+)([a-z])/g, '($1/$2)$3') });
+};
+// #15–22: distributive property
+TEMPLATES.a14Dist = (r) => {
+  const v = a1V(r), kind = pick(r, ['a(x+b)', 'neg', 'e+a', 'ax+b(c-x)', 'two']), x = nz(r, -9, 9);
+  if (kind === 'a(x+b)') { const a = pick(r, [2, 3, 4, 5, 6]), b = nz(r, -9, 9), c = a * (x + b);
+    return a1solQ(r, { v, val: x, eq: `${a}(${a1J([[1, v], [b]])}) = ${fmt(c)}`, wrongs: [c / a + b, c - a * b === c ? 0 : (c - b) / a], topic: 'Multi-step equations', solution: `Distribute: ${a1J([[a, v], [a * b]])} = ${fmt(c)}. ${a * b < 0 ? 'Add' : 'Subtract'} ${Math.abs(a * b)}: ${a}${v} = ${fmt(c - a * b)}. ${v} = ${fmt(x)}` }); }
+  if (kind === 'neg') { const a = pick(r, [2, 3, 4]), b = pick(r, [2, 3, 4, 5]), c = nz(r, -9, 9), d = -a * (b * x - c);
+    return a1solQ(r, { v, val: x, eq: `${MINUS}${a}(${a1J([[b, v], [-c]])}) = ${fmt(d)}`, wrongs: [(d / a + c) / b, (-d / a - c) / b], topic: 'Multi-step equations', solution: `Distribute: ${a1J([[-a * b, v], [a * c]])} = ${fmt(d)}. ${a1J([[-a * b, v]])} = ${fmt(d - a * c)}. ${v} = ${fmt(x)}` }); }
+  if (kind === 'e+a') { const e = ri(r, 2, 12), a = pick(r, [2, 3, 4, 5]), b = nz(r, -6, 6), d = e + a * (x + b);
+    return a1solQ(r, { v, val: x, eq: `${e} + ${a}(${a1J([[1, v], [b]])}) = ${fmt(d)}`, wrongs: [((d - e) - b) / a, (d / (e + a)) - b], topic: 'Multi-step equations', solution: `Distribute: ${e} + ${a1J([[a, v], [a * b]])} = ${fmt(d)}. Combine: ${a1J([[a, v], [e + a * b]])} = ${fmt(d)}. ${a}${v} = ${fmt(d - e - a * b)}, so ${v} = ${fmt(x)}` }); }
+  if (kind === 'ax+b(c-x)') { const a = pick(r, [5, 6, 7, 4]), b = pick(r, [2, 3]), c = ri(r, 4, 12), d = a * x + b * (c - x);
+    return a1solQ(r, { v, val: x, eq: `${a}${v} + ${b}(${c} ${MINUS} ${v}) = ${fmt(d)}`, wrongs: [(d - b * c) / (a + b), (d - c) / (a - b)], topic: 'Multi-step equations', solution: `Distribute: ${a}${v} + ${b * c} ${MINUS} ${b}${v} = ${fmt(d)}. Combine: ${a1J([[a - b, v], [b * c]])} = ${fmt(d)}. ${a - b}${v} = ${fmt(d - b * c)}, so ${v} = ${fmt(x)}` }); }
+  const a = pick(r, [6, 5]), b = pick(r, [3, 2]), c = pick(r, [4, 3]), e = pick(r, [6, 5]); if (c - a === 0) return TEMPLATES.a14Dist(r); const L = -a * (b + x) + c * (x - e);
+  return a1solQ(r, { v, val: x, eq: `${fmt(L)} = ${MINUS}${a}(${b} + ${v}) + ${c}(${v} ${MINUS} ${e})`, wrongs: [(L + a * b + c * e) / (a + c), (L - a * b - c * e) / (c - a)], topic: 'Multi-step equations', solution: `Distribute: ${fmt(L)} = ${a1J([[-a * b], [-a, v], [c, v], [-c * e]])}. Combine: ${fmt(L)} = ${a1J([[c - a, v], [-a * b - c * e]])}. ${fmt(L + a * b + c * e)} = ${a1J([[c - a, v]])}, so ${v} = ${fmt(x)}` });
+};
+// #23–28: number sense
+TEMPLATES.a14Words = (r) => {
+  const n = nz(r, -12, 12), S = pick(r, [() => { const a = ri(r, 5, 30); return [`The sum of twice a number and ${a} is ${fmt(2 * n + a)}.`, `2n + ${a} = ${fmt(2 * n + a)}`]; },
+    () => { const a = ri(r, 2, 9); return [`The difference of three times a number and ${a} is ${fmt(3 * n - a)}.`, `3n ${MINUS} ${a} = ${fmt(3 * n - a)}`]; },
+    () => { const a = ri(r, 3, 12), m = 3 * n; return [`${['Eight', 'Five', 'Ten', 'Four', 'Seven'][a % 5]} plus the quotient of a number and 3 is ${fmt([8, 5, 10, 4, 7][a % 5] + n)}.`, `${[8, 5, 10, 4, 7][a % 5]} + n/3 = ${fmt([8, 5, 10, 4, 7][a % 5] + n)}`, m]; },
+    () => { const m = 2 * n; return [`The sum of twice a number and half the number is ${fmt(2.5 * m)}.`, `2n + n/2 = ${fmt(2.5 * m)}`, m]; },
+    () => { const a = ri(r, 3, 15), k = ri(r, 2, 7); return [`${['Two', 'Three', 'Four', 'Five', 'Six', 'Seven'][k - 2]} times the sum of a number and ${a} is ${fmt(k * (n + a))}.`, `${k}(n + ${a}) = ${fmt(k * (n + a))}`]; },
+    () => { const a = ri(r, 3, 15), k = ri(r, 2, 7); return [`${['Two', 'Three', 'Four', 'Five', 'Six', 'Seven'][k - 2]} times the difference of a number and ${a} is ${fmt(k * (n - a))}.`, `${k}(n ${MINUS} ${a}) = ${fmt(k * (n - a))}`]; }])();
+  const val = S[2] ?? n;
+  return a1numQ(r, { topic: 'Multi-step equations', stem: `Write and solve an equation to find the number.   ${S[0]}`, val, label: 'The number is', wrongs: [-val, val + 2, val * 2], solution: `${S[1]}\nn = ${fmt(val)}` });
+};
+// #29–30: polygon angle sums
+TEMPLATES.a14Poly = (r) => {
+  for (let t = 0; t < 500; t++) {
+    const n = pick(r, [5, 6]), S = (n - 2) * 180, x = ri(r, 30, 90), forms = [[1, 0], [1, ri(r, 5, 45)], [2, -ri(r, 20, 90)], [3 / 2, 0], [1, -ri(r, 5, 30)]].slice(0, ri(r, 2, 3));
+    const known = [...Array(n - forms.length - 1)].map(() => 10 * ri(r, 9, 14)), ang = forms.map(([a, b]) => a * x + b);
+    const rest = S - a8sum(known) - a8sum(ang); if (rest < 60 || rest > 170 || ang.some((g) => g < 40 || g > 175) || !Number.isInteger(rest)) continue;
+    const all = [...known, rest], A = a8sum(forms.map((f) => f[0])), B = a8sum(forms.map((f) => f[1]));
+    const exprs = forms.map(([a, b]) => (b ? `(${a1J([[a, 'x'], [b]])})°` : `${a1J([[a, 'x']])}°`));
+    return a1solQ(r, { v: 'x', val: x, stem: `The sum of the angle measures of a ${n === 5 ? 'pentagon is 540°' : 'hexagon is 720°'}. Its angles measure ${all.map((g) => g + '°').join(', ')}, ${exprs.join(', ')}. Find the value of x.`, wrongs: [x + 10, (S - a8sum(all)) / (A + 1), (S - a8sum(all)) / A + B], topic: 'Multi-step equations',
+      solution: `${all.join(' + ')} + ${exprs.map((e) => e.replace('°', '')).join(' + ')} = ${S}\n${a1J([[A, 'x'], [a8sum(all) + B]])} = ${S}\n${a1J([[A, 'x']])} = ${S - a8sum(all) - B}, so x = ${x}` });
+  }
+  return TEMPLATES.a14Two(r);
+};
+// #13–14, 33–36: real life
+TEMPLATES.a14Word = (r) => {
+  const kind = pick(r, ['plane', 'repair', 'pool', 'phone', 'tacos', 'job']);
+  if (kind === 'plane') { const k = pick(r, [3400, 2800, 3000]), b = pick(r, [600, 400, 1000]), t = ri(r, 3, 9), a = k * t + b;
+    return a1numQ(r, { topic: 'Multi-step equations', stem: `The altitude a (in feet) of a plane t minutes after liftoff is given by a = ${k}t + ${b}. How many minutes after liftoff is the plane at an altitude of ${a.toLocaleString('en-US')} feet?`, val: t, unit: 'min', wrongs: [Math.round((a + b) / k * 100) / 100, Math.round(a / k * 100) / 100], solution: `${a} = ${k}t + ${b} → ${a - b} = ${k}t → t = ${t} minutes` }); }
+  if (kind === 'repair') { const parts = ri(r, 15000, 40000) / 100, rate = pick(r, [85, 75, 90, 95]), h = ri(r, 2, 8) + pick(r, [0, 0.5]), tot = Math.round((parts + rate * h) * 100) / 100;
+    return a1numQ(r, { topic: 'Multi-step equations', stem: `A repair bill for a car is $${tot.toFixed(2)}. The parts cost $${parts.toFixed(2)}. The labor cost is $${rate} per hour. Write and solve an equation to find the number of hours of labor.`, val: h, dec: true, unit: 'h', wrongs: [Math.round(tot / rate * 100) / 100, Math.round((tot + parts) / rate * 100) / 100], solution: `${parts.toFixed(2)} + ${rate}h = ${tot.toFixed(2)} → ${rate}h = ${(tot - parts).toFixed(2)} → h = ${fmt(h)}` }); }
+  if (kind === 'pool') { const w = pick(r, [10, 12, 15]), s = pick(r, [9, 8, 12]), d = ri(r, 6, 15), A = w * (d + s);
+    return a1numQ(r, { topic: 'Multi-step equations', stem: `A rectangular swimming pool is ${w} feet wide. The shallow end is ${s} feet long and the deep end is d feet long. The area of the surface of the pool is ${A} square feet. What is the length of the deep end?`, val: d, unit: 'ft', wrongs: [A / w, A / w + s], solution: `${w}(d + ${s}) = ${A} → d + ${s} = ${A / w} → d = ${d} ft` }); }
+  if (kind === 'phone') { const free = ri(r, 9000, 9900) / 10, pic = ri(r, 10, 30) / 10, song = ri(r, 25, 60) / 10, left = Math.round((free - pic - 2 * song) * 10) / 10;
+    return a1numQ(r, { topic: 'Multi-step equations', stem: `Your cell phone has ${fmt(free)} MB of free space. You save a ${fmt(pic)}-MB picture and download two songs that are the same size. Your phone now has ${fmt(left)} MB of free space. What is the size of each song?`, val: song, dec: true, unit: 'MB', wrongs: [Math.round((free - left) * 10) / 10, Math.round((free - left + pic) / 2 * 100) / 100], solution: `${fmt(free)} ${MINUS} ${fmt(pic)} ${MINUS} 2x = ${fmt(left)} → 2x = ${fmt(Math.round(2 * song * 10) / 10)} → x = ${fmt(song)} MB` }); }
+  if (kind === 'tacos') { const x = ri(r, 250, 450) / 100, sal = ri(r, 200, 400) / 100, tip = pick(r, [2, 3, 4]), tot = Math.round(((2 * x + sal) * 1.08 + tip) * 100) / 100, xx = Math.round(((tot - tip) / 1.08 - sal) / 2 * 100) / 100;
+    return a1numQ(r, { topic: 'Multi-step equations', stem: `You order two tacos and a salad. The salad costs $${sal.toFixed(2)}. You pay 8% sales tax on the food and leave a $${tip} tip. You pay a total of $${tot.toFixed(2)}. How much does one taco cost?`, val: xx, tol: 0.011, dec: true, label: '$', wrongs: [Math.round((tot - tip - sal) / 2 * 100) / 100, Math.round(((tot - tip) / 1.08 - sal) * 100) / 100], solution: `1.08(2x + ${sal.toFixed(2)}) + ${tip} = ${tot.toFixed(2)}\n1.08(2x + ${sal.toFixed(2)}) = ${(tot - tip).toFixed(2)}\n2x + ${sal.toFixed(2)} ≈ ${((tot - tip) / 1.08).toFixed(2)}\nx ≈ $${xx.toFixed(2)}` }); }
+  const h1 = 30, r1 = pick(r, [8.75, 9.5, 10]), r2 = pick(r, [11, 12, 12.5]), x = ri(r, 4, 12), goal = h1 * r1 + r2 * x;
+  return a1numQ(r, { topic: 'Multi-step equations', stem: `During the summer, you work 30 hours per week at a gas station and earn $${r1.toFixed(2)} per hour. You also work as a landscaper for $${r2.toFixed(2)} per hour. You want to earn a total of $${goal.toFixed(2)} per week. How many hours must you work as a landscaper?`, val: x, unit: 'h', wrongs: [Math.round(goal / r2 * 100) / 100, Math.round((goal - h1) / r2 * 100) / 100], solution: `${h1}(${r1.toFixed(2)}) + ${r2.toFixed(2)}x = ${goal.toFixed(2)} → ${(h1 * r1).toFixed(2)} + ${r2.toFixed(2)}x = ${goal.toFixed(2)} → x = ${x} hours` });
+};
+
+// ---------- 1.5 Modeling Quantities ----------
+TEMPLATES.a15Prop = (r) => {
+  const v = a1V(r); let a, b, c, d, pos; for (;;) { a = ri(r, 2, 15); b = ri(r, 2, 15); c = ri(r, 2, 40); pos = ri(r, 0, 3); const k = c * b / a; if (a !== b && k > 0) { d = k; break; } }
+  // a/b = c/d with one of the four unknown
+  const vals = [a, b, c, d], val = vals[pos], show = vals.map((q, i) => (i === pos ? v : fracT(q)));
+  if (!Number.isInteger(val * 4)) return TEMPLATES.a15Prop(r);
+  if (vals.some((q, i) => i !== pos && !Number.isInteger(q))) return TEMPLATES.a15Prop(r);
+  const others = vals.filter((_, i) => i !== pos);
+  return a1solQ(r, { v, val, eq: `${show[0]}/${show[1]} = ${show[2]}/${show[3]}`, wrongs: [others[0] * others[1] / others[2], others[2] * others[0] / others[1]], topic: 'Proportions', solution: `Cross multiply: ${show[0]} · ${show[3]} = ${show[1]} · ${show[2]}.\n${v} = ${fracT(val)}` });
+};
+// #9–12: unit conversions
+TEMPLATES.a15Convert = (r) => {
+  const C = pick(r, [['fl oz', 'qt', 1 / 32, '1 qt = 32 fl oz', () => ri(r, 40, 300)], ['km', 'cm', 100000, '1 km = 100,000 cm', () => ri(r, 11, 89) / 10], ['mm', 'in.', 1 / 25.4, '1 in. = 25.4 mm', () => ri(r, 100, 900) / 10], ['kg', 'oz', 35.27, '1 kg ≈ 35.27 oz', () => ri(r, 11, 89) / 10], ['mi', 'km', 1.609, '1 mi ≈ 1.609 km', () => ri(r, 3, 40)], ['gal', 'L', 3.785, '1 gal ≈ 3.785 L', () => ri(r, 2, 25)]]);
+  const x = C[4](), val = Math.round(x * C[2] * 100) / 100;
+  return a1numQ(r, { topic: 'Unit conversions', stem: `Complete the statement. Round to the nearest hundredth, if necessary. (${C[3]})   ${fmt(x)} ${C[0]} ≈ ___ ${C[1]}`, val, tol: /≈/.test(C[3]) ? Math.max(0.011, val * 0.002) : 0.0051, dec: true, unit: C[1], wrongs: [Math.round(x / C[2] * 100) / 100, Math.round(x * C[2] * 10) / 100], solution: `${fmt(x)} ${C[0]} × ${C[2] < 1 ? `(1 ${C[1]} / ${fmt(1 / C[2])} ${C[0]})` : `(${fmt(C[2])} ${C[1]} / 1 ${C[0]})`} ≈ ${fmt(val)} ${C[1]}` });
+};
+// #13–14: converting rates
+TEMPLATES.a15Rate = (r) => {
+  const C = pick(r, [['gal/min', 'qt/sec', 4 / 60, '1 gal = 4 qt, 1 min = 60 sec'], ['km/min', 'mi/h', 60 / 1.609, '1 mi ≈ 1.609 km, 1 h = 60 min'], ['ft/sec', 'mi/h', 3600 / 5280, '1 mi = 5280 ft, 1 h = 3600 sec'], ['mi/h', 'ft/sec', 5280 / 3600, '1 mi = 5280 ft, 1 h = 3600 sec'], ['m/sec', 'km/h', 3.6, '1 km = 1000 m, 1 h = 3600 sec']]);
+  const x = ri(r, 3, 120), val = Math.round(x * C[2] * 100) / 100;
+  return a1numQ(r, { topic: 'Unit conversions', stem: `Complete the statement. Round to the nearest hundredth, if necessary. (${C[3]})   ${x} ${C[0]} ≈ ___ ${C[1]}`, val, tol: /≈/.test(C[3]) ? Math.max(0.011, val * 0.003) : 0.0051, dec: true, unit: C[1], wrongs: [Math.round(x / C[2] * 100) / 100, Math.round(x * C[2] * 1000) / 100], solution: `Multiply by conversion factors so the old units cancel: ${x} ${C[0]} ≈ ${fmt(val)} ${C[1]}` });
+};
+// #5–6: similar triangles (shadows)
+TEMPLATES.a15Shadow = (r) => {
+  const ph = pick(r, [6, 5, 4, 3]), ps = pick(r, [4, 8, 2, 5, 10]), bs = ri(r, 2, 15) * ps / gcd(ps, ph) , bh = ph * bs / ps;
+  if (r() < 0.5) return a1numQ(r, { topic: 'Proportions', stem: `A person who is ${ph} feet tall casts a shadow ${ps} feet long. At the same time, a building casts a shadow ${bs} feet long. The triangles formed are similar. How tall is the building?`, val: bh, unit: 'ft', wrongs: [bs * ps / ph, bs + ph - ps], solution: `${ph}/${ps} = h/${bs} → h = ${ph} · ${bs} ÷ ${ps} = ${fracT(bh)} ft` });
+  return a1numQ(r, { topic: 'Proportions', stem: `A sign that is ${ph} feet tall casts a shadow ${ps} feet long. At the same time, a billboard casts a shadow ${fmt(bs)} feet long. How tall is the billboard?`, val: bh, unit: 'ft', wrongs: [bs * ps / ph, bs - ps + ph], solution: `${ph}/${ps} = h/${bs} → h = ${fracT(bh)} ft` });
+};
+// #7–8, 15–16: compare rates
+TEMPLATES.a15Compare = (r) => {
+  if (r() < 0.5) { const a = ri(r, 90, 130), b = ri(r, 65, 95), aM = a * 3600 / 5280, ans = Math.abs(aM - b) < 0.5 ? null : aM > b ? 'Roller coaster A' : 'Roller coaster B'; if (!ans) return TEMPLATES.a15Compare(r);
+    return { topic: 'Unit conversions', stem: `Roller coaster A can reach a top speed of ${a} feet per second. Roller coaster B can reach a top speed of ${b} miles per hour. Which roller coaster has a greater top speed? (1 mi = 5280 ft)`, ...buildChoices(r, ans, ['Roller coaster A', 'Roller coaster B'].filter((x) => x !== ans), () => null), fr: FR.select('Faster:', ['Roller coaster A', 'Roller coaster B'], ans), solution: `${a} ft/sec × 3600 sec/h ÷ 5280 ft/mi ≈ ${aM.toFixed(1)} mi/h, compared with ${b} mi/h. ${ans} is faster.` }; }
+  const L = ri(r, 8, 20), d = ri(r, 20, 55), aDay = L * 4000, bDay = d * 60 * 24, ans = aDay > bDay ? 'Faucet A' : 'Faucet B'; if (Math.abs(aDay - bDay) < 2000) return TEMPLATES.a15Compare(r);
+  return { topic: 'Unit conversions', stem: `Faucet A leaks at a rate of ${L} liters per day. Faucet B leaks at a rate of ${d} drips per minute. Which faucet leaks at a faster rate? (1 L ≈ 4000 drips)`, ...buildChoices(r, ans, ['Faucet A', 'Faucet B'].filter((x) => x !== ans), () => null), fr: FR.select('Faster:', ['Faucet A', 'Faucet B'], ans), solution: `Faucet A: ${L} × 4000 = ${aDay.toLocaleString('en-US')} drips per day. Faucet B: ${d} × 60 × 24 = ${bDay.toLocaleString('en-US')} drips per day. ${ans} is faster.` };
+};
+
+// ---------- 1.6 Accuracy with Measurements ----------
+TEMPLATES.a16Est = (r) => {
+  const kind = pick(r, ['tax', 'planet', 'field']);
+  if (kind === 'tax') { const T = ri(r, 1100, 1600) * 1e5 + ri(r, 0, 99999), R = ri(r, 30, 40) * 1e11 + ri(r, 0, 1e9), val = R / T;
+    return a1numQ(r, { topic: 'Estimating results', stem: `There are ${T.toLocaleString('en-US')} taxpayers, and the federal tax revenue is $${R.toLocaleString('en-US')}. Estimate the federal tax revenue per taxpayer. (Any reasonable estimate within about 10% is accepted.)`, val: Math.round(val / 100) * 100, tol: val * 0.1, dec: true, label: '$', wrongs: [Math.round(val / 1000) * 100, Math.round(val / 10) * 100, Math.round(val * 10 / 100) * 100], solution: `Round: about $${(Math.round(R / 1e11) / 10).toFixed(1)} trillion ÷ ${(Math.round(T / 1e6))} million ≈ $${Math.round(val / 100) * 100} per taxpayer.` }); }
+  if (kind === 'planet') { const a = ri(r, 14000, 16000), b = ri(r, 420000, 460000), val = b / a;
+    return a1numQ(r, { topic: 'Estimating results', stem: `The circumference of Mercury is about ${a.toLocaleString('en-US')} kilometers. The circumference of Jupiter is about ${b.toLocaleString('en-US')} kilometers. About how many times larger is Jupiter than Mercury? (An estimate within about 10% is accepted.)`, val: Math.round(val), tol: val * 0.1, wrongs: [Math.round(val / 10), Math.round(val * 10)], solution: `${b.toLocaleString('en-US')} ÷ ${a.toLocaleString('en-US')} ≈ ${Math.round(b / 1000) * 1000 / 1000} thousand ÷ ${Math.round(a / 1000)} thousand ≈ ${Math.round(val)} times` }); }
+  const A = ri(r, 20000, 40000) + ri(r, 0, 9) / 10, p = 1.651 * 0.99, val = Math.floor(A / p);
+  return a1numQ(r, { topic: 'Estimating results', stem: `A farmer fills a field with solar panels. The area of the field is ${A.toLocaleString('en-US')} square meters. Each panel is 165.1 cm by 99 cm. About how many panels can fit in the field? (An estimate within about 5% is accepted.)`, val, tol: val * 0.05, wrongs: [Math.round(A / 165.1 / 99), Math.round(A / 1.651 / 99 * 100) / 100, val * 10], solution: `Each panel: 1.651 m × 0.99 m ≈ 1.63 m². ${A.toLocaleString('en-US')} ÷ 1.63 ≈ ${val.toLocaleString('en-US')} panels.` });
+};
+// #5: how many bags
+TEMPLATES.a16Bags = (r) => {
+  const dia = pick(r, [[4, 3], [1, 1], [3, 2], [5, 4]]), d = dia[0] / dia[1], h = pick(r, [3, 4, 3.5, 5]), y = pick(r, [0.6, 0.45, 0.5]), V = Math.PI * (d / 2) ** 2 * h, n = Math.ceil(V / y - 1e-9);
+  const dt = dia[1] === 1 ? String(dia[0]) : `${Math.floor(d)}${B3VF[`${dia[0] % dia[1]}/${dia[1]}`] || ''}`;
+  return a1numQ(r, { topic: 'Estimating results', stem: `You dig a cylindrical hole ${dt} feet across and ${fmt(h)} feet deep for a basketball post. Each bag of concrete mix yields ${fmt(y)} cubic feet. How many bags do you need to fill the hole?`, val: n, unit: 'bags', wrongs: [Math.floor(V / y), Math.ceil(Math.PI * d * d * h / y), Math.ceil(V)], solution: `V = πr²h = π(${fracT(d / 2)})²(${fmt(h)}) ≈ ${V.toFixed(2)} ft³.\n${V.toFixed(2)} ÷ ${fmt(y)} ≈ ${(V / y).toFixed(2)}, so you need ${n} bags (round up).` });
+};
+// #7: which is not an appropriate approximation
+TEMPLATES.a16Approx = (r) => {
+  for (let t = 0; t < 300; t++) {
+    const a = ri(r, 500, 1000) / 100 * 1, b = ri(r, 300, 600) / 100, c = ri(r, 150, 350) / 100, V = a * b * c;
+    if (V % 1 < 0.55 || V % 1 > 0.95 || V < 20) continue;
+    const bad = `${Math.floor(V)} in.³`, opts = [bad, `${Math.round(V / 10) * 10} in.³`, `${V.toFixed(1)} in.³`, `${V.toFixed(3)} in.³`];
+    if (new Set(opts).size < 4) continue;
+    return { topic: 'Accuracy', stem: `You measure the dimensions of a gift box as ${a.toFixed(2)} inches, ${b.toFixed(2)} inches, and ${c.toFixed(2)} inches. Which of the following is NOT an appropriate approximation of the volume of the gift box?`, ...buildChoices(r, bad, opts.slice(1), () => null), fr: FR.select('Not appropriate:', shuffle(r, opts), bad), solution: `V = ${a.toFixed(2)} × ${b.toFixed(2)} × ${c.toFixed(2)} = ${fmt(Math.round(V * 1e5) / 1e5)} in.³ ${Math.floor(V)} is not a correct rounding (to the nearest whole number it is ${Math.round(V)}).` };
+  }
+  return TEMPLATES.a16Bags(r);
+};
+
+// ---------- 1.7 Solving Equations with Variables on Both Sides ----------
+TEMPLATES.a17Both = (r) => {
+  const v = a1V(r), x = nz(r, -10, 10), kind = pick(r, ['plain', 'plain', 'dist', 'dist', 'frac']);
+  if (kind === 'plain') { let a, c; do { a = nz(r, -9, 9); c = nz(r, -9, 9); } while (a === c); const b = ri(r, -20, 20), d = a * x + b - c * x;
+    return a1solQ(r, { v, val: x, eq: `${a1J([[b], [a, v]].slice(r() < 0.4 ? 0 : 1).concat(r() < 0.4 ? [] : [[b]]))} = ${a1J([[c, v], [d]])}`, wrongs: [(d - b) / (a + c), (d + b) / (a - c), -x], topic: 'Variables on both sides', solution: `Collect the variable terms on one side: ${a1J([[a - c, v]])} = ${fmt(d - b)}.\n${v} = ${fmt(x)}` }); }
+  if (kind === 'dist') { let a, b, c, d; do { a = pick(r, [2, 3, 4, 5, -2, -3, 10, 9]); b = nz(r, -8, 8); c = pick(r, [1, 2, 3, 4]); } while (a === c); const e = a * (x + b) - c * x;
+    return a1solQ(r, { v, val: x, eq: `${a}(${a1J([[1, v], [b]])}) = ${a1J([[c, v], [e]])}`.replace(/^-/, MINUS), wrongs: [(e - b) / (a - c), (e - a * b) / (a + c), -x], topic: 'Variables on both sides', solution: `Distribute: ${a1J([[a, v], [a * b]])} = ${a1J([[c, v], [e]])}.\n${a1J([[a - c, v]])} = ${fmt(e - a * b)}, so ${v} = ${fmt(x)}` }); }
+  const [p, q] = pick(r, [[2, 3], [3, 4], [1, 2]]), b = q * ri(r, 1, 6), c = ri(r, 1, 3); if (c * q === p) return TEMPLATES.a17Both(r);
+  // (p/q)(qv + b) = c v + e  →  pv + pb/q = cv + e
+  const X = q * nz(r, -4, 4), e = p * X + p * b / q - c * X; if (!Number.isInteger(e)) return TEMPLATES.a17Both(r);
+  return a1solQ(r, { v, val: X, eq: `(${p}/${q})(${a1J([[q, v], [b]])}) = ${a1J([[c, v], [e]])}`, wrongs: [(e - b) / (p - c), -X], topic: 'Variables on both sides', solution: `Distribute: ${a1J([[p, v], [p * b / q]])} = ${a1J([[c, v], [e]])}.\n${a1J([[p - c, v]])} = ${fmt(e - p * b / q)}, so ${v} = ${fmt(X)}` });
+};
+// #15–22: one solution, no solution, or identity
+TEMPLATES.a17Special = (r) => {
+  const v = a1V(r), kind = pick(r, ['none', 'all', 'one']), a = pick(r, [2, 3, 4, 6]), b = nz(r, -6, 6), k = pick(r, [2, 3]);
+  // left: k(a v + b); right: (k a) v + (k b + shift)
+  if (kind === 'one') { const c = k * a + pick(r, [-1, 1, 2]), x = nz(r, -6, 6), e = k * (a * x + b) - c * x;
+    return a1solQ(r, { v, val: x, eq: `${k}(${a1J([[a, v], [b]])}) = ${a1J([[c, v], [e]])}`, wrongs: [(e - k * b) / (k * a + c)], topic: 'Variables on both sides', solution: `Distribute: ${a1J([[k * a, v], [k * b]])} = ${a1J([[c, v], [e]])}.\n${a1J([[k * a - c, v]])} = ${fmt(e - k * b)}, so ${v} = ${fmt(x)}` }); }
+  const sh = kind === 'none' ? nz(r, -8, 8) : 0, R1 = ri(r, 1, k * a - 1), R2 = k * a - R1, cst = k * b + sh, cs1 = ri(r, -10, 10);
+  const right = a1J([[R1, v], [cs1], [R2, v], [cst - cs1]]);
+  return a1solQ(r, { v, kind, eq: `${k}(${a1J([[a, v], [b]])}) = ${right}`, wrongs: [`${v} = ${fracT(sh / (k * a) || 1)}`], topic: 'Variables on both sides',
+    solution: `Distribute and combine: ${a1J([[k * a, v], [k * b]])} = ${a1J([[k * a, v], [cst]])}.\n${kind === 'none' ? `Subtract ${k * a}${v}: ${fmt(k * b)} = ${fmt(cst)}, which is false. The equation has no solution.` : 'The two sides are the same, so the equation is an identity: all real numbers are solutions.'}` });
+};
+// #23, 25, 27: when are the two equal
+TEMPLATES.a17Word = (r) => {
+  const kind = pick(r, ['meet', 'catch', 'studio']);
+  if (kind === 'meet') { const a = pick(r, [50, 55, 60]), b = pick(r, [45, 40, 65]), h = pick(r, [1, 1.5, 2, 2.5]), D = (a + b) * h;
+    return a1numQ(r, { topic: 'Variables on both sides', stem: `You and your friend drive toward each other. The equation ${a}h = ${D} ${MINUS} ${b}h represents the number h of hours until you and your friend meet. After how many hours will you meet?`, val: h, dec: true, unit: 'h', wrongs: [Math.round(D / (a - b) * 100) / 100, Math.round(D / a * 100) / 100], solution: `${a}h + ${b}h = ${D} → ${a + b}h = ${D} → h = ${fmt(h)}` }); }
+  if (kind === 'catch') { const c = pick(r, [90, 100, 85]), an = pick(r, [60, 70, 55]), lead = pick(r, [120, 150, 90, 180]), t = lead / (c - an);
+    return a1numQ(r, { topic: 'Variables on both sides', stem: `A cheetah running ${c} feet per second is ${lead} feet behind an antelope running ${an} feet per second. How long will it take the cheetah to catch up to the antelope?`, val: t, unit: 'sec', wrongs: [lead / an, lead / c, lead / (c + an)], solution: `${c}t = ${an}t + ${lead} → ${c - an}t = ${lead} → t = ${fracT(t)} sec` }); }
+  const v1 = ri(r, 900, 1200) / 100, v2 = Math.round((v1 + ri(r, 300, 600) / 100) * 100) / 100, f1 = pick(r, [8, 9, 10]), h = pick(r, [2, 3, 4, 5]), f2 = Math.round((f1 - (v2 - v1) / h) * 100) / 100;
+  return a1numQ(r, { topic: 'Variables on both sides', stem: `Studio A charges $${v1.toFixed(2)} for a vase plus $${f1} per hour. Studio B charges $${v2.toFixed(2)} for a vase plus $${f2.toFixed(2)} per hour. After how many hours are the total costs the same at both studios?`, val: h, unit: 'h', wrongs: [Math.round((v2 + v1) / (f1 + f2) * 100) / 100, h + 1], solution: `${v1.toFixed(2)} + ${f1}x = ${v2.toFixed(2)} + ${f2.toFixed(2)}x → ${(f1 - f2).toFixed(2)}x = ${(v2 - v1).toFixed(2)} → x = ${h} hours` });
+};
+// #29–30: make it an identity
+TEMPLATES.a17Ident = (r) => {
+  const a = pick(r, [2, 3, 4, 5, -2]), p = pick(r, [2, 3, 4]), q = nz(r, -5, 5), k1 = ri(r, 1, a * p - 1 > 1 ? a * p - 1 : 1);
+  if (a < 0) { const s = a * p, c = a * q, R1 = ri(r, 1, 6), right = a1J([[s - R1, 'x'], [c - 4], [R1, 'x'], [4]]); return a1numQ(r, { topic: 'Variables on both sides', stem: `Find the value of a for which the equation is an identity.   a(${a1J([[p, 'x'], [q]])}) = ${right}`, val: a, label: 'a =', wrongs: [-a, s, c], solution: `The right side simplifies to ${a1J([[s, 'x'], [c]])}. For an identity, a · ${p} = ${s} and a · ${q === 1 ? '1' : a1P(q)} = ${fmt(c)}, so a = ${fmt(a)}.` }); }
+  const s = a * p, c = a * q, right = a1J([[k1, 'x'], [c - 3], [s - k1, 'x'], [3]]);
+  return a1numQ(r, { topic: 'Variables on both sides', stem: `Find the value of a for which the equation is an identity.   a(${a1J([[p, 'x'], [q]])}) = ${right}`, val: a, label: 'a =', wrongs: [s, c, a + 1], solution: `The right side simplifies to ${a1J([[s, 'x'], [c]])}. For an identity, a · ${p} = ${s} and a · ${a1P(q)} = ${fmt(c)}, so a = ${a}.` });
+};
+// #31: consecutive integers
+TEMPLATES.a17Consec = (r) => {
+  for (let t = 0; t < 200; t++) { const p = ri(r, 2, 4), q = ri(r, p + 1, 6), d = ri(r, 2, 20); // p(n+1) = q n − d → n = (p + d)/(q − p)
+    const n = (p + d) / (q - p); if (!Number.isInteger(n) || n < 2) continue;
+    const W = ['', '', 'Two', 'Three', 'Four', 'Five', 'Six'];
+    return { topic: 'Variables on both sides', stem: `${W[p]} times the greater of two consecutive integers is ${d} less than ${W[q].toLowerCase()} times the lesser integer. What are the integers?`, ...buildChoices(r, `${n} and ${n + 1}`, [`${n - 1} and ${n}`, `${n + 1} and ${n + 2}`, `${-n} and ${-n + 1}`], () => null),
+      fr: { fields: [{ kind: 'number', label: 'Lesser:' }, { kind: 'number', label: 'Greater:' }], key: [String(n), String(n + 1)], display: `${n} and ${n + 1}`, check: (v) => numOk(v[0], n) && numOk(v[1], n + 1), score: (v) => ((numOk(v[0], n) ? 1 : 0) + (numOk(v[1], n + 1) ? 1 : 0)) / 2 },
+      solution: `Let n be the lesser integer: ${p}(n + 1) = ${q}n ${MINUS} ${d}.\n${p}n + ${p} = ${q}n ${MINUS} ${d} → ${p + d} = ${q - p}n → n = ${n}. The integers are ${n} and ${n + 1}.` }; }
+  return TEMPLATES.a17Both(r);
+};
+
+// ---------- 1.8 Solving Absolute Value Equations ----------
+TEMPLATES.a18Simp = (r) => {
+  const S = pick(r, [() => { const a = ri(r, 2, 20); return [`|${MINUS}${a}|`, a]; }, () => { const a = ri(r, 2, 20); return [`${MINUS}|${a}|`, -a]; }, () => { const a = ri(r, 2, 20), b = ri(r, 2, 20); return [`|${a}| ${MINUS} |${MINUS}${b}|`, a - b]; }, () => { const a = ri(r, 2, 9); return [`|${MINUS}${a}| + |${a}|`, 2 * a]; },
+    () => { const a = ri(r, 2, 9), b = ri(r, 2, 9); return [`${MINUS}|${MINUS}${a} · (${MINUS}${b})|`, -a * b]; }, () => { const a = ri(r, 2, 9) / 10, b = pick(r, [10, 20, 5]); return [`|${MINUS}${fmt(a)} · ${b}|`, Math.round(a * b * 10) / 10]; }, () => { const k = ri(r, 2, 9), d = ri(r, 2, 5); return [`|${k * d}/(${MINUS}${d})|`, k]; }, () => { const k = ri(r, 2, 6), d = ri(r, 2, 5); return [`|${MINUS}(${MINUS}${k * d}/${d})|`, k]; }])();
+  return a1numQ(r, { topic: 'Absolute value', stem: `Simplify the expression.   ${S[0]}`, val: S[1], wrongs: [-S[1], Math.abs(S[1]) + 2], dec: true, solution: `${S[0]} = ${fmt(S[1])}` });
+};
+TEMPLATES.a18Solve = (r) => {
+  const v = a1V(r), kind = pick(r, ['simple', 'simple', 'scaled', 'scaled', 'none', 'frac']);
+  if (kind === 'simple') { const a = pick(r, [1, 1, 4, 2, 3]), b = nz(r, -9, 9), c = ri(r, 2, 20);
+    return a1setQ(r, { v, vals: [(c - b) / a, (-c - b) / a], eq: `|${a1J([[a, v], [b]])}| = ${c}`, wrongs: [[(c - b) / a], [(c + b) / a, (-c + b) / a]], topic: 'Absolute value equations', solution: `${a1J([[a, v], [b]])} = ${c} or ${a1J([[a, v], [b]])} = ${MINUS}${c}\n${v} = ${fracT((c - b) / a)} or ${v} = ${fracT((-c - b) / a)}` }); }
+  if (kind === 'frac') { const d = pick(r, [2, 3, 4]), c = ri(r, 2, 9);
+    return a1setQ(r, { v, vals: [c * d, -c * d], eq: `|${v}/${d}| = ${c}`, wrongs: [[c * d], [c / d, -c / d]], topic: 'Absolute value equations', solution: `${v}/${d} = ${c} or ${v}/${d} = ${MINUS}${c}, so ${v} = ${c * d} or ${v} = ${MINUS}${c * d}` }); }
+  const k = pick(r, [1, 2, 3, -4, 9]), a = pick(r, [1, 4, -8, -5, 2]), b = nz(r, -8, 8), m = kind === 'none' ? -ri(r, 1, 6) : ri(r, 2, 12), c = nz(r, -10, 10), d = k * m + c;
+  const eq = `${k === 1 ? '' : k === -1 ? MINUS : fmt(k)}|${a1J([[a, v], [b]])}| ${c < 0 ? MINUS : '+'} ${Math.abs(c)} = ${fmt(d)}`;
+  const vals = m < 0 ? [] : [(m - b) / a, (-m - b) / a];
+  return a1setQ(r, { v, vals, eq, wrongs: m < 0 ? [[(-m - b) / a, (m - b) / a]] : [[(m - b) / a], [(d - b) / a, (-d - b) / a]], topic: 'Absolute value equations',
+    solution: `Isolate the absolute value: |${a1J([[a, v], [b]])}| = ${fmt(m)}.\n${m < 0 ? 'An absolute value cannot be negative, so the equation has no solution.' : `${a1J([[a, v], [b]])} = ${m} or ${a1J([[a, v], [b]])} = ${MINUS}${m}\n${v} = ${fracT(vals[0])} or ${v} = ${fracT(vals[1])}`}` });
+};
+// #29–38: |A| = |B| and |A| = cx (check for extraneous solutions)
+TEMPLATES.a18Both = (r) => {
+  const v = a1V(r);
+  if (r() < 0.65) { let a, b, c, d; do { a = nz(r, -5, 5); b = nz(r, -9, 9); c = nz(r, -5, 5); d = nz(r, -9, 9); } while (Math.abs(a) === Math.abs(c) || (a + c === 0) || (a - c === 0));
+    const s1 = (d - b) / (a - c), s2 = (-d - b) / (a + c);
+    return a1setQ(r, { v, vals: [s1, s2], eq: `|${a1J([[a, v], [b]])}| = |${a1J([[c, v], [d]])}|`, wrongs: [[s1], [s2], [-s1, -s2]], topic: 'Absolute value equations', solution: `${a1J([[a, v], [b]])} = ${a1J([[c, v], [d]])} or ${a1J([[a, v], [b]])} = ${MINUS}(${a1J([[c, v], [d]])})\n${v} = ${fracT(s1)} or ${v} = ${fracT(s2)}` }); }
+  const a = pick(r, [3, 6, 2, 5]), b = nz(r, -7, 7), c = pick(r, [7, 4, 9, 1, 2].filter((q) => q !== a));
+  // |a v + b| = c v
+  const cand = [b / (c - a), -b / (c + a)].filter((x) => isFinite(x)), good = cand.filter((x) => c * x >= -1e-12 && Math.abs(Math.abs(a * x + b) - c * x) < 1e-9), bad = cand.filter((x) => !good.includes(x));
+  return a1setQ(r, { v, vals: good, eq: `|${a1J([[a, v], [b]])}| = ${c === 1 ? '' : c}${v}`, wrongs: [cand, bad.length ? bad : [-cand[0]]], topic: 'Absolute value equations',
+    solution: `${a1J([[a, v], [b]])} = ${c === 1 ? '' : c}${v} or ${a1J([[a, v], [b]])} = ${MINUS}${c === 1 ? '' : c}${v}\nCandidates: ${cand.map(fracT).join(' and ')}. Check each in the original equation${bad.length ? `: ${bad.map(fracT).join(' and ')} is extraneous` : ''}.\n${good.length ? `${v} = ${good.map(fracT).join(' and ')}` : 'No solution'}` });
+};
+// #39–42: write an absolute value equation
+TEMPLATES.a18Write = (r) => {
+  const m = nz(r, -12, 14) + pick(r, [0, 0, 0.5]), d = ri(r, 2, 12) + pick(r, [0, 0, 0.5]), lo = m - d, hi = m + d;
+  if (!lo || !hi) return TEMPLATES.a18Write(r);
+  return { topic: 'Absolute value equations', stem: `Write an absolute value equation that has the given solutions.   x = ${fmt(lo)} and x = ${fmt(hi)}`, frStem: `Write an absolute value equation |x − h| = d that has the solutions x = ${fmt(lo)} and x = ${fmt(hi)}.`,
+    ...buildChoices(r, `|x ${m < 0 ? '+' : MINUS} ${fmt(Math.abs(m))}| = ${fmt(d)}`, [`|x ${m < 0 ? MINUS : '+'} ${fmt(Math.abs(m))}| = ${fmt(d)}`, `|x ${m < 0 ? '+' : MINUS} ${fmt(Math.abs(d))}| = ${fmt(Math.abs(m)) === fmt(d) ? fmt(d + 1) : fmt(Math.abs(m))}`, `|x ${m < 0 ? '+' : MINUS} ${fmt(Math.abs(m))}| = ${fmt(2 * d)}`], () => null),
+    fr: { fields: [{ kind: 'number', label: '|x −', suffix: '|' }, { kind: 'number', label: '=' }], key: [String(m), String(d)], display: `|x ${m < 0 ? '+' : MINUS} ${fmt(Math.abs(m))}| = ${fmt(d)}`, check: (v) => numEq(v[0], m) && numEq(v[1], d), score: (v) => ((numEq(v[0], m) ? 1 : 0) + (numEq(v[1], d) ? 1 : 0)) / 2 },
+    solution: `The center is the midpoint: (${fmt(lo)} + ${fmt(hi)}) ÷ 2 = ${fmt(m)}. The distance to each solution is ${fmt(d)}.\n|x ${m < 0 ? '+' : MINUS} ${fmt(Math.abs(m))}| = ${fmt(d)}` };
+};
+// #23–24: tolerance — minimum and maximum
+TEMPLATES.a18Tol = (r) => {
+  const C = pick(r, [['A soccer ball', 'mass', 'kilogram', [0.41, 0.43, 0.45], [0.02, 0.015]], ['The distance from Earth to the Sun', 'distance', 'million miles', [92.95, 93, 92.5], [1.55, 1.5]], ['A bag of flour', 'weight', 'pounds', [5, 10, 25], [0.1, 0.2, 0.25]], ['A bolt', 'length', 'millimeters', [30, 45, 60], [0.05, 0.2]]]);
+  const c = pick(r, C[3]), t = pick(r, C[4]), lo = Math.round((c - t) * 1000) / 1000, hi = Math.round((c + t) * 1000) / 1000;
+  return { topic: 'Absolute value equations', stem: `${C[0]} should have a ${C[1]} of ${fmt3(c)} ${C[2]}, but the actual ${C[1]} is allowed to vary by up to ${fmt3(t)} ${C[2]}. Write and solve an absolute value equation to find the minimum and maximum acceptable ${C[1]}s.`,
+    ...buildChoices(r, `minimum ${fmt3(lo)}, maximum ${fmt3(hi)}`, [`minimum ${fmt3(c)}, maximum ${fmt3(hi)}`, `minimum ${fmt3(Math.round((c - 2 * t) * 1000) / 1000)}, maximum ${fmt3(Math.round((c + 2 * t) * 1000) / 1000)}`, `minimum ${fmt3(lo)}, maximum ${fmt3(c)}`], () => null),
+    fr: { fields: [{ kind: 'number', label: 'Minimum:' }, { kind: 'number', label: 'Maximum:' }], key: [String(lo), String(hi)], display: `minimum ${fmt3(lo)}, maximum ${fmt3(hi)}`, check: (v) => numOk(v[0], lo, 1e-9) && numOk(v[1], hi, 1e-9), score: (v) => ((numOk(v[0], lo, 1e-9) ? 1 : 0) + (numOk(v[1], hi, 1e-9) ? 1 : 0)) / 2 },
+    solution: `|x ${MINUS} ${fmt3(c)}| = ${fmt3(t)}\nx = ${fmt3(c)} ${MINUS} ${fmt3(t)} = ${fmt3(lo)} or x = ${fmt3(c)} + ${fmt3(t)} = ${fmt3(hi)}` };
+};
+const fmt3 = (x) => String(Math.round(x * 1000) / 1000);
+// #46: number of solutions
+TEMPLATES.a18Count = (r) => {
+  const a = nz(r, -9, 9), b = nz(r, -9, 9), m = pick(r, [-ri(r, 1, 9), 0, ri(r, 1, 9), ri(r, 1, 9)]), c = m + b, ans = m < 0 ? 'No solution' : m === 0 ? 'One solution' : 'Two solutions';
+  return { topic: 'Absolute value equations', stem: `Without solving completely, decide how many solutions the equation has.   |x ${a < 0 ? '+' : MINUS} ${Math.abs(a)}| ${b < 0 ? MINUS : '+'} ${Math.abs(b)} = ${fmt(c)}`, ...buildChoices(r, ans, ['No solution', 'One solution', 'Two solutions'].filter((x) => x !== ans), () => null),
+    fr: FR.select('Number of solutions:', ['No solution', 'One solution', 'Two solutions'], ans), solution: `Isolate the absolute value: |x ${a < 0 ? '+' : MINUS} ${Math.abs(a)}| = ${fmt(m)}. ${m < 0 ? 'An absolute value is never negative, so there is no solution.' : m === 0 ? 'Only x = ' + fmt(a) + ' works, so there is one solution.' : 'A positive distance gives two solutions.'}` };
+};
+
+// ---------- 1.9 Rewriting Equations and Formulas ----------
+// does the typed expression equal truth(env) for random values of vars? (target letter not allowed)
+function a1litOk(raw, target, vars, truth) {
+  const s = String(raw || '').replace(new RegExp(`^\\s*${target}\\s*=`, 'i'), '');
+  const f = pxParse(s, vars, ''); if (!f) return false;
+  let n = 0;
+  for (let j = 0; j < 40; j++) { const e = {}; vars.forEach((q, i) => { e[q] = 1.3 + ((j * 7 + i * 13) % 37) / 5.3 + i * 0.17; }); const t = truth(e); if (!isFinite(t)) continue; const a = f(e); if (!isFinite(a) || Math.abs(a - t) > 1e-6 * Math.max(1, Math.abs(t))) return false; n++; }
+  return n >= 10;
+}
+function a1litQ(r, { stem, target, vars, truth, text, latex, wrongs, solution, topic = 'Literal equations' }) {
+  const correct = `${target} = ${text}`;
+  return { topic, stem, ...buildChoices(r, correct, wrongs.map((w) => `${target} = ${w}`).filter((w) => w !== correct), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'func', label: `${target} =` }], key: [latex], display: correct, check: (v) => a1litOk(v[0], target, vars, truth) }, solution };
+}
+// #1–10: solve for y
+TEMPLATES.a19ForY = (r) => {
+  for (let t = 0; t < 200; t++) {
+    const a = nz(r, -9, 9), b = pick(r, [1, -1, 2, 3, 5, -3, 4]), c = nz(r, -20, 20); // a x + b y = c → y = (c − a x)/b
+    if (b === 1 && a < 0 && r() < 0.5) continue;
+    const m = -a / b, k = c / b, txt = a1J([[m, 'x'], [k]]), lat = `${fracL(m).replace(/^1$/, '').replace(/^-1$/, '-')}x${k < 0 ? '' : '+'}${fracL(k)}`;
+    return a1litQ(r, { stem: `Solve the literal equation for y.   ${a1J([[a, 'x'], [b, 'y']])} = ${fmt(c)}`, target: 'y', vars: ['x'], truth: (e) => m * e.x + k, text: txt, latex: lat,
+      wrongs: [a1J([[-m, 'x'], [k]]), a1J([[m, 'x'], [-k]]), a1J([[-a, 'x'], [c]])], solution: `${a > 0 ? 'Subtract' : 'Add'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}x on each side: ${a1J([[b, 'y']])} = ${a1J([[-a, 'x'], [c]])}.${b === 1 ? '' : ` Divide each side by ${a1P(b)}.`}\ny = ${txt}` });
+  }
+};
+// #11–20: solve for x (other letters stay)
+TEMPLATES.a19ForX = (r) => {
+  const p = ri(r, 2, 9), q = ri(r, 2, 9), F = pick(r, [
+    () => [`y = ${p}x + ${q}x`, ['y'], (e) => e.y / (p + q), `y/${p + q}`, `\\frac{y}{${p + q}}`, [`${p + q}y`, `y ${MINUS} ${p + q}`, `y/${p * q}`], `Combine like terms: y = ${p + q}x. Divide by ${p + q}.`],
+    () => [`m = ${p + 5}x ${MINUS} x`, ['m'], (e) => e.m / (p + 4), `m/${p + 4}`, `\\frac{m}{${p + 4}}`, [`m/${p + 5}`, `${p + 4}m`, `m ${MINUS} ${p + 4}`], `Combine like terms: m = ${p + 4}x. Divide by ${p + 4}.`],
+    () => [`a = ${p}x + ${q}xz`, ['a', 'z'], (e) => e.a / (p + q * e.z), `a/(${p} + ${q}z)`, `\\frac{a}{${p}+${q}z}`, [`a/${p} + ${q}z`, `(a ${MINUS} ${p})/(${q}z)`, `a/(${p + q}z)`], `Factor out x: a = x(${p} + ${q}z). Divide by (${p} + ${q}z).`],
+    () => [`y = ${p}bx ${MINUS} ${q}x`, ['y', 'b'], (e) => e.y / (p * e.b - q), `y/(${p}b ${MINUS} ${q})`, `\\frac{y}{${p}b-${q}}`, [`y/(${p}b + ${q})`, `y/${p}b ${MINUS} ${q}`, `(y + ${q})/(${p}b)`], `Factor out x: y = x(${p}b ${MINUS} ${q}). Divide by (${p}b ${MINUS} ${q}).`],
+    () => [`z = ${q} + ${p}x ${MINUS} px`, ['z', 'p'], (e) => (e.z - q) / (p - e.p), `(z ${MINUS} ${q})/(${p} ${MINUS} p)`, `\\frac{z-${q}}{${p}-p}`, [`(z + ${q})/(${p} ${MINUS} p)`, `(z ${MINUS} ${q})/(${p} + p)`, `z/(${p} ${MINUS} p) ${MINUS} ${q}`], `Subtract ${q}: z ${MINUS} ${q} = x(${p} ${MINUS} p). Divide by (${p} ${MINUS} p).`],
+    () => [`sx + tx = r`, ['s', 't', 'r'], (e) => e.r / (e.s + e.t), `r/(s + t)`, `\\frac{r}{s+t}`, [`r/s + t`, `r ${MINUS} s ${MINUS} t`, `(s + t)/r`], 'Factor out x: x(s + t) = r. Divide by (s + t).'],
+    () => [`a = bx + cx + d`, ['a', 'b', 'c', 'd'], (e) => (e.a - e.d) / (e.b + e.c), `(a ${MINUS} d)/(b + c)`, `\\frac{a-d}{b+c}`, [`(a + d)/(b + c)`, `a/(b + c) + d`, `(a ${MINUS} d)/(bc)`], 'Subtract d: a − d = x(b + c). Divide by (b + c).'],
+    () => [`x ${MINUS} ${q} + ${p}wx = y`, ['w', 'y'], (e) => (e.y + q) / (1 + p * e.w), `(y + ${q})/(1 + ${p}w)`, `\\frac{y+${q}}{1+${p}w}`, [`(y ${MINUS} ${q})/(1 + ${p}w)`, `(y + ${q})/(${p}w)`, `y/(1 + ${p}w) + ${q}`], `Add ${q}: x + ${p}wx = y + ${q}. Factor: x(1 + ${p}w) = y + ${q}. Divide.`]])();
+  const [eq, vars, truth, text, latex, wrongs, how] = F;
+  return a1litQ(r, { stem: `Solve the literal equation for x.   ${eq}`, target: 'x', vars, truth, text, latex, wrongs, solution: `${how}\nx = ${text}` });
+};
+// #25–30: formulas
+TEMPLATES.a19Formula = (r) => {
+  const F = pick(r, [
+    ['Profit: P = R − C. Solve for C.', 'c', ['p', 'r'], (e) => e.r - e.p, 'R − P', 'R-P', ['P − R', 'R + P', 'P/R'], 'Add C and subtract P: C = R − P.'],
+    ['Surface area of a cylinder: S = 2πr² + 2πrh. Solve for h.', 'h', ['s', 'r'], (e) => (e.s - 2 * Math.PI * e.r ** 2) / (2 * Math.PI * e.r), '(S − 2πr²)/(2πr)', '\\frac{S-2\\pi r^2}{2\\pi r}', ['S/(2πr) − 2πr²', '(S − 2πr)/(2πr²)', 'S − 2πr² − 2πr'], 'Subtract 2πr²: S − 2πr² = 2πrh. Divide by 2πr.'],
+    ['Area of a trapezoid: A = ½h(b + c). Solve for c.', 'c', ['a', 'h', 'b'], (e) => (2 * e.a) / e.h - e.b, '2A/h − b', '\\frac{2A}{h}-b', ['2A/h + b', 'A/(2h) − b', '2A − h − b'], 'Multiply by 2: 2A = h(b + c). Divide by h: 2A/h = b + c. Subtract b.'],
+    ['Average acceleration: a = (v − u)/t. Solve for v.', 'v', ['a', 'u', 't'], (e) => e.a * e.t + e.u, 'at + u', 'at+u', ['at − u', '(a + u)/t', 'a/t + u'], 'Multiply by t: at = v − u. Add u: v = at + u.'],
+    ['Simple interest: I = Prt. Solve for r.', 'r', ['i', 'p', 't'], (e) => e.i / (e.p * e.t), 'I/(Pt)', '\\frac{I}{Pt}', ['IPt', 'Pt/I', 'I − Pt'], 'Divide each side by Pt.'],
+    ['Distance: d = rt. Solve for t.', 't', ['d', 'r'], (e) => e.d / e.r, 'd/r', '\\frac{d}{r}', ['dr', 'r/d', 'd − r'], 'Divide each side by r.'],
+    ['Volume of a box: V = ℓwh. Solve for w.', 'w', ['v', 'l', 'h'], (e) => e.v / (e.l * e.h), 'V/(ℓh)', '\\frac{V}{lh}', ['Vℓh', 'ℓh/V', 'V − ℓh'], 'Divide each side by ℓh.'],
+    ['Temperature: C = (5/9)(F − 32). Solve for F.', 'f', ['c'], (e) => (9 / 5) * e.c + 32, '(9/5)C + 32', '\\frac{9}{5}C+32', ['(5/9)C + 32', '(9/5)(C + 32)', '(9/5)C − 32'], 'Multiply by 9/5: (9/5)C = F − 32. Add 32.'],
+    ['Perimeter of a rectangle: P = 2ℓ + 2w. Solve for w.', 'w', ['p', 'l'], (e) => (e.p - 2 * e.l) / 2, '(P − 2ℓ)/2', '\\frac{P-2l}{2}', ['P − 2ℓ/2', '(P + 2ℓ)/2', 'P/2 − 2ℓ'], 'Subtract 2ℓ: P − 2ℓ = 2w. Divide by 2.'],
+    ['Quarterback completion rating: R = 5(C/A − 0.3). Solve for C.', 'c', ['r', 'a'], (e) => e.a * (e.r / 5 + 0.3), 'A(R/5 + 0.3)', 'A\\left(\\frac{R}{5}+0.3\\right)', ['A(5R + 0.3)', 'A(R/5 − 0.3)', 'R/5 + 0.3A'], 'Divide by 5: R/5 = C/A − 0.3. Add 0.3, then multiply by A.']]);
+  const [stem, tv, vars, truth, text, latex, wrongs, how] = F, shown = { c: 'C', h: 'h', v: 'v', r: 'r', t: 't', w: 'w', f: 'F' }[tv];
+  const q = a1litQ(r, { stem: `Solve the formula for the indicated variable.   ${stem}`, target: shown, vars, truth, text, latex, wrongs, solution: `${how}\n${shown} = ${text}`, topic: 'Formulas' });
+  q.fr.check = (v) => a1litOk(String(v[0] || '').replace(/ℓ|\\ell/g, 'l'), shown, vars, truth);
+  return q;
+};
+// #21–22: rewrite, then use
+TEMPLATES.a19Word = (r) => {
+  if (r() < 0.5) { const m = pick(r, [85, 75, 90]), b = pick(r, [60, 50, 40]), n = ri(r, 2, 9), C = m * n + b;
+    return a1numQ(r, { topic: 'Literal equations', stem: `The total cost C (in dollars) to participate in a ski club is C = ${m}x + ${b}, where x is the number of ski trips you take. Solve the equation for x. How many ski trips did you take if you spent a total of $${C}?`, val: n, unit: 'trips', wrongs: [Math.round(C / m * 100) / 100, Math.round((C + b) / m * 100) / 100], solution: `x = (C ${MINUS} ${b})/${m} = (${C} ${MINUS} ${b})/${m} = ${n}` }); }
+  const d = pick(r, [1, 1.5, 2, 2.5, 3, 4, 5]), n = (d + 2) / 4;
+  return a1numQ(r, { topic: 'Literal equations', stem: `The penny size d of a nail that is 1 to 3 inches long is d = 4n − 2, where n is the length (in inches) of the nail. Solve the equation for n. What is the length of a ${fmt(d) === '1' ? '' : ''}${fmt(d)}d nail? (Use d = ${fmt(d) === '1' ? 2 : fmt(d * 2)}.)`.replace(/What is the length.*/, `What is the length of a nail with penny size ${fmt(d * 2)}?`), val: (d * 2 + 2) / 4, unit: 'in.', wrongs: [(d * 2 - 2) / 4, d * 8 - 2], solution: `n = (d + 2)/4 = (${fmt(d * 2)} + 2)/4 = ${fracT((d * 2 + 2) / 4)} in.` });
+};
+for (const name of Object.keys(TEMPLATES)) if (/^a1\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== ALGEBRA 1 CH1 END ==== */
+/* ==== ALGEBRA 1 CH2 BEGIN ==== */
+/* ---------- Algebra 1 (Big Ideas Learning 2025), Chapter 2: Solving Linear Inequalities ---------- */
+KEYROWS_P.ineq = [['<', '<'], ['>', '>'], ['≤', '\\le '], ['≥', '\\ge '], ['a⁄b', '\\frac{#@}{#?}'], ['or', '\\text{ or }'], ['and', '\\text{ and }'], ['no solution', '\\text{no solution}'], ['all real numbers', '\\text{all real numbers}']];
+// solution sets are lists of intervals {a, b, ca, cb} (like ALL)
+const a2I = (a, b, ca = false, cb = false) => ({ a, b, ca, cb });
+const a2S = (op, c) => (op === '<' ? [a2I(-Infinity, c)] : op === '≤' ? [a2I(-Infinity, c, false, true)] : op === '>' ? [a2I(c, Infinity)] : [a2I(c, Infinity, true)]);
+const A2FLIP = { '<': '>', '>': '<', '≤': '≥', '≥': '≤' }, A2LX = { '<': '<', '>': '>', '≤': '\\le ', '≥': '\\ge ' };
+const a2isAll = (S) => S.length === 1 && S[0].a === -Infinity && S[0].b === Infinity;
+const a2num = (x, dec) => (dec || Number.isInteger(x * 2) ? fmt(x) : fracT(x));
+// inequality text: "x < 3", "−2 < x ≤ 5", "x < −3 or x > 5", "No solution", "All real numbers"
+function a2T(v, S, { latex = false, dec = false } = {}) {
+  if (!S.length) return latex ? '\\text{no solution}' : 'No solution';
+  if (a2isAll(S)) return latex ? '\\text{all real numbers}' : 'All real numbers';
+  const N = (x) => (latex ? (dec || Number.isInteger(x * 2) ? String(x) : fracL(x)) : a2num(x, dec)), op = (o) => (latex ? A2LX[o] : ` ${o} `);
+  const one = (I) => (I.a === -Infinity ? `${v}${op(I.cb ? '≤' : '<')}${N(I.b)}` : I.b === Infinity ? `${v}${op(I.ca ? '≥' : '>')}${N(I.a)}` : `${N(I.a)}${op(I.ca ? '≤' : '<')}${v}${op(I.cb ? '≤' : '<')}${N(I.b)}`);
+  return S.map(one).join(latex ? '\\text{ or }' : ' or ');
+}
+// a typed inequality → a test function x → bool, 'none', 'all', or null; solved: the variable must stand alone
+function a2pred(raw, v, solved) {
+  const w = pxWords(raw);
+  if (/nosolution|^none$/.test(w)) return 'none';
+  if (/allreal|everyreal|allnumbers/.test(w)) return 'all';
+  let s = pxPlain(String(raw || '').replace(/\\lor|\\vee/g, ' or ').replace(/\\land|\\wedge/g, ' and ')); if (s == null) return null;
+  s = s.replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/=</g, '≤').replace(/=>/g, '≥').replace(/\s+/g, '');
+  if (!s || /=/.test(s)) return null;
+  const E = 1e-9, cmp = { '<': (a, b) => a < b - E, '≤': (a, b) => a <= b + E, '>': (a, b) => a > b + E, '≥': (a, b) => a >= b - E };
+  const ors = [];
+  for (const part of s.split(/or|∪/)) {
+    const ands = [];
+    for (const atom of part.split(/and/)) {
+      const t = atom.split(/(≤|≥|<|>)/); if (t.length !== 3 && t.length !== 5) return null;
+      const ex = t.filter((_, i) => i % 2 === 0), ops = t.filter((_, i) => i % 2 === 1);
+      if (ex.some((e) => !e)) return null;
+      const F = ex.map((e) => pxParse(e, [v], '')); if (F.some((f) => !f)) return null;
+      if (solved) {
+        const isV = (e) => e.toLowerCase() === v, isC = (e) => !!pxParse(e, [], '');
+        if (ex.length === 3) { if (!(isV(ex[1]) && isC(ex[0]) && isC(ex[2]))) return null; if (/[<≤]/.test(ops[0]) !== /[<≤]/.test(ops[1])) return null; }
+        else if (!((isV(ex[0]) && isC(ex[1])) || (isV(ex[1]) && isC(ex[0])))) return null;
+      }
+      ands.push((x) => ops.every((o, i) => cmp[o](F[i]({ [v]: x }), F[i + 1]({ [v]: x }))));
+    }
+    ors.push((x) => ands.every((f) => f(x)));
+  }
+  return (x) => ors.some((f) => f(x));
+}
+function a2ok(raw, S, v, { solved = true, pos = false } = {}) {
+  const P = a2pred(raw, v, solved); if (!P) return false;
+  if (P === 'none' || P === 'all') return P === 'none' ? !S.length : a2isAll(S);
+  const pts = [-1e6, 1e6];
+  for (let x = -80; x <= 80; x += 0.25) pts.push(x + 0.13);
+  for (const I of S) for (const e of [I.a, I.b]) if (isFinite(e)) { pts.push(e, e + 1e-6, e - 1e-6); for (let k = 1; k <= 60; k++) pts.push(e + k * 0.01, e - k * 0.01); }
+  const ends = S.flatMap((I) => [I.a, I.b]).filter(isFinite);
+  return pts.filter((x) => (!pos || x > 0) && ends.every((e) => x === e || Math.abs(x - e) > 1e-7)).every((x) => !!P(x) === inSet(S, x));
+}
+// a typed-answer question with text choices
+function a2Q(r, { topic, stem, v, S, wrongs = [], solution, solved = true, pos = false, dec = false, frStem, draw, size, display, key, label = '' }) {
+  const correct = display || a2T(v, S, { dec });
+  const W = [...new Set(wrongs.filter((x) => Array.isArray(x)).map((x) => a2T(v, x, { dec })).concat(wrongs.filter((x) => typeof x === 'string')))].filter((t) => t !== correct);
+  return { topic, stem, frStem, draw, size, ...buildChoices(r, correct, W, (i) => a2T(v, a2S(pick(r, ['<', '>', '≤', '≥']), i + 2), { dec })),
+    fr: { fields: [{ kind: 'expr', keys: 'ineq', label }], key: [key || a2T(v, S, { latex: true, dec })], display: correct, check: (x) => a2ok(x[0], S, v, { solved, pos }) }, solution };
+}
+// wrong answers: reverse the inequality sign / switch strict and inclusive
+const a2rev = (S) => S.map((I) => (I.a === -Infinity ? a2I(I.b, Infinity, I.cb, false) : I.b === Infinity ? a2I(-Infinity, I.a, false, I.ca) : I));
+const a2inc = (S) => S.map((I) => a2I(I.a, I.b, isFinite(I.a) && !I.ca, isFinite(I.b) && !I.cb));
+const a2at = (S, f) => S.map((I) => a2I(isFinite(I.a) ? f(I.a) : I.a, isFinite(I.b) ? f(I.b) : I.b, I.ca, I.cb));
+// ---------- number-line graphs ----------
+function a2Win(S) {
+  const E = S.flatMap((I) => [I.a, I.b]).filter(isFinite), m = Math.min(...E), M = Math.max(...E), span = Math.max(M - m, 1);
+  const tick = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500].find((t) => (span + 6 * t) / t <= 18) || 1000;
+  const half = E.some((e) => !Number.isInteger(e / tick)), ss = half ? (E.every((e) => Number.isInteger(e * 2)) ? 0.5 : 0.25) : tick;
+  let lo = Math.floor((m - 3 * tick) / tick) * tick, hi = Math.ceil((M + 3 * tick) / tick) * tick; while ((hi - lo) / tick < 10) { lo -= tick; hi += tick; }
+  const n = (hi - lo) / tick, lab = n > 12 ? 2 * tick : tick, w = hi - lo;
+  return { lo, hi, tick, lab, nl: S, xr: [lo, hi], yr: [1 - 0.11 * w, 1 + 0.09 * w], hFrac: 0.32, snap: (x) => [Math.max(lo, Math.min(hi, Math.round(x / ss) * ss)), 1] };
+}
+// paint a solution set on a number line at height y
+function a2paint(c, X, y, W, segs, color) {
+  c.save(); c.strokeStyle = color; c.fillStyle = color; c.lineWidth = 4;
+  const L = X(W.lo) - 10, R = X(W.hi) + 10;
+  for (const { a, b } of segs) {
+    const x1 = a === -Infinity ? L : X(a), x2 = b === Infinity ? R : X(b);
+    c.beginPath(); c.moveTo(x1, y); c.lineTo(x2, y); c.stroke();
+    for (const [inf, x, d] of [[a === -Infinity, L, -1], [b === Infinity, R, 1]]) if (inf) { c.beginPath(); c.moveTo(x + d * 4, y); c.lineTo(x - d * 8, y - 7); c.lineTo(x - d * 8, y + 7); c.closePath(); c.fill(); }
+  }
+  c.restore();
+}
+function a2dot(c, X, y, x, closed, color) {
+  c.save(); c.beginPath(); c.arc(X(x), y, 6.5, 0, 2 * Math.PI); c.lineWidth = 2.5; c.strokeStyle = closed == null ? '#9a958a' : color;
+  c.fillStyle = closed ? color : '#fff'; c.fill(); c.stroke(); c.restore();
+}
+function a2line(c, X, y, W) { a8axis(c, X, y, W.lo, W.hi, W.tick, W.lab); c.save(); c.fillStyle = '#1d1d1b'; for (const [x, d] of [[X(W.lo) - 8, -1], [X(W.hi) + 8, 1]]) { c.beginPath(); c.moveTo(x + d * 6, y); c.lineTo(x - d * 3, y - 5); c.lineTo(x - d * 3, y + 5); c.closePath(); c.fill(); } c.restore(); }
+function a2drawSet(c, X, y, W, S, color) {
+  if (!S.length || a2isAll(S)) { if (a2isAll(S)) a2paint(c, X, y, W, [{ a: -Infinity, b: Infinity }], color); return; }
+  a2paint(c, X, y, W, S.map((I) => ({ a: I.a, b: I.b })), color);
+  S.forEach((I) => { if (isFinite(I.a)) a2dot(c, X, y, I.a, I.ca, color); if (isFinite(I.b)) a2dot(c, X, y, I.b, I.cb, color); });
+}
+// the student's graph from the points and the circle choice
+function a2studentSet(family, pts, style) {
+  const xs = pts.map((p) => p[0]);
+  if (family === 'nline1') {
+    if (pts.length < 2 || xs[1] === xs[0]) return null; const e = xs[0], cl = style ? style === 'closed' : null;
+    return { segs: [xs[1] > e ? { a: e, b: Infinity } : { a: -Infinity, b: e }], dots: [[e, cl]] };
+  }
+  if (pts.length < 3) return null; const [a, b] = [Math.min(xs[0], xs[1]), Math.max(xs[0], xs[1])], s = xs[2]; if (a === b || s === a || s === b) return null;
+  const cl = style ? [style[0] === 'c', style[1] === 'c'] : [null, null];
+  return { segs: s > a && s < b ? [{ a, b }] : [{ a: -Infinity, b: a }, { a: b, b: Infinity }], dots: [[a, cl[0]], [b, cl[1]]] };
+}
+function a2sketchDraw(family) {
+  return (cv, f, pts, overlay, style) => {
+    const W = f.win, c = cv._ctx, T = skTransform(cv, W), X = T.X, y = T.Y(1);
+    c.clearRect(0, 0, cv._w, cv._h); a2line(c, X, y, W);
+    if (overlay) { c.save(); c.globalAlpha = 0.85; a2drawSet(c, X, y - 26, W, W.nl, '#5aa95a'); c.restore(); }
+    const St = a2studentSet(family, pts, style);
+    if (St) { a2paint(c, X, y, W, St.segs, '#1f5fa8'); St.dots.forEach(([x, cl]) => a2dot(c, X, y, x, cl, '#1f5fa8')); }
+    c.font = '12px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom';
+    pts.forEach(([x], j) => { if (!St || !St.dots.some((d) => d[0] === x) || j === (family === 'nline1' ? 1 : 2)) { c.beginPath(); c.arc(X(x), y, 5, 0, 2 * Math.PI); c.fillStyle = family === 'nline1' && j === 1 || j === 2 ? '#c0392b' : '#1f5fa8'; c.fill(); } c.fillStyle = '#1d1d1b'; c.fillText(fmt(x), X(x), y - 10); });
+  };
+}
+SKETCH.nline1 = { roles: ['the endpoint', 'a point on the part of the line to shade'], short: ['', ''], fit: () => null, style: true,
+  styleOpts: [['● Closed circle', 'closed'], ['○ Open circle', 'open']], styleMsg: 'Now choose a closed circle (● included) or an open circle (○ not included).',
+  match: (pts, T, win, style) => { const S = win.nl, I = S[0], up = I.b === Infinity, e = up ? I.a : I.b, cl = up ? I.ca : I.cb;
+    return pts.length === 2 && Math.abs(pts[0][0] - e) < 1e-9 && (up ? pts[1][0] > e : pts[1][0] < e) && (style === undefined || style === (cl ? 'closed' : 'open')); },
+  draw: a2sketchDraw('nline1') };
+SKETCH.nline2 = { roles: ['one endpoint', 'the other endpoint', 'a point on a part of the line to shade'], short: ['', '', ''], fit: () => null, style: true,
+  styleOpts: [['○ … ○', 'oo'], ['○ … ●', 'oc'], ['● … ○', 'co'], ['● … ●', 'cc']], styleMsg: 'Now choose the circles: left endpoint, then right endpoint (● included, ○ not included).',
+  match: (pts, T, win, style) => { if (pts.length !== 3) return false; const S = win.nl, xs = pts.map((p) => p[0]), a = Math.min(xs[0], xs[1]), b = Math.max(xs[0], xs[1]), s = xs[2];
+    const between = S.length === 1, A = between ? S[0].a : S[0].b, B = between ? S[0].b : S[1].a, ca = between ? S[0].ca : S[0].cb, cb = between ? S[0].cb : S[1].ca;
+    if (Math.abs(a - A) > 1e-9 || Math.abs(b - B) > 1e-9) return false;
+    if (between ? !(s > a && s < b) : !(s < a || s > b)) return false;
+    return style === undefined || style === (ca ? 'c' : 'o') + (cb ? 'c' : 'o'); },
+  draw: a2sketchDraw('nline2') };
+const a2graphable = (S) => S.length && !a2isAll(S) && S.flatMap((I) => [I.a, I.b]).filter(isFinite).every((e) => Number.isInteger(e * 2)) && (S.length === 1 || (S[0].a === -Infinity && S[1].b === Infinity));
+// describe a graph in words
+function a2desc(S) {
+  const cw = (x) => (x ? 'closed' : 'open');
+  if (S.length === 1 && S[0].a === -Infinity) return `${cw(S[0].cb)} circle at ${a2num(S[0].b)}, shaded to the left`;
+  if (S.length === 1 && S[0].b === Infinity) return `${cw(S[0].ca)} circle at ${a2num(S[0].a)}, shaded to the right`;
+  if (S.length === 1) return `${cw(S[0].ca)} circle at ${a2num(S[0].a)}, ${cw(S[0].cb)} circle at ${a2num(S[0].b)}, shaded between`;
+  return `${cw(S[0].cb)} circle at ${a2num(S[0].b)} shaded left; ${cw(S[1].ca)} circle at ${a2num(S[1].a)} shaded right`;
+}
+// a students-graph question; typed: also type the solution
+function a2GQ(r, { topic, stem, v, S, solution, typed = true, pos = false }) {
+  const win = a2Win(S), family = S.length === 1 && (S[0].a === -Infinity || S[0].b === Infinity) ? 'nline1' : 'nline2';
+  const E = S.flatMap((I) => [I.a, I.b]).filter(isFinite), keyPts = family === 'nline1' ? [[E[0], 1], [E[0] + (S[0].b === Infinity ? 1 : -1) * win.tick, 1]] : [[E[0], 1], [E[1], 1], [S.length === 1 ? (E[0] + E[1]) / 2 : E[0] - win.tick, 1]];
+  const display = `${a2T(v, S)} (${a2desc(S)})`;
+  const fr = typed ? skFRplus({ family, target: S, keyPts, win, display, more: { fields: [{ kind: 'expr', keys: 'ineq', label: 'Solution:' }], key: [a2T(v, S, { latex: true })], check: (x) => a2ok(x[0], S, v, { pos }) } })
+    : skFR({ family, target: S, keyPts, win, display });
+  const st = family === 'nline1' ? ((S[0].b === Infinity ? S[0].ca : S[0].cb) ? 'closed' : 'open') : S.length === 1 ? (S[0].ca ? 'c' : 'o') + (S[0].cb ? 'c' : 'o') : (S[0].cb ? 'c' : 'o') + (S[1].ca ? 'c' : 'o');
+  fr.key[0] += '|' + st; fr._target = S;
+  return { topic, stem, sketch: true, fr, choices: null, answer: -1, solution: `${solution}\nGraph: ${a2desc(S)}.` };
+}
+// a drawn graph (to read)
+const a2graphDraw = (S) => (cv) => { const W = a2Win(S), c = cv._ctx, T = skTransform(cv, W), y = T.Y(1); c.clearRect(0, 0, cv._w, cv._h); a2line(c, T.X, y, W); a2drawSet(c, T.X, y, W, S, '#1f5fa8'); };
+const a2V = (r) => pick(r, ['x', 'x', 'n', 'm', 'p', 'w', 'y', 'k', 'z', 't', 'c', 'h', 'b', 'g']);
+const a2O = (r) => pick(r, ['<', '>', '≤', '≥']);
+const a2s = (x) => (x < 0 ? `(${fracT(x)})` : fracT(x)); // a number that follows an operation sign
+
+// ---------- 2.1 Writing and Graphing Inequalities ----------
+const A2WORD = { '<': 'less than', '>': 'greater than', '≤': 'less than or equal to', '≥': 'greater than or equal to' };
+TEMPLATES.a21Write = (r) => {
+  const v = a2V(r), k = ri(r, 1, 8);
+  let sent, S, shown;
+  if (k === 1) { const c = nz(r, -12, 12), op = a2O(r); sent = `A number ${v} is ${A2WORD[op]} ${fmt(c)}.`; S = a2S(op, c); shown = `${v} ${op} ${fmt(c)}`; }
+  else if (k === 2) { const a = ri(r, 2, 12), b = nz(r, -10, 15); sent = `A number ${v} plus ${a} is less than or equal to ${fmt(b)}.`; S = a2S('≤', b - a); shown = `${v} + ${a} ≤ ${fmt(b)}`; }
+  else if (k === 3) { const b = ri(r, 3, 20), d = ri(r, 2, 6), W = ['Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty'][b - 2]; sent = `${W} is no more than a number ${v} divided by ${d}.`; S = a2S('≥', b * d); shown = `${b} ≤ ${v}/${d}`; }
+  else if (k === 4) { const c = ri(r, 3, 30); sent = `One-half of a number ${v} is more than ${c}.`; S = a2S('>', 2 * c); shown = `(1/2)${v} > ${c}`; }
+  else if (k === 5) { const a = ri(r, 11, 89) / 10, c = -ri(r, 11, 89) / 10; sent = `The sum of a number ${v} and ${fmt(a)} is at least ${fmt(c)}.`; S = a2S('≥', Math.round((c - a) * 10) / 10); shown = `${v} + ${fmt(a)} ≥ ${fmt(c)}`; }
+  else if (k === 6) { const b = ri(r, 2, 9), d = pick(r, [2, 3, 2.1, 1.5]); sent = `${['', '', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'][b]} is no less than the quotient of a number ${v} and ${fmt(d)}.`; S = a2S('≤', Math.round(b * d * 100) / 100); shown = `${b} ≥ ${v}/${fmt(d)}`; }
+  else if (k === 7) { const m = ri(r, 2, 5), [p, q] = pick(r, [[5, 3], [1, 2], [3, 4]]), [s, t] = pick(r, [[4, 9], [1, 3], [5, 6]]); sent = `${['', '', 'Two', 'Three', 'Four', 'Five'][m]} times a number ${v} minus ${p}/${q} is no more than ${s}/${t}.`; S = a2S('≤', (s / t + p / q) / m); shown = `${m}${v} − ${p}/${q} ≤ ${s}/${t}`; }
+  else { const [c1, c2] = pick(r, [[7, 8], [1, 2], [2, 3]]), [p, q] = pick(r, [[5, 4], [1, 3], [3, 2]]); sent = `−${c1}/${c2} is at most the difference of twice a number ${v} and ${p}/${q}.`; S = a2S('≥', (-c1 / c2 + p / q) / 2); shown = `−${c1}/${c2} ≤ 2${v} − ${p}/${q}`; }
+  const ops = ['<', '>', '≤', '≥'], cur = ops.find((o) => shown.includes(` ${o} `)), wr = ops.filter((o) => o !== cur).map((o) => shown.replace(` ${cur} `, ` ${o} `));
+  return a2Q(r, { topic: 'Writing inequalities', stem: `Write the sentence as an inequality.   ${sent}`, v, S, solved: false, display: shown, key: shown.replace(/≤/g, '\\le ').replace(/≥/g, '\\ge ').replace(/−/g, '-'), wrongs: wr,
+    solution: `${shown}\n(Key words: "at most" / "no more than" mean ≤; "at least" / "no less than" mean ≥.)` });
+};
+// #9–18: is the value a solution?
+TEMPLATES.a21Check = (r) => {
+  const v = a2V(r), x = nz(r, -8, 8), F = pick(r, [
+    () => { const a = ri(r, 2, 9); return [`${v} + ${a}`, x + a]; }, () => { const a = ri(r, 2, 9); return [`${a} − ${v}`, a - x]; }, () => { const k = ri(r, 2, 5); return [`${k}${v}`, k * x]; },
+    () => { const k = ri(r, 2, 4), a = ri(r, 1, 9); return [`${k}${v} − ${a}`, k * x - a]; }, () => { const k = pick(r, [2, 3]); return [`−${v}/${k}`, -x / k]; }, () => { const k = ri(r, 2, 8); return [`${k}/${v}`, k / x]; }])();
+  const op = a2O(r), c = Math.round(F[1] + pick(r, [-2, -1, 0, 1, 2])), swap = r() < 0.3, holds = { '<': F[1] < c, '>': F[1] > c, '≤': F[1] <= c + 1e-12, '≥': F[1] >= c - 1e-12 }[op];
+  const ineq = swap ? `${fmt(c)} ${A2FLIP[op]} ${F[0]}` : `${F[0]} ${op} ${fmt(c)}`, ans = holds ? 'Yes' : 'No';
+  return { topic: 'Solutions of inequalities', stem: `Tell whether the value is a solution of the inequality.   ${ineq};  ${v} = ${fmt(x)}`, ...buildChoices(r, ans, [holds ? 'No' : 'Yes'], () => null), fr: FR.select(`Is ${v} = ${fmt(x)} a solution?`, ['Yes', 'No'], ans),
+    solution: `Substitute: ${F[0].replace(new RegExp(v, 'g'), `(${fmt(x)})`)} = ${fracT(F[1])}.\n${swap ? `${fmt(c)} ${A2FLIP[op]} ${fracT(F[1])}` : `${fracT(F[1])} ${op} ${fmt(c)}`} is ${holds ? 'true' : 'false'}, so ${v} = ${fmt(x)} is ${holds ? '' : 'not '}a solution.` };
+};
+// #23–30, 33–38: graph the inequality (students graph)
+TEMPLATES.a21Graph = (r) => {
+  const v = a2V(r), op = a2O(r), c = nz(r, -9, 9) + pick(r, [0, 0, 0, 0.5]), S = a2S(op, c), kind = pick(r, ['plain', 'rev', 'set', 'abs']);
+  const shown = kind === 'rev' ? `${fracT(c)} ${A2FLIP[op]} ${v}` : kind === 'set' ? `{${v} | ${v} ${op} ${fracT(c)}}` : kind === 'abs' && Number.isInteger(c) ? `${v} ${op} ${c < 0 ? '−' : ''}|${c < 0 ? '−' : ''}${Math.abs(c)}|` : `${v} ${op} ${fracT(c)}`;
+  return a2GQ(r, { topic: 'Graphing inequalities', stem: `Graph the ${kind === 'set' ? 'solution set' : 'inequality'}.   ${shown}`, v, S, typed: false, solution: `${shown} means ${a2T(v, S)}.` });
+};
+// #39–40: write an inequality from a graph
+TEMPLATES.a21FromGraph = (r) => {
+  const v = 'x', op = a2O(r), c = nz(r, -6, 6) + pick(r, [0, 0, 0.5]), S = a2S(op, c);
+  return a2Q(r, { topic: 'Graphing inequalities', stem: 'Write an inequality that represents the graph.', v, S, solved: false, draw: a2graphDraw(S), size: [420, 120], wrongs: [a2rev(S), a2inc(S), a2rev(a2inc(S))],
+    solution: `${S[0].a === -Infinity ? (S[0].cb ? 'A closed circle' : 'An open circle') : S[0].ca ? 'A closed circle' : 'An open circle'} at ${fracT(c)} with the ${S[0].a === -Infinity ? 'left' : 'right'} side shaded: ${a2T(v, S)}.` });
+};
+// #19–20, 41–44: real-life inequalities
+TEMPLATES.a21Word = (r) => {
+  const C = pick(r, [() => { const L = ri(r, 300, 500); return [`The longest natural arch in the world has a length of ${L} feet. Write an inequality that represents the possible lengths ℓ (in feet) of all other natural arches.`, 'l', a2S('<', L), `ℓ < ${L}`, true]; },
+    () => { const w = ri(r, 300, 450), d = ri(r, 10, 40); return [`The winner of a weight-lifting competition bench-pressed ${w} pounds. The other competitors all bench-pressed at least ${d} pounds less. Write an inequality for the weights w (in pounds) the other competitors bench-pressed.`, 'w', a2S('≤', w - d), `w ≤ ${w - d}`, true]; },
+    () => { const e = pick(r, [18000, 15000, 20000]); return [`An elevation more than ${e.toLocaleString('en-US')} feet above sea level is considered extremely high altitude. Write an inequality for the elevations e (in feet) that are extremely high altitude.`, 'e', a2S('>', e), `e > ${e}`, false]; },
+    () => { const m = pick(r, [7.25, 8.5, 9, 10.5]); return [`A state requires employees to be paid at least $${m.toFixed(2)} per hour. Write an inequality for the hourly wages m (in dollars) that meet the requirement.`, 'm', a2S('≥', m), `m ≥ ${fmt(m)}`, false]; },
+    () => { const t = ri(r, 74, 80), now = t - ri(r, 1, 6); return [`The water temperature of a pool must be no less than ${t}°F. It is currently ${now}°F. Write an inequality for the number of degrees d the temperature must increase.`, 'd', a2S('≥', t - now), `d ≥ ${t - now}`, false]; }])();
+  const [stem, v, S, disp, pos] = C;
+  const q = a2Q(r, { topic: 'Writing inequalities', stem, v, S, solved: false, display: disp, key: disp.replace('ℓ', 'l').replace('≤', '\\le ').replace('≥', '\\ge '), pos, wrongs: [a2rev(S), a2inc(S)], solution: disp });
+  q.fr.check = (x) => a2ok(String(x[0] || '').replace(/ℓ|\\ell/g, 'l'), S, v, { solved: false, pos });
+  return q;
+};
+
+// ---------- 2.2 Solving Inequalities Using Addition or Subtraction ----------
+function a2addsub(r, dec = false) {
+  const v = a2V(r), op = a2O(r), kind = dec ? 'dec' : pick(r, ['int', 'int', 'int', 'neg', 'frac']);
+  let s, c, sT;
+  if (kind === 'dec') { s = ri(r, -60, 60) / 10 || 1.5; c = ri(r, -80, 80) / 10; sT = fmt(s); }
+  else if (kind === 'frac') { s = pick(r, [1 / 6, -2 / 5, 1 / 2, -3 / 4, 2 / 3]); c = pick(r, [8 / 3, -4 / 5, 3 / 2, -1 / 4, 5 / 6]); sT = fracT(s); }
+  else { s = nz(r, -15, 15); c = ri(r, -12, 12); sT = String(s); }
+  const sol = Math.round((c - s) * 1e9) / 1e9, swap = r() < 0.35, form = kind === 'neg' && s > 0 ? `${v} − (−${fmt(s)})` : pick(r, [0, 1]) ? `${v} ${s < 0 ? '−' : '+'} ${a2num(Math.abs(s), kind === 'dec')}` : `${a2num(s, kind === 'dec')} + ${v}`;
+  const L = form, cT = a2num(c, kind === 'dec');
+  const ineq = swap ? `${cT} ${op} ${L}` : `${L} ${op} ${cT}`, vop = swap ? A2FLIP[op] : op, S = a2S(vop, sol);
+  const step = `${s < 0 ? 'Add' : 'Subtract'} ${a2num(Math.abs(s), kind === 'dec')} ${s < 0 ? 'to' : 'from'} each side: ${swap ? `${a2num(sol, kind === 'dec')} ${op} ${v}` : `${v} ${op} ${a2num(sol, kind === 'dec')}`}`;
+  return { v, ineq, S, dec: kind === 'dec', wrongs: [a2rev(S), a2S(vop, Math.round((c + s) * 1e9) / 1e9), a2inc(S)], solution: `${step}\nSo ${a2T(v, S, { dec: kind === 'dec' })}.` };
+}
+TEMPLATES.a22Solve = (r) => { const G = a2addsub(r, r() < 0.25); return a2Q(r, { topic: 'Solving inequalities', stem: `Solve the inequality.   ${G.ineq}`, v: G.v, S: G.S, dec: G.dec, wrongs: G.wrongs, solution: G.solution }); };
+TEMPLATES.a22Graph = (r) => { let G; do { G = a2addsub(r); } while (!a2graphable(G.S)); return a2GQ(r, { topic: 'Solving inequalities', stem: `Solve the inequality. Graph the solution.   ${G.ineq}`, v: G.v, S: G.S, solution: G.solution }); };
+// #15–18: write and solve
+TEMPLATES.a22Words = (r) => {
+  const v = 'n', C = pick(r, [() => { const a = ri(r, 2, 15), b = ri(r, -5, 20); return [`A number plus ${a} is greater than ${fmt(b)}.`, `n + ${a} > ${fmt(b)}`, a2S('>', b - a)]; },
+    () => { const a = ri(r, 2, 9), b = -ri(r, 1, 9); return [`A number minus ${a} is at least ${fmt(b)}.`, `n − ${a} ≥ ${fmt(b)}`, a2S('≥', b + a)]; },
+    () => { const a = ri(r, 2, 12), b = ri(r, -4, 9); return [`The difference of a number and ${a} is fewer than ${fmt(b)}.`, `n − ${a} < ${fmt(b)}`, a2S('<', b + a)]; },
+    () => { const a = ri(r, 3, 9), [w, f] = [ri(r, 1, 4), pick(r, [[1, 4], [1, 2], [2, 3]])]; return [`${['', '', '', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'][a]} is less than or equal to the sum of a number and ${w}${B3VF[`${f[0]}/${f[1]}`]}.`, `${a} ≤ n + ${w}${B3VF[`${f[0]}/${f[1]}`]}`, a2S('≥', a - w - f[0] / f[1])]; }])();
+  return a2Q(r, { topic: 'Solving inequalities', stem: `Write the sentence as an inequality. Then solve the inequality.   ${C[0]}`, frStem: `Write the sentence as an inequality, then solve it. Enter the solution.   ${C[0]}`, v, S: C[2], wrongs: [a2rev(C[2]), a2inc(C[2])], solution: `${C[1]}\nSolution: ${a2T(v, C[2])}` });
+};
+// #19–20, 23, 25–26: real life
+TEMPLATES.a22Word = (r) => {
+  const kind = pick(r, ['hockey', 'sodium', 'bag', 'perim']);
+  if (kind === 'hockey') { const rec = ri(r, 80, 95), now = ri(r, 40, rec - 10), need = rec - now + 1;
+    return a1numQ(r, { topic: 'Solving inequalities', stem: `A hockey player has ${now} goals so far this season. The record is ${rec} goals in a season. What is the least number of additional goals the player must score to break the record?`, val: need, unit: 'goals', wrongs: [need - 1, rec - now - 1, rec + now], solution: `${now} + g > ${rec} → g > ${rec - now}. The least whole number of goals is ${need}.` }); }
+  if (kind === 'sodium') { const lim = pick(r, [2300, 2000, 1500]), cer = ri(r, 100, 250), v = 's';
+    return a2Q(r, { topic: 'Solving inequalities', stem: `You want your daily sodium intake to be less than ${lim} milligrams. For breakfast, you eat a cereal bar with ${cer} milligrams of sodium. Write and solve an inequality for the amounts s of sodium (in milligrams) you can eat during the rest of the day.`, v, S: a2S('<', lim - cer), pos: true, wrongs: [a2S('>', lim - cer), a2S('≤', lim - cer), a2S('<', lim + cer)], solution: `${cer} + s < ${lim} → s < ${lim - cer}` }); }
+  if (kind === 'bag') { const lim = 50, bag = ri(r, 400, 470) / 10, items = [ri(r, 15, 30) / 10, ri(r, 10, 20) / 10], v = 'w', rest = Math.round((lim - bag - items[0] - items[1]) * 10) / 10; if (rest <= 0) return TEMPLATES.a22Word(r);
+    return a2Q(r, { topic: 'Solving inequalities', stem: `An airline charges an extra fee for a checked bag that weighs more than ${lim} pounds. Your bag weighs ${fmt(bag)} pounds. You add a ${fmt(items[0])}-pound souvenir and a ${fmt(items[1])}-pound hair dryer. Write and solve an inequality for the weights w (in pounds) you can still add without paying the fee.`, v, S: a2S('≤', rest), dec: true, pos: true, wrongs: [a2S('<', rest), a2S('≥', rest), a2S('≤', Math.round((lim - bag) * 10) / 10)], solution: `${fmt(bag)} + ${fmt(items[0])} + ${fmt(items[1])} + w ≤ ${lim} → w ≤ ${fmt(rest)}` }); }
+  const a = ri(r, 80, 160) / 10, b = ri(r, 80, 160) / 10, P = Math.round((a + b + ri(r, 50, 150) / 10) * 10) / 10, lim = Math.round((P - a - b) * 10) / 10, v = 'x';
+  return a2Q(r, { topic: 'Solving inequalities', stem: `A triangle has sides of ${fmt(a)} inches, ${fmt(b)} inches, and x inches. Its perimeter is less than ${fmt(P)} inches. Write and solve an inequality to find the possible values of x.`, v, S: a2S('<', lim), dec: true, pos: true, wrongs: [a2S('>', lim), a2S('<', Math.round((P - a) * 10) / 10), a2S('≤', lim)], solution: `${fmt(a)} + ${fmt(b)} + x < ${fmt(P)} → x < ${fmt(lim)} (and x > 0, because it is a length)` });
+};
+
+// ---------- 2.3 Solving Inequalities Using Multiplication or Division ----------
+function a2muldiv(r) {
+  const v = a2V(r), op = a2O(r), kind = pick(r, ['mul', 'mul', 'div', 'frac', 'dec']), swap = r() < 0.3;
+  let k, kT, c, sol, form;
+  if (kind === 'mul') { k = pick(r, [2, 3, 4, 5, 6, 7, -2, -3, -4, -5, -6, -9, 10, -10]); sol = ri(r, -9, 9) + (r() < 0.25 ? 0.5 : 0); c = k * sol; form = `${k === -1 ? '−' : fmt(k)}${v}`; }
+  else if (kind === 'div') { const d = pick(r, [2, 3, 4, 5, -2, -3, -4, -5]); k = 1 / d; c = nz(r, -9, 9); sol = c * d; form = `${v}/${d < 0 ? `(−${-d})` : d}`; }
+  else if (kind === 'frac') { const [p, q] = pick(r, [[8, 3], [4, 5], [2, 3], [5, 4], [3, 2]]), sg = pick(r, [1, -1]); k = sg * p / q; sol = q * nz(r, -6, 6) / (p % 2 === 0 ? 1 : 1); c = k * sol; if (!Number.isInteger(c * 2)) return a2muldiv(r); form = `${sg < 0 ? '−' : ''}(${p}/${q})${v}`; }
+  else { k = pick(r, [7.4, -1.1, 0.5, 2.5, -0.2]); sol = ri(r, -9, 9); c = Math.round(k * sol * 100) / 100; form = `${fmt(k)}${v}`; }
+  const cT = kind === 'dec' ? fmt(c) : fracT(c), ineq = swap ? `${cT} ${op} ${form}` : `${form} ${op} ${cT}`, vop0 = swap ? A2FLIP[op] : op, neg = k < 0, vop = neg ? A2FLIP[vop0] : vop0, S = a2S(vop, sol);
+  const how = kind === 'div' ? `Multiply each side by ${fracT(1 / k)}` : kind === 'frac' ? `Multiply each side by ${fracT(1 / k)}` : `Divide each side by ${fmt(k)}`;
+  return { v, ineq, S, dec: kind === 'dec', wrongs: [a2S(vop0, sol), a2rev(S), a2S(vop, c * k), a2inc(S)], solution: `${how}${neg ? ', and reverse the inequality symbol because it is negative' : ''}.\n${a2T(v, S, { dec: kind === 'dec' })}` };
+}
+TEMPLATES.a23Solve = (r) => { const G = a2muldiv(r); return a2Q(r, { topic: 'Solving inequalities', stem: `Solve the inequality.   ${G.ineq}`, v: G.v, S: G.S, dec: G.dec, wrongs: G.wrongs, solution: G.solution }); };
+TEMPLATES.a23Graph = (r) => { let G; do { G = a2muldiv(r); } while (!a2graphable(G.S)); return a2GQ(r, { topic: 'Solving inequalities', stem: `Solve the inequality. Graph the solution.   ${G.ineq}`, v: G.v, S: G.S, solution: G.solution }); };
+TEMPLATES.a23Word = (r) => {
+  const kind = pick(r, ['temp', 'apps', 'bottles']);
+  if (kind === 'temp') { const rate = pick(r, [8, 6, 5, 4]), drop = rate * pick(r, [3.5, 4.5, 5, 6, 2.5]);
+    return a2Q(r, { topic: 'Solving inequalities', stem: `A weather forecaster predicts that the temperature will decrease ${rate}°F each hour for the next several hours. Write and solve an inequality for the numbers h of hours it will take for the temperature to drop at least ${fmt(drop)}°F.`, v: 'h', S: a2S('≥', drop / rate), pos: true, wrongs: [a2S('≤', drop / rate), a2S('>', drop / rate), a2S('≥', drop * rate)], solution: `${rate}h ≥ ${fmt(drop)} → h ≥ ${fracT(drop / rate)}` }); }
+  if (kind === 'apps') { const m = pick(r, [25, 20, 30, 15]), p = pick(r, [3.99, 2.99, 4.99, 1.99]), n = Math.floor(m / p);
+    return a1numQ(r, { topic: 'Solving inequalities', stem: `You have $${m} to buy apps. Each app costs $${p.toFixed(2)}. What is the greatest number of apps you can buy?`, val: n, unit: 'apps', wrongs: [n + 1, Math.round(m / p * 100) / 100, n - 1], solution: `${p.toFixed(2)}n ≤ ${m} → n ≤ ${(m / p).toFixed(2)}. You can buy at most ${n} apps.` }); }
+  const goal = pick(r, [100, 50, 75]), each = pick(r, [0.05, 0.1]), n = Math.ceil(goal / each - 1e-9);
+  return a1numQ(r, { topic: 'Solving inequalities', stem: `Your class wants to raise at least $${goal} by collecting bottles. Each bottle earns $${each.toFixed(2)}. What is the least number of bottles your class needs to collect?`, val: n, unit: 'bottles', wrongs: [goal * each, n / 2, n * 2], solution: `${each.toFixed(2)}b ≥ ${goal} → b ≥ ${n}. You need at least ${n} bottles.` });
+};
+
+// ---------- 2.4 Solving Multi-Step Inequalities ----------
+function a2multi(r) {
+  const v = a2V(r), op = a2O(r), kind = pick(r, ['two', 'two', 'over', 'both', 'dist']);
+  let L, R, a, b, c, d, sol; // a v + b  op  c v + d  (shown as L, R)
+  if (kind === 'two') { a = pick(r, [2, 3, 4, 5, -2, -3, -8, 6]); b = nz(r, -12, 12); sol = nz(r, -8, 8); c = 0; d = a * sol + b; L = `${a1J([[a, v], [b]])}`; R = fmt(d); if (r() < 0.4) { L = `${a1J([[b], [a, v]])}`; } }
+  else if (kind === 'over') { const q = pick(r, [2, 3, -3, 4, -4]); b = nz(r, -6, 6); sol = q * nz(r, -6, 6); a = 1 / q; c = 0; d = sol / q + b; L = `${v}/${q < 0 ? `(−${-q})` : q} ${b < 0 ? '−' : '+'} ${Math.abs(b)}`; R = fmt(d); }
+  else if (kind === 'both') { do { a = nz(r, -9, 9); c = nz(r, -9, 9); } while (a === c); b = ri(r, -12, 12); sol = nz(r, -8, 8); d = (a - c) * sol + b; L = a1J([[a, v], [b]]); R = a1J([[c, v], [d]]); }
+  else { const k = pick(r, [2, 3, 4, 5, -2, -3]), p = pick(r, [1, 2, 3]), q = nz(r, -6, 6); do { c = nz(r, -6, 6); } while (c === k * p); sol = nz(r, -6, 6); a = k * p; b = k * q; d = (a - c) * sol + b; L = `${k}(${a1J([[p, v], [q]])})`; R = a1J([[c, v], [d]]); }
+  const A = a - c, swap = r() < 0.25 && kind !== 'both' && kind !== 'dist', ineq = swap ? `${R} ${A2FLIP[op]} ${L}` : `${L} ${op} ${R}`, vop = A < 0 ? A2FLIP[op] : op, S = a2S(vop, sol);
+  return { v, ineq, S, wrongs: [a2S(op, sol), a2rev(S), a2S(vop, -sol), a2inc(S)], solution: `${kind === 'dist' ? 'Distribute, then c' : 'C'}ollect the variable terms on one side and the constants on the other: ${a1J([[A, v]])} ${op} ${fmt(d - b)}.\n${A < 0 ? `Divide by ${fmt(A)} and reverse the symbol` : A === 1 ? 'So' : `Divide by ${fmt(A)}`}: ${a2T(v, S)}` };
+}
+TEMPLATES.a24Solve = (r) => { const G = a2multi(r); return a2Q(r, { topic: 'Multi-step inequalities', stem: `Solve the inequality.   ${G.ineq}`, v: G.v, S: G.S, wrongs: G.wrongs, solution: G.solution }); };
+TEMPLATES.a24Graph = (r) => { let G; do { G = a2multi(r); } while (!a2graphable(G.S)); return a2GQ(r, { topic: 'Multi-step inequalities', stem: `Solve the inequality. Graph the solution.   ${G.ineq}`, v: G.v, S: G.S, solution: G.solution }); };
+// #11–22: may have no solution or all real numbers
+TEMPLATES.a24Special = (r) => {
+  const v = a2V(r), op = a2O(r), k = pick(r, [2, 3, 4, 5, 6]), p = pick(r, [1, 2, 3]), q = nz(r, -6, 6), kind = pick(r, ['none', 'all', 'one']);
+  if (kind === 'one') return TEMPLATES.a24Solve(r);
+  const kq = k * q, holds = (c) => ({ '<': kq < c, '>': kq > c, '≤': kq <= c, '≥': kq >= c }[op]);
+  let cst; do { cst = kq + ri(r, -6, 6); } while (holds(cst) !== (kind === 'all'));
+  const R1 = ri(r, 1, Math.max(1, k * p - 1)), sh = ri(r, -8, 8), right = a1J([[R1, v], [cst - sh], [k * p - R1, v], [sh]]);
+  const S = kind === 'all' ? ALL : [];
+  return a2Q(r, { topic: 'Multi-step inequalities', stem: `Solve the inequality, if possible.   ${k}(${a1J([[p, v], [q]])}) ${op} ${right}`, v, S, wrongs: [kind === 'all' ? [] : ALL, a2S(op, 0), a2S(op, cst - kq)],
+    solution: `Distribute and combine like terms: ${a1J([[k * p, v], [kq]])} ${op} ${a1J([[k * p, v], [cst]])}.\nSubtract ${k * p}${v} from each side: ${fmt(kq)} ${op} ${fmt(cst)}, which is ${kind === 'all' ? 'always true, so all real numbers are solutions' : 'never true, so there is no solution'}.` });
+};
+// #29–30: make all real numbers solutions
+TEMPLATES.a24Ident = (r) => {
+  const p = pick(r, [3, 4, 5, 6]), b = pick(r, [2, 3, 4]), op = pick(r, ['<', '≤', '>', '≥']), up = op === '<' || op === '≤';
+  const pb = p * b, q = up ? pb + ri(r, 1, 6) : pb - ri(r, 1, 6), R1 = ri(r, 1, p + 3), sh = ri(r, 2, 9);
+  const right = a1J([[p + R1, 'x'], [q - sh], [sh], [-R1, 'x']]);
+  return a1numQ(r, { topic: 'Multi-step inequalities', stem: `Find the value of a for which the solutions of the inequality are all real numbers.   a(x + ${b}) ${op} ${right}`, val: p, label: 'a =', wrongs: [p + R1, q / b, -p],
+    solution: `The right side simplifies to ${a1J([[p, 'x'], [q]])}. The x-terms must match, so a = ${p}. Then ${pb} ${op} ${q} is true for every x, so all real numbers are solutions.` });
+};
+TEMPLATES.a24Word = (r) => {
+  const kind = pick(r, ['avg', 'bowl', 'rect']);
+  if (kind === 'avg') { const goal = pick(r, [30, 40, 45]), days = [...Array(6)].map(() => pick(r, [5, 10, 15, 20, 30, 45, 60])), need = Math.max(0, 7 * goal - a8sum(days));
+    const D = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return a1numQ(r, { topic: 'Multi-step inequalities', stem: `You want an average of at least ${goal} active minutes each day for a week. So far: ${D.map((d, i) => `${d} ${days[i]}`).join(', ')}. How many active minutes do you need on Sunday?`, label: 'At least', val: need, unit: 'minutes', wrongs: [goal, Math.round((6 * goal - a8sum(days)) * 1), need + goal], solution: `(${days.join(' + ')} + x)/7 ≥ ${goal}\n${a8sum(days)} + x ≥ ${7 * goal} → x ≥ ${7 * goal - a8sum(days)}${7 * goal - a8sum(days) < 0 ? ' (you already met the goal)' : ''}` }); }
+  if (kind === 'bowl') { const sA = pick(r, [3.75, 4, 3.5]), gA = pick(r, [4, 4.25]), sB = pick(r, [2.5, 2, 3]), gB = gA + pick(r, [0.5, 0.25]), x = (sA - sB) / (gB - gA), n = Math.floor(x + 1e-9) + 1;
+    return a1numQ(r, { topic: 'Multi-step inequalities', stem: `Bowling alley A charges $${sA.toFixed(2)} to rent shoes and $${gA.toFixed(2)} per game. Bowling alley B charges $${sB.toFixed(2)} to rent shoes and $${gB.toFixed(2)} per game. What is the least number of games for which the total cost is less at bowling alley A?`, val: n, unit: 'games', wrongs: [Math.round(x * 100) / 100, n - 1, n + 1], solution: `${sA.toFixed(2)} + ${gA.toFixed(2)}g < ${sB.toFixed(2)} + ${gB.toFixed(2)}g → ${fmt(sA - sB)} < ${fmt(gB - gA)}g → g > ${fmt(x)}. The least whole number of games is ${n}.` }); }
+  const L = pick(r, [12, 10, 8]), k = pick(r, [2, 3]), b = ri(r, 1, 5), A = L * (k * ri(r, 3, 6) - b), x0 = (A / L + b) / k;
+  return a2Q(r, { topic: 'Multi-step inequalities', stem: `A rectangle is ${L} feet long and (${k}x − ${b}) feet wide. Its area is greater than ${A} square feet. Write and solve an inequality to find the possible values of x.`, v: 'x', S: a2S('>', x0), wrongs: [a2S('<', x0), a2S('>', A / L), a2S('≥', x0)], solution: `${L}(${k}x − ${b}) > ${A} → ${k}x − ${b} > ${fmt(A / L)} → x > ${fracT(x0)}` });
+};
+
+// ---------- 2.5 Solving Compound Inequalities ----------
+TEMPLATES.a25Write = (r) => {
+  const v = pick(r, ['p', 'n', 'm', 'x', 'k']), kind = ri(r, 1, 4);
+  let sent, S, shown;
+  if (kind === 1) { const a = ri(r, -5, 4), b = a + ri(r, 3, 9); sent = `A number ${v} is less than ${fmt(b)} and greater than ${fmt(a)}.`; S = [a2I(a, b)]; shown = `${fmt(a)} < ${v} < ${fmt(b)}`; }
+  else if (kind === 2) { const a = -ri(r, 2, 9), b = ri(r, 3, 15); sent = `A number ${v} is less than or equal to ${fmt(a)} or greater than ${b}.`; S = [a2I(-Infinity, a, false, true), a2I(b, Infinity)]; shown = `${v} ≤ ${fmt(a)} or ${v} > ${b}`; }
+  else if (kind === 3) { const b = -ri(r, 2, 15), a = -ri(r, 1, 7) - pick(r, [2 / 3, 1 / 2, 0]); sent = `A number ${v} is more than ${fracT(a)} or at most ${fmt(b)}.`; if (a <= b) return TEMPLATES.a25Write(r); S = [a2I(-Infinity, b, false, true), a2I(a, Infinity)]; shown = `${v} > ${fracT(a)} or ${v} ≤ ${fmt(b)}`; }
+  else { const a = -ri(r, 1, 4) - 0.5, b = ri(r, 3, 12) - 0.5; sent = `A number ${v} is no less than ${fmt(a)} and fewer than ${fmt(b)}.`; S = [a2I(a, b, true, false)]; shown = `${fmt(a)} ≤ ${v} < ${fmt(b)}`; }
+  return a2Q(r, { topic: 'Compound inequalities', stem: `Write the sentence as an inequality.   ${sent}`, v, S, display: shown, key: a2T(v, S, { latex: true }), wrongs: [a2inc(S), S.length === 1 ? [a2I(-Infinity, S[0].a), a2I(S[0].b, Infinity)] : [a2I(S[0].b, S[1].a)], a2at(S, (e) => -e)], solution: shown });
+};
+function a2compound(r) {
+  const v = pick(r, ['x', 'n', 'm', 'p', 'w', 'y', 'k', 'z', 't', 'c', 'h', 'b', 'g']), kind = pick(r, ['and', 'and', 'or', 'or', 'all', 'none']);
+  if (kind === 'and') { // c1 < a v + b ≤ c2
+    const a = pick(r, [1, 2, 3, 4, -1, -2, -3, -8]), b = ri(r, -9, 9), s1 = ri(r, -8, 4), s2 = s1 + ri(r, 2, 7), [o1, o2] = [pick(r, ['<', '≤']), pick(r, ['<', '≤'])];
+    const c1 = a > 0 ? a * s1 + b : a * s2 + b, c2 = a > 0 ? a * s2 + b : a * s1 + b, S = a > 0 ? [a2I(s1, s2, o1 === '≤', o2 === '≤')] : [a2I(s1, s2, o2 === '≤', o1 === '≤')];
+    const mid = a1J([[a, v], [b]]);
+    return { v, ineq: `${fmt(c1)} ${o1} ${mid} ${o2} ${fmt(c2)}`, S, wrongs: [a2inc(S), [a2I(-Infinity, S[0].a), a2I(S[0].b, Infinity)], [a2I(S[0].a - 1, S[0].b + 1, S[0].ca, S[0].cb)]],
+      solution: `${b ? `${b < 0 ? 'Add' : 'Subtract'} ${Math.abs(b)} in all three parts: ${fmt(c1 - b)} ${o1} ${a1J([[a, v]])} ${o2} ${fmt(c2 - b)}.\n` : ''}${a === 1 ? '' : `Divide all three parts by ${fmt(a)}${a < 0 ? ' and reverse both symbols' : ''}.\n`}${a2T(v, S)}` };
+  }
+  // two separate inequalities joined by or / and
+  const mk = (sol, dirLeft) => { const a = pick(r, [1, 2, 3, -1, -2, -3, 5]), b = ri(r, -9, 9), inc = r() < 0.5, op0 = dirLeft ? (inc ? '≤' : '<') : (inc ? '≥' : '>'), op = a < 0 ? A2FLIP[op0] : op0;
+    return { text: `${a1J([[a, v], [b]])} ${op} ${fmt(a * sol + b)}`, S: a2S(op0, sol), a }; };
+  if (kind === 'or') { const s1 = ri(r, -9, 2), s2 = s1 + ri(r, 2, 8), A = mk(s1, true), B = mk(s2, false), S = [A.S[0], B.S[0]];
+    return { v, ineq: `${A.text} or ${B.text}`, S, wrongs: [[a2I(s1, s2, A.S[0].cb, B.S[0].ca)], a2inc(S), [a2I(-Infinity, s2), a2I(s1, Infinity)].slice(0, 1)],
+      solution: `Solve each part: ${a2T(v, A.S)}${A.a < 0 ? ' (reverse the symbol when dividing by a negative)' : ''}, or ${a2T(v, B.S)}${B.a < 0 ? ' (reverse the symbol when dividing by a negative)' : ''}.\n${a2T(v, S)}` }; }
+  if (kind === 'all') { const s1 = ri(r, -3, 6), s2 = s1 - ri(r, 1, 6), A = mk(s1, true), B = mk(s2, false);
+    return { v, ineq: `${A.text} or ${B.text}`, S: ALL, wrongs: [[a2I(s2, s1, B.S[0].ca, A.S[0].cb)], [], a2S(A.S[0].cb ? '≤' : '<', s1)],
+      solution: `Solve each part: ${a2T(v, A.S)} or ${a2T(v, B.S)}. Every number is in at least one part, so the solution is all real numbers.` }; }
+  const s1 = ri(r, -6, 3), s2 = s1 + ri(r, 1, 6), A = mk(s1, true), B = mk(s2, false);
+  return { v, ineq: `${A.text} and ${B.text}`, S: [], wrongs: [[a2I(s1, s2)], ALL, [A.S[0], B.S[0]]],
+    solution: `Solve each part: ${a2T(v, A.S)} and ${a2T(v, B.S)}. No number is in both, so there is no solution.` };
+}
+TEMPLATES.a25Solve = (r) => { const G = a2compound(r); return a2Q(r, { topic: 'Compound inequalities', stem: `Solve the inequality, if possible.   ${G.ineq}`, v: G.v, S: G.S, wrongs: G.wrongs, solution: G.solution }); };
+TEMPLATES.a25Graph = (r) => { let G; do { G = a2compound(r); } while (!a2graphable(G.S)); return a2GQ(r, { topic: 'Compound inequalities', stem: `Solve the inequality. Graph the solution.   ${G.ineq}`, v: G.v, S: G.S, solution: G.solution }); };
+// #13, 15–16: temperature ranges in Fahrenheit
+TEMPLATES.a25Word = (r) => {
+  const F = (c) => Math.round((1.8 * c + 32) * 10) / 10;
+  if (r() < 0.5) { const c1 = -5 * ri(r, 2, 6), c2 = c1 + 5 * ri(r, 1, 2);
+    return a2Q(r, { topic: 'Compound inequalities', stem: `The temperatures in the interior of an iceberg range from ${c1}°C to ${c2}°C. Write a compound inequality for the temperatures F (in degrees Fahrenheit). Use F = 1.8C + 32.`, v: 'f', S: [a2I(F(c1), F(c2), true, true)], dec: true, display: `${fmt(F(c1))} ≤ F ≤ ${fmt(F(c2))}`, key: `${F(c1)}\\le F\\le ${F(c2)}`,
+      wrongs: [[a2I(c1, c2, true, true)], [a2I(F(c1), F(c2))], [a2I(-Infinity, F(c1), false, true), a2I(F(c2), Infinity, true)]], solution: `${c1} ≤ (F − 32)/1.8 ≤ ${c2}\n1.8(${c1}) + 32 ≤ F ≤ 1.8(${c2}) + 32\n${fmt(F(c1))} ≤ F ≤ ${fmt(F(c2))}` }); }
+  const [el, mp, bp] = pick(r, [['gold', 1064, 2807], ['silver', 962, 2212], ['copper', 1083, 2567], ['aluminum', 660, 2470], ['iron', 1538, 2862]]);
+  return a2Q(r, { topic: 'Compound inequalities', stem: `The melting point of ${el} is ${mp}°C and its boiling point is ${bp}°C. Write an inequality for the temperatures F (in degrees Fahrenheit) at which ${el} is a liquid. Use F = 1.8C + 32.`, v: 'f', S: [a2I(F(mp), F(bp))], dec: true, display: `${fmt(F(mp))} < F < ${fmt(F(bp))}`, key: `${F(mp)}<F<${F(bp)}`,
+    wrongs: [[a2I(mp, bp)], [a2I(F(mp), F(bp), true, true)], [a2I(-Infinity, F(mp)), a2I(F(bp), Infinity)]], solution: `${mp} < (F − 32)/1.8 < ${bp}\n${fmt(F(mp))} < F < ${fmt(F(bp))}` });
+};
+
+// ---------- 2.6 Solving Absolute Value Inequalities ----------
+function a2abs(r) {
+  const v = pick(r, ['x', 'y', 'd', 'h', 's', 'c', 'p', 'n', 't', 'j', 'm', 'b', 'w', 'u', 'f']);
+  const a = pick(r, [1, 1, 2, 3, 4, -4, 6, -1, 5]), b = ri(r, -9, 9), k = pick(r, [1, 1, 1, 2, 3, -3, -4, 6]), c = pick(r, [0, 0, ri(r, -9, 9)]);
+  const base = pick(r, ['<', '≤', '>', '≥']), special = r() < 0.15;
+  const m = special ? -ri(r, 1, 5) : ri(r, 1, 12) + (r() < 0.2 ? 0.5 : 0), d = k * m + c, op = k < 0 ? A2FLIP[base] : base; // |a v + b| base m
+  const inner = a1J([[a, v], [b]]), lhs = `${k === 1 ? '' : fmt(k)}|${inner}|${c ? ` ${c < 0 ? '−' : '+'} ${Math.abs(c)}` : ''}`;
+  let S;
+  if (m < 0) S = base === '<' || base === '≤' ? [] : ALL;
+  else { const p1 = (-m - b) / a, p2 = (m - b) / a, lo = Math.min(p1, p2), hi = Math.max(p1, p2), inc = base === '≤' || base === '≥';
+    S = base === '<' || base === '≤' ? [a2I(lo, hi, inc, inc)] : [a2I(-Infinity, lo, false, inc), a2I(hi, Infinity, inc, false)]; }
+  const iso = `|${inner}| ${base} ${fmt(m)}`;
+  const solution = `${k !== 1 || c ? `Isolate the absolute value${k < 0 ? ' (dividing by a negative reverses the symbol)' : ''}: ${iso}.\n` : ''}${m < 0 ? (S.length ? 'An absolute value is always greater than a negative number, so all real numbers are solutions.' : 'An absolute value is never less than a negative number, so there is no solution.')
+    : base === '<' || base === '≤' ? `Write a compound inequality: ${fmt(-m)} ${base} ${inner} ${base} ${fmt(m)}.\n${a2T(v, S)}` : `Write a compound inequality: ${inner} ${A2FLIP[base]} ${fmt(-m)} or ${inner} ${base} ${fmt(m)}.\n${a2T(v, S)}`}`;
+  const wr = m < 0 ? [S.length ? [] : ALL, a2S(base, -m)] : S.length === 1 ? [[a2I(-Infinity, S[0].a, false, !S[0].ca), a2I(S[0].b, Infinity, !S[0].cb)], a2inc(S), [a2I(S[0].a, S[0].b + 2, S[0].ca, S[0].cb)]] : [[a2I(S[0].b, S[1].a, !S[0].cb, !S[1].ca)], a2inc(S), [S[1]]];
+  return { v, ineq: `${lhs} ${op} ${fmt(d)}`, S, wrongs: wr, solution };
+}
+TEMPLATES.a26Solve = (r) => { const G = a2abs(r); return a2Q(r, { topic: 'Absolute value inequalities', stem: `Solve the inequality, if possible.   ${G.ineq}`, v: G.v, S: G.S, wrongs: G.wrongs, solution: G.solution }); };
+TEMPLATES.a26Graph = (r) => { let G; do { G = a2abs(r); } while (!a2graphable(G.S)); return a2GQ(r, { topic: 'Absolute value inequalities', stem: `Solve the inequality. Graph the solution.   ${G.ineq}`, v: G.v, S: G.S, solution: G.solution }); };
+// #17–18
+TEMPLATES.a26Write = (r) => {
+  if (r() < 0.5) { const d = ri(r, 3, 12), lt = r() < 0.5, S = lt ? [a2I(-d, d)] : [a2I(-Infinity, -d, false, true), a2I(d, Infinity, true)];
+    return a2Q(r, { topic: 'Absolute value inequalities', stem: `Write the sentence as an absolute value inequality. Then solve the inequality.   A number is ${lt ? 'less than' : 'at least'} ${d} units from 0.`, frStem: `Write the sentence as an absolute value inequality and solve it. Enter the solution.   A number is ${lt ? 'less than' : 'at least'} ${d} units from 0.`, v: 'x', S, wrongs: [a2inc(S), lt ? a2S('<', d) : a2S('≥', d)], solution: `|x| ${lt ? '<' : '≥'} ${d}\n${a2T('x', S)}` }); }
+  const k = pick(r, [2, 3]), d = ri(r, 4, 12), p = -ri(r, 1, 5), lo = (p - d) / k, hi = (p + d) / k, S = [a2I(-Infinity, lo, false, true), a2I(hi, Infinity, true)];
+  return a2Q(r, { topic: 'Absolute value inequalities', stem: `Write the sentence as an absolute value inequality. Then solve the inequality.   ${k === 2 ? 'Twice' : 'Three times'} a number is no less than ${d} units from ${p}.`, frStem: `Write the sentence as an absolute value inequality and solve it. Enter the solution.   ${k === 2 ? 'Twice' : 'Three times'} a number is no less than ${d} units from ${p}.`, v: 'x', S, wrongs: [[a2I(lo, hi, true, true)], a2inc(S), [a2I(-Infinity, (-p - d) / k, false, true), a2I((-p + d) / k, Infinity, true)]],
+    solution: `|${k}x − (${p})| ≥ ${d}, so |${k}x + ${-p}| ≥ ${d}\n${k}x + ${-p} ≤ −${d} or ${k}x + ${-p} ≥ ${d}\n${a2T('x', S)}` });
+};
+TEMPLATES.a26Word = (r) => {
+  const kind = pick(r, ['essay', 'camel', 'gasket', 'trail']);
+  if (kind === 'essay') { const w = pick(r, [500, 750, 1000]), d = pick(r, [30, 25, 50]), S = [a2I(w - d, w + d, true, true)];
+    return a2Q(r, { topic: 'Absolute value inequalities', stem: `The rules for an essay contest require entries to have ${w} words with an absolute deviation of at most ${d} words. Write and solve an absolute value inequality for the acceptable numbers w of words.`, v: 'w', S, wrongs: [[a2I(w - d, w + d)], [a2I(-Infinity, w - d, false, true), a2I(w + d, Infinity, true)], a2S('≤', w + d)], solution: `|w − ${w}| ≤ ${d}\n${w - d} ≤ w ≤ ${w + d}` }); }
+  if (kind === 'camel') { const t = 37, d = pick(r, [3, 2, 4]), S = [a2I(t - d, t + d, true, true)];
+    return a2Q(r, { topic: 'Absolute value inequalities', stem: `The normal body temperature of a camel is ${t}°C. This temperature varies by up to ${d}°C throughout the day. Write and solve an absolute value inequality for the range of normal body temperatures t (in °C).`, v: 't', S, wrongs: [[a2I(t - d, t + d)], [a2I(-Infinity, t - d, false, true), a2I(t + d, Infinity, true)], [a2I(0, t + d, true, true)]], solution: `|t − ${t}| ≤ ${d}\n${t - d} ≤ t ≤ ${t + d}` }); }
+  if (kind === 'gasket') { let W, mean, out; do { W = [...Array(6)].map(() => ri(r, 50, 70) / 100); mean = a8sum(W) / 6; out = W.filter((w) => Math.abs(w - mean) > 0.06 + 1e-9); } while (!out.length || out.length > 3 || W.some((w) => Math.abs(Math.abs(w - mean) - 0.06) < 0.004));
+    const o = [...new Set(out)].sort((a, b) => a - b), txt = o.map((x) => x.toFixed(2)).join(', ');
+    return { topic: 'Absolute value inequalities', stem: `A manufacturer throws out gaskets whose weights have an absolute deviation of more than 0.06 pound from the mean weight of the batch. The weights (in pounds) in a batch are ${W.map((x) => x.toFixed(2)).join(', ')}. Which weights should be thrown out?`,
+      ...buildChoices(r, txt, [W.filter((w) => !o.includes(w)).slice(0, 2).map((x) => x.toFixed(2)).join(', '), [Math.min(...W), Math.max(...W)].map((x) => x.toFixed(2)).join(', '), 'None'].filter((t) => t !== txt), () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Weights:' }], key: [o.map((x) => x.toFixed(2)).join(',')], display: txt, check: (v) => realListOk(v[0], o, 1e-6) },
+      solution: `The mean is ${a8sum(W).toFixed(2)} ÷ 6 ≈ ${mean.toFixed(3)}. Throw out w when |w − ${mean.toFixed(3)}| > 0.06: ${txt}.` }; }
+  const sp = 3, t = 1.5, dv = 0.25, lo = sp * (t - dv), hi = sp * (t + dv), M = [ri(r, 10, 18) / 4, ri(r, 14, 21) / 4, ri(r, 8, 13) / 4, ri(r, 12, 17) / 4], names = ['A', 'B', 'C', 'D'], ok = names.filter((_, i) => M[i] >= lo && M[i] <= hi);
+  if (!ok.length || ok.length === 4) return TEMPLATES.a26Word(r);
+  const mixed = (x) => { const w = Math.floor(x), f = x - w; return f ? `${w}${B3VF[fracT(f)] || ''}` : String(w); };
+  return { topic: 'Absolute value inequalities', stem: `You want to complete a trail in 1½ hours with an absolute deviation of at most 15 minutes. You hike at 3 miles per hour. The trails are A: ${mixed(M[0])} mi, B: ${mixed(M[1])} mi, C: ${mixed(M[2])} mi, D: ${mixed(M[3])} mi. Which trails can you hike?`,
+    ...buildChoices(r, ok.join(', '), [names.filter((n) => !ok.includes(n)).join(', '), names.join(', '), ok.slice(0, -1).join(', ') || 'None'].filter((t) => t && t !== ok.join(', ')), () => null), fr: FR.letters('Trails:', ok.join(''), ok.join(', '), { anyOrder: true }),
+    solution: `|t − 1.5| ≤ 0.25 → 1.25 ≤ t ≤ 1.75 hours. At 3 mi/h, that is ${fmt(lo)} to ${fmt(hi)} miles: trails ${ok.join(', ')}.` };
+};
+for (const name of Object.keys(TEMPLATES)) if (/^a2\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
+/* ==== ALGEBRA 1 CH2 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -18253,6 +19183,23 @@ const QUESTION_TYPES = [
 /* ==== ALGEBRA CATALOG BEGIN ==== */
 /* ---------- Algebra I and Algebra II (Mr. Spencer's classes): menu assignments and builder catalog ---------- */
 Object.assign(SETS, {
+  // ----- Algebra I, Chapter 1: Solving Linear Equations -----
+  'alg1-1-1': { subject: 'algebra1', title: '1.1 Evaluating Algebraic Expressions', items: [['a11Eval', 3], ['a11TwoVar', 3], ['a11Multi', 2], ['a11Word', 2]] },
+  'alg1-1-2': { subject: 'algebra1', title: '1.2 Finding Cube Roots', items: [['a12Cube', 3], ['a12Edge', 2], ['a12Expr', 2], ['a12Var', 2], ['a12Compare', 2], ['a12Race', 1]] },
+  'alg1-1-3': { subject: 'algebra1', title: '1.3 Solving Simple Equations', items: [['a13AddSub', 3], ['a13MulDiv', 3], ['a13Frac', 2], ['a13Word', 2], ['a13Sum', 1]] },
+  'alg1-1-4': { subject: 'algebra1', title: '1.4 Solving Multi-Step Equations', items: [['a14Two', 3], ['a14Dist', 3], ['a14Words', 2], ['a14Poly', 1], ['a14Word', 2]] },
+  'alg1-1-5': { subject: 'algebra1', title: '1.5 Modeling Quantities', items: [['a15Prop', 3], ['a15Shadow', 2], ['a15Convert', 3], ['a15Rate', 2], ['a15Compare', 2]] },
+  'alg1-1-6': { subject: 'algebra1', title: '1.6 Accuracy with Measurements', items: [['a16Est', 3], ['a16Bags', 2], ['a16Approx', 2]] },
+  'alg1-1-7': { subject: 'algebra1', title: '1.7 Solving Equations with Variables on Both Sides', items: [['a17Both', 4], ['a17Special', 3], ['a17Word', 2], ['a17Ident', 1], ['a17Consec', 1]] },
+  'alg1-1-8': { subject: 'algebra1', title: '1.8 Solving Absolute Value Equations', items: [['a18Simp', 2], ['a18Solve', 4], ['a18Both', 2], ['a18Write', 1], ['a18Tol', 1], ['a18Count', 1]] },
+  'alg1-1-9': { subject: 'algebra1', title: '1.9 Rewriting Equations and Formulas', items: [['a19ForY', 3], ['a19ForX', 3], ['a19Formula', 3], ['a19Word', 1]] },
+  // ----- Algebra I, Chapter 2: Solving Linear Inequalities -----
+  'alg1-2-1': { subject: 'algebra1', title: '2.1 Writing and Graphing Inequalities', items: [['a21Write', 2], ['a21Check', 2], ['a21Graph', 3], ['a21FromGraph', 2], ['a21Word', 1]] },
+  'alg1-2-2': { subject: 'algebra1', title: '2.2 Solving Inequalities Using Addition or Subtraction', items: [['a22Solve', 4], ['a22Graph', 3], ['a22Words', 2], ['a22Word', 1]] },
+  'alg1-2-3': { subject: 'algebra1', title: '2.3 Solving Inequalities Using Multiplication or Division', items: [['a23Solve', 4], ['a23Graph', 3], ['a23Word', 2]] },
+  'alg1-2-4': { subject: 'algebra1', title: '2.4 Solving Multi-Step Inequalities', items: [['a24Solve', 4], ['a24Graph', 2], ['a24Special', 2], ['a24Ident', 1], ['a24Word', 1]] },
+  'alg1-2-5': { subject: 'algebra1', title: '2.5 Solving Compound Inequalities', items: [['a25Write', 2], ['a25Solve', 4], ['a25Graph', 2], ['a25Word', 1]] },
+  'alg1-2-6': { subject: 'algebra1', title: '2.6 Solving Absolute Value Inequalities', items: [['a26Solve', 4], ['a26Graph', 2], ['a26Write', 1], ['a26Word', 2]] },
   // ----- Algebra I, Chapter 4: Writing Linear Functions -----
   'alg1-4-1': { subject: 'algebra1', title: '4.1 Writing Equations in Slope-Intercept Form', items: [['a41SlopeInt', 3], ['a41Graph', 2], ['a41TwoPts', 2], ['a41FuncVals', 2], ['a41Table', 1], ['a41Word', 2]] },
   'alg1-4-2': { subject: 'algebra1', title: '4.2 Writing Equations in Point-Slope Form', items: [['a42PointSlope', 3], ['a42Graph', 2], ['a42TwoPts', 3], ['a42FuncVals', 2], ['a42TableLinear', 2], ['a42Word', 2]] },
@@ -18339,6 +19286,74 @@ Object.assign(SETS, {
   'geo-9-7': { subject: 'geometry', title: '9.7 Law of Sines and Law of Cosines', items: [['g97Calc', 2], ['g97Area', 3], ['g97SinesAAS', 2], ['g97SinesSSA', 1], ['g97CosSSS', 2], ['g97CosSAS', 2]] },
 });
 QUESTION_TYPES.push(
+  { id: 'a11Eval', subject: 'algebra1', section: '1.1 Evaluating Algebraic Expressions', label: 'One variable', desc: '#1–6' },
+  { id: 'a11TwoVar', subject: 'algebra1', section: '1.1 Evaluating Algebraic Expressions', label: 'Two variables', desc: '#7–12' },
+  { id: 'a11Multi', subject: 'algebra1', section: '1.1 Evaluating Algebraic Expressions', label: 'Several variables', desc: '#13–16' },
+  { id: 'a11Word', subject: 'algebra1', section: '1.1 Evaluating Algebraic Expressions', label: 'Real-life expressions', desc: '#17–18' },
+  { id: 'a12Cube', subject: 'algebra1', section: '1.2 Finding Cube Roots', label: 'Find the cube root', desc: '#5–10' },
+  { id: 'a12Edge', subject: 'algebra1', section: '1.2 Finding Cube Roots', label: 'Edge length of a cube', desc: '#1–4, 25–26' },
+  { id: 'a12Expr', subject: 'algebra1', section: '1.2 Finding Cube Roots', label: 'Evaluate expressions', desc: '#11–16' },
+  { id: 'a12Var', subject: 'algebra1', section: '1.2 Finding Cube Roots', label: 'Evaluate with a variable', desc: '#17–24' },
+  { id: 'a12Compare', subject: 'algebra1', section: '1.2 Finding Cube Roots', label: 'Compare: <, >, or =', desc: '#27–30' },
+  { id: 'a12Race', subject: 'algebra1', section: '1.2 Finding Cube Roots', label: 'Drag race velocity', desc: '#31' },
+  { id: 'a13AddSub', subject: 'algebra1', section: '1.3 Solving Simple Equations', label: 'Addition and subtraction', desc: '#1–10' },
+  { id: 'a13MulDiv', subject: 'algebra1', section: '1.3 Solving Simple Equations', label: 'Multiplication and division', desc: '#13–22' },
+  { id: 'a13Frac', subject: 'algebra1', section: '1.3 Solving Simple Equations', label: 'Fractions and mixed numbers', desc: '#23–32' },
+  { id: 'a13Word', subject: 'algebra1', section: '1.3 Solving Simple Equations', label: 'Real-life equations', desc: '#11–12, 37, 39–42' },
+  { id: 'a13Sum', subject: 'algebra1', section: '1.3 Solving Simple Equations', label: 'Angle sums and percents', desc: '#35–36, 50' },
+  { id: 'a14Two', subject: 'algebra1', section: '1.4 Solving Multi-Step Equations', label: 'Two-step equations', desc: '#1–12' },
+  { id: 'a14Dist', subject: 'algebra1', section: '1.4 Solving Multi-Step Equations', label: 'Distributive Property', desc: '#15–22' },
+  { id: 'a14Words', subject: 'algebra1', section: '1.4 Solving Multi-Step Equations', label: 'Find the number', desc: '#23–28' },
+  { id: 'a14Poly', subject: 'algebra1', section: '1.4 Solving Multi-Step Equations', label: 'Polygon angle sums', desc: '#29–30' },
+  { id: 'a14Word', subject: 'algebra1', section: '1.4 Solving Multi-Step Equations', label: 'Real-life equations', desc: '#13–14, 33–36' },
+  { id: 'a15Prop', subject: 'algebra1', section: '1.5 Modeling Quantities', label: 'Solve a proportion', desc: '#1–4' },
+  { id: 'a15Shadow', subject: 'algebra1', section: '1.5 Modeling Quantities', label: 'Shadows (similar triangles)', desc: '#5–6' },
+  { id: 'a15Convert', subject: 'algebra1', section: '1.5 Modeling Quantities', label: 'Convert units', desc: '#9–12' },
+  { id: 'a15Rate', subject: 'algebra1', section: '1.5 Modeling Quantities', label: 'Convert rates', desc: '#13–14' },
+  { id: 'a15Compare', subject: 'algebra1', section: '1.5 Modeling Quantities', label: 'Compare rates', desc: '#7–8, 15–16' },
+  { id: 'a16Est', subject: 'algebra1', section: '1.6 Accuracy with Measurements', label: 'Estimate results', desc: '#3–4, 6' },
+  { id: 'a16Bags', subject: 'algebra1', section: '1.6 Accuracy with Measurements', label: 'How many bags?', desc: '#5' },
+  { id: 'a16Approx', subject: 'algebra1', section: '1.6 Accuracy with Measurements', label: 'Appropriate approximations', desc: '#7' },
+  { id: 'a17Both', subject: 'algebra1', section: '1.7 Solving Equations with Variables on Both Sides', label: 'Variables on both sides', desc: '#1–14' },
+  { id: 'a17Special', subject: 'algebra1', section: '1.7 Solving Equations with Variables on Both Sides', label: 'No solution or identity', desc: '#15–22' },
+  { id: 'a17Word', subject: 'algebra1', section: '1.7 Solving Equations with Variables on Both Sides', label: 'Real-life equations', desc: '#23, 25, 27' },
+  { id: 'a17Ident', subject: 'algebra1', section: '1.7 Solving Equations with Variables on Both Sides', label: 'Make an identity', desc: '#29–30' },
+  { id: 'a17Consec', subject: 'algebra1', section: '1.7 Solving Equations with Variables on Both Sides', label: 'Consecutive integers', desc: '#31' },
+  { id: 'a18Simp', subject: 'algebra1', section: '1.8 Solving Absolute Value Equations', label: 'Simplify', desc: '#1–8' },
+  { id: 'a18Solve', subject: 'algebra1', section: '1.8 Solving Absolute Value Equations', label: 'Solve', desc: '#9–22' },
+  { id: 'a18Both', subject: 'algebra1', section: '1.8 Solving Absolute Value Equations', label: 'Two absolute values; extraneous solutions', desc: '#29–38' },
+  { id: 'a18Write', subject: 'algebra1', section: '1.8 Solving Absolute Value Equations', label: 'Write an equation', desc: '#39–42' },
+  { id: 'a18Tol', subject: 'algebra1', section: '1.8 Solving Absolute Value Equations', label: 'Minimum and maximum', desc: '#23–24' },
+  { id: 'a18Count', subject: 'algebra1', section: '1.8 Solving Absolute Value Equations', label: 'Number of solutions', desc: '#46' },
+  { id: 'a19ForY', subject: 'algebra1', section: '1.9 Rewriting Equations and Formulas', label: 'Solve for y', desc: '#1–10' },
+  { id: 'a19ForX', subject: 'algebra1', section: '1.9 Rewriting Equations and Formulas', label: 'Solve for x', desc: '#11–20' },
+  { id: 'a19Formula', subject: 'algebra1', section: '1.9 Rewriting Equations and Formulas', label: 'Rewrite a formula', desc: '#25–30' },
+  { id: 'a19Word', subject: 'algebra1', section: '1.9 Rewriting Equations and Formulas', label: 'Rewrite, then use', desc: '#21–22' },
+  { id: 'a21Write', subject: 'algebra1', section: '2.1 Writing and Graphing Inequalities', label: 'Write an inequality from a sentence', desc: '#1–8' },
+  { id: 'a21Check', subject: 'algebra1', section: '2.1 Writing and Graphing Inequalities', label: 'Is the value a solution?', desc: '#9–18' },
+  { id: 'a21Graph', subject: 'algebra1', section: '2.1 Writing and Graphing Inequalities', sketch: true, label: 'Graph the inequality (students graph)', desc: 'On a number line (#23–30, 33–38)' },
+  { id: 'a21FromGraph', subject: 'algebra1', section: '2.1 Writing and Graphing Inequalities', label: 'Write an inequality from a graph', desc: '#39–40' },
+  { id: 'a21Word', subject: 'algebra1', section: '2.1 Writing and Graphing Inequalities', label: 'Real-life inequalities', desc: '#19–20, 41–44' },
+  { id: 'a22Solve', subject: 'algebra1', section: '2.2 Solving Inequalities Using Addition or Subtraction', label: 'Solve', desc: '#1–14' },
+  { id: 'a22Graph', subject: 'algebra1', section: '2.2 Solving Inequalities Using Addition or Subtraction', sketch: true, label: 'Solve and graph (students graph)', desc: 'On a number line (#1–14)' },
+  { id: 'a22Words', subject: 'algebra1', section: '2.2 Solving Inequalities Using Addition or Subtraction', label: 'Write and solve', desc: '#15–18' },
+  { id: 'a22Word', subject: 'algebra1', section: '2.2 Solving Inequalities Using Addition or Subtraction', label: 'Real-life inequalities', desc: '#19–20, 23, 25–26' },
+  { id: 'a23Solve', subject: 'algebra1', section: '2.3 Solving Inequalities Using Multiplication or Division', label: 'Solve', desc: '#1–16' },
+  { id: 'a23Graph', subject: 'algebra1', section: '2.3 Solving Inequalities Using Multiplication or Division', sketch: true, label: 'Solve and graph (students graph)', desc: 'On a number line (#1–16)' },
+  { id: 'a23Word', subject: 'algebra1', section: '2.3 Solving Inequalities Using Multiplication or Division', label: 'Real-life inequalities', desc: '#17–18, 27' },
+  { id: 'a24Solve', subject: 'algebra1', section: '2.4 Solving Multi-Step Inequalities', label: 'Solve', desc: '#1–10' },
+  { id: 'a24Graph', subject: 'algebra1', section: '2.4 Solving Multi-Step Inequalities', sketch: true, label: 'Solve and graph (students graph)', desc: 'On a number line (#1–10)' },
+  { id: 'a24Special', subject: 'algebra1', section: '2.4 Solving Multi-Step Inequalities', label: 'No solution or all real numbers', desc: '#11–22' },
+  { id: 'a24Ident', subject: 'algebra1', section: '2.4 Solving Multi-Step Inequalities', label: 'Make all real numbers solutions', desc: '#29–30' },
+  { id: 'a24Word', subject: 'algebra1', section: '2.4 Solving Multi-Step Inequalities', label: 'Real-life inequalities', desc: '#25–27' },
+  { id: 'a25Write', subject: 'algebra1', section: '2.5 Solving Compound Inequalities', label: 'Write a compound inequality', desc: '#1–4' },
+  { id: 'a25Solve', subject: 'algebra1', section: '2.5 Solving Compound Inequalities', label: 'Solve', desc: '#5–12, 17–22' },
+  { id: 'a25Graph', subject: 'algebra1', section: '2.5 Solving Compound Inequalities', sketch: true, label: 'Solve and graph (students graph)', desc: 'On a number line (#5–12)' },
+  { id: 'a25Word', subject: 'algebra1', section: '2.5 Solving Compound Inequalities', label: 'Temperature ranges', desc: '#15–16' },
+  { id: 'a26Solve', subject: 'algebra1', section: '2.6 Solving Absolute Value Inequalities', label: 'Solve', desc: '#1–16' },
+  { id: 'a26Graph', subject: 'algebra1', section: '2.6 Solving Absolute Value Inequalities', sketch: true, label: 'Solve and graph (students graph)', desc: 'On a number line (#1–16)' },
+  { id: 'a26Write', subject: 'algebra1', section: '2.6 Solving Absolute Value Inequalities', label: 'Write and solve', desc: '#17–18' },
+  { id: 'a26Word', subject: 'algebra1', section: '2.6 Solving Absolute Value Inequalities', label: 'Real-life inequalities', desc: '#19–20, 23–24' },
   { id: 'a41SlopeInt', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'From slope and y-intercept', desc: 'Write y = mx + b (#1–6)' },
   { id: 'a41Graph', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'From a graph', desc: 'Line through the y-intercept and one more point (#7–10)' },
   { id: 'a41TwoPts', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: 'Through two points', desc: 'One point is the y-intercept (#11–16)' },
@@ -19734,7 +20749,7 @@ function prevTry(i, W) {
   if (q.sketch) { // their graph (blue) over the correct one (green)
     const ansS = String(h.answer || '').replace(/−/g, '-'), gPart = (ansS.match(/points ((?:\(-?[\d.]+,\s*-?[\d.]+\)(?:,\s*)?)+)/) || [])[1] ?? ansS; // only the graph's points, not points typed in the other answer boxes
     const pts = [...gPart.matchAll(/\((-?[\d.]+),\s*(-?[\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
-    const g = makeCanvas(300, 300); try { skDraw(g, q.fr.fields[0], pts, q.fr.fields[0].family === 'vec' || q.fr.fields[0].family === 'ineq' ? skParse(q.fr.key[0]) : q.fr._target, (String(h.answer || '').match(/(solid|dashed) line/) || [])[1] || ''); g.style.width = '260px'; box.append(g); } catch {}
+    const f0 = q.fr.fields[0], g = makeCanvas(300, f0.win && f0.win.hFrac ? Math.round(300 * f0.win.hFrac) : 300); try { skDraw(g, f0, pts, f0.family === 'vec' || f0.family === 'ineq' ? skParse(q.fr.key[0]) : q.fr._target, skStyleFrom(f0.family, h.answer)); g.style.width = '260px'; box.append(g); } catch {}
   }
   box.append(el('div', { class: 'sol' }, q.solution));
   return box;
@@ -19796,13 +20811,16 @@ function offCanvas(w, h, scale = 1.5) {
   return c;
 }
 const toPng = (c) => { const x = c._ctx; x.save(); x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, c._w, c._h); x.restore(); return c.toDataURL('image/png').split(',')[1]; };
+// how a graph's line style or circle choice reads in an answer
+const skStyleText = (fam, st) => { const O = SKETCH[fam] && SKETCH[fam].styleOpts; return O ? ((O.find((o) => o[1] === st) || [st])[0]) : `${st} line`; };
+const skStyleFrom = (fam, text) => { const O = SKETCH[fam] && SKETCH[fam].styleOpts; if (O) { const o = O.find((x) => String(text || '').includes(x[0])); return o ? o[1] : ''; } return (String(text || '').match(/(solid|dashed) line/) || [])[1] || ''; };
 function answerText(q, a) {
   if (q.mode !== 'fr') return a === null || a === undefined || Array.isArray(a) ? '(no answer)' : `${LETTERS[a]}. ${q.choices[a]}`;
   if (!Array.isArray(a) || !isAnswered(q, a)) return '(no answer)';
   if (q.twoPart) return a[0] + (a[0] !== 'Not possible' ? `;  △${normLetters(a[1])} ≅ △${normLetters(a[2])}` : '');
   if (q.proofQ) return '\n' + proofLines(a[0]).map((s, k) => (k ? '   = ' : '   ') + (/[\\{}]/.test(s) ? latexToText(s) : s)).join('\n');
-  if (q.fr.fields.length === 1 && q.fr.fields[0].kind === 'graph') { const P = skParse(a && a[0]), st = skStyle(a && a[0]); return P.length ? `points ${skText(P)}${st ? `, ${st} line` : ''}` : '—'; }
-  return q.fr.fields.map((f, k) => f.kind === 'graph' ? (skParse(a && a[k]).length ? `points ${skText(skParse(a[k]))}` : '—') : `${f.label ? f.label + ' ' : ''}${f.prefix || ''}${((f.kind === 'number' || f.kind === 'expr') && /[\\{}]/.test(a[k] || '') ? latexToText(a[k]) : a[k]) || '—'}${f.suffix || ''}`).join(',  ');
+  if (q.fr.fields.length === 1 && q.fr.fields[0].kind === 'graph') { const P = skParse(a && a[0]), st = skStyle(a && a[0]); return P.length ? `points ${skText(P)}${st ? `, ${skStyleText(q.fr.fields[0].family, st)}` : ''}` : '—'; }
+  return q.fr.fields.map((f, k) => f.kind === 'graph' ? (skParse(a && a[k]).length ? `points ${skText(skParse(a[k]))}${skStyle(a[k]) ? `, ${skStyleText(f.family, skStyle(a[k]))}` : ''}` : '—') : `${f.label ? f.label + ' ' : ''}${f.prefix || ''}${((f.kind === 'number' || f.kind === 'expr') && /[\\{}]/.test(a[k] || '') ? latexToText(a[k]) : a[k]) || '—'}${f.suffix || ''}`).join(',  ');
 }
 function exportWork(pts) {
   return state.qs.map((q, i) => {
@@ -20448,7 +21466,7 @@ function printScreen(preKey) {
       const kd = el('div', { class: 'pkey' }, el('h2', {}, `Answer key — ${S.title}${PRINT.versions > 1 ? ` (Version ${L})` : ''}`));
       qs.forEach((q, i) => {
         const ans = q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}.  ${q.choices[q.answer]}`;
-        kd.append(el('div', { class: 'pkrow' }, el('div', { style: 'font-weight:700' }, `${i + 1}.`), el('div', {}, el('div', {}, ans), q.sketch ? (() => { const g = makeCanvas(300, 300); skDraw(g, q.fr.fields[0], skParse(q.fr.key[0]), null, skStyle(q.fr.key[0])); g.style.width = '170px'; return g; })() : '', PRINT.sols && q.solution ? el('div', { class: 'psol' }, q.solution) : '')));
+        kd.append(el('div', { class: 'pkrow' }, el('div', { style: 'font-weight:700' }, `${i + 1}.`), el('div', {}, el('div', {}, ans), q.sketch ? (() => { const f0 = q.fr.fields[0], g = makeCanvas(300, f0.win && f0.win.hFrac ? Math.round(300 * f0.win.hFrac) : 300); skDraw(g, f0, skParse(q.fr.key[0]), null, skStyle(q.fr.key[0])); g.style.width = '170px'; return g; })() : '', PRINT.sols && q.solution ? el('div', { class: 'psol' }, q.solution) : '')));
       });
       out.append(kd);
     });
@@ -20690,7 +21708,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
