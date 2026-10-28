@@ -97,7 +97,9 @@
   .prevtry canvas { max-width: 100%; height: auto; display: block; margin: 6px 0; opacity: 0.92; }
   .prevhead { font-weight: 700; color: #a33a2c; font-size: 15px; margin-bottom: 6px; }
   .prevans { margin-top: 6px; } .prevwrong { color: #a33a2c; } .prevright { color: #2e7d4f; }
-  .newver { font-weight: 700; font-size: 15px; margin: 12px 0 4px; color: #1f5fa8; }
+  .newver { font-weight: 700; font-size: 16px; margin: 12px 0 6px; color: #1f5fa8; background: #e6f0fb; border-left: 4px solid #1f5fa8; border-radius: 6px; padding: 8px 12px; }
+  .q.regen { animation: regenPulse 2.4s ease-out 1; }
+  @keyframes regenPulse { 0%, 30% { box-shadow: 0 0 0 4px #1f5fa8; background: #eef5fd; } 100% { box-shadow: 0 0 0 0 transparent; } }
   .sol { white-space: pre-line; margin-top: 10px; font-size: 15px; background: #faf9f6; border-left: 3px solid var(--accent); padding: 8px 12px; }
   .tag { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
   .tag.good { background: var(--good-soft); color: var(--good); }
@@ -22726,11 +22728,12 @@ function registerCustomUrl(url) {
   const shuffleQs = q.get('order') === 'mixed';
   const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
+  const checks = Math.max(1, Math.min(5, Math.floor(+q.get('checks') || 1)));
   const same = q.get('same') === '1', hints = q.get('hints') === '1', desmos = q.get('desmos') === '1', redo = q.get('redo') === 'missed' ? 'missed' : 'all';
   const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints, desmos, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, attempts, lockdown, same, hints, desmos, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
 })();
 
 /* ---------- question generation ---------- */
@@ -22788,6 +22791,7 @@ const setting = (setKey, name) => {
   if (name === 'desmos') return !!CONFIG.DESMOS;
   if (name === 'leaveLimit') return CONFIG.LEAVE_LIMIT || 0;
   if (name === 'redo') return CONFIG.REDO === 'missed' ? 'missed' : 'all';
+  if (name === 'checks') return CONFIG.CHECKS || 1; // typed-answer questions: Checks allowed on one version before new numbers
   return CONFIG.RETRIES || 0;
 };
 
@@ -23180,7 +23184,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
     } catch {}
   });
   const ps = !teacher && rid ? signinPass() : null;
-  state = { origQs, setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, teacher, hints: !!setting(setKey, 'hints'), desmos: !!setting(setKey, 'desmos') && !!CONFIG.DESMOS_KEY, hintUsed: saved.hintUsed || {},
+  state = { origQs, setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, checks: Math.max(1, Math.floor(+setting(setKey, 'checks') || 1)), misses: (!teacher && saved.misses) || {}, fresh: {}, teacher, hints: !!setting(setKey, 'hints'), desmos: !!setting(setKey, 'desmos') && !!CONFIG.DESMOS_KEY, hintUsed: saved.hintUsed || {},
     answers: Array.from({ length: qs.length }, (_, i) => (carried[i] ? carried[i].a : saved.answers && saved.answers[i] !== undefined ? saved.answers[i] : null)),
     submitted: !teacher && saved.submitted ? saved.submitted : null,
     started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
@@ -23196,7 +23200,7 @@ function saveState() {
   const saved = store.get(state.key) || {};
   store.set(state.key, { ...saved, answers: state.answers, started: state.started, tabAways: state.tabAways,
     tries: state.tries, status: state.status, history: state.history, submitted: state.submitted, ai: state.ai, hintUsed: state.hintUsed, sig: state.sig,
-    frozen: state.frozen, leaveBase: state.leaveBase, unlocks: state.unlocks });
+    frozen: state.frozen, leaveBase: state.leaveBase, unlocks: state.unlocks, misses: state.misses });
 }
 // fingerprint of a question (before any retries), so saved work follows its question if the assignment is edited
 const qSig = (q) => q.tpl + ':' + cyrb53(unM(String(q.stem)) + '|' + unM((q.choices || []).join('|'))).toString(36);
@@ -23243,7 +23247,8 @@ function render() {
     const locked = !!state.status[i];
     const box = el('div', { class: 'q' + (wm ? ' wm' : ''), id: 'q' + i });
     box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic)));
-    const prev = !teacher && prevTry(i, W); if (prev) box.append(prev, el('div', { class: 'newver' }, 'New version — try this one:'));
+    const prev = !teacher && prevTry(i, W); if (prev) box.append(prev, el('div', { class: 'newver' }, `🔄 New numbers — version ${(state.tries[i] || 0) + 1} of this question. Try this one:`));
+    if (!teacher && state.fresh && state.fresh[i]) { box.classList.add('regen'); delete state.fresh[i]; }
     box.append(textCanvas(q.stem, W));
     if (q.draw) {
       const graph = q.topic.startsWith('Graphs');
@@ -23720,6 +23725,8 @@ function hintBar(q, i) {
   return bar;
 }
 /* ---------- per-question Check button and retries ---------- */
+// how many Checks a question gets on one version before new numbers (multiple choice: always 1)
+const perVersion = (q) => (q.mode === 'fr' ? Math.max(1, state.checks || 1) : 1);
 function checkBar(q, i) {
   if (state.teacher) return el('span');
   const st = state.status[i], used = state.tries[i] || 0;
@@ -23729,10 +23736,10 @@ function checkBar(q, i) {
   if (st === 'correct') bar.append(el('span', { class: 'tag good' }, used ? `Correct on try ${used + 1}` : 'Correct'));
   else if (st === 'locked') bar.append(el('span', { class: 'tag ' + (scoreOf(q, state.answers[i]) > 0 ? 'part' : 'bad') }, scoreOf(q, state.answers[i]) > 0 ? 'Out of tries (½ credit)' : 'Out of tries'));
   else if (!state.submitted) {
-    const left = state.retries - used;
+    const left = state.retries - used, k = perVersion(q), m = (state.misses && state.misses[i]) || 0, total = left * k + (k - m);
     const btn = el('button', { class: 'btn checkbtn', type: 'button' }, 'Check');
     btn.addEventListener('click', () => { hideVK(); checkQ(i); });
-    bar.append(btn, el('span', { class: 'small' }, `${left + 1} ${left === 0 ? 'try' : 'tries'} left`));
+    bar.append(btn, el('span', { class: 'small' }, `${total} ${total === 1 ? 'try' : 'tries'} left` + (k > 1 && left > 0 ? ` · new numbers after ${k - m} more ${k - m === 1 ? 'miss' : 'misses'}` : '')));
     if (state.flash[i]) bar.append(el('div', { class: 'flash' }, state.flash[i]));
   }
   return bar;
@@ -23743,16 +23750,23 @@ async function checkQ(i) {
   if (q.proofQ) await gradeAllProofs(i);
   const pts = scoreOf(q, a);
   state.flash[i] = '';
-  if (pts === 1) state.status[i] = 'correct';
+  const k = perVersion(q), m = (state.misses[i] || 0) + 1;
+  if (pts === 1) { state.status[i] = 'correct'; delete state.misses[i]; }
+  else if (m < k) { // typed answer: more Checks on this same version before new numbers
+    state.misses[i] = m;
+    const left = k - m, more = (state.tries[i] || 0) < state.retries;
+    state.flash[i] = `Not quite. Check your work and try again — ${more ? `${left} more ${left === 1 ? 'miss' : 'misses'} and you’ll get new numbers.` : `${left} ${left === 1 ? 'try' : 'tries'} left.`}`;
+  }
   else if ((state.tries[i] || 0) < state.retries) {
+    delete state.misses[i]; state.fresh[i] = true;
     (state.history[i] = state.history[i] || []).push({ stem: q.stem, answer: answerText(q, a) });
     state.tries[i] = (state.tries[i] || 0) + 1;
     state.qs[i] = regenQuestion(state.seedStr, q, i, state.tries[i]);
     state.answers[i] = null;
     delete state.drawings[String(i)]; delete state.drawings['L' + i]; saveDrawings();
     const left = state.retries - state.tries[i] + 1;
-    state.flash[i] = `Not quite. Your last try and its worked-out solution are shown above. Here’s a new version — ${left} ${left === 1 ? 'try' : 'tries'} left.`;
-  } else state.status[i] = 'locked';
+    state.flash[i] = `🔄 New numbers! This question just changed — solve the new version. Your last try and its worked-out solution are shown above.`;
+  } else { state.status[i] = 'locked'; delete state.misses[i]; }
   saveState();
   rerenderAt(i);
 }
@@ -23762,9 +23776,9 @@ function prevTry(i, W) {
   const k = hist.length - 1, h = hist[k];
   let q; try { q = k === 0 ? state.origQs[i] : regenQuestion(state.seedStr, state.origQs[i], i, k); } catch { return null; }
   if (!q || unM(q.stem) !== unM(h.stem)) { // can't rebuild it exactly (the assignment changed): show what was saved
-    return el('div', { class: 'prevtry' }, el('div', { class: 'prevhead' }, `✗ Your previous try (try ${k + 1})`), textCanvas(h.stem, W - 34), el('div', { class: 'small' }, 'Your answer: ', el('strong', {}, String(h.answer || '').trim())));
+    return el('div', { class: 'prevtry' }, el('div', { class: 'prevhead' }, `✗ Your previous version (version ${k + 1})`), textCanvas(h.stem, W - 34), el('div', { class: 'small' }, 'Your answer: ', el('strong', {}, String(h.answer || '').trim())));
   }
-  const box = el('div', { class: 'prevtry' }, el('div', { class: 'prevhead' }, `✗ Your previous try (try ${k + 1}) — here’s how to solve it`), textCanvas(q.stem, W - 34));
+  const box = el('div', { class: 'prevtry' }, el('div', { class: 'prevhead' }, `✗ Your previous version (version ${k + 1}) — here’s how to solve it`), textCanvas(q.stem, W - 34));
   if (q.draw) {
     const cv = q.size ? makeCanvas(Math.min(q.size[0], W - 40), Math.round(q.size[1] * Math.min(1, (W - 40) / q.size[0]))) : makeCanvas(Math.min(560, W - 40), 300);
     cv._stack = W < 480 && q.pair; try { q.draw(cv); box.append(cv); } catch {}
@@ -24593,7 +24607,7 @@ function builder() {
   const orderSel = el('select', {}, el('option', { value: 'grouped' }, 'Grouped by type (in the order listed)'), el('option', { value: 'mixed' }, 'Mixed up (different order for each student)'));
   orderSel.value = saved.order || 'grouped';
   const numIn = (val, min, max) => el('input', { type: 'number', min: String(min), max: String(max), value: String(val), style: 'width:80px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
-  const retriesIn = numIn(saved.retries ?? 0, 0, 5), attemptsIn = numIn(saved.attempts ?? 1, 1, 10), leaveIn = numIn(saved.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, 0, 20);
+  const checksIn = numIn(saved.checks ?? 1, 1, 5), retriesIn = numIn(saved.retries ?? 0, 0, 5), attemptsIn = numIn(saved.attempts ?? 1, 1, 10), leaveIn = numIn(saved.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, 0, 20);
   const lockIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   lockIn.checked = saved.lockdown !== false;
   const sameIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
@@ -24609,6 +24623,11 @@ function builder() {
     el('span', { class: 'small' }, 'Only matters when attempts is 2 or more. “Only the ones they missed” keeps each question they got right (already marked correct) and gives new versions of the rest.'));
   const redoGray = () => { const off = Math.floor(+attemptsIn.value || 1) <= 1; redoSel.disabled = off; [redoLab, redoBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; }); };
   attemptsIn.addEventListener('input', redoGray); redoGray();
+  // typed-answer questions: wrong Checks allowed on one version before it gets new numbers (grayed out with no retries)
+  const checksLab = el('label', {}, 'Checks before new numbers (typed-answer questions)'), checksBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, checksIn,
+    el('span', { class: 'small' }, '1 = every wrong Check gives new numbers. 2 or more lets a student fix a typed answer before the question changes. Multiple choice always gets new numbers.'));
+  const checksGray = () => { const off = Math.floor(+retriesIn.value || 0) <= 0; checksIn.disabled = off; [checksLab, checksBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; }); };
+  retriesIn.addEventListener('input', checksGray); checksGray();
   // grayed out when lockdown mode is off (it only applies in lockdown mode)
   const leaveLab = el('label', {}, 'Lock after leaving (lockdown mode only)'), leaveBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, leaveIn,
     el('span', { class: 'small' }, 'Leaving the page this many times locks the assignment until you unlock it from the Results dashboard. 0 = never lock.'));
@@ -24629,14 +24648,14 @@ function builder() {
     const q = u.searchParams, mix = q.get('mix');
     if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
-      retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', desmos: q.get('desmos') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
+      retries: +q.get('retries') || 0, checks: +q.get('checks') || 1, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', desmos: q.get('desmos') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
       leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), gen: q.get('g') === '2' ? 2 : 1, note, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
     const S = SETS[key]; if (!S) return;
     store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m]) => [id, n, m === 'fr' ? 'fr' : 'mc'])), title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
-      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, desmos: !!S.desmos, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
+      retries: S.retries || 0, checks: S.checks || 1, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, desmos: !!S.desmos, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadEdit = () => loadFromUrl(editIn.value);
@@ -24727,6 +24746,7 @@ function builder() {
     el('label', {}, 'Question order'), orderSel,
     el('label', {}, 'Retries on a missed question'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, retriesIn,
       el('span', { class: 'small' }, '0 = graded only at Submit. 1 or more adds a Check button; each retry is a new version of the question.')),
+    checksLab, checksBox,
     el('label', {}, 'Attempts at the whole assignment'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, attemptsIn,
       el('span', { class: 'small' }, '1 = one try. Every attempt is recorded.')),
     redoLab, redoBox,
@@ -24850,7 +24870,7 @@ function builder() {
     el('details', { style: 'margin-top:10px' }, el('summary', { class: 'small' }, 'Make it a permanent menu item (optional)'),
       el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut), shareBox);
   app.append(out);
-  [titleIn, subjSel, orderSel, retriesIn, attemptsIn, leaveIn].forEach((x) => x.addEventListener('input', update));
+  [titleIn, subjSel, orderSel, retriesIn, checksIn, attemptsIn, leaveIn].forEach((x) => x.addEventListener('input', update));
   lockIn.addEventListener('change', update);
   sameIn.addEventListener('change', update);
   hintsIn.addEventListener('change', update);
@@ -24873,7 +24893,7 @@ function builder() {
     const title = titleIn.value.trim() || 'Custom Practice';
     changedNow = false;
     const prevLast = store.get(TK('builder:last')) || {};
-    const nextLast = { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
+    const nextLast = { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
     const sig = draftSig(nextLast);
     if (sig === store.get(TK('builder:sentSig'))) nextLast.t = prevLast.t || 0;
     else if (opening) { // first look at what was already here: copy it only if it came from loading an assignment just now
@@ -24893,6 +24913,8 @@ function builder() {
     if (orderSel.value === 'mixed') q.set('order', 'mixed');
     const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), at = Math.max(1, Math.min(10, Math.floor(+attemptsIn.value || 1)));
     if (rt) q.set('retries', String(rt));
+    const ck = Math.max(1, Math.min(5, Math.floor(+checksIn.value || 1)));
+    if (rt && ck > 1) q.set('checks', String(ck));
     const lv = Math.max(0, Math.min(20, Math.floor(+leaveIn.value || 0)));
     if (lv !== (CONFIG.LEAVE_LIMIT || 0)) q.set('leave', String(lv));
     if (at > 1) q.set('attempts', String(at));
@@ -24907,7 +24929,7 @@ function builder() {
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1'; shareA.value = shareLink(url, true); shareQ.value = shareLink(url, false);
     if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${desmosIn.checked ? ', desmos: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${desmosIn.checked ? ', desmos: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
   }
   update(); opening = false;
 }
@@ -24971,7 +24993,7 @@ function viewScreen() {
     el('p', { style: 'margin-top:0' }, `This is a view-only copy of an assignment. Nothing you do here is saved or sent to ${CONFIG.TEACHER_NAME}’s gradebook.`),
     el('p', { class: 'small' }, `${total} question${total === 1 ? '' : 's'}: `, S.items.map(([id, n, m]) => `${name(id)} (${n}${m === 'fr' ? ', free response' : ''})`).join('; '), '.'),
     el('p', { class: 'small' }, `Every student gets ${setting(setKey, 'same') ? 'the same version' : 'their own version with different numbers'}${S.shuffle ? ', in a mixed-up order' : ''}. `,
-      `Tries per question: ${ret + 1}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. Desmos calculator: ${yes(setting(setKey, 'desmos'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
+      `Tries per question: ${ret + 1}${ret && setting(setKey, 'checks') > 1 ? ` (typed answers: ${setting(setKey, 'checks')} checks per version)` : ''}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. Desmos calculator: ${yes(setting(setKey, 'desmos'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
     el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
       el('button', { class: 'btn secondary', type: 'button', onclick: () => { sample++; draw(); } }, 'Show another version'),
       ans ? ansBtn : '',
@@ -24995,7 +25017,7 @@ function copyIntoBuilder(link) {
   Object.keys(f).forEach((id) => { if (f[id] !== 'both') delete frc[id]; });
   const g = (k, d) => (q.has(k) ? q.get(k) : d);
   store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, title: g('title', set ? set.title : ''), subject: SUBJECTS[g('subject', set ? set.subject : '')] ? g('subject', set ? set.subject : '') : Object.keys(SUBJECTS)[0],
-    order: g('order', set && set.shuffle ? 'mixed' : '') === 'mixed' ? 'mixed' : 'grouped', retries: +g('retries', set ? set.retries || 0 : 0) || 0, attempts: +g('attempts', set ? set.attempts || 1 : 1) || 1,
+    order: g('order', set && set.shuffle ? 'mixed' : '') === 'mixed' ? 'mixed' : 'grouped', retries: +g('retries', set ? set.retries || 0 : 0) || 0, checks: +g('checks', set ? set.checks || 1 : 1) || 1, attempts: +g('attempts', set ? set.attempts || 1 : 1) || 1,
     lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', desmos: g('desmos', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
     note: 'This is a copy of a shared assignment. Check the title and settings, then copy your own student link below.', t: Date.now() });
   return true;
