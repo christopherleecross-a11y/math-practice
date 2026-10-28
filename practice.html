@@ -6201,9 +6201,9 @@ const TRIG_VERIFY = [
   ['csc X tan X', 'sec X', [['(1/sin X)(sin X/cos X)', 'Mixed'], ['1/cos X', 'Algebra'], ['sec X', 'Reciprocal']]],
 ];
 const chainLines = (lhs, rhs, steps, v, mark) => {
-  const lines = [`Verify the identity:   ${prettyTrig(lhs, v)} = ${prettyTrig(rhs, v)}`, '', `${prettyTrig(lhs, v)}`];
+  const lines = [`Verify the identity:   ${mathTrig(lhs, v)} = ${mathTrig(rhs, v)}`, '', `${mathTrig(lhs, v)}`];
   const gap = '\u00a0'.repeat(6);
-  steps.forEach(([e, why], k) => lines.push(`${gap}= ${mark && mark[k] != null ? mark[k] : prettyTrig(e, v)}` + (mark && mark.note && mark.note[k] ? `${gap}${mark.note[k]}` : '')));
+  steps.forEach(([e, why], k) => lines.push(`${gap}= ${mark && mark[k] != null ? mark[k] : mathTrig(e, v)}` + (mark && mark.note && mark.note[k] ? `${gap}${mark.note[k]}` : '')));
   return lines.join('\n');
 };
 // small edits that turn a correct step into a believable wrong one
@@ -6224,7 +6224,7 @@ function mutChoices(r, ans, v, { only = null } = {}) {
     const p = parseTrig(trigVar(s, v));
     if (!p || seen.some((q) => trigEquiv(p, q) && trigEquiv(q, p))) continue;
     if (only && [...trigInfo(p).names].some((f) => !only.includes(f))) continue;
-    seen.push(p); cands.push(prettyTrig(s, v));
+    seen.push(p); cands.push(mathTrig(s, v));
   }
   return cands;
 }
@@ -6245,7 +6245,7 @@ TEMPLATES.trigVerifyStep = (r) => {
     return {
       topic: 'Verifying identities',
       stem: fill('belongs in the blank?'),
-      ...buildChoices(r, prettyTrig(ans, v), cands, (i) => String(i)),
+      ...buildChoices(r, mathTrig(ans, v), cands, (i) => String(i)),
       frStem: fill(`belongs in the blank? (Hint: the ${STEP_NOTE[steps[k][1]]} is used.)`),
       fr: { fields: [{ kind: 'expr', label: 'Missing step:' }], key: [latexTrig(ans, v)], display: prettyTrig(ans, v),
         check: (vals) => {
@@ -6321,7 +6321,7 @@ function falseIdentity(r, v, avoid) {
 TEMPLATES.trigIsIdentity = (r) => {
   const pool = identityPool(), v = pick(r, TRIG_VARS);
   const truth = pick(r, pool);
-  const eq = ([l, rr]) => `${prettyTrig(l, v)} = ${prettyTrig(rr, v)}`;
+  const eq = ([l, rr]) => `${mathTrig(l, v)} = ${mathTrig(rr, v)}`;
   const wrongs = [];
   for (let t = 0; t < 50 && wrongs.length < 3; t++) { const w = falseIdentity(r, v, [truth[0], ...wrongs.map((x) => x[0])]); if (w) wrongs.push(w); }
   const isTrue = r() < 0.5, one = isTrue ? truth : wrongs[0];
@@ -6354,9 +6354,9 @@ TEMPLATES.trigSinCos = (r) => {
     if (cands.length < 3) continue;
     return {
       topic: 'Converting to sines and cosines',
-      stem: `Rewrite the expression using only sines and cosines, and simplify:   ${prettyTrig(e, v)}`,
-      ...buildChoices(r, prettyTrig(ans, v), cands, (i) => String(i)),
-      frStem: `Rewrite the expression using only sines and cosines, and simplify:   ${prettyTrig(e, v)}   (Use only sin and cos.)`,
+      stem: `Rewrite the expression using only sines and cosines, and simplify:   ${mathTrig(e, v)}`,
+      ...buildChoices(r, mathTrig(ans, v), cands, (i) => String(i)),
+      frStem: `Rewrite the expression using only sines and cosines, and simplify:   ${mathTrig(e, v)}   (Use only sin and cos.)`,
       fr: FR.trig('', ans, v, { ban: ['tan', 'cot', 'sec', 'csc'] }),
       solution: `Use tan = sin/cos, cot = cos/sin, sec = 1/cos, csc = 1/sin (and sin(−u) = −sin u, cos(−u) = cos u), then simplify: ${prettyTrig(e, v)} = ${prettyTrig(ans, v)}.`,
     };
@@ -6387,7 +6387,7 @@ TEMPLATES.trigWhichProof = (r) => {
     const [lhs, rhs, steps] = pick(r, TRIG_VERIFY.filter((x) => x[2].length >= 2)), v = pick(r, TRIG_VARS);
     const L = parseTrig(trigVar(lhs, v));
     const lines = [lhs, ...steps.map(([e]) => e)];
-    const fmtProof = (ls) => ls.map((e, k) => (k ? '= ' : '') + prettyTrig(e, v)).join('\n');
+    const fmtProof = (ls) => ls.map((e, k) => (k ? '= ' : '') + mathTrig(e, v)).join('\n');
     // a wrong version changes one middle line and keeps the rest
     const wrongs = [];
     for (const k of shuffle(r, lines.map((_, k) => k).filter((k) => k > 0 && k < lines.length - 1))) {
@@ -6410,7 +6410,7 @@ TEMPLATES.trigWhichProof = (r) => {
       if (!wrongs.some((w) => w.text === text)) wrongs.push({ text, k, why, bad });
     }
     if (wrongs.length < 3) continue;
-    const correct = fmtProof(lines), ident = `${prettyTrig(lhs, v)} = ${prettyTrig(rhs, v)}`;
+    const correct = fmtProof(lines), ident = `${mathTrig(lhs, v)} = ${mathTrig(rhs, v)}`;
     const mc = buildChoices(r, correct, wrongs.map((w) => w.text), (i) => String(i));
     const one = pick(r, wrongs), lineOpts = lines.map((_, k) => `Line ${k + 1}`).slice(1, -1);
     const shown = one.text.split('\n').map((l, k) => `Line ${k + 1}:   ${l.replace(/^= /, '')}`).join('\n');
@@ -6433,7 +6433,7 @@ TEMPLATES.trigProve = (r) => {
   const model = [lhs, ...steps.map(([e]) => e)];
   const q = {
     topic: 'Proving identities', proofQ: { lhs, rhs, v },
-    stem: `Prove the identity:   ${prettyTrig(lhs, v)} = ${prettyTrig(rhs, v)}\n` +
+    stem: `Prove the identity:   ${mathTrig(lhs, v)} = ${mathTrig(rhs, v)}\n` +
       'Start with one side exactly as written. On each new line, write the next expression, changing one thing at a time, until you reach the other side. Press Enter for a new line.',
     choices: [], answer: -1,
     solution: 'One possible proof:\n' + chainLines(lhs, rhs, steps, v, { note: steps.map(([, w]) => `(${STEP_NOTE[w]})`) }).split('\n').slice(2).join('\n'),
@@ -9216,7 +9216,113 @@ function wrapLines(ctx, text, maxW) {
   if (line) lines.push(line);
   return lines;
 }
+/* ---------- stacked fractions in canvas text ----------
+   Text between MB and ME is a trig expression (prettyTrig text). It is drawn with real fractions (numerator over denominator).
+   Everywhere the text is shown as plain text, unM() removes the two markers and the expression reads as before (a/b). */
+const MB = '\uE000', ME = '\uE001';
+const unM = (t) => (typeof t === 'string' ? t.replace(/[\uE000\uE001]/g, '') : t);
+const hasM = (t) => typeof t === 'string' && t.includes(MB);
+const mathTrig = (e, v) => MB + prettyTrig(e, v) + ME;
+// parse prettyTrig text into boxes: { k: 'row', c: [...] } | { k: 't', s } | { k: 'frac', n, d } | { k: 'par', c }
+function mParse(src) {
+  const toks = []; let i = 0; const S = src.replace(/\u00a0/g, ' ');
+  while (i < S.length) {
+    const r = S.slice(i); let m;
+    if (r[0] === ' ') { i++; continue; }
+    if ((m = /^(sin|cos|tan|csc|sec|cot)[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*/.exec(r))) { toks.push({ t: 'fn', s: m[0] }); i += m[0].length; continue; }
+    if ((m = /^\d+(\.\d+)?[⁰¹²³⁴⁵⁶⁷⁸⁹]*/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
+    if ((m = /^_+/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
+    if ((m = /^[A-Za-zθαβγπ][⁰¹²³⁴⁵⁶⁷⁸⁹]*/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
+    if ((m = /^\)[⁰¹²³⁴⁵⁶⁷⁸⁹]*/.exec(r))) { toks.push({ t: ')', s: m[0].slice(1) }); i += m[0].length; continue; }
+    if ('(+−-·=/'.includes(r[0])) { toks.push({ t: r[0] === '-' ? '−' : r[0] }); i++; continue; }
+    return null;
+  }
+  let k = 0; const is = (t) => k < toks.length && toks[k].t === t;
+  const startsPrim = () => k < toks.length && ['a', 'fn', '('].includes(toks[k].t);
+  const fail = () => { throw new Error('m'); };
+  function prim() {
+    const t = toks[k]; if (!t) fail();
+    if (t.t === 'a') { k++; return { k: 't', s: t.s }; }
+    if (t.t === '(') { k++; const e = expr(); if (!is(')')) fail(); const sup = toks[k].s; k++; return { k: 'par', c: e, sup }; }
+    if (t.t === 'fn') { k++; const a = prim(); return { k: 'row', c: [{ k: 't', s: t.s }, { k: 'sp' }, a] }; }
+    fail();
+  }
+  function unary() { if (is('−')) { k++; const u = unary(); return { k: 'row', c: [{ k: 't', s: '−' }, u] }; } return prim(); }
+  function term() {
+    let parts = [unary()];
+    for (;;) {
+      if (is('/')) { k++; const d = unary(); parts = [{ k: 'frac', n: parts.length > 1 ? { k: 'row', c: mJoin(parts) } : mStrip(parts[0]), d: mStrip(d) }]; }
+      else if (is('·')) { k++; parts.push({ k: 't', s: ' · ' }, unary()); }
+      else if (startsPrim()) parts.push(unary());
+      else break;
+    }
+    return parts.length > 1 ? { k: 'row', c: mJoin(parts) } : parts[0];
+  }
+  function expr() { const c = [term()]; while (is('+') || is('−')) { const op = toks[k++].t; c.push({ k: 't', s: ` ${op} ` }, term()); } return c.length > 1 ? { k: 'row', c } : c[0]; }
+  try { const c = [expr()]; while (is('=')) { k++; c.push({ k: 't', s: ' = ' }, expr()); } if (k !== toks.length) return null; return c.length > 1 ? { k: 'row', c } : c[0]; } catch { return null; }
+}
+// implicit products get a thin space; a parenthesized denominator or numerator loses its parentheses (the bar groups it)
+const mJoin = (parts) => parts.flatMap((p, j) => (j && p.k !== 't' && parts[j - 1].k !== 't' ? [{ k: 'sp' }, p] : [p]));
+const mStrip = (b) => (b.k === 'par' && !b.sup ? b.c : b);
+function mFont(fs) { return `${fs}px Georgia, "Times New Roman", serif`; }
+function mBox(ctx, b, fs) { // returns { w, a, d }
+  if (b.k === 't') { ctx.font = mFont(fs); return { w: ctx.measureText(b.s).width, a: fs * 0.75, d: fs * 0.25 }; }
+  if (b.k === 'sp') return { w: fs * 0.22, a: 0, d: 0 };
+  if (b.k === 'row') { let w = 0, a = fs * 0.75, d = fs * 0.25; for (const c of b.c) { const m = mBox(ctx, c, fs); w += m.w; a = Math.max(a, m.a); d = Math.max(d, m.d); } return { w, a, d }; }
+  if (b.k === 'par') { const m = mBox(ctx, b.c, fs), tall = m.a + m.d > fs * 1.3; ctx.font = mFont(fs); const pw = tall ? fs * 0.4 : ctx.measureText('(').width, sw = b.sup ? ctx.measureText(b.sup).width : 0; return { w: m.w + 2 * pw + sw, a: Math.max(m.a, fs * 0.75) + (tall ? 2 : 0), d: Math.max(m.d, fs * 0.25) + (tall ? 2 : 0) }; }
+  if (b.k === 'frac') { const f2 = fs * 0.88, n = mBox(ctx, b.n, f2), d = mBox(ctx, b.d, f2), ax = fs * 0.3; return { w: Math.max(n.w, d.w) + fs * 0.4, a: ax + 3 + n.a + n.d, d: d.a + d.d + 3 - ax }; }
+  return { w: 0, a: 0, d: 0 };
+}
+function mDraw(ctx, b, x, y, fs) { // y = baseline
+  const m = mBox(ctx, b, fs);
+  if (b.k === 't') { ctx.font = mFont(fs); ctx.fillText(b.s, x, y); }
+  else if (b.k === 'row') { let xx = x; for (const c of b.c) { mDraw(ctx, c, xx, y, fs); xx += mBox(ctx, c, fs).w; } }
+  else if (b.k === 'par') {
+    const c = mBox(ctx, b.c, fs), tall = c.a + c.d > fs * 1.3; ctx.font = mFont(fs);
+    if (!tall) { const pw = ctx.measureText('(').width; ctx.fillText('(', x, y); mDraw(ctx, b.c, x + pw, y, fs); ctx.fillText(')' + (b.sup || ''), x + pw + c.w, y); }
+    else {
+      const pw = fs * 0.4, top = y - c.a - 1, bot = y + c.d + 1;
+      const paren = (px, dir) => { ctx.beginPath(); ctx.moveTo(px + pw * 0.75 * (dir > 0 ? 1 : 0) + pw * 0.15 * (dir > 0 ? 0 : 1), top); ctx.quadraticCurveTo(px + (dir > 0 ? pw * 0.05 : pw * 0.95), (top + bot) / 2, px + pw * 0.75 * (dir > 0 ? 1 : 0) + pw * 0.15 * (dir > 0 ? 0 : 1), bot); ctx.stroke(); };
+      ctx.save(); ctx.lineWidth = 1.3; paren(x, 1); mDraw(ctx, b.c, x + pw, y, fs); paren(x + pw + c.w, -1); ctx.restore();
+      if (b.sup) { ctx.font = mFont(fs); ctx.fillText(b.sup, x + 2 * pw + c.w, top + fs * 0.6); }
+    }
+  } else if (b.k === 'frac') {
+    const f2 = fs * 0.88, n = mBox(ctx, b.n, f2), d = mBox(ctx, b.d, f2), ax = y - fs * 0.3;
+    ctx.save(); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + fs * 0.12, ax); ctx.lineTo(x + m.w - fs * 0.12, ax); ctx.stroke(); ctx.restore();
+    mDraw(ctx, b.n, x + (m.w - n.w) / 2, ax - 3 - n.d, f2);
+    mDraw(ctx, b.d, x + (m.w - d.w) / 2, ax + 3 + d.a, f2);
+  }
+}
+// a canvas for text that contains marked expressions: fractions are stacked, and each line is as tall as it needs to be
+function mathTextCanvas(text, width, font, lh) {
+  const fs = +((/(\d+(?:\.\d+)?)px/.exec(font) || [0, 17])[1]);
+  const probe = document.createElement('canvas').getContext('2d'); probe.font = font;
+  const wrapped = wrapLines(probe, text.replace(/\uE000([^\uE001]*)\uE001/g, (m0, e) => MB + e.replace(/ /g, '\u00a0') + ME), width - 4);
+  const rows = wrapped.map((line) => {
+    const parts = line.split(/(\uE000[^\uE001]*\uE001)/).filter((x) => x !== '').map((p) => {
+      if (p.startsWith(MB)) { const src = p.slice(1, -1), b = mParse(src); if (b) return { b, m: mBox(probe, b, fs) }; return { s: src.replace(/\u00a0/g, ' ') }; }
+      return { s: p.replace(/[\uE000\uE001]/g, '') };
+    });
+    let a = fs * 0.8, d = fs * 0.3; parts.forEach((q) => { if (q.b) { a = Math.max(a, q.m.a); d = Math.max(d, q.m.d); } });
+    return { parts, a, d, h: Math.max(lh, a + d + 8) };
+  });
+  const H = rows.reduce((t, r0) => t + r0.h, 0) + 6, cv = makeCanvas(width, H);
+  cv.style.maxWidth = '100%'; cv.style.width = width + 'px';
+  const ctx = cv._ctx; ctx.fillStyle = '#1d1d1b'; ctx.strokeStyle = '#1d1d1b'; ctx.textBaseline = 'alphabetic';
+  let y = 3;
+  rows.forEach((row) => {
+    const base = y + (row.h - row.a - row.d) / 2 + row.a; let x = 2;
+    row.parts.forEach((q) => {
+      if (q.b) { mDraw(ctx, q.b, x, base, fs); x += q.m.w; }
+      else { ctx.font = font; ctx.fillText(q.s, x, base); x += ctx.measureText(q.s).width; }
+    });
+    y += row.h;
+  });
+  return cv;
+}
+const solNode = (t) => el('div', { class: 'sol' }, hasM(t) ? mathTextCanvas(t, Math.max(280, contentWidth() - 30), '16px Georgia, "Times New Roman", serif', 24) : t);
 function textCanvas(text, width, font = TEXT_FONT, lh = 26) {
+  if (hasM(text)) return mathTextCanvas(text, width, font, lh);
   const probe = document.createElement('canvas').getContext('2d');
   probe.font = font;
   const lines = wrapLines(probe, text, width - 4);
@@ -22746,6 +22852,8 @@ function cloudPayload() {
   const b = state.base;
   return { action: 'saveProgress', key: b, period: state.period, name: state.name, rid: state.rid || undefined, token: state.token || undefined, title: SETS[state.setKey].title, updated: +(store.get(b + ':cloudts') || Date.now()),
     data: (() => { const d = { meta: store.get(b + ':meta'), curKey: state.key, saved: store.get(state.key), work: store.get(state.key + ':work'), draw: store.get(state.key + ':draw') };
+      // points earned so far (for the teacher dashboard's "still working" view); only a number, never the answers
+      try { if (state.qs && state.answers) d.correct = Math.round(2 * state.qs.reduce((s, q, i) => s + (state.answers[i] == null ? 0 : scoreOf(q, state.answers[i]) || 0), 0)) / 2; } catch (e) {}
       let t = JSON.stringify(d); if (t.length > 190000) { delete d.draw; t = JSON.stringify(d); } if (t.length > 190000) { delete d.work; t = JSON.stringify(d); } return t; })() };
 }
 async function cloudFlush(leaving) {
@@ -22870,7 +22978,7 @@ function el(tag, attrs = {}, ...kids) {
   for (const [k, v] of Object.entries(attrs)) {
     if (k === 'class') e.className = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
   }
-  kids.flat().forEach((k) => e.append(k instanceof Node ? k : document.createTextNode(k)));
+  kids.flat().forEach((k) => e.append(k instanceof Node ? k : document.createTextNode(unM(k))));
   return e;
 }
 const contentWidth = () => Math.min(700, app.clientWidth) - 38;
@@ -23089,7 +23197,7 @@ function saveState() {
     frozen: state.frozen, leaveBase: state.leaveBase, unlocks: state.unlocks });
 }
 // fingerprint of a question (before any retries), so saved work follows its question if the assignment is edited
-const qSig = (q) => q.tpl + ':' + cyrb53(String(q.stem) + '|' + (q.choices || []).join('|')).toString(36);
+const qSig = (q) => q.tpl + ':' + cyrb53(unM(String(q.stem)) + '|' + unM((q.choices || []).join('|'))).toString(36);
 // the assignment changed since this student saved (questions added, removed, or reordered):
 // keep each saved answer with the question it belongs to and drop answers to questions that are gone
 function remapSaved(key, saved, sig) {
@@ -23145,7 +23253,7 @@ function render() {
     }
     const showSol = ((submitted || locked) && CONFIG.SHOW_SOLUTIONS) || teacher;
     if (state.hints) box.append(hintBar(q, i));
-    if (q.mode === 'fr') { box.append(frArea(q, i)); box.append(checkBar(q, i)); if (!teacher && !q.proofQ) box.append(workArea(q, i)); if (showSol) box.append(el('div', { class: 'sol' }, q.solution)); app.append(box); return; }
+    if (q.mode === 'fr') { box.append(frArea(q, i)); box.append(checkBar(q, i)); if (!teacher && !q.proofQ) box.append(workArea(q, i)); if (showSol) box.append(solNode(q.solution)); app.append(box); return; }
     const ch = el('div', { class: 'choices' });
     q.choices.forEach((c, j) => {
       let cls = 'choice';
@@ -23161,7 +23269,7 @@ function render() {
     box.append(ch);
     box.append(checkBar(q, i));
     if (!teacher) box.append(workArea(q, i));
-    if (showSol) box.append(el('div', { class: 'sol' }, q.solution));
+    if (showSol) box.append(solNode(q.solution));
     app.append(box);
   });
   if (!submitted && !teacher) {
@@ -23651,7 +23759,7 @@ function prevTry(i, W) {
   const hist = state.history && state.history[i]; if (!hist || !hist.length || !state.origQs || !state.origQs[i]) return null;
   const k = hist.length - 1, h = hist[k];
   let q; try { q = k === 0 ? state.origQs[i] : regenQuestion(state.seedStr, state.origQs[i], i, k); } catch { return null; }
-  if (!q || q.stem !== h.stem) { // can't rebuild it exactly (the assignment changed): show what was saved
+  if (!q || unM(q.stem) !== unM(h.stem)) { // can't rebuild it exactly (the assignment changed): show what was saved
     return el('div', { class: 'prevtry' }, el('div', { class: 'prevhead' }, `✗ Your previous try (try ${k + 1})`), textCanvas(h.stem, W - 34), el('div', { class: 'small' }, 'Your answer: ', el('strong', {}, String(h.answer || '').trim())));
   }
   const box = el('div', { class: 'prevtry' }, el('div', { class: 'prevhead' }, `✗ Your previous try (try ${k + 1}) — here’s how to solve it`), textCanvas(q.stem, W - 34));
@@ -23667,7 +23775,7 @@ function prevTry(i, W) {
     const pts = [...gPart.matchAll(/\((-?[\d.]+),\s*(-?[\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
     const f0 = q.fr.fields[0], g = makeCanvas(300, f0.win && f0.win.hFrac ? Math.round(300 * f0.win.hFrac) : 300); try { skDraw(g, f0, pts, f0.family === 'vec' || f0.family === 'ineq' ? skParse(q.fr.key[0]) : q.fr._target, skStyleFrom(f0.family, h.answer)); g.style.width = '260px'; box.append(g); } catch {}
   }
-  box.append(el('div', { class: 'sol' }, q.solution));
+  box.append(solNode(q.solution));
   return box;
 }
 function rerenderAt(i) {
@@ -23731,7 +23839,7 @@ const toPng = (c) => { const x = c._ctx; x.save(); x.globalCompositeOperation = 
 const skStyleText = (fam, st) => { const O = SKETCH[fam] && SKETCH[fam].styleOpts; return O ? ((O.find((o) => o[1] === st) || [st])[0]) : `${st} line`; };
 const skStyleFrom = (fam, text) => { const O = SKETCH[fam] && SKETCH[fam].styleOpts; if (O) { const o = O.find((x) => String(text || '').includes(x[0])); return o ? o[1] : ''; } return (String(text || '').match(/(solid|dashed) line/) || [])[1] || ''; };
 function answerText(q, a) {
-  if (q.mode !== 'fr') return a === null || a === undefined || Array.isArray(a) ? '(no answer)' : `${LETTERS[a]}. ${q.choices[a]}`;
+  if (q.mode !== 'fr') return a === null || a === undefined || Array.isArray(a) ? '(no answer)' : `${LETTERS[a]}. ${unM(q.choices[a])}`;
   if (!Array.isArray(a) || !isAnswered(q, a)) return '(no answer)';
   if (q.twoPart) return a[0] + (a[0] !== 'Not possible' ? `;  △${normLetters(a[1])} ≅ △${normLetters(a[2])}` : '');
   if (q.proofQ) return '\n' + proofLines(a[0]).map((s, k) => (k ? '   = ' : '   ') + (/[\\{}]/.test(s) ? latexToText(s) : s)).join('\n');
@@ -23753,9 +23861,9 @@ function exportWork(pts) {
       const PL = state.drawings['Lw' + i] || PAD;
       if (ws.length) { const c = offCanvas(PL[0], PL[1]); paintGrid(c); paintStrokes(c._ctx, ws, PL[0], PL[1]); pad = toPng(c); }
     } catch (e) { /* never block a submission over a picture */ }
-    const correct = q.proofQ ? '\n' + q.solution : q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`;
+    const correct = unM(q.proofQ ? '\n' + q.solution : q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`);
     const g = q.proofQ && state.ai[i];
-    return { n: i + 1, topic: q.topic, stem: q.stem, answer: answerText(q, state.answers[i]), correct, pts: pts[i],
+    return { n: i + 1, topic: q.topic, stem: unM(q.stem), answer: answerText(q, state.answers[i]), correct, pts: pts[i],
       feedback: g ? (g.ai ? 'AI grader: ' : 'Step checker (AI not used): ') + g.feedback : '', typed: workLines(i).map(latexToText).filter(Boolean).join('\n'), fig, pad,
       tries: (state.tries[i] || 0) + 1, history: state.history[i] || [] };
   });
@@ -24198,7 +24306,7 @@ function dashAssignment(a) {
   else scard.append(dashTable([
     { k: 'name', t: 'Student', sort: byStudent, show: (r) => linkBtn(r.name, () => { DASH.student = { period: r.period, name: r.name }; dashRender(); }) },
     { k: 'period', t: 'Period', sort: (r) => perOrder(r.period) * 1000 + 0 },
-    { k: 'pct', t: 'Best', desc: true, show: (r) => `${r.score}/${r.total} (${pctT(r.pct)})`, bg: (r) => band(r.pct) },
+    { k: 'pct', t: 'Best', desc: true, show: (r) => el('span', {}, el('strong', {}, pctT(r.pct)), el('span', { class: 'small' }, ` (${r.score}/${r.total})`)), bg: (r) => band(r.pct) },
     { k: 'tries', t: 'Tries', desc: true },
     { k: 'lastT', t: 'Turned in', desc: true, show: (r) => dashDate(r.lastT) },
     { k: 'minutes', t: 'Minutes', desc: true },
@@ -24211,7 +24319,7 @@ function dashAssignment(a) {
 
   if (wip.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Started but not turned in'),
     dashTable([{ k: 'name', t: 'Student', sort: byStudent }, { k: 'period', t: 'Period', sort: byStudent },
-      { k: 'answered', t: 'Answered', desc: true, show: (p) => `${p.answered} of ${p.total || '?'}` }, { k: 't', t: 'Last saved', desc: true, show: (p) => dashDate(p.t) },
+      { k: 'answered', t: 'Answered', desc: true, show: (p) => `${p.answered} of ${p.total || '?'}` }, { k: 'correct', t: 'Correct so far', desc: true, sort: (p) => (p.correct == null ? -1 : p.correct), show: (p) => (p.correct == null ? '—' : p.answered ? el('span', {}, el('strong', {}, pctT(p.correct / p.answered)), el('span', { class: 'small' }, ` (${p.correct} of ${p.answered})`)) : '0'), bg: (p) => (p.correct != null && p.answered ? band(p.correct / p.answered) : '') }, { k: 't', t: 'Last saved', desc: true, show: (p) => dashDate(p.t) },
       { k: 'frozen', t: 'Status', sort: (p) => (p.frozen ? 1 : 0), show: (p) => (p.frozen ? el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:6px 14px', onclick: (e) => dashUnlock(p, e.target) }, '🔒 Unlock') : 'working') },
       { k: 'reset', t: '', sort: () => 0, show: (p) => resetBtn(p) }], wip)));
   if (notStarted.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Not started'),
@@ -24233,7 +24341,7 @@ function dashStudent(s) {
       tile(best.length ? pctT(avg) : '—', 'average best score', best.length ? band(avg) : undefined), tile(String(prog.length), 'started, not turned in', '#fbf1dc')),
     best.length ? dashTable([
       { k: 'title', t: 'Assignment', sort: (r) => r.title },
-      { k: 'pct', t: 'Best', desc: true, show: (r) => `${r.score}/${r.total} (${pctT(r.pct)})`, bg: (r) => band(r.pct) },
+      { k: 'pct', t: 'Best', desc: true, show: (r) => el('span', {}, el('strong', {}, pctT(r.pct)), el('span', { class: 'small' }, ` (${r.score}/${r.total})`)), bg: (r) => band(r.pct) },
       { k: 'tries', t: 'Tries', desc: true },
       { k: 'lastT', t: 'Turned in', desc: true, show: (r) => dashDate(r.lastT) },
       { k: 'minutes', t: 'Minutes', desc: true },
@@ -24241,7 +24349,7 @@ function dashStudent(s) {
       { k: 'work', t: 'Work', sort: (r) => (r.work ? 1 : 0), show: (r) => (r.work ? el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'View') : '') },
       { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn({ ...r, name: s.name, period: s.period }) },
     ], best) : el('p', {}, 'Nothing turned in yet.'),
-    prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered, ${dashDate(p.t)})`).join('; ')) : ''));
+    prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered${p.correct != null ? `, ${p.correct} correct` : ''}, ${dashDate(p.t)})`).join('; ')) : ''));
 }
 /* ==== RESULTS DASHBOARD END ==== */
 /* ---------- teacher tools: menu + assignment builder ---------- */
@@ -24810,12 +24918,12 @@ function previewQuestion(q, showAns = true) {
       f.kind === 'choice' ? el('span', { class: 'small' }, f.options.map((o, j) => `${LETTERS[j]}. ${o}`).join('   ')) :
       f.kind === 'select' ? el('select', { disabled: 'disabled' }, el('option', {}, 'Choose…')) : f.kind === 'graph' ? el('span', { class: 'small' }, `Students place ${SKETCH[f.family].roles.join(', then ')} on a grid; the graph is drawn through them.`) : f.kind === 'proof' ? el('span', { class: 'small' }, 'Students type the proof one line at a time; each line is checked, then the AI grades it.') : el('input', { disabled: 'disabled', class: f.kind === 'number' ? 'num' : 'let' }),
       f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''))),
-      showAns ? el('div', { class: 'small', style: 'margin-top:6px' }, 'Correct answer: ', el('strong', {}, q.fr.display.replace(/(.)\u0305/g, '$1'))) : ''), showAns ? el('div', { class: 'sol' }, q.solution) : '');
+      showAns ? el('div', { class: 'small', style: 'margin-top:6px' }, 'Correct answer: ', el('strong', {}, q.fr.display.replace(/(.)\u0305/g, '$1'))) : ''), showAns ? solNode(q.solution) : '');
     return box;
   }
   const ch = el('div', { class: 'choices' });
   q.choices.forEach((c, j) => ch.append(el('div', { class: 'choice' + (showAns && j === q.answer ? ' right' : '') }, el('span', { class: 'letter' }, LETTERS[j]), textCanvas(c, Math.min(W - 70, 500), '17px Georgia, "Times New Roman", serif', 24))));
-  box.append(ch, showAns ? el('div', { class: 'sol' }, q.solution) : '');
+  box.append(ch, showAns ? solNode(q.solution) : '');
   return box;
 }
 
