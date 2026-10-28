@@ -27,6 +27,10 @@
   .q { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 18px 12px; margin-top: 16px; }
   .qhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
   .qnum { font-weight: 700; }
+  .q.bonus { border: 2px solid #c9a227; box-shadow: 0 0 0 3px #f6e7b0; }
+  .bonustag { display: inline-block; background: #c9a227; color: #fff; font-weight: 800; letter-spacing: .5px; border-radius: 999px; padding: 2px 10px; margin-right: 8px; font-size: 13px; }
+  .bonusnote { background: #fdf6dc; border-radius: 8px; padding: 6px 10px; margin: 0 0 10px; font-size: 14px; color: #6b5310; }
+  .bonusintro { border: 2px solid #c9a227; background: #fffaf0; }
   .qtopic { font-size: 13px; color: var(--muted); }
   canvas { display: block; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   .diagram { margin: 10px 0 4px; }
@@ -6430,8 +6434,15 @@ TEMPLATES.trigWhichProof = (r) => {
     };
   }
 };
-TEMPLATES.trigProve = (r) => {
-  const [lhs, rhs, steps] = pick(r, TRIG_VERIFY), v = pick(r, TRIG_VARS);
+TEMPLATES.trigProve = (r) => trigProveFrom(r, TRIG_VERIFY);
+// the same proofs sorted by difficulty (positions in TRIG_VERIFY): easy = one or two steps,
+// medium = a few steps or a cofunction/fraction to rewrite, hard = combining fractions or factoring
+const TRIG_PROVE_LEVELS = { easy: [0, 2, 3, 4, 8, 10, 13, 23, 24, 25, 27], medium: [1, 6, 7, 9, 14, 17, 20, 21, 26], hard: [5, 11, 12, 15, 16, 18, 19, 22] };
+TEMPLATES.trigProveEasy = (r) => trigProveFrom(r, TRIG_PROVE_LEVELS.easy.map((k) => TRIG_VERIFY[k]));
+TEMPLATES.trigProveMedium = (r) => trigProveFrom(r, TRIG_PROVE_LEVELS.medium.map((k) => TRIG_VERIFY[k]));
+TEMPLATES.trigProveHard = (r) => trigProveFrom(r, TRIG_PROVE_LEVELS.hard.map((k) => TRIG_VERIFY[k]));
+function trigProveFrom(r, pool) {
+  const [lhs, rhs, steps] = pick(r, pool), v = pick(r, TRIG_VARS);
   const model = [lhs, ...steps.map(([e]) => e)];
   const q = {
     topic: 'Proving identities', proofQ: { lhs, rhs, v },
@@ -6443,7 +6454,7 @@ TEMPLATES.trigProve = (r) => {
   q.fr = { fields: [{ kind: 'proof' }], key: [model.map((e) => latexTrig(e, v)).join('\n')], display: 'See the sample proof below.',
     answered: (vals) => proofLines(vals[0]).length > 0, check: (vals) => proofScore(q, vals[0]) === 1, score: (vals) => proofScore(q, vals[0]) };
   return q;
-};
+}
 const proofLines = (s) => String(s || '').split('\n').filter((x) => x.replace(/\\[,;: ]|\s/g, '') !== '');
 // a line's "shape": its symbols in order, ignoring × signs and grouping, to tell whether it is one side as written
 const formKey = (s) => { const t = tokTrig(/[\\{}]/.test(s) ? latexToPlain(s) : s); return t ? t.filter((k) => !['*', '(', ')'].includes(k.t)).map((k) => k.t + (k.v != null ? ':' + (typeof k.v === 'number' ? k.v.toFixed(6) : k.v) : '')) : null; };
@@ -21704,7 +21715,10 @@ const QUESTION_TYPES = [
   { id: 'trigVerifyStep',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Fill in the missing step', desc: 'A worked verification with one step blank (#5–32)' },
   { id: 'trigSinCos',         subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Convert to sines and cosines', desc: 'Rewrite with only sin and cos (#27–32)' },
   { id: 'trigWhichProof',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', label: 'Which proof is correct?', desc: 'MC: pick the valid proof of four. Free response: find the line with the mistake' },
-  { id: 'trigProve',          subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', writtenOnly: true, label: 'Prove the identity (AI graded)', desc: 'Students write the whole proof line by line; each line is checked, then Claude grades it' },
+  { id: 'trigProve',          subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', writtenOnly: true, label: 'Prove the identity — any difficulty (AI graded)', desc: 'Students write the whole proof line by line; each line is checked, then Claude grades it' },
+  { id: 'trigProveEasy',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', writtenOnly: true, label: 'Prove the identity — easy (AI graded)', desc: 'Written proof, graded by Claude. One or two steps, like tan θ cot θ = 1' },
+  { id: 'trigProveMedium',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', writtenOnly: true, label: 'Prove the identity — medium (AI graded)', desc: 'Written proof, graded by Claude. A few steps, cofunctions, or one fraction to rewrite' },
+  { id: 'trigProveHard',     subject: 'precalc',  section: '2.2 Verifying Trigonometric Identities', writtenOnly: true, label: 'Prove the identity — hard (AI graded)', desc: 'Written proof, graded by Claude. Combining fractions, factoring, or five-step proofs' },
   { id: 'trigCheckSolution', subject: 'precalc',  section: '2.3 Solving Trigonometric Equations', label: 'Is it a solution?', desc: 'Check whether an x-value solves the equation (#7–12)' },
   { id: 'trigSolveBasic', subject: 'precalc',  section: '2.3 Solving Trigonometric Equations', label: 'Solve (isolate the function)', desc: 'General solution, like x = π/6 + 2nπ (#13–20)' },
   { id: 'trigSolveFactor', subject: 'precalc',  section: '2.3 Solving Trigonometric Equations', label: 'Solve by factoring', desc: 'Factored, cubic, and quadratic-type equations (#21–30)' },
@@ -22707,20 +22721,27 @@ function customKeyFor(q) {
 }
 /* ---------- custom assignments from a link: ?mix=findXY.3_thirdAngle.2&title=...&subject=geometry ---------- */
 let CUSTOM_KEY = null;
+// "id.n", "id.n.fr", and bonus questions "id.n.mc.b" / "id.n.fr.b" → [id, n, mode] or [id, n, mode, 'b']
+const mixItems = (mix) => mix.split('_').map((p) => p.split('.')).filter(([id, n]) => TEMPLATES[id] && +n > 0)
+  .map(([id, n, f, b]) => (b === 'b' ? [id, Math.min(20, Math.floor(+n)), f === 'fr' ? 'fr' : 'mc', 'b'] : [id, Math.min(20, Math.floor(+n)), f === 'fr' ? 'fr' : 'mc']));
+// percent added to the score for each bonus question answered right, from a link (bpct=5); half percents allowed
+const bonusPctOf = (q) => (q.has('bpct') ? Math.max(0.5, Math.min(50, Math.round(2 * (+q.get('bpct') || 5)) / 2)) : undefined);
+// a bonus question: wrong costs nothing, right adds the teacher's bonus points
+const isBonus = (q) => !!(q && q.bonus);
 // a built assignment's link (from the teacher's list) → its key in SETS
 function registerCustomUrl(url) {
   let q; try { q = new URL(url).searchParams; } catch { return null; }
   const mix = q.get('mix'); if (!mix) return null;
-  const items = mix.split('_').map((p) => p.split('.')).filter(([id, n]) => TEMPLATES[id] && +n > 0).map(([id, n, f]) => [id, Math.min(20, Math.floor(+n)), f === 'fr' ? 'fr' : 'mc']);
+  const items = mixItems(mix);
   if (!items.length) return null;
   const key = customKeyFor(q);
-  if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1', gen: q.get('g') === '2' ? 2 : undefined };
+  if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1', bonusPct: bonusPctOf(q), gen: q.get('g') === '2' ? 2 : undefined };
   return key;
 }
 (function loadCustom() {
   const mix = new URLSearchParams(location.search).get('mix');
   if (!mix) return;
-  const items = mix.split('_').map((p) => p.split('.')).filter(([id, n]) => TEMPLATES[id] && +n > 0).map(([id, n, f]) => [id, Math.min(20, Math.floor(+n)), f === 'fr' ? 'fr' : 'mc']);
+  const items = mixItems(mix);
   if (!items.length) return;
   const q = new URLSearchParams(location.search);
   const title = (q.get('title') || 'Custom Practice').slice(0, 80);
@@ -22733,7 +22754,7 @@ function registerCustomUrl(url) {
   const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, attempts, lockdown, same, hints, desmos, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, desmos, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
 })();
 
 /* ---------- question generation ---------- */
@@ -22768,17 +22789,20 @@ function generate(setKey, period, sid, attempt = 1) {
   let qs = [];
   // gen 2: each question gets its own random numbers, so a change to one question type never changes the others
   const gen = SETS[setKey].gen || 1, seen = {};
-  for (const [tpl, count, mode] of SETS[setKey].items) for (let i = 0; i < count; i++) {
+  for (const [tpl, count, mode, b] of SETS[setKey].items) for (let i = 0; i < count; i++) {
     const n = (seen[tpl] = (seen[tpl] || 0) + 1), rr = gen >= 2 ? mulberry32(cyrb53(`${seedStr}|${tpl}#${n}`)) : r;
-    const q = applyMode(TEMPLATES[tpl](rr), mode); q.tpl = tpl; q.fmt = mode; qs.push(q);
+    const q = applyMode(TEMPLATES[tpl](rr), mode); q.tpl = tpl; q.fmt = mode; if (b === 'b') q.bonus = true; qs.push(q);
   }
-  if (SETS[setKey].shuffle) qs = shuffle(r, qs);
+  if (qs.some(isBonus)) { // bonus questions always come last (mixed up among themselves if the order is mixed)
+    const reg = qs.filter((q) => !q.bonus), bon = qs.filter(isBonus);
+    qs = SETS[setKey].shuffle ? [...shuffle(r, reg), ...shuffle(r, bon)] : [...reg, ...bon];
+  } else if (SETS[setKey].shuffle) qs = shuffle(r, qs);
   return { qs, seedStr, version: cyrb53(seedStr).toString(36).slice(-6).toUpperCase() };
 }
 // a fresh version of question i for retry number t (same type and format, new numbers)
 function regenQuestion(seedStr, old, i, t) {
   const q = applyMode(TEMPLATES[old.tpl](mulberry32(cyrb53(`${seedStr}|q${i}|r${t}`))), old.fmt);
-  q.tpl = old.tpl; q.fmt = old.fmt;
+  q.tpl = old.tpl; q.fmt = old.fmt; if (old.bonus) q.bonus = true;
   return q;
 }
 const setting = (setKey, name) => {
@@ -22791,6 +22815,7 @@ const setting = (setKey, name) => {
   if (name === 'desmos') return !!CONFIG.DESMOS;
   if (name === 'leaveLimit') return CONFIG.LEAVE_LIMIT || 0;
   if (name === 'redo') return CONFIG.REDO === 'missed' ? 'missed' : 'all';
+  if (name === 'bonusPct') return CONFIG.BONUS_PERCENT || 5; // percent added for each bonus question answered right
   if (name === 'checks') return CONFIG.CHECKS || 1; // typed-answer questions: Checks allowed on one version before new numbers
   return CONFIG.RETRIES || 0;
 };
@@ -23245,8 +23270,12 @@ function render() {
   if (teacher) app.append(el('div', { class: 'card' }, el('strong', {}, 'Answer key'), el('p', { class: 'small' }, `Version ${state.version}. This is exactly what this student sees.`)));
   qs.forEach((q, i) => {
     const locked = !!state.status[i];
-    const box = el('div', { class: 'q' + (wm ? ' wm' : ''), id: 'q' + i });
-    box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic)));
+    if (q.bonus && !(i && qs[i - 1].bonus)) { const bp = setting(state.setKey, 'bonusPct'), nb = qs.filter(isBonus).length;
+      app.append(el('div', { class: 'card bonusintro' }, el('div', { style: 'font-size:20px;font-weight:800;color:#8a6d0f' }, `★ Bonus question${nb === 1 ? '' : 's'}`),
+        el('p', { style: 'margin:6px 0 0' }, `${nb === 1 ? 'This one is' : 'These are'} extra credit. A wrong or blank answer costs you nothing. Each one you get right adds `, el('strong', {}, `+${fmt(bp)}%`), ' to your percent.'))); }
+    const box = el('div', { class: 'q' + (wm ? ' wm' : '') + (q.bonus ? ' bonus' : ''), id: 'q' + i });
+    box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, q.bonus ? el('span', { class: 'bonustag' }, '★ BONUS') : '', `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic)));
+    if (q.bonus) { const bp = setting(state.setKey, 'bonusPct'); box.append(el('div', { class: 'bonusnote' }, `Extra credit: +${fmt(bp)}% added to your score if correct. Nothing is taken off if it’s wrong.`)); }
     const prev = !teacher && prevTry(i, W); if (prev) box.append(prev, el('div', { class: 'newver' }, `🔄 New numbers — version ${(state.tries[i] || 0) + 1} of this question. Try this one:`));
     if (!teacher && state.fresh && state.fresh[i]) { box.classList.add('regen'); delete state.fresh[i]; }
     box.append(textCanvas(q.stem, W));
@@ -23280,9 +23309,8 @@ function render() {
     app.append(box);
   });
   if (!submitted && !teacher) {
-    const done = qs.filter((q, i) => isAnswered(q, answers[i])).length;
     const err = el('span', { class: 'err', id: 'submitErr' });
-    app.append(el('div', { class: 'bar' }, el('span', {}, el('strong', { id: 'doneCount' }, `${done} of ${qs.length}`), ' answered ', err, el('span', { id: 'cloudStatus', class: 'small', style: 'margin-left:10px;opacity:.75' }, cloudStatus)),
+    app.append(el('div', { class: 'bar' }, el('span', {}, el('strong', { id: 'doneCount' }, doneText()), ' ', err, el('span', { id: 'cloudStatus', class: 'small', style: 'margin-left:10px;opacity:.75' }, cloudStatus)),
       el('span', { style: 'display:flex;gap:8px' }, state.desmos ? el('button', { class: 'btn secondary', type: 'button', onclick: () => toggleDesmos() }, 'Desmos') : '', el('button', { class: 'btn', onclick: submit }, 'Submit'))));
   }
 }
@@ -23538,7 +23566,7 @@ function frArea(q, i) {
     const saved = store.get(state.key) || {};
     store.set(state.key, { ...saved, answers: state.answers });
     const dc = document.getElementById('doneCount');
-    if (dc) dc.textContent = `${state.qs.filter((qq, n) => isAnswered(qq, state.answers[n])).length} of ${state.qs.length}`;
+    if (dc) dc.textContent = doneText();
     applyLocks();
   };
   q.fr.fields.forEach((f, k) => {
@@ -23794,6 +23822,11 @@ function prevTry(i, W) {
   box.append(solNode(q.solution));
   return box;
 }
+// "5 of 12" (regular questions), plus "· bonus 1 of 2" when there are bonus questions
+function doneText() {
+  const reg = [], bon = []; state.qs.forEach((q, n) => (q.bonus ? bon : reg).push(isAnswered(q, state.answers[n])));
+  return `${reg.filter(Boolean).length} of ${reg.length} answered` + (bon.length ? ` · ★ ${bon.filter(Boolean).length} of ${bon.length} bonus` : '');
+}
 function rerenderAt(i) {
   const y = window.scrollY; render(); window.scrollTo(0, y);
 }
@@ -23822,7 +23855,7 @@ document.addEventListener('pointerdown', (e) => { // a tap on the page outside a
 async function submit() {
   hideVK();
   if (submitting) return;
-  const blanks = state.qs.filter((q, i) => !isAnswered(q, state.answers[i])).length;
+  const blanks = state.qs.filter((q, i) => !q.bonus && !isAnswered(q, state.answers[i])).length; // a blank bonus question is fine
   if (blanks && !confirmArmed) {
     confirmArmed = true;
     document.getElementById('submitErr').textContent = `${blanks} unanswered. Tap Submit again to turn it in anyway.`;
@@ -23831,8 +23864,12 @@ async function submit() {
   submitting = true;
   try { await gradeAllProofs(); } finally { submitting = false; }
   const pts = state.qs.map((q, i) => scoreOf(q, state.answers[i]));
-  const score = pts.reduce((a, b) => a + b, 0);
-  state.submitted = { score, total: state.qs.length, at: Date.now(), saveStatus: 'wait' };
+  // bonus questions: each one right adds the teacher's percent to the percent correct; wrong adds nothing.
+  // They don't count toward the total, so the score is (regular points) + (bonus percent of the total).
+  const bp = setting(state.setKey, 'bonusPct'), nReg = state.qs.filter((q) => !q.bonus).length;
+  const bonus = state.qs.reduce((a, q, i) => a + (q.bonus ? bp * pts[i] : 0), 0); // percentage points earned
+  const score = state.qs.some(isBonus) ? Math.round(100 * (state.qs.reduce((a, q, i) => a + (q.bonus ? 0 : pts[i]), 0) + (bonus / 100) * (nReg || 1))) / 100 : pts.reduce((a, b) => a + b, 0);
+  state.submitted = { score, total: nReg || 1, at: Date.now(), saveStatus: 'wait', ...(state.qs.some(isBonus) ? { bonus } : {}) };
   saveState();
   state.meta.scores[state.attempt - 1] = score;
   store.set(state.base + ':meta', state.meta);
@@ -23879,7 +23916,7 @@ function exportWork(pts) {
     } catch (e) { /* never block a submission over a picture */ }
     const correct = unM(q.proofQ ? '\n' + q.solution : q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`);
     const g = q.proofQ && state.ai[i];
-    return { n: i + 1, topic: q.topic, stem: unM(q.stem), answer: answerText(q, state.answers[i]), correct, pts: pts[i],
+    return { n: i + 1, topic: (q.bonus ? `★ BONUS (+${fmt(setting(state.setKey, 'bonusPct'))}% if right) · ` : '') + q.topic, stem: unM(q.stem), answer: answerText(q, state.answers[i]), correct, pts: pts[i],
       feedback: g ? (g.ai ? 'AI grader: ' : 'Step checker (AI not used): ') + g.feedback : '', typed: workLines(i).map(latexToText).filter(Boolean).join('\n'), fig, pad,
       tries: (state.tries[i] || 0) + 1, history: state.history[i] || [] };
   });
@@ -23895,7 +23932,7 @@ async function send(pts) {
     set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, subject: SUBJECTS[SETS[state.setKey].subject] || '', setTitle: SETS[state.setKey].title, period: state.period, name: state.name,
     score: sub.score, total: sub.total, percent: Math.round((100 * sub.score) / sub.total),
     detail: state.qs.map((q, i) => { const a = state.answers[i];
-      const tr = (state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '') + (state.hintUsed && state.hintUsed[i] ? '(hint)' : '');
+      const tr = (state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '') + (state.hintUsed && state.hintUsed[i] ? '(hint)' : '') + (q.bonus ? '(bonus)' : '');
       if (pts[i] === 1) return `${i + 1}✓${tr}` + (q.proofQ && state.ai[i] && state.ai[i].ai ? '(AI)' : '');
       if (!isAnswered(q, a)) return `${i + 1}✗${tr}–`;
       if (q.proofQ) return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}(proof${state.ai[i] && state.ai[i].ai ? ', AI' : ''})`;
@@ -23928,7 +23965,9 @@ function resultsCard() {
   const best = scores.length ? Math.max(...scores) : score;
   const card = el('div', { class: 'card' },
     el('div', { class: 'small' }, multi ? `Attempt ${state.attempt} of ${state.attempts} · your score` : 'Your score'),
-    el('div', { class: 'score' }, `${fmt(score)} / ${total}`),
+    el('div', { class: 'score' }, state.submitted.bonus !== undefined ? `${Math.round((100 * score) / total)}%` : `${fmt(score)} / ${total}`),
+    state.submitted.bonus !== undefined ? (() => { const b = state.submitted.bonus, reg = Math.round(100 * (score - (b / 100) * total)) / 100;
+      return el('div', { style: 'font-weight:600;color:#8a6d0f' }, `${fmt(reg)} / ${total} correct (${Math.round((100 * reg) / total)}%)` + (b > 0 ? ` ★ plus ${fmt(b)}% bonus` : ' · ★ no bonus this time (nothing was taken off)')); })() : '',
     multi && scores.length > 1 ? el('div', { style: 'font-weight:600' }, `Best score so far: ${fmt(best)} / ${total}`) : '',
     el('div', { class: 'small' }, `Turned in ${new Date(at).toLocaleString()} · Version ${state.version}`),
     el('div', { id: 'saveStatus', class: 'status wait' }, ''));
@@ -24094,7 +24133,7 @@ function parseDetail(s) {
   const out = [], re = /(?:^|\s)(\d+)([✓✗½])/g; let m; const idx = [];
   while ((m = re.exec(s))) idx.push({ n: +m[1], mark: m[2], at: m.index });
   idx.forEach((x, k) => { const seg = s.slice(x.at, k + 1 < idx.length ? idx[k + 1].at : s.length);
-    out.push({ n: x.n, pts: x.mark === '✓' ? 1 : x.mark === '½' ? 0.5 : 0, hint: seg.includes('(hint)'), blank: /✗(\([^)]*\))*–/.test(seg) }); });
+    out.push({ n: x.n, pts: x.mark === '✓' ? 1 : x.mark === '½' ? 0.5 : 0, hint: seg.includes('(hint)'), bonus: seg.includes('(bonus)'), blank: /✗(\([^)]*\))*–/.test(seg) }); });
   return out;
 }
 // question number → type name, when the order is the same for everyone
@@ -24300,15 +24339,15 @@ function dashAssignment(a) {
   // which questions were missed
   if (best.length) {
     const per = {}; let maxN = 0;
-    best.forEach((r) => parseDetail(r.detail).forEach((d) => { const p = (per[d.n] = per[d.n] || { s: 0, c: 0, h: 0, b: 0 }); p.s += d.pts; p.c++; if (d.hint) p.h++; if (d.blank) p.b++; maxN = Math.max(maxN, d.n); }));
+    best.forEach((r) => parseDetail(r.detail).forEach((d) => { const p = (per[d.n] = per[d.n] || { s: 0, c: 0, h: 0, b: 0 }); p.s += d.pts; p.c++; if (d.hint) p.h++; if (d.blank) p.b++; if (d.bonus) p.bonus = true; maxN = Math.max(maxN, d.n); }));
     const labels = dashLabels(a.set), qcard = el('div', { class: 'card' }, el('strong', {}, 'Questions: percent of students who got each one right'),
       el('p', { class: 'small', style: 'margin:4px 0 12px' }, (labels ? '' : 'Question order differs from student to student on this assignment, so a number isn’t the same question for everyone. ') + 'Red bars are the ones to reteach.'));
     for (let n = 1; n <= maxN; n++) {
       const p = per[n]; if (!p) continue; const f = p.s / p.c;
       qcard.append(el('div', { style: 'display:grid;grid-template-columns:40px 1fr 60px;gap:10px;align-items:center;margin:5px 0' },
-        el('div', { style: 'font-weight:700' }, '#' + n),
+        el('div', { style: 'font-weight:700' + (p.bonus ? ';color:#8a6d0f' : '') }, (p.bonus ? '★' : '#') + n),
         el('div', {}, el('div', { style: 'background:#eee;border-radius:6px;height:16px;overflow:hidden' }, el('div', { style: `height:100%;width:${Math.round(100 * f)}%;background:${f >= 0.8 ? '#4e9a51' : f >= 0.6 ? '#c9a227' : '#c0392b'}` })),
-          el('div', { class: 'small' }, (labels && labels[n - 1] ? labels[n - 1] : '') + (p.h ? `${labels && labels[n - 1] ? ' · ' : ''}${p.h} used a hint` : '') + (p.b ? ` · ${p.b} left blank` : ''))),
+          el('div', { class: 'small' }, (p.bonus ? 'Bonus · ' : '') + (labels && labels[n - 1] ? labels[n - 1] : '') + (p.h ? `${labels && labels[n - 1] ? ' · ' : ''}${p.h} used a hint` : '') + (p.b ? ` · ${p.b} left blank` : ''))),
         el('div', { style: 'text-align:right' }, pctT(f))));
     }
     app.append(qcard);
@@ -24408,11 +24447,12 @@ const PRINT = { key: null, versions: 1, format: 'as', space: 'some', key2: true,
 function printQuestions(setKey, letter) {
   const S = SETS[setKey], seedStr = `${CONFIG.SALT}|${setKey}|print|${letter}|${PRINT.nonce}`, r = mulberry32(cyrb53(seedStr));
   let qs = [];
-  for (const [tpl, count, mode] of S.items) for (let i = 0; i < count; i++) {
+  for (const [tpl, count, mode, b] of S.items) for (let i = 0; i < count; i++) {
     const m = PRINT.format === 'mc' ? 'mc' : PRINT.format === 'fr' ? 'fr' : mode;
-    const q = applyMode(TEMPLATES[tpl](r), m); q.tpl = tpl; q.fmt = m; qs.push(q);
+    const q = applyMode(TEMPLATES[tpl](r), m); q.tpl = tpl; q.fmt = m; if (b === 'b') q.bonus = true; qs.push(q);
   }
-  if (S.shuffle) qs = shuffle(r, qs);
+  if (qs.some(isBonus)) { const reg = qs.filter((q) => !q.bonus), bon = qs.filter(isBonus); qs = S.shuffle ? [...shuffle(r, reg), ...shuffle(r, bon)] : [...reg, ...bon]; } // bonus last
+  else if (S.shuffle) qs = shuffle(r, qs);
   return qs;
 }
 function printScreen(preKey) {
@@ -24468,6 +24508,7 @@ function printScreen(preKey) {
         el('div', { class: 'pdir' }, 'Show your work. For multiple choice, circle the letter of the best answer.'));
       qs.forEach((q, i) => {
         const body = el('div', {});
+        if (q.bonus) { const bp = setting(PRINT.key, 'bonusPct'); body.append(el('div', { style: 'font-weight:700;margin-bottom:4px' }, `★ BONUS — +${fmt(bp)}% if correct; nothing taken off if wrong`)); }
         body.append(textCanvas(q.stem, W - 40));
         let fig = null, figW = 0;
         if (q.draw) {
@@ -24601,6 +24642,7 @@ function builder() {
   const counts = Object.assign({}, saved.counts || {});
   const formats = Object.assign({}, saved.formats || {});
   const frCounts = Object.assign({}, saved.frCounts || {}); // "Some of each": how many of a type are free response
+  const bonusCounts = Object.assign({}, saved.bonusCounts || {}), bonusFormats = Object.assign({}, saved.bonusFormats || {}); // bonus questions (always at the end)
   const titleIn = el('input', { type: 'text', value: saved.title || '', placeholder: 'e.g. 5.6 Quiz Review' });
   const subjSel = el('select', {}, ...Object.entries(SUBJECTS).map(([k, v]) => el('option', { value: k }, v)));
   subjSel.value = saved.subject && SUBJECTS[saved.subject] ? saved.subject : Object.keys(SUBJECTS)[0];
@@ -24608,6 +24650,10 @@ function builder() {
   orderSel.value = saved.order || 'grouped';
   const numIn = (val, min, max) => el('input', { type: 'number', min: String(min), max: String(max), value: String(val), style: 'width:80px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
   const checksIn = numIn(saved.checks ?? 1, 1, 5), retriesIn = numIn(saved.retries ?? 0, 0, 5), attemptsIn = numIn(saved.attempts ?? 1, 1, 10), leaveIn = numIn(saved.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, 0, 20);
+  const bonusPctIn = numIn(saved.bonusPct ?? 5, 0.5, 50); bonusPctIn.step = '0.5';
+  const bonusLab = el('label', {}, 'Percent added for each bonus question'), bonusBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, bonusPctIn, el('span', {}, '%'),
+    el('span', { class: 'small' }, 'Each bonus question answered right adds this much to the student’s percent correct (75% + 5% = 80%); nothing is taken off when it’s wrong. Scores can go over 100%. Pick bonus questions with the ★ Bonus button on any question type below.'));
+  const bonusGray = () => { const off = !Object.values(bonusCounts).some((n) => n > 0); bonusPctIn.disabled = off; [bonusLab, bonusBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; }); };
   const lockIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   lockIn.checked = saved.lockdown !== false;
   const sameIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
@@ -24635,26 +24681,27 @@ function builder() {
   // edit an assignment you already made: pick it from the list (or paste its link), change it, then post the new link in its place
   const editIn = el('input', { type: 'text', placeholder: 'Paste the student link here', style: 'flex:1;min-width:220px' });
   const editMsg = el('div', { class: 'small', style: 'margin-top:6px' });
-  const loadItems = (items) => { // [[id, n, 'mc'|'fr'], …] → the builder's counts and formats
-    const c = {}, f = {}, frc = {};
-    items.forEach(([id, n, m]) => { if (!TEMPLATES[id] || !(+n > 0)) return; n = Math.floor(+n);
+  const loadItems = (items) => { // [[id, n, 'mc'|'fr'(, 'b')], …] → the builder's counts and formats
+    const c = {}, f = {}, frc = {}, bc = {}, bf = {};
+    items.forEach(([id, n, m, b]) => { if (!TEMPLATES[id] || !(+n > 0)) return; n = Math.floor(+n);
+      if (b === 'b') { bc[id] = (bc[id] || 0) + n; bf[id] = m === 'fr' ? 'fr' : 'mc'; return; }
       const prev = f[id]; c[id] = (c[id] || 0) + n;
       if (m === 'fr') { frc[id] = (frc[id] || 0) + n; f[id] = prev && prev !== 'fr' ? 'both' : 'fr'; } else f[id] = prev && prev !== 'mc' ? 'both' : 'mc'; });
     Object.keys(f).forEach((id) => { if (f[id] !== 'both') delete frc[id]; });
-    return { counts: c, formats: f, frCounts: frc };
+    return { counts: c, formats: f, frCounts: frc, bonusCounts: bc, bonusFormats: bf };
   };
   const loadFromUrl = (text, note = '') => {
     let u; try { u = new URL(String(text).trim()); } catch { editMsg.textContent = 'That doesn’t look like a link. Copy the whole student link (it starts with https://).'; return; }
     const q = u.searchParams, mix = q.get('mix');
     if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
-      retries: +q.get('retries') || 0, checks: +q.get('checks') || 1, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', desmos: q.get('desmos') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
+      retries: +q.get('retries') || 0, checks: +q.get('checks') || 1, bonusPct: bonusPctOf(q) || 5, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', desmos: q.get('desmos') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
       leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), gen: q.get('g') === '2' ? 2 : 1, note, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
     const S = SETS[key]; if (!S) return;
-    store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m]) => [id, n, m === 'fr' ? 'fr' : 'mc'])), title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
+    store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m, b]) => [id, n, m === 'fr' ? 'fr' : 'mc', b])), bonusPct: S.bonusPct || 5, title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
       retries: S.retries || 0, checks: S.checks || 1, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, desmos: !!S.desmos, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
@@ -24753,6 +24800,7 @@ function builder() {
     el('label', {}, 'Lockdown mode'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, lockIn,
       el('span', { class: 'small' }, 'Full screen required; right-click, copy, and printing blocked; leaving the page hides the questions and is recorded.')),
     leaveLab, leaveBox,
+    bonusLab, bonusBox,
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
       el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Unchecked = a different version for each student.')),
     el('label', {}, 'Hints'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
@@ -24766,7 +24814,8 @@ function builder() {
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
   const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
-  const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0); return n ? `${n} chosen` : ''; };
+  const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0), b = secs[sec].ids.reduce((a, id) => a + (bonusCounts[id] || 0), 0);
+    return [n ? `${n} chosen` : '', b ? `★ ${b} bonus` : ''].filter(Boolean).join(' · '); };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
   const setAll = (open) => { Object.entries(secs).forEach(([sec, S]) => { S.box.open = open; openSaved[sec] = open; }); store.set(TK('builder:open'), openSaved); };
   const foldBox = (key, label, big) => {
@@ -24832,12 +24881,25 @@ function builder() {
     frIn.addEventListener('input', () => { frCounts[t.id] = Math.max(0, Math.min(20, Math.floor(+frIn.value || 0))); showSplit(); update(); });
     num.addEventListener('input', showSplit);
     showSplit();
+    // bonus questions of this type (extra credit, always at the end of the assignment)
+    const bNum = el('input', { type: 'number', min: '0', max: '20', value: String(bonusCounts[t.id] || 0), 'aria-label': `How many bonus ${t.label}`,
+      style: 'width:62px;padding:6px;font-size:15px;border:1px solid #c9a227;border-radius:8px' });
+    const bFmt = el('select', { 'aria-label': `Format for bonus ${t.label}`, style: 'width:auto;padding:6px 8px;font-size:14px' }, el('option', { value: 'mc' }, 'Multiple choice'), el('option', { value: 'fr' }, 'Free response'));
+    bFmt.value = bonusFormats[t.id] === 'fr' ? 'fr' : 'mc';
+    const bLine = el('div', { style: 'flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0 0 82px' },
+      el('span', { style: 'font-weight:700;color:#8a6d0f' }, '★ Bonus questions:'), bNum, t.writtenOnly || t.sketch ? '' : bFmt, el('span', { class: 'small' }, 'extra credit, placed at the end'));
+    bLine.style.display = bonusCounts[t.id] > 0 ? 'flex' : 'none';
+    const bBtn = el('button', { class: 'btn secondary', style: 'margin:0;padding:7px 12px;font-size:14px;border-color:#c9a227;color:#8a6d0f', type: 'button', onclick: () => {
+      bLine.style.display = 'flex'; if (!(bonusCounts[t.id] > 0)) { bNum.value = '1'; bonusCounts[t.id] = 1; bonusFormats[t.id] = bFmt.value; refreshBadges(); update(); } bNum.focus();
+    } }, '★ Bonus');
+    bNum.addEventListener('input', () => { bonusCounts[t.id] = Math.max(0, Math.min(20, Math.floor(+bNum.value || 0))); if (!bonusCounts[t.id]) delete bonusCounts[t.id]; refreshBadges(); update(); });
+    bFmt.addEventListener('input', () => { bonusFormats[t.id] = bFmt.value; update(); });
     secBody.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' },
       num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc)),
-      t.writtenOnly || t.sketch ? el('span', { class: 'small', style: 'padding:7px 8px' }, t.sketch ? 'Graph on a grid' : 'Written proof') : fmtSel, prevBtn, hideBtn, t.writtenOnly || t.sketch ? '' : split), prevBox);
+      t.writtenOnly || t.sketch ? el('span', { class: 'small', style: 'padding:7px 8px' }, t.sketch ? 'Graph on a grid' : 'Written proof') : fmtSel, prevBtn, hideBtn, bBtn, t.writtenOnly || t.sketch ? '' : split, bLine), prevBox);
     prevBtn._fmt = fmtSel;
   });
-  Object.entries(secs).forEach(([sec, S]) => { S.box.open = openSaved[sec] ?? S.ids.some((id) => counts[id] > 0); });
+  Object.entries(secs).forEach(([sec, S]) => { S.box.open = openSaved[sec] ?? S.ids.some((id) => counts[id] > 0 || bonusCounts[id] > 0); });
   refreshBadges();
   app.append(list);
 
@@ -24870,7 +24932,7 @@ function builder() {
     el('details', { style: 'margin-top:10px' }, el('summary', { class: 'small' }, 'Make it a permanent menu item (optional)'),
       el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut), shareBox);
   app.append(out);
-  [titleIn, subjSel, orderSel, retriesIn, checksIn, attemptsIn, leaveIn].forEach((x) => x.addEventListener('input', update));
+  [titleIn, subjSel, orderSel, retriesIn, checksIn, attemptsIn, leaveIn, bonusPctIn].forEach((x) => x.addEventListener('input', update));
   lockIn.addEventListener('change', update);
   sameIn.addEventListener('change', update);
   hintsIn.addEventListener('change', update);
@@ -24889,11 +24951,14 @@ function builder() {
       } else items.push([t.id, n, f === 'fr' ? 'fr' : 'mc']);
     });
     const total = items.reduce((a, [, n]) => a + n, 0);
-    totalEl.textContent = String(total);
+    const bItems = QUESTION_TYPES.filter((t) => bonusCounts[t.id] > 0).map((t) => [t.id, bonusCounts[t.id], t.writtenOnly || t.sketch ? 'mc' : bonusFormats[t.id] === 'fr' ? 'fr' : 'mc', 'b']);
+    const nBonus = bItems.reduce((a, [, n]) => a + n, 0), bp = Math.max(0.5, Math.min(50, Math.round(2 * (+bonusPctIn.value || 5)) / 2));
+    totalEl.textContent = String(total) + (nBonus ? ` + ${nBonus} bonus (each adds ${fmt(bp)}% if right)` : '');
+    bonusGray();
     const title = titleIn.value.trim() || 'Custom Practice';
     changedNow = false;
     const prevLast = store.get(TK('builder:last')) || {};
-    const nextLast = { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
+    const nextLast = { counts, formats, frCounts, bonusCounts, bonusFormats, bonusPct: +bonusPctIn.value || 5, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
     const sig = draftSig(nextLast);
     if (sig === store.get(TK('builder:sentSig'))) nextLast.t = prevLast.t || 0;
     else if (opening) { // first look at what was already here: copy it only if it came from loading an assignment just now
@@ -24904,15 +24969,16 @@ function builder() {
       if (!draftBlank(nextLast) || !draftBlank(prevLast)) queueDraft(nextLast);
     }
     store.set(TK('builder:last'), nextLast);
-    if (!total) { linkIn.value = ''; shareQ.value = ''; shareA.value = ''; msg.textContent = 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
+    if (!total) { linkIn.value = ''; shareQ.value = ''; shareA.value = ''; msg.textContent = nBonus ? 'Choose at least one regular question too (bonus questions are extra credit on top of them).' : 'Choose at least one question.'; [tryLink, keyLink].forEach((a) => a.removeAttribute('href')); codeOut.textContent = ''; return; }
     msg.textContent = total > 40 ? 'That’s a lot of questions — students may need extra time.' : '';
     const q = new URLSearchParams();
     if (TEACHER_ID) q.set('t', TEACHER_ID);
-    q.set('mix', items.map(([id, n, f]) => `${id}.${n}${f === 'fr' ? '.fr' : ''}`).join('_'));
+    q.set('mix', [...items.map(([id, n, f]) => `${id}.${n}${f === 'fr' ? '.fr' : ''}`), ...bItems.map(([id, n, f]) => `${id}.${n}.${f}.b`)].join('_'));
     q.set('title', title); q.set('subject', subjSel.value);
     if (orderSel.value === 'mixed') q.set('order', 'mixed');
     const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), at = Math.max(1, Math.min(10, Math.floor(+attemptsIn.value || 1)));
     if (rt) q.set('retries', String(rt));
+    if (nBonus && bp !== 5) q.set('bpct', String(bp));
     const ck = Math.max(1, Math.min(5, Math.floor(+checksIn.value || 1)));
     if (rt && ck > 1) q.set('checks', String(ck));
     const lv = Math.max(0, Math.min(20, Math.floor(+leaveIn.value || 0)));
@@ -24929,7 +24995,7 @@ function builder() {
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1'; shareA.value = shareLink(url, true); shareQ.value = shareLink(url, false);
     if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${desmosIn.checked ? ', desmos: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${[...items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`), ...bItems.map(([id, n, f]) => `['${id}', ${n}, '${f}', 'b']`)].join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${nBonus && bp !== 5 ? `, bonusPct: ${bp}` : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${desmosIn.checked ? ', desmos: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
   }
   update(); opening = false;
 }
@@ -24991,7 +25057,8 @@ function viewScreen() {
   app.innerHTML = '';
   app.append(el('div', { class: 'card' },
     el('p', { style: 'margin-top:0' }, `This is a view-only copy of an assignment. Nothing you do here is saved or sent to ${CONFIG.TEACHER_NAME}’s gradebook.`),
-    el('p', { class: 'small' }, `${total} question${total === 1 ? '' : 's'}: `, S.items.map(([id, n, m]) => `${name(id)} (${n}${m === 'fr' ? ', free response' : ''})`).join('; '), '.'),
+    el('p', { class: 'small' }, `${total} question${total === 1 ? '' : 's'}: `, S.items.map(([id, n, m, b]) => `${b === 'b' ? '★ BONUS: ' : ''}${name(id)} (${n}${m === 'fr' ? ', free response' : ''})`).join('; '), '.',
+      S.items.some((it) => it[3] === 'b') ? ` Bonus questions come last: +${fmt(setting(setKey, 'bonusPct'))}% added to the score for each one right, nothing off if wrong.` : ''),
     el('p', { class: 'small' }, `Every student gets ${setting(setKey, 'same') ? 'the same version' : 'their own version with different numbers'}${S.shuffle ? ', in a mixed-up order' : ''}. `,
       `Tries per question: ${ret + 1}${ret && setting(setKey, 'checks') > 1 ? ` (typed answers: ${setting(setKey, 'checks')} checks per version)` : ''}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. Desmos calculator: ${yes(setting(setKey, 'desmos'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
     el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
@@ -25009,14 +25076,16 @@ function viewScreen() {
 function copyIntoBuilder(link) {
   let q; try { q = new URL(link).searchParams; } catch { return false; }
   const set = SETS[q.get('set')], mix = q.get('mix');
-  const items = mix ? mix.split('_').map((x) => x.split('.')) : set ? set.items.map(([id, n, m]) => [id, n, m === 'fr' ? 'fr' : 'mc']) : null;
+  const items = mix ? mix.split('_').map((x) => x.split('.')) : set ? set.items.map(([id, n, m, b]) => [id, n, m === 'fr' ? 'fr' : 'mc', b]) : null;
   if (!items) return false;
-  const c = {}, f = {}, frc = {};
-  items.forEach(([id, n, m]) => { if (!TEMPLATES[id] || !(+n > 0)) return; n = Math.floor(+n); const prev = f[id]; c[id] = (c[id] || 0) + n;
+  const c = {}, f = {}, frc = {}, bc = {}, bf = {};
+  items.forEach(([id, n, m, b]) => { if (!TEMPLATES[id] || !(+n > 0)) return; n = Math.floor(+n);
+    if (b === 'b') { bc[id] = (bc[id] || 0) + n; bf[id] = m === 'fr' ? 'fr' : 'mc'; return; }
+    const prev = f[id]; c[id] = (c[id] || 0) + n;
     if (m === 'fr') { frc[id] = (frc[id] || 0) + n; f[id] = prev && prev !== 'fr' ? 'both' : 'fr'; } else f[id] = prev && prev !== 'mc' ? 'both' : 'mc'; });
   Object.keys(f).forEach((id) => { if (f[id] !== 'both') delete frc[id]; });
   const g = (k, d) => (q.has(k) ? q.get(k) : d);
-  store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, title: g('title', set ? set.title : ''), subject: SUBJECTS[g('subject', set ? set.subject : '')] ? g('subject', set ? set.subject : '') : Object.keys(SUBJECTS)[0],
+  store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, bonusCounts: bc, bonusFormats: bf, bonusPct: (mix ? bonusPctOf(q) : set && set.bonusPct) || 5, title: g('title', set ? set.title : ''), subject: SUBJECTS[g('subject', set ? set.subject : '')] ? g('subject', set ? set.subject : '') : Object.keys(SUBJECTS)[0],
     order: g('order', set && set.shuffle ? 'mixed' : '') === 'mixed' ? 'mixed' : 'grouped', retries: +g('retries', set ? set.retries || 0 : 0) || 0, checks: +g('checks', set ? set.checks || 1 : 1) || 1, attempts: +g('attempts', set ? set.attempts || 1 : 1) || 1,
     lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', desmos: g('desmos', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
     note: 'This is a copy of a shared assignment. Check the title and settings, then copy your own student link below.', t: Date.now() });
