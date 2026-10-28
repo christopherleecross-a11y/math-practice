@@ -107,6 +107,12 @@
   .hidden { display: none; }
   .q.wm { background-image: var(--wm); background-repeat: repeat; }
   .q.wm .choice:not(.sel):not(.right):not(.wrong) { background: transparent; }
+  .desmos-panel { position: fixed; top: 0; right: 0; width: min(460px, 100vw); height: 100vh; background: #fff; border-left: 1px solid var(--line); box-shadow: -6px 0 20px rgba(0,0,0,.12); z-index: 900; display: none; flex-direction: column; }
+  .desmos-panel.open { display: flex; }
+  .desmos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .desmos-body { flex: 1; min-height: 0; }
+  @media (min-width: 1180px) { body.desmos-open { padding-right: 460px; } }
+  @media (max-width: 899px) { .desmos-panel { top: auto; bottom: 0; width: 100vw; height: 55vh; border-left: 0; border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(0,0,0,.12); } body.desmos-open { padding-bottom: 55vh; } }
   #shield { position: fixed; inset: 0; z-index: 9999; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; }
   .shieldcard { max-width: 460px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 28px; text-align: center; }
   .shieldcard h2 { margin: 8px 0; font-size: 22px; }
@@ -204,6 +210,11 @@ const CONFIG = {
   // HINTS = true puts a Hint button on every question in every assignment. Usually set per assignment instead:
   // hints: true in SETS, or the builder's "Hints" box. Using a hint never changes the score; the gradebook detail shows (hint).
   HINTS: false,
+  // DESMOS = true puts a Desmos graphing calculator button on every assignment. Usually set per assignment instead:
+  // desmos: true in SETS, or the builder's "Desmos calculator" box. Students open it beside the questions; it is never graded.
+  DESMOS: false,
+  // DESMOS_KEY = your Desmos API key (desmos.com/my-api). A trial key shows a small notice on the calculator.
+  DESMOS_KEY: 'c80044b29fac4a34aad05e6df2542e5f',
   // AI_GRADING = true lets "Prove the identity" questions be graded by Claude through your Apps Script
   // (needs an Anthropic API key saved in the script — see PracticeResults.gs). false = step checker only.
   AI_GRADING: true,
@@ -22609,11 +22620,11 @@ function registerCustomUrl(url) {
   const shuffleQs = q.get('order') === 'mixed';
   const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
-  const same = q.get('same') === '1', hints = q.get('hints') === '1', redo = q.get('redo') === 'missed' ? 'missed' : 'all';
+  const same = q.get('same') === '1', hints = q.get('hints') === '1', desmos = q.get('desmos') === '1', redo = q.get('redo') === 'missed' ? 'missed' : 'all';
   const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, attempts, lockdown, same, hints, desmos, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
 })();
 
 /* ---------- question generation ---------- */
@@ -22668,6 +22679,7 @@ const setting = (setKey, name) => {
   if (name === 'lockdown') return CONFIG.LOCKDOWN !== false;
   if (name === 'same') return !!CONFIG.SAME_FOR_EVERYONE;
   if (name === 'hints') return !!CONFIG.HINTS;
+  if (name === 'desmos') return !!CONFIG.DESMOS;
   if (name === 'leaveLimit') return CONFIG.LEAVE_LIMIT || 0;
   if (name === 'redo') return CONFIG.REDO === 'missed' ? 'missed' : 'all';
   return CONFIG.RETRIES || 0;
@@ -23058,7 +23070,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
     } catch {}
   });
   const ps = !teacher && rid ? signinPass() : null;
-  state = { origQs, setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, teacher, hints: !!setting(setKey, 'hints'), hintUsed: saved.hintUsed || {},
+  state = { origQs, setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, teacher, hints: !!setting(setKey, 'hints'), desmos: !!setting(setKey, 'desmos') && !!CONFIG.DESMOS_KEY, hintUsed: saved.hintUsed || {},
     answers: Array.from({ length: qs.length }, (_, i) => (carried[i] ? carried[i].a : saved.answers && saved.answers[i] !== undefined ? saved.answers[i] : null)),
     submitted: !teacher && saved.submitted ? saved.submitted : null,
     started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
@@ -23156,7 +23168,7 @@ function render() {
     const done = qs.filter((q, i) => isAnswered(q, answers[i])).length;
     const err = el('span', { class: 'err', id: 'submitErr' });
     app.append(el('div', { class: 'bar' }, el('span', {}, el('strong', { id: 'doneCount' }, `${done} of ${qs.length}`), ' answered ', err, el('span', { id: 'cloudStatus', class: 'small', style: 'margin-left:10px;opacity:.75' }, cloudStatus)),
-      el('button', { class: 'btn', onclick: submit }, 'Submit')));
+      el('span', { style: 'display:flex;gap:8px' }, state.desmos ? el('button', { class: 'btn secondary', type: 'button', onclick: () => toggleDesmos() }, 'Desmos') : '', el('button', { class: 'btn', onclick: submit }, 'Submit'))));
   }
 }
 
@@ -23518,6 +23530,41 @@ function frArea(q, i) {
     wrap.append(el('div', { class: 'small', style: 'margin-top:6px' }, 'Correct answer: ', el('strong', { style: 'color:var(--ink)' }, q.fr.display.replace(/(.)̅/g, '$1'))));
   }
   return wrap;
+}
+
+/* ---------- Desmos graphing calculator (teacher turns it on per assignment; never graded) ---------- */
+let desmosCalc = null, desmosLoading = null;
+function loadDesmos() {
+  if (window.Desmos && window.Desmos.GraphingCalculator) return Promise.resolve();
+  if (!desmosLoading) desmosLoading = new Promise((ok, bad) => {
+    const s = document.createElement('script');
+    s.src = `https://www.desmos.com/api/v1.12/calculator.js?apiKey=${encodeURIComponent(CONFIG.DESMOS_KEY)}`;
+    s.onload = () => (window.Desmos && window.Desmos.GraphingCalculator ? ok() : bad());
+    s.onerror = () => { desmosLoading = null; s.remove(); bad(); };
+    document.head.append(s);
+  });
+  return desmosLoading;
+}
+function toggleDesmos(force) {
+  let p = document.getElementById('desmosPanel');
+  if (!p) {
+    p = el('div', { id: 'desmosPanel', class: 'desmos-panel', role: 'dialog', 'aria-label': 'Desmos graphing calculator' },
+      el('div', { class: 'desmos-head' }, el('strong', {}, 'Desmos graphing calculator'), el('button', { class: 'btn secondary', type: 'button', onclick: () => toggleDesmos(false) }, 'Close')),
+      el('div', { id: 'desmosBody', class: 'desmos-body' }, el('div', { class: 'small', style: 'padding:14px' }, 'Loading Desmos…')));
+    document.body.append(p);
+  }
+  const open = force === undefined ? !p.classList.contains('open') : !!force;
+  p.classList.toggle('open', open); document.body.classList.toggle('desmos-open', open);
+  if (!open) return;
+  if (desmosCalc) { desmosCalc.resize(); return; }
+  loadDesmos().then(() => {
+    const b = document.getElementById('desmosBody'); if (!b || desmosCalc) return;
+    b.innerHTML = '';
+    desmosCalc = window.Desmos.GraphingCalculator(b, { keypad: true, expressions: true, settingsMenu: true, zoomButtons: true, border: false });
+  }).catch(() => {
+    const b = document.getElementById('desmosBody');
+    if (b) b.innerHTML = '<div class="small" style="padding:14px">Desmos couldn’t load. Check the internet connection — desmos.com may be blocked on this network. Close this and try again.</div>';
+  });
 }
 
 /* ---------- hints (teacher turns them on per assignment) ---------- */
@@ -24442,7 +24489,9 @@ function builder() {
   const sameIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   sameIn.checked = !!saved.same;
   const hintsIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
+  const desmosIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   hintsIn.checked = !!saved.hints;
+  desmosIn.checked = !!saved.desmos;
   const redoSel = el('select', {}, el('option', { value: 'all' }, 'Redo every question (all new numbers)'), el('option', { value: 'missed' }, 'Redo only the questions they missed (correct answers carry over)'));
   redoSel.value = saved.redo === 'missed' ? 'missed' : 'all';
   // edit an assignment you already made: pick it from the list (or paste its link), change it, then post the new link in its place
@@ -24461,14 +24510,14 @@ function builder() {
     const q = u.searchParams, mix = q.get('mix');
     if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
-      retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
+      retries: +q.get('retries') || 0, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', desmos: q.get('desmos') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
       leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), gen: q.get('g') === '2' ? 2 : 1, note, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
     const S = SETS[key]; if (!S) return;
     store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m]) => [id, n, m === 'fr' ? 'fr' : 'mc'])), title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
-      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
+      retries: S.retries || 0, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, desmos: !!S.desmos, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadEdit = () => loadFromUrl(editIn.value);
@@ -24570,7 +24619,9 @@ function builder() {
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
       el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Unchecked = a different version for each student.')),
     el('label', {}, 'Hints'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
-      el('span', { class: 'small' }, 'Adds a Hint button to every question (the first step of the solution, with the answer hidden). Hints do not change the score; the gradebook detail marks each question where a hint was used.'))));
+      el('span', { class: 'small' }, 'Adds a Hint button to every question (the first step of the solution, with the answer hidden). Hints do not change the score; the gradebook detail marks each question where a hint was used.')),
+    el('label', {}, 'Desmos calculator'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, desmosIn,
+      el('span', { class: 'small' }, 'Adds a Desmos button at the bottom of the assignment. It opens the Desmos graphing calculator beside the questions (it is never graded).'))));
 
   const list = el('div', { class: 'card' });
   const totalEl = el('strong', {}, '0');
@@ -24686,6 +24737,7 @@ function builder() {
   lockIn.addEventListener('change', update);
   sameIn.addEventListener('change', update);
   hintsIn.addEventListener('change', update);
+  desmosIn.addEventListener('change', update);
   redoSel.addEventListener('change', update);
 
   function update() {
@@ -24703,7 +24755,7 @@ function builder() {
     const title = titleIn.value.trim() || 'Custom Practice';
     changedNow = false;
     const prevLast = store.get(TK('builder:last')) || {};
-    const nextLast = { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
+    const nextLast = { counts, formats, frCounts, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
     const sig = draftSig(nextLast);
     if (sig === store.get(TK('builder:sentSig'))) nextLast.t = prevLast.t || 0;
     else if (opening) { // first look at what was already here: copy it only if it came from loading an assignment just now
@@ -24730,13 +24782,14 @@ function builder() {
     if (!lockIn.checked) q.set('lock', '0');
     if (sameIn.checked) q.set('same', '1');
     if (hintsIn.checked) q.set('hints', '1');
+    if (desmosIn.checked) q.set('desmos', '1');
     if (!editId || saved.gen === 2) q.set('g', '2');
     if (editId) q.set('id', editId);
     const url = location.origin + location.pathname + '?' + q.toString();
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1'; shareA.value = shareLink(url, true); shareQ.value = shareLink(url, false);
     if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`).join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${rt ? `, retries: ${rt}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${desmosIn.checked ? ', desmos: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
   }
   update(); opening = false;
 }
@@ -24800,7 +24853,7 @@ function viewScreen() {
     el('p', { style: 'margin-top:0' }, `This is a view-only copy of an assignment. Nothing you do here is saved or sent to ${CONFIG.TEACHER_NAME}’s gradebook.`),
     el('p', { class: 'small' }, `${total} question${total === 1 ? '' : 's'}: `, S.items.map(([id, n, m]) => `${name(id)} (${n}${m === 'fr' ? ', free response' : ''})`).join('; '), '.'),
     el('p', { class: 'small' }, `Every student gets ${setting(setKey, 'same') ? 'the same version' : 'their own version with different numbers'}${S.shuffle ? ', in a mixed-up order' : ''}. `,
-      `Tries per question: ${ret + 1}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
+      `Tries per question: ${ret + 1}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. Desmos calculator: ${yes(setting(setKey, 'desmos'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
     el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
       el('button', { class: 'btn secondary', type: 'button', onclick: () => { sample++; draw(); } }, 'Show another version'),
       ans ? ansBtn : '',
@@ -24825,7 +24878,7 @@ function copyIntoBuilder(link) {
   const g = (k, d) => (q.has(k) ? q.get(k) : d);
   store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, title: g('title', set ? set.title : ''), subject: SUBJECTS[g('subject', set ? set.subject : '')] ? g('subject', set ? set.subject : '') : Object.keys(SUBJECTS)[0],
     order: g('order', set && set.shuffle ? 'mixed' : '') === 'mixed' ? 'mixed' : 'grouped', retries: +g('retries', set ? set.retries || 0 : 0) || 0, attempts: +g('attempts', set ? set.attempts || 1 : 1) || 1,
-    lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
+    lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', desmos: g('desmos', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
     note: 'This is a copy of a shared assignment. Check the title and settings, then copy your own student link below.', t: Date.now() });
   return true;
 }
