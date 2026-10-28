@@ -22820,7 +22820,8 @@ function pMergeSaved(A, B, strict = false) { // strict: never refill an answer t
     const a = (A.answers || [])[i], b = (B.answers || [])[i];
     // a retry clears the answer and makes a new version of the question: an answer saved for an older version doesn't belong
     const sameVersion = ((A.tries || {})[i] || 0) === ((B.tries || {})[i] || 0) && !(A.status || {})[i] && !(strict && ((A.tries || {})[i] || 0) > 0);
-    if (pBlank(a) && !pBlank(b) && sameVersion) { out.answers[i] = b; added++; ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (B[f] && B[f][i] !== undefined) { out[f] = out[f] || {}; out[f][i] = B[f][i]; } }); }
+    // only fill a question this device never touched (null); an answer the student erased here stays erased
+    if ((a === null || a === undefined || a === '') && !pBlank(b) && sameVersion) { out.answers[i] = b; added++; ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (B[f] && B[f][i] !== undefined) { out[f] = out[f] || {}; out[f][i] = B[f][i]; } }); }
     else out.answers[i] = a === undefined ? null : a;
   }
   ['tries', 'status', 'history', 'hintUsed'].forEach((f) => { if (B[f]) Object.keys(B[f]).forEach((i) => { out[f] = out[f] || {}; if (out[f][i] === undefined) out[f][i] = B[f][i]; }); });
@@ -22870,7 +22871,7 @@ async function cloudFlush(leaving) {
         const now = store.get(st.key), m = pMergeSaved(now, d.saved, true);
         if (m && m._added) {
           delete m._added; cloudApply(st.base, { ...d, saved: m, meta: store.get(st.base + ':meta'), work: store.get(st.key + ':work') || d.work, draw: store.get(st.key + ':draw') || d.draw }, 0);
-          begin(st.setKey, st.period, st.name, false, 1, st.rid, true); setCloudStatus('Progress saved online ✓ (added answers saved from another Chromebook)'); cloudNote(st.key); return;
+          { const y = window.scrollY; await begin(st.setKey, st.period, st.name, false, 1, st.rid, true); window.scrollTo(0, y); } setCloudStatus('Progress saved online ✓ (added answers saved from another Chromebook)'); cloudNote(st.key); return;
         }
       }
     }
@@ -22963,7 +22964,8 @@ document.addEventListener('visibilitychange', async () => {
   cloudChecking = true;
   try {
     const st = state;
-    if (await cloudRestore(st.base) && state === st) begin(st.setKey, st.period, st.name, false, 1, st.rid);
+    const y = window.scrollY;
+    if (await cloudRestore(st.base) && state === st) { await begin(st.setKey, st.period, st.name, false, 1, st.rid); window.scrollTo(0, y); }
   } finally { cloudChecking = false; }
 });
 
