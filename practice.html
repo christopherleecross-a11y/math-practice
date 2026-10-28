@@ -24609,6 +24609,10 @@ function builder() {
     el('span', { class: 'small' }, 'Only matters when attempts is 2 or more. “Only the ones they missed” keeps each question they got right (already marked correct) and gives new versions of the rest.'));
   const redoGray = () => { const off = Math.floor(+attemptsIn.value || 1) <= 1; redoSel.disabled = off; [redoLab, redoBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; }); };
   attemptsIn.addEventListener('input', redoGray); redoGray();
+  // grayed out when lockdown mode is off (it only applies in lockdown mode)
+  const leaveLab = el('label', {}, 'Lock after leaving (lockdown mode only)'), leaveBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, leaveIn,
+    el('span', { class: 'small' }, 'Leaving the page this many times locks the assignment until you unlock it from the Results dashboard. 0 = never lock.'));
+  const leaveGray = () => { const off = !lockIn.checked; leaveIn.disabled = off; [leaveLab, leaveBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; }); };
   // edit an assignment you already made: pick it from the list (or paste its link), change it, then post the new link in its place
   const editIn = el('input', { type: 'text', placeholder: 'Paste the student link here', style: 'flex:1;min-width:220px' });
   const editMsg = el('div', { class: 'small', style: 'margin-top:6px' });
@@ -24728,8 +24732,7 @@ function builder() {
     redoLab, redoBox,
     el('label', {}, 'Lockdown mode'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, lockIn,
       el('span', { class: 'small' }, 'Full screen required; right-click, copy, and printing blocked; leaving the page hides the questions and is recorded.')),
-    el('label', {}, 'Lock after leaving (lockdown mode only)'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, leaveIn,
-      el('span', { class: 'small' }, 'Leaving the page this many times locks the assignment until you unlock it from the Results dashboard. 0 = never lock.')),
+    leaveLab, leaveBox,
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
       el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Unchecked = a different version for each student.')),
     el('label', {}, 'Hints'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
@@ -24855,6 +24858,7 @@ function builder() {
   redoSel.addEventListener('change', update);
 
   function update() {
+    leaveGray();
     const items = [];
     QUESTION_TYPES.filter((t) => counts[t.id] > 0).forEach((t) => {
       const n = counts[t.id], f = t.writtenOnly || t.sketch ? 'mc' : formats[t.id];
