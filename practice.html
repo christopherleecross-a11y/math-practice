@@ -24604,6 +24604,11 @@ function builder() {
   desmosIn.checked = !!saved.desmos;
   const redoSel = el('select', {}, el('option', { value: 'all' }, 'Redo every question (all new numbers)'), el('option', { value: 'missed' }, 'Redo only the questions they missed (correct answers carry over)'));
   redoSel.value = saved.redo === 'missed' ? 'missed' : 'all';
+  // grayed out while attempts is 1 (it only matters for a second attempt)
+  const redoLab = el('label', {}, 'When a student starts another attempt'), redoBox = el('div', { style: 'display:flex;flex-direction:column;gap:4px' }, redoSel,
+    el('span', { class: 'small' }, 'Only matters when attempts is 2 or more. “Only the ones they missed” keeps each question they got right (already marked correct) and gives new versions of the rest.'));
+  const redoGray = () => { const off = Math.floor(+attemptsIn.value || 1) <= 1; redoSel.disabled = off; [redoLab, redoBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; }); };
+  attemptsIn.addEventListener('input', redoGray); redoGray();
   // edit an assignment you already made: pick it from the list (or paste its link), change it, then post the new link in its place
   const editIn = el('input', { type: 'text', placeholder: 'Paste the student link here', style: 'flex:1;min-width:220px' });
   const editMsg = el('div', { class: 'small', style: 'margin-top:6px' });
@@ -24720,8 +24725,7 @@ function builder() {
       el('span', { class: 'small' }, '0 = graded only at Submit. 1 or more adds a Check button; each retry is a new version of the question.')),
     el('label', {}, 'Attempts at the whole assignment'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, attemptsIn,
       el('span', { class: 'small' }, '1 = one try. Every attempt is recorded.')),
-    el('label', {}, 'When a student starts another attempt'), el('div', { style: 'display:flex;flex-direction:column;gap:4px' }, redoSel,
-      el('span', { class: 'small' }, 'Only matters when attempts is 2 or more. “Only the ones they missed” keeps each question they got right (already marked correct) and gives new versions of the rest.')),
+    redoLab, redoBox,
     el('label', {}, 'Lockdown mode'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, lockIn,
       el('span', { class: 'small' }, 'Full screen required; right-click, copy, and printing blocked; leaving the page hides the questions and is recorded.')),
     el('label', {}, 'Lock after leaving (lockdown mode only)'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, leaveIn,
