@@ -6341,6 +6341,7 @@ TEMPLATES.trigIsIdentity = (r) => {
     ...buildChoices(r, eq(truth), wrongs.map(eq), (i) => String(i)),
     frStem: `Is this equation an identity (true for every value of the variable where both sides are defined)?\n\n${eq(one)}`,
     fr: FR.select('This equation is', ['an identity', 'not an identity'], isTrue ? 'an identity' : 'not an identity'),
+    hint: 'An identity is true for every value of the variable. Rewrite each side with sines and cosines (or a Pythagorean identity) and see whether the two sides match. To rule one out, try a value like 30° or 45° in both sides.',
     solution: `${eq(truth)} is an identity:\n${why(truth)}` + `\n\n${eq(wrongs[0])} is not: ${counterexample(wrongs[0][0], wrongs[0][1], v)}`,
   };
 };
@@ -6428,6 +6429,7 @@ TEMPLATES.trigWhichProof = (r) => {
       ...mc,
       frStem: `This proof of   ${ident}   has exactly one mistake.\n\n${shown}\n\nWhich line is wrong?`,
       fr: FR.select('The mistake is in', lineOpts, `Line ${one.k + 1}`),
+      hint: 'Check each proof one line at a time: every line should follow from the one before it by a single identity or an algebra step. Look for a function swapped for its reciprocal or cofunction, a sign that flipped, or a lost exponent.',
       solution: `Proof ${LETTERS[mc.answer]} is correct:\n${chainLines(lhs, rhs, steps, v, { note: steps.map(([, w]) => `(${STEP_NOTE[w]})`) }).split('\n').slice(2).join('\n')}\n\n` +
         wrongs.slice().sort((a, b) => letterOf(a).localeCompare(letterOf(b))).map((w) => `Proof ${letterOf(w)}: ${explain(w)}`).join('\n'),
       _frSolution: `${explain(one)}\n\nThe correct proof:\n${chainLines(lhs, rhs, steps, v, { note: steps.map(([, w]) => `(${STEP_NOTE[w]})`) }).split('\n').slice(2).join('\n')}`,
@@ -6450,6 +6452,9 @@ function trigProveFrom(r, pool) {
       'Start with one side exactly as written. On each new line, write the next expression, changing one thing at a time, until you reach the other side. Press Enter for a new line.',
     choices: [], answer: -1,
     solution: 'One possible proof:\n' + chainLines(lhs, rhs, steps, v, { note: steps.map(([, w]) => `(${STEP_NOTE[w]})`) }).split('\n').slice(2).join('\n'),
+    // hint: the first step of the sample proof (which identity to use, and what the first line becomes)
+    hint: `Start with ${unM(mathTrig(lhs, v))}. First step: use the ${STEP_NOTE[steps[0][1]]}, so it becomes ${unM(mathTrig(steps[0][0], v))}.` +
+      (steps[0][1] === 'Algebra' ? '' : ' Then keep going one change at a time.'),
   };
   q.fr = { fields: [{ kind: 'proof' }], key: [model.map((e) => latexTrig(e, v)).join('\n')], display: 'See the sample proof below.',
     answered: (vals) => proofLines(vals[0]).length > 0, check: (vals) => proofScore(q, vals[0]) === 1, score: (vals) => proofScore(q, vals[0]) };
@@ -24672,8 +24677,10 @@ function builder() {
   // typed-answer questions: wrong Checks allowed on one version before it gets new numbers (grayed out with no retries)
   const checksLab = el('label', {}, 'Checks before new numbers (typed-answer questions)'), checksBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, checksIn,
     el('span', { class: 'small' }, '1 = every wrong Check gives new numbers. 2 or more lets a student fix a typed answer before the question changes. Multiple choice always gets new numbers.'));
-  const checksGray = () => { const off = Math.floor(+retriesIn.value || 0) <= 0; checksIn.disabled = off; [checksLab, checksBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; }); };
-  retriesIn.addEventListener('input', checksGray); checksGray();
+  // can't be more than the retries: the max follows Retries, and a bigger number is pulled down to it
+  const checksGray = () => { const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), off = rt <= 0; checksIn.disabled = off; [checksLab, checksBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; });
+    checksIn.max = String(Math.max(1, rt)); if (!off && Math.floor(+checksIn.value || 1) > rt) checksIn.value = String(rt); };
+  retriesIn.addEventListener('input', checksGray); checksIn.addEventListener('input', checksGray); checksIn.addEventListener('change', () => { if (+checksIn.value < 1) checksIn.value = '1'; }); checksGray();
   // grayed out when lockdown mode is off (it only applies in lockdown mode)
   const leaveLab = el('label', {}, 'Lock after leaving (lockdown mode only)'), leaveBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, leaveIn,
     el('span', { class: 'small' }, 'Leaving the page this many times locks the assignment until you unlock it from the Results dashboard. 0 = never lock.'));
@@ -24979,7 +24986,7 @@ function builder() {
     const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), at = Math.max(1, Math.min(10, Math.floor(+attemptsIn.value || 1)));
     if (rt) q.set('retries', String(rt));
     if (nBonus && bp !== 5) q.set('bpct', String(bp));
-    const ck = Math.max(1, Math.min(5, Math.floor(+checksIn.value || 1)));
+    const ck = Math.max(1, Math.min(5, rt || 1, Math.floor(+checksIn.value || 1)));
     if (rt && ck > 1) q.set('checks', String(ck));
     const lv = Math.max(0, Math.min(20, Math.floor(+leaveIn.value || 0)));
     if (lv !== (CONFIG.LEAVE_LIMIT || 0)) q.set('leave', String(lv));
