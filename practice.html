@@ -317,7 +317,7 @@ const SETS = {
   'geo-6-1':       { subject: 'geometry', title: '6.1 Perpendicular and Angle Bisectors', items: [['g61PerpBis', 3], ['g61PerpConclude', 2], ['g61AngBis', 3], ['g61AngConclude', 2], ['g61PerpEq', 3]] },
   'geo-6-2':       { subject: 'geometry', title: '6.2 Bisectors of Triangles', items: [['g62Centers', 6], ['g62CircumCoord', 4], ['g62WhichCenter', 2]] },
   'geo-6-3':       { subject: 'geometry', title: '6.3 Medians and Altitudes of Triangles', items: [['g63Centroid', 4], ['g63CentroidFind', 4], ['g63CentroidCoord', 2], ['g63Ortho', 3]] },
-  'geo-6-4':       { subject: 'geometry', title: '6.4 The Triangle Midsegment Theorem', items: [['g64Coords', 2], ['g64FindX', 4], ['g64Complete', 4], ['g64Word', 2]] },
+  'geo-6-4':       { subject: 'geometry', title: '6.4 The Triangle Midsegment Theorem', items: [['g64Coords', 2], ['g64FindX', 4], ['g64Complete', 4], ['g64Word', 2], ['g64Backward', 1, undefined, 'b']] },
   'geo-6-5':       { subject: 'geometry', title: '6.5 Indirect Proof and Inequalities in One Triangle', items: [['g65FirstStep', 2], ['g65OrderAngles', 3], ['g65OrderSides', 3], ['g65ThirdSide', 3], ['g65Possible', 3]] },
   'geo-6-6':       { subject: 'geometry', title: '6.6 Inequalities in Two Triangles', items: [['g66Hinge', 6], ['g66Flights', 2], ['g66PossibleX', 3]] },
   // ----- Pre-Calculus -----
@@ -10635,6 +10635,20 @@ TEMPLATES.g64Word = (r) => {
   return { topic: 'Midsegments in real life', stem: `Oak Street joins the midpoints of Walnut Street and Maple Street, which form two sides of a triangle with Spruce Street. Walnut Street is ${a} miles long, Maple Street is ${a} miles long, and Spruce Street is ${b} miles long. A parade float starts where Walnut Street meets Spruce Street, travels up Walnut Street to Oak Street, along Oak Street to Maple Street, and then down Maple Street to Spruce Street. About how far does the float travel?`,
     ...g6Choices(r, Math.round(total * 100) / 100, (x) => `${fmt(x)} mi`), fr: FR.num('Distance =', Math.round(total * 100) / 100, { suffix: ' mi' }),
     solution: `Half of Walnut Street (${a / 2} mi) + Oak Street, a midsegment half as long as Spruce Street (${b / 2} mi) + half of Maple Street (${a / 2} mi) = ${fmt(total)} miles.` };
+};
+TEMPLATES.g64Backward = (r) => { // work backwards: from the three midpoints to a vertex (bonus / advanced)
+  for (;;) {
+    const V = [0, 1, 2].map(() => [2 * ri(r, -4, 4), 2 * ri(r, -4, 4)]), [p, q, s] = V;
+    const area = (q[0] - p[0]) * (s[1] - p[1]) - (s[0] - p[0]) * (q[1] - p[1]); if (Math.abs(area) < 16) continue;
+    const [A, B, C, D, E, F] = pickLetters(r, 6), mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const Dm = mid(p, q), Em = mid(q, s), Fm = mid(p, s); // D on AB, E on BC, F on AC
+    const correct = ptT(p);
+    const wrongs = [ptT(q), ptT(s), ptT([Dm[0] + Em[0] - Fm[0], Dm[1] + Em[1] - Fm[1]]), ptT([(Dm[0] + Fm[0]) / 2, (Dm[1] + Fm[1]) / 2])].filter((w) => w !== correct);
+    return { topic: 'Midsegments: work backwards', stem: `The midpoints of the sides of △${A}${B}${C} are ${D}${ptT(Dm)} on ${SEG(A + B)}, ${E}${ptT(Em)} on ${SEG(B + C)}, and ${F}${ptT(Fm)} on ${SEG(A + C)}. Find the coordinates of ${A}.`,
+      ...buildChoices(r, correct, [...new Set(wrongs)], (i) => ptT([p[0] + i + 1, p[1] - i - 1])),
+      fr: { fields: [{ kind: 'expr', keys: 'point', label: `${A}:` }], key: [`\\left(${p[0]},${p[1]}\\right)`], display: correct, check: (v) => onePointOk(v[0], p) },
+      solution: `${SEG(E + F)} ∥ ${SEG(A + B)} and ${SEG(D + E)} ∥ ${SEG(A + C)} (each midsegment is parallel to the third side), so ${A}${D}${E}${F} is a parallelogram with ${A} opposite ${E}.\n${A} = ${D} + ${F} − ${E} = (${fmt(Dm[0])} + ${fmt(Fm[0])} − ${fmt(Em[0])}, ${fmt(Dm[1])} + ${fmt(Fm[1])} − ${fmt(Em[1])}) = ${correct}.` };
+  }
 };
 
 /* ---------- 6.5 Indirect Proof and Inequalities in One Triangle ---------- */
@@ -21591,6 +21605,7 @@ const QUESTION_TYPES = [
   { id: 'g64FindX', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Find x with a midsegment', desc: '(#7–10)' },
   { id: 'g64Complete', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Complete the statement', desc: 'Parallel and congruent segments (#11–16)' },
   { id: 'g64Word', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Midsegment word problems', desc: '(#17–18)' },
+  { id: 'g64Backward', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Work backwards from the midpoints', desc: 'Find a vertex (good bonus question)' },
   { id: 'g65FirstStep', subject: 'geometry', section: '6.5 Indirect Proof and Inequalities in One Triangle', label: 'Indirect proof: first step', desc: '(#1–4)' },
   { id: 'g65OrderAngles', subject: 'geometry', section: '6.5 Indirect Proof and Inequalities in One Triangle', label: 'Order the angles', desc: 'From side lengths (#11–14)' },
   { id: 'g65OrderSides', subject: 'geometry', section: '6.5 Indirect Proof and Inequalities in One Triangle', label: 'Order the sides', desc: 'From angle measures (#15–18)' },
