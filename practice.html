@@ -235,6 +235,9 @@ const CONFIG = {
   // Teacher answer-key PIN, stored as a hash. Default PIN is 1234.
   // To change it: open practice.html?makehash=YOURPIN and paste the number shown here.
   TEACHER_PIN_HASH: '676594817605674',
+  // true = the built-in menu assignments are hidden from your lists (builder, Print, and answer key). Students still see them.
+  // Old links to them (…?set=geo-5-2) still work. Set to false to show them again.
+  HIDE_MENU: true,
 };
 
 /* =====================================================================
@@ -253,6 +256,7 @@ const TEACHERS = {
     SIGNIN_URL: 'https://script.google.com/a/macros/atoka.org/s/AKfycbz2j4eEizsnhR9tzIxJI7xBETVirVtdnyBOeUTMUw5n82Wpe9WzRGjeXA82Us42Jt2b/exec', // his second deployment ("Anyone within atoka.org")
     TEACHER_PIN_HASH: '3825129222348298', // he opens practice.html?t=spencer&makehash=HIS-PIN and sends you the number it shows
     AI_GRADING: false,
+    HIDE_MENU: false, // he still sees the menu assignments
   },
 };
 // "Try it as a student" from the builder: no Google sign-in, and nothing is saved to the gradebook
@@ -23067,6 +23071,8 @@ async function loadRoster() {
   ROSTER = cached || {};
   return ROSTER;
 }
+// the start screen's assignment choice: a menu key, or a built assignment's link (answer key lookup)
+const pickedSet = (sel, key) => { const v = sel ? sel.value : key; return v && v.startsWith('url:') ? registerCustomUrl(v.slice(4)) : v; };
 function startScreen(teacher = false) {
   if (teacher) teacherNav('key');
   const setKey = CUSTOM_KEY || params.get('set');
@@ -23080,11 +23086,19 @@ function startScreen(teacher = false) {
     setSel = el('select', { id: 'set' }, el('option', { value: '' }, 'Choose an assignment…'),
       ...subjects.map((sk) => {
         const g = el('optgroup', { label: SUBJECTS[sk] });
-        Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden).forEach(([k, v]) => g.append(el('option', { value: k }, v.title)));
+        Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden && !(teacher && (v.custom || CONFIG.HIDE_MENU))).forEach(([k, v]) => g.append(el('option', { value: k }, v.title)));
         return g;
       }).filter((g) => g.children.length));
     card.append(el('label', { for: 'set' }, 'Assignment'), setSel);
-    if (!setSel.querySelector('option[value]:not([value=""])')) card.append(el('p', { class: 'small' }, 'No assignments here yet.'));
+    const none = el('p', { class: 'small' }, teacher ? 'Loading the assignments you built…' : 'No assignments here yet.');
+    if (!setSel.querySelector('option[value]:not([value=""])')) card.append(none);
+    if (teacher) builderLibrary().then((lib) => { // answer key: the assignments you built come first
+      subjects.slice().reverse().forEach((sk) => {
+        const mine = lib.filter((e) => e.subject === sk); if (!mine.length) return;
+        setSel.insertBefore(el('optgroup', { label: `${SUBJECTS[sk]} — assignments you built` }, ...mine.map((e) => el('option', { value: 'url:' + e.url }, e.title))), setSel.children[1] || null);
+      });
+      if (setSel.querySelector('option[value]:not([value=""])')) none.remove(); else none.textContent = 'No assignments here yet.';
+    }).catch(() => {});
   } else {
     document.getElementById('title').textContent = SETS[setKey].title;
     document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${CONFIG.TEACHER_NAME}`;
@@ -23100,7 +23114,7 @@ function startScreen(teacher = false) {
       el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); signOut(); startScreen(false); } }, 'Not you? Sign out')));
     if (pSel) card.append(el('label', { for: 'period' }, 'Class period'), pSel);
     card.append(el('button', { class: 'btn', onclick: () => {
-      const sk = setSel ? setSel.value : setKey, period = pSel ? pSel.value : pass.ps[0];
+      const sk = pickedSet(setSel, setKey), period = pSel ? pSel.value : pass.ps[0];
       if (!sk) return (err0.textContent = 'Choose an assignment first.');
       if (!period) return (err0.textContent = 'Choose your class period.');
       begin(sk, period, pass.n, false, 1, pass.rid);
@@ -23165,7 +23179,7 @@ function startScreen(teacher = false) {
     : 'Type your full name exactly the same way every time. Your questions are made just for you, so your answers won’t match anyone else’s.');
   if (hintP) card.append(hintP);
   card.append(el('button', { class: 'btn', onclick: () => {
-    const sk = setSel ? setSel.value : setKey;
+    const sk = pickedSet(setSel, setKey);
     if (!sk) return (err.textContent = 'Choose an assignment first.');
     if (!per.value) return (err.textContent = 'Choose your class period.');
     if (roster && nameSel.value && nameSel.value !== '__typed') {
@@ -24474,7 +24488,7 @@ function printScreen(preKey) {
     Object.entries(SUBJECTS).forEach(([sk, sname]) => {
       const mine = lib.filter((e) => e.subject === sk);
       if (mine.length) pick.append(el('optgroup', { label: `${sname} — assignments you built` }, ...mine.map((e) => el('option', { value: 'url:' + e.url }, e.title))));
-      const menu = Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden && !v.custom);
+      const menu = Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden && !v.custom && !CONFIG.HIDE_MENU);
       if (menu.length) pick.append(el('optgroup', { label: `${sname} — menu assignments` }, ...menu.map(([k, v]) => el('option', { value: k }, v.title))));
     });
     const cur = PRINT.key && [...pick.options].find((o) => o.value === PRINT.key || (o.value.startsWith('url:') && registerCustomUrl(o.value.slice(4)) === PRINT.key));
@@ -24722,7 +24736,7 @@ function builder() {
       const mine = lib.map((e, i) => [e, i]).filter(([e]) => e.subject === sk);
       if (mine.length) pick.append(el('optgroup', { label: `${sname} — assignments you built` },
         ...mine.map(([e, i]) => el('option', { value: 'lib:' + i }, `${e.title}${e.t ? ' · ' + new Date(e.t).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}${e.src === 'results' ? ' (from turned-in work)' : ''}`))));
-      const menu = Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden && !v.custom);
+      const menu = Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden && !v.custom && !CONFIG.HIDE_MENU);
       if (menu.length) pick.append(el('optgroup', { label: `${sname} — menu assignments (loads a copy)` }, ...menu.map(([k, v]) => el('option', { value: 'set:' + k }, v.title))));
     });
   };
