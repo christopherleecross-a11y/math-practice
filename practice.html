@@ -144,6 +144,27 @@
   .pkey h2 { font: 700 20px Georgia, serif; margin: 0 0 8px; border-bottom: 2px solid #000; padding-bottom: 4px; }
   .pkrow { display: grid; grid-template-columns: 34px 1fr; padding: 4px 0; border-bottom: 1px solid #eee; break-inside: avoid; font: 15px Georgia, serif; }
   .pkrow .psol { color: #333; font-size: 13px; white-space: pre-wrap; margin-top: 2px; }
+  .lp p { margin: 6px 0; line-height: 1.45; }
+  .lp-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  .lp-h { font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6b6b66); margin: 18px 0 4px; }
+  .lp-ul { margin: 4px 0; padding-left: 22px; line-height: 1.45; }
+  .lp-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  @media (max-width: 640px) { .lp-two { grid-template-columns: 1fr; } }
+  .lp-step { display: flex; gap: 14px; border-top: 1px solid var(--line); padding: 12px 0; break-inside: avoid; }
+  .lp-time { width: 58px; flex: none; font-weight: 700; font-size: 17px; }
+  .lp-name { font-weight: 700; font-size: 17px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lp-tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #e8f0fa; color: #1f5fa8; }
+  .lp-check { background: #f6f4ec; border-left: 3px solid #c9a227; padding: 6px 10px; }
+  .lp-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .tvshow { position: fixed; inset: 0; z-index: 9999; background: #fff; color: #1d1d1b; overflow: auto; display: flex; flex-direction: column; }
+  .tv-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid #ddd; background: #fafaf7; position: sticky; top: 0; }
+  .tv-body { padding: 24px 40px 60px; max-width: 1180px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+  .tv-label { font: 600 18px system-ui, sans-serif; color: #6b6b66; margin-bottom: 10px; }
+  .tv-ch { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 30px; margin-top: 12px; }
+  .tv-ch > div { display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 10px; font: 30px Georgia, serif; }
+  .tv-right { background: #e4f2e4; outline: 2px solid #2e7d32; }
+  .tv-ans { margin-top: 22px; padding: 16px 20px; background: #f6f4ec; border-left: 4px solid #c9a227; border-radius: 6px; }
+  @media print { .tvshow { display: none !important; } }
   @media print {
     body.printing { background: #fff; }
     body.printing header, body.printing #tnav, body.printing .noprint { display: none !important; }
@@ -10651,7 +10672,7 @@ TEMPLATES.g64Backward = (r) => { // work backwards: from the three midpoints to 
     return { topic: 'Midsegments: work backwards', stem: `The midpoints of the sides of △${A}${B}${C} are ${D}${ptT(Dm)} on ${SEG(A + B)}, ${E}${ptT(Em)} on ${SEG(B + C)}, and ${F}${ptT(Fm)} on ${SEG(A + C)}. Find the coordinates of ${A}.`,
       ...buildChoices(r, correct, [...new Set(wrongs)], (i) => ptT([p[0] + i + 1, p[1] - i - 1])),
       fr: { fields: [{ kind: 'expr', keys: 'point', label: `${A}:` }], key: [`\\left(${p[0]},${p[1]}\\right)`], display: correct, check: (v) => onePointOk(v[0], p) },
-      solution: `${SEG(E + F)} ∥ ${SEG(A + B)} and ${SEG(D + E)} ∥ ${SEG(A + C)} (each midsegment is parallel to the third side), so ${A}${D}${E}${F} is a parallelogram with ${A} opposite ${E}.\n${A} = ${D} + ${F} − ${E} = (${fmt(Dm[0])} + ${fmt(Fm[0])} − ${fmt(Em[0])}, ${fmt(Dm[1])} + ${fmt(Fm[1])} − ${fmt(Em[1])}) = ${correct}.` };
+      solution: `${SEG(E + F)} ∥ ${SEG(A + B)} and ${SEG(D + E)} ∥ ${SEG(A + C)} (each midsegment is parallel to the third side), so ${A}${D}${E}${F} is a parallelogram with ${A} opposite ${E}.\n${A} = ${D} + ${F} − ${E} = (${fmt(Dm[0])} + ${g10paren2(Fm[0])} − ${g10paren2(Em[0])}, ${fmt(Dm[1])} + ${g10paren2(Fm[1])} − ${g10paren2(Em[1])}) = ${correct}.` };
   }
 };
 
@@ -25832,11 +25853,164 @@ function teacherNav(active) {
     ['dash', 'Results dashboard', go(() => { DASH.title = ''; DASH.student = null; dashboard(); })],
     ['key', 'Look up an answer key', go(() => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); })],
     ['print', 'Print', go(() => printScreen())],
+    ['lesson', 'Lesson plans', go(() => lessonScreen())],
   ];
   nav.innerHTML = '';
   tabs.forEach(([id, label, fn]) => nav.append(el('button', { type: 'button', onclick: fn, 'aria-current': id === active ? 'page' : 'false',
     style: `flex:1;min-width:150px;padding:9px 12px;font:600 15px system-ui,sans-serif;border-radius:8px;border:1px solid ${id === active ? 'var(--accent)' : 'transparent'};background:${id === active ? 'var(--accent)' : 'transparent'};color:${id === active ? '#fff' : 'var(--accent)'};cursor:pointer` }, label)));
 }
+/* ==== LESSON PLANS BEGIN ==== */
+/* ---------- lesson plans (teacher only): a 45-minute plan for a section, with examples shown on the TV ----------
+   Each plan is keyed by the section's assignment key. "show" lists question types the plan puts on the TV: they are made
+   fresh from the same question types students practice, so there are always new numbers. */
+const LESSONS = {
+  'geo-6-4': {
+    minutes: 45,
+    objective: 'Use midsegments of triangles in the coordinate plane, and use the Triangle Midsegment Theorem to find lengths and distances.',
+    iCan: ['I can find the midsegments of a triangle.', 'I can explain why a midsegment is parallel to the third side and half as long.', 'I can use the Triangle Midsegment Theorem to find missing lengths, including in real-life problems.'],
+    vocab: [['Midsegment of a triangle', 'a segment that connects the midpoints of two sides of a triangle'], ['Midsegment triangle', 'the triangle formed by the three midsegments'], ['Triangle Midsegment Theorem', 'a midsegment is parallel to the third side and is half as long as that side']],
+    materials: 'Chromebooks, TV, graph paper, small whiteboards or scratch paper, rulers',
+    prior: 'Midpoint Formula (1.3), slope of parallel lines (3.5), distance formula (1.3)',
+    steps: [
+      { time: '0–5', name: 'Bell ringer (ACT style)', tag: 'All learners',
+        teacher: 'Put the ACT-style midpoint question on the TV. Give 2 minutes, then have everyone hold up their letter (fingers or whiteboard) at the same time.',
+        students: 'Work it on paper and show their answer choice.',
+        check: 'Scan the room: who still mixes up adding vs. subtracting in the Midpoint Formula? Those students are your first stop during practice.',
+        show: [{ tpl: 'g13Midpoint', mode: 'mc', label: 'Bell ringer' }] },
+      { time: '5–13', name: 'Discover the pattern', tag: 'All learners',
+        teacher: 'Each student draws their own triangle on graph paper using even coordinates (so midpoints are whole numbers). Pairs find the midpoints of two sides, connect them, and compare the slope and length of that segment with the third side.',
+        students: 'Each pair reports their slopes and lengths. Every triangle is different, but every pair should find the same thing.',
+        check: 'Call on pairs at random (not volunteers) to share. Ask: “Did anyone get a different pattern?”',
+        say: 'Every one of us drew a different triangle. What stayed the same?' },
+      { time: '13–17', name: 'Name it: vocabulary and the theorem',
+        teacher: 'Students write the definition of a midsegment and the Triangle Midsegment Theorem in their notes, in their own words first, then compare with the book. Point out that every triangle has three midsegments, which form the midsegment triangle.',
+        students: 'Fill in: “A midsegment is ______ to the third side and ______ as long.”',
+        check: 'Have a few students read their sentence aloud before you show the book’s wording.' },
+      { time: '17–27', name: 'Examples: I do, we do, you do', tag: 'Monitor',
+        teacher: 'Example 1 (I do): think aloud through the coordinate example, checking slope and length. Example 2 (we do): students try the find-x problem on whiteboards first, then you reveal. Example 3 (you do): press “New numbers” and let them do one alone.',
+        students: 'Whiteboards up after each try. Pairs explain to each other which side is the “third side.”',
+        check: 'If more than a few boards are wrong on Example 2, do another with New numbers before moving on. The most common mistake is doubling when they should halve (or the reverse).',
+        show: [{ tpl: 'g64Coords', mode: 'fr', label: 'Example 1 (I do)' }, { tpl: 'g64FindX', mode: 'fr', label: 'Example 2 (we do)' }, { tpl: 'g64FindX', mode: 'fr', label: 'Example 3 (you do)' }] },
+      { time: '27–40', name: 'Practice on Chromebooks', tag: 'Monitor',
+        teacher: 'Students work the 6.4 assignment. Keep the Results dashboard open and pull a small group of anyone missing the find-x questions. Early finishers try the work-backwards bonus.',
+        students: 'Independent practice; every student gets different numbers.',
+        check: 'Watch “Correct so far” on the dashboard. Adjust: if most of a period is missing the same type, stop and reteach it on the TV with New numbers.',
+        practice: true },
+      { time: '40–45', name: 'Closure and exit ticket', tag: 'Closure',
+        teacher: 'Put two exit-ticket questions on the TV. Then ask students to finish the sentence frame from earlier without notes, and preview tomorrow (6.5, indirect proof and inequalities in one triangle).',
+        students: 'Answer the exit ticket on a half sheet; finish the sentence frame from memory.',
+        check: 'Sort exit tickets into “got it,” “almost,” “not yet” for tomorrow’s groups.',
+        show: [{ tpl: 'g64Complete', mode: 'fr', label: 'Exit ticket 1' }, { tpl: 'g64Word', mode: 'fr', label: 'Exit ticket 2' }] },
+    ],
+    mistakes: ['Doubling when they should halve (or the reverse): ask “Which one is the midsegment? It’s the short one.”', 'Pairing the midsegment with the wrong side: the midsegment is parallel to the side it does not touch.', 'Midpoint Formula sign errors with negative coordinates.'],
+    support: ['Give a labeled diagram with the midsegment and its parallel side in the same color.', 'Keep the sentence frame on the board during practice.', 'Turn on Hints in the builder for this assignment.'],
+    extend: ['The work-backwards bonus: find a vertex from the three midpoints.', 'Prove the theorem with coordinates: put the vertices at (0, 0), (2a, 0), and (2b, 2c).'],
+  },
+};
+
+const LESSON = { key: null };
+function lessonScreen(preKey) {
+  teacherNav('lesson');
+  document.getElementById('title').textContent = 'Lesson plans';
+  document.getElementById('subtitle').textContent = 'A 45-minute plan for each section, with examples to put on the TV.';
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '';
+  document.body.classList.add('printing');
+  if (preKey) LESSON.key = preKey;
+  app.innerHTML = '';
+  const keys = Object.keys(LESSONS).filter((k) => SETS[k]);
+  if (!LESSON.key || !LESSONS[LESSON.key]) LESSON.key = keys[0] || null;
+  const pick = el('select', {}, ...keys.map((k) => el('option', { value: k }, `${SUBJECTS[SETS[k].subject] || ''} — ${SETS[k].title}`)));
+  if (LESSON.key) pick.value = LESSON.key;
+  const out = el('div', {});
+  app.append(el('div', { class: 'card noprint' },
+    el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, el('label', { style: 'margin:0' }, 'Section'), pick,
+      el('button', { class: 'btn secondary', type: 'button', onclick: () => window.print() }, '🖨 Print the plan')),
+    el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Buttons marked 📺 put a question on the TV with fresh numbers. Press “Show answer” when you’re ready, or “New numbers” for another one.')), out);
+  pick.addEventListener('change', () => { LESSON.key = pick.value; draw(); });
+  function draw() {
+    out.innerHTML = '';
+    const L = LESSONS[LESSON.key], S = SETS[LESSON.key]; if (!L || !S) return;
+    const h = (t) => el('h3', { class: 'lp-h' }, t);
+    const list = (arr) => el('ul', { class: 'lp-ul' }, ...arr.map((x) => el('li', {}, x)));
+    const all = L.steps.flatMap((s) => s.show || []);
+    out.append(el('div', { class: 'card lp' },
+      el('div', { class: 'lp-top' }, el('div', {}, el('h2', { style: 'margin:0' }, S.title), el('div', { class: 'small' }, `${SUBJECTS[S.subject] || ''} · ${L.minutes} minutes · ${CONFIG.TEACHER_NAME}`)),
+        all.length ? el('button', { class: 'btn noprint', type: 'button', onclick: () => tvShow(all, 0) }, '📺 Present the whole lesson') : ''),
+      h('Objective'), el('p', {}, L.objective),
+      h('Students will say'), list(L.iCan),
+      h('Vocabulary'), el('ul', { class: 'lp-ul' }, ...L.vocab.map(([w, d]) => el('li', {}, el('b', {}, w), ' — ', d))),
+      el('div', { class: 'lp-two' }, el('div', {}, h('Materials'), el('p', {}, L.materials)), el('div', {}, h('Builds on'), el('p', {}, L.prior))),
+      h('Lesson flow'),
+      ...L.steps.map((s) => el('div', { class: 'lp-step' },
+        el('div', { class: 'lp-time' }, s.time, el('div', { class: 'small' }, 'min')),
+        el('div', { style: 'flex:1;min-width:0' },
+          el('div', { class: 'lp-name' }, s.name, s.tag ? el('span', { class: 'lp-tag' }, s.tag) : ''),
+          el('p', {}, el('b', {}, 'Teacher: '), s.teacher),
+          el('p', {}, el('b', {}, 'Students: '), s.students),
+          s.say ? el('p', {}, el('b', {}, 'Ask: '), el('i', {}, s.say)) : '',
+          el('p', { class: 'lp-check' }, el('b', {}, 'Check for understanding: '), s.check),
+          s.show ? el('div', { class: 'lp-btns noprint' }, ...s.show.map((x) => el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, all.indexOf(x)) }, '📺 ' + x.label))) : '',
+          s.practice ? el('div', { class: 'lp-btns noprint' },
+            el('button', { class: 'btn secondary', type: 'button', onclick: () => lessonBuild(LESSON.key) }, `Build a ${S.title.split(' ')[0]} assignment`),
+            el('button', { class: 'btn secondary', type: 'button', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard')) : ''))),
+      el('div', { class: 'lp-two' },
+        el('div', {}, h('Watch for these mistakes'), list(L.mistakes)),
+        el('div', {}, h('Support'), list(L.support), h('Extend'), list(L.extend)))));
+  }
+  draw();
+}
+// start a fresh assignment in the builder with this section's question types
+function lessonBuild(key) {
+  const S = SETS[key], counts = {}, bonusCounts = {};
+  S.items.forEach(([id, n, , b]) => { if (b === 'b') bonusCounts[id] = n; else counts[id] = n; });
+  store.set(TK('builder:last'), { counts, formats: {}, frCounts: {}, bonusCounts, bonusFormats: {}, title: S.title, subject: S.subject, t: Date.now() });
+  document.body.classList.remove('printing');
+  builder(); window.scrollTo(0, 0);
+}
+// full-screen question for the TV: fresh numbers each time, answer hidden until asked
+function tvShow(list, at) {
+  let i = Math.max(0, at), q = null, shown = false;
+  const old = document.getElementById('tvShow'); if (old) old.remove();
+  const box = el('div', { id: 'tvShow', class: 'tvshow', role: 'dialog', 'aria-label': 'Question on the TV' });
+  const body = el('div', { class: 'tv-body' });
+  const make = () => { const x = list[i]; q = applyMode(TEMPLATES[x.tpl](mulberry32((Date.now() ^ (Math.random() * 1e9)) >>> 0)), x.mode); q.tpl = x.tpl; shown = false; paint(); };
+  const W = () => Math.max(320, Math.min(1100, window.innerWidth - 80));
+  const font = '30px Georgia, "Times New Roman", serif';
+  function paint() {
+    body.innerHTML = '';
+    const w = W();
+    body.append(el('div', { class: 'tv-label' }, `${list[i].label} · ${q.topic}`), textCanvas(q.stem, w, font, 42));
+    if (q.draw) {
+      const graph = q.topic.startsWith('Graphs'), sz = q.size || (graph ? [620, 330] : [560, 300]);
+      const cv = makeCanvas(sz[0], sz[1]); cv._stack = false; try { q.draw(cv); } catch {}
+      const k = Math.min(w / sz[0], (window.innerHeight * 0.5) / sz[1], 2); cv.style.width = Math.round(sz[0] * k) + 'px'; cv.style.maxWidth = '100%';
+      cv.style.display = 'block'; body.append(el('div', { style: 'display:flex;justify-content:center;margin:10px 0' }, cv));
+    }
+    if (q.mode !== 'fr' && q.choices) body.append(el('div', { class: 'tv-ch' }, ...q.choices.map((c, j) => el('div', { class: shown && j === q.answer ? 'tv-right' : '' }, el('b', {}, LETTERS[j] + '. '), textCanvas(c, Math.floor(w / 2) - 60, font, 42)))));
+    if (shown) {
+      const ans = q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`;
+      body.append(el('div', { class: 'tv-ans' }, el('div', { class: 'tv-label' }, 'Answer'), textCanvas(ans, w - 40, 'bold ' + font, 42),
+        q.solution ? textCanvas(q.solution, w - 40, '24px Georgia, "Times New Roman", serif', 34) : ''));
+    }
+    ansBtn.textContent = shown ? 'Hide answer' : 'Show answer';
+    prevBtn.disabled = i === 0; nextBtn.disabled = i === list.length - 1;
+    count.textContent = `${i + 1} of ${list.length}`;
+  }
+  const ansBtn = el('button', { class: 'btn', type: 'button', onclick: () => { shown = !shown; paint(); } }, 'Show answer');
+  const prevBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (i > 0) { i--; make(); } } }, '← Back');
+  const nextBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (i < list.length - 1) { i++; make(); } } }, 'Next →');
+  const count = el('span', { class: 'small', style: 'margin:0 4px' });
+  const close = () => { box.remove(); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  const keys = (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowRight') nextBtn.click(); else if (e.key === 'ArrowLeft') prevBtn.click(); else if (e.key === ' ' && e.target === document.body) { e.preventDefault(); ansBtn.click(); } };
+  box.append(el('div', { class: 'tv-bar' }, prevBtn, count, nextBtn, el('span', { style: 'flex:1' }), ansBtn,
+    el('button', { class: 'btn secondary', type: 'button', onclick: make }, 'New numbers'),
+    el('button', { class: 'btn secondary', type: 'button', onclick: () => { const f = box.requestFullscreen || box.webkitRequestFullscreen; if (f) f.call(box); } }, 'Full screen'),
+    el('button', { class: 'btn secondary', type: 'button', onclick: close }, 'Close ✕')), body);
+  document.body.append(box); document.addEventListener('keydown', keys);
+  make();
+}
+/* ==== LESSON PLANS END ==== */
+
 function teacherMenu() {
   if (params.has('copy')) { const c = params.get('copy'); params.delete('copy'); if (copyIntoBuilder(c)) return builder(); }
   if (params.has('print')) return printScreen(CUSTOM_KEY || (SETS[params.get('set')] ? params.get('set') : null));
@@ -25850,7 +26024,8 @@ function teacherMenu() {
     el('button', { class: 'btn', onclick: builder }, 'Build an assignment'), ' ',
     el('button', { class: 'btn', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard'), ' ',
     el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => printScreen() }, 'Print an assignment')));
+    el('button', { class: 'btn secondary', onclick: () => printScreen() }, 'Print an assignment'), ' ',
+    el('button', { class: 'btn secondary', onclick: () => lessonScreen() }, 'Lesson plans')));
 }
 
 /* ---------- printing (teacher only): paper copies in one or more versions, with an answer key ---------- */
