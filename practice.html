@@ -21564,6 +21564,1244 @@ TEMPLATES.b23Graph = (r) => {
 for (const name of Object.keys(TEMPLATES)) if (/^b2\d[A-Z]/.test(name)) { const make = TEMPLATES[name]; TEMPLATES[name] = (r) => pTidyQ(make(r)); }
 TEMPLATES.b23Match = (r) => TEMPLATES.a2Match(r);
 /* ==== ALGEBRA 2 CH2 END ==== */
+/* ==== GEOMETRY CH10 BEGIN ==== */
+/* ---------- Geometry (Big Ideas Math), Chapter 10: Circles ---------- */
+// a point at angle d (degrees, counterclockwise from the right) on a circle of radius R around c
+const g10P = (d, R = 1, c = [0, 0]) => [c[0] + R * Math.cos((d * Math.PI) / 180), c[1] + R * Math.sin((d * Math.PI) / 180)];
+const g10ang = (p, c = [0, 0]) => { let a = (Math.atan2(p[1] - c[1], p[0] - c[0]) * 180) / Math.PI; if (a < 0) a += 360; return a; };
+const g10seg = (s) => s.split('').map((ch) => ch + '̅').join(''); // segment AB with a bar over it
+// "3x + 7", "x − 4", "5x" (m ≠ 0)
+const g10lin = (m, c, v = 'x') => { const a = m === 1 ? v : m === -1 ? `${MINUS}${v}` : `${fmt(m)}${v}`; return c === 0 ? a : `${a} ${c > 0 ? '+' : MINUS} ${fmt(Math.abs(c))}`; };
+const g10deg = (t) => `${t}°`, g10paren = (t) => (/[ +−]/.test(t.replace(/^−/, '')) ? `(${t})°` : `${t}°`);
+const G10BLUE = '#1f5fa8', G10RED = '#b03a2e', G10INK = '#1d1d1b';
+// circle figures: circles, points, segments, lines (with arrows), red arcs, arc/angle/segment labels, right-angle marks, tick marks
+function g10Draw(cv, F) {
+  const ctx = cv._ctx, W = cv._w, H = cv._h, C = F.circles || [], P = F.pts || {};
+  const lineEnds = (F.lines || []).map(([a, b, e1 = 0.3, e2 = 0.3]) => { const A = P[a], B = P[b], d = [B[0] - A[0], B[1] - A[1]]; return [[A[0] - d[0] * e1, A[1] - d[1] * e1], [B[0] + d[0] * e2, B[1] + d[1] * e2], e1 > 0, e2 > 0]; });
+  const at0 = (n) => (Array.isArray(n) ? n : P[n]);
+  const ext = [...Object.values(P), ...lineEnds.flatMap(([u, v]) => [u, v]), ...(F.extra || []), ...(F.polys || []).flatMap((q) => q.pts.map(at0))];
+  C.forEach((c) => ext.push([c.c[0] - c.r, c.c[1] - c.r], [c.c[0] + c.r, c.c[1] + c.r]));
+  const bb = bbox(ext), m = F.margin ?? 46;
+  const s = Math.min((W - 2 * m) / Math.max(1e-6, bb.x1 - bb.x0), (H - 2 * m) / Math.max(1e-6, bb.y1 - bb.y0));
+  const ox = (W - (bb.x1 - bb.x0) * s) / 2, oy = (H - (bb.y1 - bb.y0) * s) / 2;
+  const X = (p) => [ox + (p[0] - bb.x0) * s, oy + (bb.y1 - p[1]) * s];
+  const at = (n) => (Array.isArray(n) ? n : P[n]);
+  ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  // shaded planes / polygons (drawn first)
+  const drawPoly = (q) => { const c = q.pts.map((p) => X(at0(p))); ctx.beginPath(); c.forEach((v, i) => (i ? ctx.lineTo(...v) : ctx.moveTo(...v))); ctx.closePath(); ctx.fillStyle = q.fill || 'rgba(31,95,168,0.10)'; ctx.fill(); if (q.stroke !== false) { ctx.strokeStyle = q.stroke || '#5d7fa8'; ctx.lineWidth = q.over ? 2 : 1.5; ctx.stroke(); } };
+  (F.polys || []).filter((q) => !q.over).forEach(drawPoly);
+  // shaded sectors (counterclockwise from a0 to a1, in degrees)
+  (F.sectors || []).forEach((A) => { const c = C[A.c || 0], q = X(c.c); let a1 = A.a1; while (a1 < A.a0) a1 += 360; ctx.beginPath(); ctx.moveTo(...q); ctx.arc(q[0], q[1], c.r * s, (-A.a0 * Math.PI) / 180, (-a1 * Math.PI) / 180, true); ctx.closePath(); ctx.fillStyle = A.fill || 'rgba(214,120,80,0.45)'; ctx.fill(); });
+  (F.polys || []).filter((q) => q.over).forEach(drawPoly); // polygons drawn over shaded sectors
+  // circles
+  C.forEach((c) => { const q = X(c.c); ctx.strokeStyle = G10INK; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q[0], q[1], c.r * s, 0, 2 * Math.PI); ctx.stroke(); });
+  // red arcs (counterclockwise from a0 to a1, in degrees)
+  (F.arcs || []).forEach((A) => { if (!A.red) return; const c = C[A.c || 0], q = X(c.c); let a1 = A.a1; while (a1 < A.a0) a1 += 360;
+    ctx.strokeStyle = G10RED; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(q[0], q[1], c.r * s, (-A.a0 * Math.PI) / 180, (-a1 * Math.PI) / 180, true); ctx.stroke(); });
+  // segments and lines
+  ctx.strokeStyle = G10INK; ctx.lineWidth = 2;
+  const segsPx = [];
+  (F.segs || []).forEach(([a, b]) => { const u = X(at(a)), v = X(at(b)); ctx.beginPath(); ctx.moveTo(...u); ctx.lineTo(...v); ctx.stroke(); segsPx.push([u, v]); });
+  const arrow = (tip, from) => { const d = VEC.norm(VEC.sub(tip, from)), n = [-d[1], d[0]]; ctx.beginPath(); ctx.moveTo(...VEC.add(tip, VEC.add(VEC.mul(d, -10), VEC.mul(n, 5)))); ctx.lineTo(...tip); ctx.lineTo(...VEC.add(tip, VEC.add(VEC.mul(d, -10), VEC.mul(n, -5)))); ctx.stroke(); };
+  lineEnds.forEach(([u0, v0, ea, eb]) => { const u = X(u0), v = X(v0); ctx.beginPath(); ctx.moveTo(...u); ctx.lineTo(...v); ctx.stroke(); if (ea) arrow(u, v); if (eb) arrow(v, u); segsPx.push([u, v]); });
+  // dashed (hidden) segments
+  ctx.save(); ctx.setLineDash([6, 5]); ctx.lineWidth = 1.6; ctx.strokeStyle = '#555';
+  (F.dsegs || []).forEach(([a, b]) => { const u = X(at(a)), v = X(at(b)); ctx.beginPath(); ctx.moveTo(...u); ctx.lineTo(...v); ctx.stroke(); segsPx.push([u, v]); });
+  ctx.restore();
+  // right-angle marks
+  ctx.strokeStyle = G10RED; ctx.lineWidth = 1.6;
+  (F.right || []).forEach(([a, v0, b]) => { const v = X(at(v0)), u1 = VEC.norm(VEC.sub(X(at(a)), v)), u2 = VEC.norm(VEC.sub(X(at(b)), v)), z = 11;
+    ctx.beginPath(); ctx.moveTo(...VEC.add(v, VEC.mul(u1, z))); ctx.lineTo(...VEC.add(v, VEC.add(VEC.mul(u1, z), VEC.mul(u2, z)))); ctx.lineTo(...VEC.add(v, VEC.mul(u2, z))); ctx.stroke(); });
+  // tick marks (congruent segments)
+  (F.ticks || []).forEach(([a, b, n = 1]) => { const u = X(at(a)), v = X(at(b)), mid = VEC.mul(VEC.add(u, v), 0.5), d = VEC.norm(VEC.sub(v, u)), nr = [-d[1], d[0]];
+    for (let k = 0; k < n; k++) { const c = VEC.add(mid, VEC.mul(d, (k - (n - 1) / 2) * 5)); ctx.beginPath(); ctx.moveTo(...VEC.add(c, VEC.mul(nr, 6))); ctx.lineTo(...VEC.add(c, VEC.mul(nr, -6))); ctx.stroke(); } });
+  // angle marks: the smaller angle p-v-q, with a label along its bisector
+  const labels = [];
+  (F.angs || []).forEach((A) => {
+    const v = X(at(A.v)), u1 = VEC.norm(VEC.sub(X(at(A.p)), v)), u2 = VEC.norm(VEC.sub(X(at(A.q)), v));
+    const a1 = Math.atan2(u1[1], u1[0]); let d = Math.atan2(u2[1], u2[0]) - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    if (A.big) d = d > 0 ? d - 2 * Math.PI : d + 2 * Math.PI; // the reflex side (around the outside)
+    const rr = A.r || 20;
+    if (A.mark !== false) { ctx.strokeStyle = A.red ? G10RED : '#7a7a7a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(v[0], v[1], rr, a1, a1 + d, d < 0); ctx.stroke(); }
+    const mid = a1 + d / 2; if (A.lab) labels.push({ x: v[0] + Math.cos(mid) * (rr + (A.far || 15)), y: v[1] + Math.sin(mid) * (rr + (A.far || 15)), t: A.lab, color: A.red ? G10RED : G10BLUE, font: A.red ? 'bold 16px Georgia, serif' : '15px Georgia, serif' });
+  });
+  // dots and point names
+  ctx.fillStyle = G10INK;
+  C.forEach((c) => { if (c.dot !== false) { const q = X(c.c); ctx.beginPath(); ctx.arc(q[0], q[1], 3, 0, 2 * Math.PI); ctx.fill(); } });
+  Object.entries(P).forEach(([n, p]) => { if ((F.noDot || []).includes(n)) return; const q = X(p); ctx.beginPath(); ctx.arc(q[0], q[1], 3, 0, 2 * Math.PI); ctx.fill(); });
+  // point names: on a circle, outward (nudged away from lines leaving the point); elsewhere, in the widest gap between its lines and angle labels
+  const rays = (n) => { const p = P[n], out = [];
+    (F.segs || []).concat(F.dsegs || [], (F.lines || []).map((l) => l.slice(0, 2))).forEach(([a, b]) => { const o = a === n ? b : b === n ? a : null; if (o != null) { const q = at(o); out.push(Math.atan2(q[1] - p[1], q[0] - p[0])); } });
+    lineEnds.forEach(([u, v], i) => { const [a, b] = F.lines[i]; if (a === n) out.push(Math.atan2(u[1] - p[1], u[0] - p[0])); if (b === n) out.push(Math.atan2(v[1] - p[1], v[0] - p[0])); });
+    (F.angs || []).forEach((A) => { if (A.v !== n) return; const a1 = Math.atan2(at(A.p)[1] - p[1], at(A.p)[0] - p[0]), a2 = Math.atan2(at(A.q)[1] - p[1], at(A.q)[0] - p[0]); let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; if (A.big) d = d > 0 ? d - 2 * Math.PI : d + 2 * Math.PI; out.push(a1 + d / 2); });
+    return out; };
+  const gapDir = (rs, cands) => { let best = cands[0], bs = -1; cands.forEach((c) => { const sc = rs.length ? Math.min(...rs.map((t) => { let d = Math.abs(c - t) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; })) : 1; if (sc > bs + 1e-9) { bs = sc; best = c; } }); return best; };
+  Object.entries(P).forEach(([n, p]) => {
+    if (n.startsWith('_')) return;
+    let th;
+    const fixed = F.labDir && F.labDir[n];
+    if (fixed) th = Math.atan2(fixed[1], fixed[0]);
+    else {
+      const on = C.find((c) => { const dd = Math.hypot(p[0] - c.c[0], p[1] - c.c[1]); return dd > 0.2 * c.r && Math.abs(dd - c.r) < 0.12 * c.r; });
+      const rs = rays(n);
+      if (on) { const o = Math.atan2(p[1] - on.c[1], p[0] - on.c[0]); th = gapDir([...rs, o + Math.PI], [-60, -45, -30, -15, 0, 15, 30, 45, 60].map((k) => o + (k * Math.PI) / 180)); }
+      else th = gapDir(rs.length ? rs : [Math.PI / 4], [...Array(24)].map((_, k) => (k * Math.PI) / 12 + Math.PI / 24 * 0));
+    }
+    const u = [Math.cos(th), -Math.sin(th)], q = X(p);
+    labels.push({ x: q[0] + u[0] * 17, y: q[1] + u[1] * 17, t: n, color: G10INK, font: 'italic 19px Georgia, serif' });
+  });
+  // arc labels, outside the circle at the middle of the arc
+  (F.arcs || []).forEach((A) => { if (!A.lab) return; const c = C[A.c || 0]; let a1 = A.a1; while (a1 < A.a0) a1 += 360; const mid = (A.a0 + a1) / 2, q = X(g10P(mid, c.r, c.c)), u = [Math.cos((mid * Math.PI) / 180), -Math.sin((mid * Math.PI) / 180)];
+    const k = A.inside ? -1 : 1, dd = 14 + 4 * A.lab.length * Math.abs(u[0]);
+    labels.push({ x: q[0] + u[0] * k * dd, y: q[1] + u[1] * k * (A.inside ? 14 : 16), t: A.lab, color: A.red ? G10RED : G10BLUE, font: '15px Georgia, serif' }); });
+  // segment length labels: beside the midpoint, on the side away from the circle's center (or `side`)
+  (F.slab || []).forEach((L) => { const u = X(at(L.p)), v = X(at(L.q)), mid = VEC.mul(VEC.add(u, v), 0.5 + (L.shift || 0)), d = VEC.norm(VEC.sub(v, u)); let nr = [-d[1], d[0]];
+    const ref = L.from ? X(at(L.from)) : C.length ? X(C[0].c) : mid; if (VEC.len(VEC.sub(ref, mid)) > 1 && (VEC.sub(mid, ref)[0] * nr[0] + VEC.sub(mid, ref)[1] * nr[1]) < 0) nr = VEC.mul(nr, -1); if (L.side === -1) nr = VEC.mul(nr, -1);
+    const off = 11 + 3.2 * L.t.length * Math.abs(nr[0]);
+    labels.push({ x: mid[0] + nr[0] * off, y: mid[1] + nr[1] * 13, t: L.t, color: G10BLUE, font: '15px Georgia, serif' }); });
+  (F.txt || []).forEach((T) => { const q = X(T.at); labels.push({ x: q[0] + (T.dx || 0), y: q[1] + (T.dy || 0), t: T.t, color: T.color || G10INK, font: T.font || '15px Georgia, serif' }); });
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  labels.forEach((L) => { ctx.font = L.font; const w = ctx.measureText(L.t).width; ctx.fillStyle = 'rgba(255,255,255,0.82)'; ctx.fillRect(L.x - w / 2 - 2, L.y - 9, w + 4, 18); ctx.fillStyle = L.color; ctx.fillText(L.t, L.x, L.y); });
+}
+const g10Fig = (F) => (cv) => g10Draw(cv, F);
+// spread k angles around a circle, at least gap degrees apart, starting anywhere
+function g10Spread(r, k, gap = 35) {
+  for (;;) { const a = [...Array(k)].map(() => ri(r, 0, 359)).sort((x, y) => x - y); if (a.every((v, i) => ((i ? v - a[i - 1] : v + 360 - a[k - 1]) >= gap))) return a; }
+}
+// letters for a figure, never using O as a point on the circle
+const g10Letters = (r, n, exclude = []) => pickLetters(r, n, ['O', 'I', ...exclude]);
+const g10Num = (label, ans, suffix = '') => ({ fields: [{ kind: 'expr', keys: 'num', label, suffix }], key: [fmt(ans).replace(MINUS, '-')], display: `${fmt(ans)}${suffix}`, check: (v) => numOk(v[0], ans) });
+const g10NumT = (label, ans, suffix = '') => ({ fields: [{ kind: 'expr', keys: 'num', label, suffix }], key: [g9r(ans)], display: `≈ ${g9r(ans)}${suffix}`, check: (v) => numOk(v[0], ans, 0.051 / Math.max(1, Math.abs(ans))) });
+const g10DegChoices = (r, ans, alts) => buildChoices(r, deg(ans), [...new Set(alts.filter((x) => x > 0 && x < 360 && Math.abs(x - ans) > 1e-9).map(deg))], (i) => deg(ans + (i % 2 ? 1 : -1) * 10 * (1 + (i >> 1))));
+const g10NumChoices = (r, ans, alts) => buildChoices(r, fmt(ans), [...new Set(alts.filter((x) => x > 0 && Math.abs(x - ans) > 1e-9 && (!Number.isInteger(ans) || Number.isInteger(Math.round(x * 1e9) / 1e9))).map(fmt))], (i) => fmt(ans + (i % 2 ? 1 : -1) * (1 + (i >> 1))));
+
+// (−3)² for negatives; a − b written without "− 0" or "− −3"
+const g10sq = (n) => (n < 0 ? `(${fmt(n)})²` : `${fmt(n)}²`);
+const g10minus = (a, b) => (b === 0 ? fmt(a) : `${fmt(a)} − ${b < 0 ? `(${fmt(b)})` : fmt(b)}`);
+// solving m1·x + c1 = m2·x + c2, line by line
+const g10solve = (m1, c1, m2, c2, x) => `${g10lin(m1, c1)} = ${g10lin(m2, c2)}\n${m1 - m2 === 1 ? '' : `${g10lin(m1 - m2, 0)} = ${fmt(c2 - c1)}\n`}x = ${fmt(x)}`;
+/* ---------- 10.1 Lines and Segments That Intersect Circles ---------- */
+TEMPLATES.g101Name = (r) => {
+  const [cn, d1, d2, c1, c2, s1, s2, tp, tk] = g10Letters(r, 9), rot = ri(r, 0, 359), fl = r() < 0.5 ? -1 : 1, A = (d) => g10P(fl * (d + rot));
+  const pts = { [cn]: [0, 0], [d1]: A(160), [d2]: A(340), [c1]: A(50), [c2]: A(110), [s1]: A(190), [s2]: A(250), [tp]: A(295) };
+  const tdir = [-Math.sin((fl * (295 + rot) * Math.PI) / 180), Math.cos((fl * (295 + rot) * Math.PI) / 180)]; pts[tk] = [pts[tp][0] + tdir[0] * 0.95, pts[tp][1] + tdir[1] * 0.95];
+  const draw = g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts, segs: [[d1, d2], [c1, c2]], lines: [[s1, s2, 0.45, 0.45], [tp, tk, 0.9, 0.35]], noDot: [] });
+  const sg = (a, b) => g10seg(a + b), ln = (a, b) => `line ${a}${b}`;
+  const asks = {
+    'Name the circle.': [`⊙${cn}`, [`⊙${d1}`, `⊙${tp}`, `⊙${c1}`]],
+    'Name a radius.': [sg(cn, pick(r, [d1, d2])), [sg(c1, c2), sg(d1, d2), sg(tp, tk)]],
+    'Name a chord that is not a diameter.': [sg(c1, c2), [sg(cn, d1), sg(tp, tk), sg(cn, d2)]],
+    'Name a diameter.': [sg(d1, d2), [sg(c1, c2), sg(cn, d1), sg(s1, s2)]],
+    'Name a secant.': [ln(s1, s2), [ln(tp, tk), sg(c1, c2), sg(cn, d2)]],
+    'Name a tangent.': [ln(tp, tk), [ln(s1, s2), sg(d1, d2), sg(cn, d1)]],
+    'Name the point of tangency.': [tp, [tk, s1, cn]],
+  };
+  const ask = pick(r, Object.keys(asks)), [ans, wr] = asks[ask], ch = buildChoices(r, ans, wr, () => null);
+  const why = { 'Name the circle.': `The circle is named by its center, ${cn}.`, 'Name a radius.': `A radius joins the center ${cn} to a point on the circle.`, 'Name a chord that is not a diameter.': `A chord joins two points on the circle. ${sg(c1, c2)} does not pass through the center.`,
+    'Name a diameter.': `A diameter is a chord through the center: ${sg(d1, d2)}.`, 'Name a secant.': `A secant is a line that crosses the circle at two points: ${ln(s1, s2)}.`, 'Name a tangent.': `A tangent is a line that touches the circle at exactly one point: ${ln(tp, tk)}.`, 'Name the point of tangency.': `${ln(tp, tk)} touches the circle only at ${tp}.` }[ask];
+  return { topic: 'Parts of a circle', stem: `Use the diagram. ${ask}`, ...ch, fr: FR.select('Answer:', ch.choices, ans), draw, size: [380, 330], solution: why };
+};
+TEMPLATES.g101CommonTan = (r) => {
+  const kinds = [['apart', 4, 'The circles do not touch and neither is inside the other: 2 external tangents and 2 internal tangents.'], ['ext', 3, 'The circles touch at one point from the outside: 2 external tangents and 1 internal tangent (through the point where they touch).'],
+    ['cross', 2, 'The circles cross at two points: only the 2 external tangents.'], ['int', 1, 'One circle is inside the other and they touch at one point: just 1 tangent, at that point.'], ['inside', 0, 'One circle is inside the other without touching: there are no common tangents.']];
+  const [k, n, why] = pick(r, kinds), r1 = 1, r2 = pick(r, [0.45, 0.55, 0.65, 0.75]);
+  const d = { apart: r1 + r2 + 0.5, ext: r1 + r2, cross: r1 + r2 - 0.45, int: r1 - r2, inside: (r1 - r2) * 0.35 }[k];
+  const th = ri(r, 0, 359), c2 = g10P(th, d);
+  return { topic: 'Common tangents', stem: 'How many common tangents do the circles have?', ...buildChoices(r, String(n), ['0', '1', '2', '3', '4'].filter((x) => x !== String(n)), () => null),
+    fr: FR.num('Common tangents:', n), draw: g10Fig({ circles: [{ c: [0, 0], r: r1 }, { c: c2, r: r2 }], margin: 30 }), size: [380, 260], solution: why };
+};
+TEMPLATES.g101IsTangent = (r) => {
+  for (;;) {
+    const [cn, a, b] = g10Letters(r, 3), [p, q, h] = pick(r, G9TRIPLES), m = pick(r, [1, 1, 2]), tan = r() < 0.55;
+    const rad = p * m, t = q * m, hyp = tan ? h * m : h * m + pick(r, [-1, 1, 2]), out = hyp - rad; if (out <= 0 || rad > 24) continue;
+    const cosB = (rad * rad + t * t - hyp * hyp) / (2 * rad * t); if (Math.abs(cosB) >= 0.95) continue;
+    const B = [0, 0], th = ri(r, 0, 359), Cc = g10P(th, rad), Bang = Math.acos(cosB), sg = r() < 0.5 ? 1 : -1, Aa = g10P(th + sg * (Bang * 180) / Math.PI, t);
+    const sc = 1 / rad, S = (u) => [u[0] * sc, u[1] * sc], CC = S(Cc), AA = S(Aa), onC = [CC[0] + (AA[0] - CC[0]) * (rad / hyp), CC[1] + (AA[1] - CC[1]) * (rad / hyp)];
+    const right = rad * rad + t * t === hyp * hyp, ans = right ? 'Yes' : 'No';
+    return { topic: 'Is the segment tangent?', stem: `Tell whether ${g10seg(a + b)} is tangent to ⊙${cn}. Explain your reasoning.`,
+      ...buildChoices(r, right ? `Yes; ${rad}² + ${t}² = ${hyp}², so ${g10seg(cn + b)} ⊥ ${g10seg(a + b)}` : `No; ${rad}² + ${t}² ≠ ${hyp}², so ${g10seg(a + b)} is not perpendicular to the radius`,
+        [right ? `No; ${rad}² + ${t}² ≠ ${hyp}², so ${g10seg(a + b)} is not perpendicular to the radius` : `Yes; ${rad}² + ${t}² = ${hyp}², so ${g10seg(cn + b)} ⊥ ${g10seg(a + b)}`, `Yes; ${g10seg(a + b)} touches the circle at ${b}`, `No; ${g10seg(a + b)} is longer than the radius`], () => null),
+      fr: FR.select('Tangent?', ['Yes', 'No'], ans),
+      draw: g10Fig({ circles: [{ c: CC, r: 1 }], pts: { [cn]: CC, [b]: S(B), [a]: AA, _o: onC }, noDot: ['_o'], segs: [[cn, b], [a, b], [cn, a]], slab: [{ p: cn, q: b, t: String(rad), from: a }, { p: a, q: b, t: String(t), from: cn }, { p: '_o', q: a, t: String(out), from: b }] }), size: [400, 300],
+      solution: `${g10seg(a + b)} is tangent exactly when it is perpendicular to the radius ${g10seg(cn + b)}, which happens when the Pythagorean Theorem holds in △${cn}${b}${a}.\n${cn}${a} = ${rad} + ${out} = ${hyp}.\n${rad}² + ${t}² = ${rad * rad + t * t} and ${hyp}² = ${hyp * hyp}.\n${right ? `They are equal, so △${cn}${b}${a} is a right triangle and ${g10seg(a + b)} is tangent to ⊙${cn}.` : `They are not equal, so △${cn}${b}${a} is not a right triangle and ${g10seg(a + b)} is not tangent to ⊙${cn}.`}` };
+  }
+};
+TEMPLATES.g101Radius = (r) => {
+  for (;;) {
+    const [cn, a, b] = g10Letters(r, 3), [p, q, h] = pick(r, G9TRIPLES), m = pick(r, [1, 1, 2]), rad = p * m, t = q * m, e = (h - p) * m; if (rad > 30) continue;
+    const th = ri(r, 0, 359), sg = r() < 0.5 ? 1 : -1, CC = g10P(th, 1), AA = g10P(th + sg * 90, q / p), onC = g10P(g10ang(AA, CC), 1, CC);
+    const B = [0, 0], ex = [rad, t, e, h * m];
+    return { topic: 'Finding a radius with a tangent', stem: `Point ${b} is a point of tangency. Find the radius r of ⊙${cn}.`, ...g10NumChoices(r, rad, [t - e, (t * t) / e, t, e, Math.round(Math.sqrt(t * t + e * e)), rad + e]),
+      fr: g10Num('r =', rad), draw: g10Fig({ circles: [{ c: CC, r: 1 }], pts: { [cn]: CC, [b]: B, [a]: AA, _o: onC }, noDot: ['_o'], segs: [[cn, b], [a, b], [cn, a]], right: [[cn, b, a]], slab: [{ p: cn, q: b, t: 'r', from: a }, { p: a, q: b, t: String(t), from: cn }, { p: '_o', q: a, t: String(e), from: b }, { p: cn, q: '_o', t: 'r', from: b }] }), size: [400, 300],
+      solution: `A tangent is perpendicular to the radius at the point of tangency, so △${cn}${b}${a} is a right triangle with hypotenuse ${cn}${a} = r + ${e}.\nr² + ${t}² = (r + ${e})²\nr² + ${t * t} = r² + ${2 * e}r + ${e * e}\n${t * t - e * e} = ${2 * e}r\nr = ${rad}`, _ex: ex };
+  }
+};
+TEMPLATES.g101TwoTan = (r) => {
+  for (;;) {
+    const [cn, a, b, d] = g10Letters(r, 4), quad = r() < 0.3, th = ri(r, 0, 359), half = ri(r, 50, 66), dist = 1 / Math.cos((half * Math.PI) / 180);
+    const AA = g10P(th, dist), tB = g10P(th + half), tD = g10P(th - half);
+    let e1, e2, x, ans, sol;
+    if (!quad) {
+      x = ri(r, 2, 12); const m1 = ri(r, 2, 9); let m2 = ri(r, 2, 9); if (m1 === m2) continue; const c1 = ri(r, -12, 15), L = m1 * x + c1, c2 = L - m2 * x; if (L < 4 || c1 === 0 || c2 === 0 || Math.abs(c2) > 30) continue;
+      e1 = g10lin(m1, c1); e2 = g10lin(m2, c2); ans = x;
+      sol = `Tangent segments from a common external point are congruent, so ${a}${b} = ${a}${d}.\n${g10solve(m1, c1, m2, c2, x)}`;
+      return { topic: 'Tangent segments from a common point', stem: `Points ${b} and ${d} are points of tangency. Find the value of x.`, ...g10NumChoices(r, x, [x + 1, x - 1, (c2 + c1) / (m1 + m2), L, Math.abs(c2 - c1) / (m1 + m2) || x + 2]),
+        fr: g10Num('x =', x), draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], [a]: AA, [b]: tB, [d]: tD }, segs: [[a, b], [a, d]], slab: [{ p: a, q: b, t: e1 }, { p: a, q: d, t: e2 }] }), size: [400, 300], solution: sol };
+    }
+    x = ri(r, 2, 6); const a2 = ri(r, 2, 4), c0 = ri(r, -8, 8), L = a2 * x * x + c0, lin = r() < 0.5 ? ri(r, 1, 4) : 0, c3 = L - lin * x; if (L < 5 || c0 === 0) continue;
+    e1 = `${a2}x² ${c0 > 0 ? '+' : MINUS} ${Math.abs(c0)}`; e2 = lin ? g10lin(lin, c3) : String(L);
+    if (lin) { e1 = `${a2}x² + ${lin === 1 ? '' : lin}x ${c0 > 0 ? '+' : MINUS} ${Math.abs(c0)}`; }
+    const R = `x = ±${x}`, ok = (v) => realListOk(String(v).replace(/^\s*x\s*=\s*/i, ''), [x, -x]);
+    sol = `Tangent segments from a common external point are congruent, so ${a}${b} = ${a}${d}.\n${e1} = ${e2}\n${a2}x² = ${a2 * x * x}\nx² = ${x * x}\nx = ±${x}`;
+    return { topic: 'Tangent segments from a common point', stem: `Points ${b} and ${d} are points of tangency. Find the value(s) of x.`, ...buildChoices(r, R, [`x = ${x}`, `x = ±${x + 1}`, `x = ±${x * x}`, `x = ${MINUS}${x}`], () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'x =' }], key: [`\\pm ${x}`], display: R, check: (v) => ok(v[0]) }, draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], [a]: AA, [b]: tB, [d]: tD }, segs: [[a, b], [a, d]], slab: [{ p: a, q: b, t: e1 }, { p: a, q: d, t: e2 }] }), size: [420, 300], solution: sol };
+  }
+};
+
+/* ---------- 10.2 Finding Arc Measures ---------- */
+TEMPLATES.g102MinorMajor = (r) => {
+  const [cn, a, b, d] = g10Letters(r, 4), th = ri(r, 4, 34) * 5, st = ri(r, 0, 359), mid = st + th / 2 + 180, dd = mid + ri(r, -30, 30);
+  const draw = g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], [a]: g10P(st), [b]: g10P(st + th), [d]: g10P(dd) }, segs: [[cn, a], [cn, b]], angs: [{ v: cn, p: a, q: b, lab: `${th}°`, r: 22 }] });
+  const C = `Minor arc ${a}${b}: ${th}°; major arc ${a}${d}${b}: ${360 - th}°`;
+  return { topic: 'Minor and major arcs', stem: `Name the minor arc and find its measure. Then name the major arc and find its measure.`,
+    ...buildChoices(r, C, [`Minor arc ${a}${b}: ${360 - th}°; major arc ${a}${d}${b}: ${th}°`, `Minor arc ${a}${d}${b}: ${th}°; major arc ${a}${b}: ${360 - th}°`, `Minor arc ${a}${b}: ${th}°; major arc ${a}${d}${b}: ${180 - th > 0 ? 180 - th : 180 + th}°`], () => null),
+    fr: { fields: [{ kind: 'number', label: `m(minor arc ${a}${b}) =`, suffix: '°' }, { kind: 'number', label: `m(major arc ${a}${d}${b}) =`, suffix: '°' }], key: [String(th), String(360 - th)], display: `${th}°, ${360 - th}°`,
+      check: (v) => numEq(v[0], th) && numEq(v[1], 360 - th), score: (v) => (numEq(v[0], th) + numEq(v[1], 360 - th)) / 2 },
+    draw, size: [360, 320], solution: `The minor arc ${a}${b} has the same measure as its central angle: ${th}°.\nThe major arc ${a}${d}${b} is the rest of the circle: 360° − ${th}° = ${360 - th}°.` };
+};
+TEMPLATES.g102Identify = (r) => {
+  const [cn, p, q, s, t] = g10Letters(r, 5), th = ri(r, 6, 32) * 5, st = ri(r, 0, 359), extra = r() < 0.5;
+  const pts = { [cn]: [0, 0], [p]: g10P(st), [q]: g10P(st + 180), [s]: g10P(st + th) }; if (extra) pts[t] = g10P(st + 180 + ri(r, 50, 130));
+  const opts = [[`${p}${s}`, 'Minor arc', th], [`${s}${q}`, 'Minor arc', 180 - th], [`${p}${s}${q}`, 'Semicircle', 180], [`${s}${q}${p}`, 'Major arc', 360 - th]];
+  if (extra) opts.push([`${q}${t}${p}`, 'Semicircle', 180]);
+  const [nm, kind, val] = pick(r, opts.filter(([, , v]) => v !== 180 || r() < 0.6)), C = `${kind}; ${val}°`;
+  const alts = ['Minor arc', 'Major arc', 'Semicircle'].flatMap((k) => [val, 360 - val, 180 - val > 0 ? 180 - val : val + 20].map((v) => `${k}; ${v}°`)).filter((x) => x !== C);
+  return { topic: 'Major arcs, minor arcs, and semicircles', stem: `${g10seg(p + q)} is a diameter of ⊙${cn}. Identify arc ${nm} as a major arc, minor arc, or semicircle. Then find its measure.`,
+    ...buildChoices(r, C, alts, () => null), fr: { fields: [{ kind: 'select', label: 'Type:', options: ['Minor arc', 'Major arc', 'Semicircle'] }, { kind: 'number', label: 'Measure:', suffix: '°' }], key: [kind, String(val)], display: C,
+      check: (v) => v[0] === kind && numEq(v[1], val), score: (v) => ((v[0] === kind) + numEq(v[1], val)) / 2 },
+    draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts, segs: [[p, q], [cn, s]], angs: [{ v: cn, p, q: s, lab: `${th}°`, r: 20 }] }), size: [360, 320],
+    solution: `${val === 180 ? `Its endpoints are the ends of a diameter, so it is a semicircle: 180°.` : val < 180 ? `It is less than half the circle, so it is a minor arc. Its measure is ${val}°.` : `It is more than half the circle, so it is a major arc. Its measure is ${val}°.`}\n(${p}${s} = ${th}°, ${s}${q} = 180° − ${th}° = ${180 - th}°, a semicircle = 180°.)` };
+};
+TEMPLATES.g102Find = (r) => {
+  for (;;) {
+    const L = g10Letters(r, 5), cn = L[0], N = L.slice(1), ms = [ri(r, 8, 28) * 5, ri(r, 8, 28) * 5, ri(r, 8, 28) * 5], last = 360 - ms[0] - ms[1] - ms[2]; if (last < 40 || last > 160) continue;
+    const st = ri(r, 0, 359), A = [st, st + ms[0], st + ms[0] + ms[1], st + ms[0] + ms[1] + ms[2]], all = [...ms, last];
+    const asks = [[`${N[3]}${N[0]}`, last, `360° − (${ms.join('° + ')}°) = ${last}°`], [`${N[0]}${N[1]}${N[2]}`, ms[0] + ms[1], `${ms[0]}° + ${ms[1]}° = ${ms[0] + ms[1]}°`], [`${N[1]}${N[2]}${N[3]}`, ms[1] + ms[2], `${ms[1]}° + ${ms[2]}° = ${ms[1] + ms[2]}°`],
+      [`${N[3]}${N[0]}${N[1]}`, last + ms[0], `${last}° + ${ms[0]}° = ${last + ms[0]}° (first ${N[3]}${N[0]} = 360° − ${ms[0] + ms[1] + ms[2]}° = ${last}°)`], [`${N[0]}${N[3]}${N[2]}`, last + ms[2], `${last}° + ${ms[2]}° = ${last + ms[2]}°, since ${N[3]}${N[0]} = 360° − ${ms[0] + ms[1] + ms[2]}° = ${last}°`]];
+    const [nm, ans, how] = pick(r, asks);
+    return { topic: 'Finding arc measures', stem: `Find the measure of arc ${nm} in ⊙${cn}.`, ...g10DegChoices(r, ans, [360 - ans, ...all, ans + ms[0], 180 - (ans % 180)]), fr: g10Num(`m(arc ${nm}) =`, ans, '°'),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], ...Object.fromEntries(N.slice(0, 4).map((n, i) => [n, g10P(A[i])])) }, segs: N.slice(0, 4).map((n) => [cn, n]), angs: ms.map((v, i) => ({ v: cn, p: N[i], q: N[i + 1], lab: `${v}°`, r: 22 + 4 * (i % 2) })) }), size: [360, 330],
+      solution: `Arc Addition: add the measures of the adjacent arcs (each central angle equals its arc).\nm(arc ${nm}) = ${how}` };
+  }
+};
+TEMPLATES.g102Graph = (r) => {
+  const cats = shuffle(r, ['Pop', 'Country', 'Rock', 'Hip-Hop', 'R&B', 'Folk', 'Jazz', 'Classical']).slice(0, 5);
+  for (;;) {
+    const pc = cats.slice(0, 4).map(() => ri(r, 4, 30)), rest = 100 - pc.reduce((a, b) => a + b, 0); if (rest < 5 || rest > 40) continue;
+    const all = [...pc, rest], two = r() < 0.4, i = ri(r, 0, 3), sel = two ? [i, i + 1] : [i], p = sel.reduce((a, k) => a + all[k], 0), ans = (p * 360) / 100;
+    const list = cats.map((c, k) => `${c}: ${all[k]}%`).join(', ');
+    return { topic: 'Arcs in a circle graph', stem: `A survey asked students their favorite type of music. A circle graph shows the results: ${list}. Find the measure of the arc for ${two ? `${cats[sel[0]]} and ${cats[sel[1]]} together` : cats[sel[0]]}.`,
+      ...g10DegChoices(r, ans, [p, ans / 2, 360 - ans, p * 3]), fr: g10Num('Arc measure:', ans, '°'),
+      solution: `The whole circle is 360°, so each percent is 3.6°.\n${p}% of 360° = ${p / 100} · 360° = ${fmt(ans)}°` };
+  }
+};
+TEMPLATES.g102Congruent = (r) => {
+  const same = r() < 0.5, eqm = r() < 0.6, m1 = ri(r, 7, 26) * 5, m2 = eqm ? m1 : m1 + pick(r, [-15, -10, 10, 15]), r1 = ri(r, 4, 15), r2 = same || r() < 0.5 ? r1 : r1 + ri(r, 2, 6);
+  const L = g10Letters(r, 6), st = ri(r, 0, 359);
+  let F, why, ans;
+  if (same) {
+    const [cn, a, b, c, d] = L, s2 = st + m1 + ri(r, 40, Math.max(41, 300 - m1 - m2 - 40));
+    F = { circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], [a]: g10P(st), [b]: g10P(st + m1), [c]: g10P(s2), [d]: g10P(s2 + m2) }, segs: [[cn, a], [cn, b], [cn, c], [cn, d]],
+      arcs: [{ a0: st, a1: st + m1, red: true }, { a0: s2, a1: s2 + m2, red: true }], angs: [{ v: cn, p: a, q: b, lab: `${m1}°`, r: 18 }, { v: cn, p: c, q: d, lab: `${m2}°`, r: 18 }] };
+    ans = eqm ? 'Yes' : 'No'; why = eqm ? `Yes; they are in the same circle and both measure ${m1}°.` : `No; they are in the same circle, but they have different measures (${m1}° and ${m2}°).`;
+  } else {
+    const [c1, a, b, c2, d, e] = L, k = r2 / r1, C2 = [2.2 + k, 0];
+    F = { circles: [{ c: [0, 0], r: 1 }, { c: C2, r: k }], pts: { [c1]: [0, 0], [a]: g10P(st), [b]: g10P(st + m1), [c2]: C2, [d]: g10P(st, k, C2), [e]: g10P(st + m2, k, C2) }, segs: [[c1, a], [c1, b], [c2, d], [c2, e]],
+      arcs: [{ a0: st, a1: st + m1, red: true }, { c: 1, a0: st, a1: st + m2, red: true }], angs: [{ v: c1, p: a, q: b, lab: `${m1}°`, r: 18 }, { v: c2, p: d, q: e, lab: `${m2}°`, r: 18 }],
+      slab: [{ p: c1, q: a, t: String(r1), from: b }, { p: c2, q: d, t: String(r2), from: e }] };
+    ans = eqm && r1 === r2 ? 'Yes' : 'No';
+    why = !eqm ? `No; the arcs have different measures (${m1}° and ${m2}°).` : r1 === r2 ? `Yes; the circles are congruent (both have radius ${r1}) and the arcs both measure ${m1}°.` : `No; the arcs have the same measure, but the circles are not congruent (radii ${r1} and ${r2}).`;
+  }
+  const wrongs = [`No; arcs in different places on a circle are never congruent.`, `Yes; they have the same measure.`, `No; they have different measures (${m1}° and ${m2}°).`, `Yes; they are in congruent circles.`, `No; the circles are not congruent (radii ${r1} and ${r2}).`, `Yes; they are in the same circle and both measure ${m1}°.`].filter((x) => x !== why && !(x.startsWith(ans) && x.length && why.startsWith(ans)));
+  return { topic: 'Congruent arcs', stem: 'Tell whether the red arcs are congruent. Explain why or why not.', ...buildChoices(r, why, wrongs, () => null), fr: FR.select('Congruent?', ['Yes', 'No'], ans), draw: g10Fig(F), size: [same ? 360 : 460, 300],
+    solution: `Two arcs are congruent when they have the same measure and are in the same circle or in congruent circles.\n${why}` };
+};
+TEMPLATES.g102Algebra = (r) => {
+  for (;;) {
+    const L = g10Letters(r, 6), cn = L[0], semi = r() < 0.4, n = semi ? 3 : 4, x = ri(r, 4, 25), co = [...Array(n)].map(() => ri(r, 1, 8)), cs = [...Array(n)].map(() => (r() < 0.4 ? ri(r, -30, 30) : 0));
+    const tot = semi ? 180 : 360, sum = co.reduce((a, c, i) => a + c * x + cs[i], 0); const fix = tot - sum; cs[n - 1] += fix;
+    const ms = co.map((c, i) => c * x + cs[i]); if (ms.some((v) => v < 20) || (semi && ms.slice(0, 2).some((v) => v > 150))) continue; if (cs[n - 1] !== 0 && Math.abs(cs[n - 1]) > 60) continue;
+    const ex = co.map((c, i) => g10paren(g10lin(c, cs[i]))), N = L.slice(1), st = ri(r, 0, 359);
+    const A = [st]; ms.forEach((v, i) => A.push(A[i] + v)); // angles of the points
+    const red = ri(r, 0, n - 2), redM = ms[red] + ms[red + 1];
+    const pts = { [cn]: [0, 0] }; N.slice(0, 4).forEach((p, i) => (pts[p] = g10P(A[i])));
+    const segs = semi ? [[N[0], N[3]], [cn, N[1]], [cn, N[2]]] : N.slice(0, 4).map((p) => [cn, p]);
+    const nameArc = `${N[red]}${N[red + 1]}${N[(red + 2) % 4]}`;
+    const arcs = ms.map((v, i) => ({ a0: A[i], a1: A[i + 1], lab: ex[i], red: i === red || i === red + 1 }));
+    const sumT = co.reduce((a, c) => a + c, 0), csT = cs.reduce((a, c) => a + c, 0);
+    return { topic: 'Arc measures with algebra', stem: `${semi ? `${g10seg(N[0] + N[3])} is a diameter of ⊙${cn}. ` : ''}Find the value of x. Then find the measure of the red arc ${nameArc}.`,
+      ...buildChoices(r, `x = ${x}; ${redM}°`, [`x = ${x}; ${360 - redM}°`, `x = ${x + 2}; ${redM + (co[red] + co[red + 1]) * 2}°`, `x = ${x}; ${ms[red]}°`, `x = ${fmt(tot / sumT)}; ${fmt(((co[red] + co[red + 1]) * tot) / sumT)}°`], () => null),
+      fr: { fields: [{ kind: 'number', label: 'x =' }, { kind: 'number', label: `m(arc ${nameArc}) =`, suffix: '°' }], key: [String(x), String(redM)], display: `x = ${x}; ${redM}°`, check: (v) => numEq(v[0], x) && numEq(v[1], redM), score: (v) => (numEq(v[0], x) + numEq(v[1], redM)) / 2 },
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts, segs, arcs }), size: [400, 340],
+      solution: `${semi ? 'The arcs make a semicircle, so they add to 180°' : 'The arcs make the whole circle, so they add to 360°'}:\n${ex.map((t) => t.replace(/°$/, '')).join(' + ')} = ${tot}\n${g10lin(sumT, csT)} = ${tot}  →  x = ${x}\nRed arc: ${ms[red]}° + ${ms[red + 1]}° = ${redM}°` };
+  }
+};
+
+/* ---------- 10.3 Using Chords ---------- */
+TEMPLATES.g103ArcChord = (r) => {
+  const [cn, a, b, c, d] = g10Letters(r, 5), st = ri(r, 0, 359), m = ri(r, 9, 26) * 5, gap = ri(r, 40, Math.max(41, 340 - 2 * m - 40)), s2 = st + m + gap;
+  const pts = { [cn]: [0, 0], [a]: g10P(st), [b]: g10P(st + m), [c]: g10P(s2), [d]: g10P(s2 + m) };
+  const kind = pick(r, ['arc', 'chord', 'bisect']);
+  if (kind === 'arc') {
+    return { topic: 'Congruent chords and arcs', stem: `${g10seg(a + b)} ≅ ${g10seg(c + d)}. Find the measure of the red arc ${c}${d}.`, ...g10DegChoices(r, m, [m / 2, 180 - m, 360 - m, 2 * m]), fr: g10Num(`m(arc ${c}${d}) =`, m, '°'),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts, segs: [[a, b], [c, d]], ticks: [[a, b, 1], [c, d, 1]], arcs: [{ a0: st, a1: st + m, lab: `${m}°` }, { a0: s2, a1: s2 + m, red: true }] }), size: [360, 320],
+      solution: `Congruent Corresponding Chords Theorem: in the same circle, congruent chords have congruent minor arcs.\nm(arc ${c}${d}) = m(arc ${a}${b}) = ${m}°` };
+  }
+  if (kind === 'chord') {
+    const len = ri(r, 4, 20);
+    return { topic: 'Congruent chords and arcs', stem: `Arc ${a}${b} ≅ arc ${c}${d}. Find the length of the red chord ${g10seg(c + d)}.`, ...g10NumChoices(r, len, [len * 2, len / 2, m / 10 + len, len + 3]), fr: g10Num(`${c}${d} =`, len),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts, segs: [[a, b], [c, d]], arcs: [{ a0: st, a1: st + m, lab: `${m}°` }, { a0: s2, a1: s2 + m, lab: `${m}°` }], slab: [{ p: a, q: b, t: String(len), side: -1 }, { p: c, q: d, t: '?', side: -1 }] }), size: [360, 320],
+      solution: `The minor arcs are congruent (both ${m}°), so their chords are congruent (Congruent Corresponding Chords Theorem).\n${c}${d} = ${a}${b} = ${len}` };
+  }
+  const h = ri(r, 12, 40), mid = st + h, ends = { [a]: g10P(st), [b]: g10P(mid + h), [c]: g10P(mid), [d]: g10P(mid + 180) };
+  return { topic: 'Perpendicular diameters and arcs', stem: `Diameter ${g10seg(c + d)} is perpendicular to chord ${g10seg(a + b)}. Arc ${a}${c} measures ${h}°. Find the measure of the red arc ${a}${c}${b}.`, ...g10DegChoices(r, 2 * h, [h, 180 - h, 360 - 2 * h, 90 + h]), fr: g10Num(`m(arc ${a}${c}${b}) =`, 2 * h, '°'),
+    draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], ...ends, _m: g10P(mid, Math.cos((h * Math.PI) / 180)) }, noDot: ['_m'], segs: [[a, b], [c, d]], right: [[a, '_m', d]], arcs: [{ a0: st, a1: mid, lab: `${h}°` }, { a0: st, a1: mid + h, red: true }] }), size: [360, 320],
+    solution: `Perpendicular Chord Bisector Theorem: a diameter perpendicular to a chord bisects the chord and its arc.\nSo arc ${c}${b} = arc ${a}${c} = ${h}°, and arc ${a}${c}${b} = ${h}° + ${h}° = ${2 * h}°.` };
+};
+TEMPLATES.g103FindX = (r) => {
+  for (;;) {
+    const [cn, a, b, c, d, e, f] = g10Letters(r, 7), x = ri(r, 2, 14), m1 = ri(r, 2, 9), m2 = ri(r, 2, 9); if (m1 === m2) continue;
+    const c1 = ri(r, -10, 15), v = m1 * x + c1, c2 = v - m2 * x; if (c1 === 0 || c2 === 0 || Math.abs(c2) > 30 || v < 4) continue;
+    const e1 = g10lin(m1, c1), e2 = g10lin(m2, c2), kind = pick(r, ['seg', 'arc', 'equi']), st = ri(r, 0, 359), h = 50;
+    const sol0 = g10solve(m1, c1, m2, c2, x);
+    const ch = g10NumChoices(r, x, [x + 1, x - 1, (c2 + c1) / (m1 + m2), v, Math.abs((c2 - c1) / (m1 + m2)) || x + 2]);
+    if (kind === 'seg') {
+      const mid = st + 90, ends = { [a]: g10P(mid - h), [b]: g10P(mid + h), [c]: g10P(mid), [d]: g10P(mid + 180) }, M = g10P(mid, Math.cos((h * Math.PI) / 180));
+      return { topic: 'Perpendicular diameters and chords', stem: `Diameter ${g10seg(c + d)} is perpendicular to chord ${g10seg(a + b)} at ${e}. Find the value of x.`, ...ch, fr: g10Num('x =', x),
+        draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], ...ends, [e]: M }, segs: [[a, b], [c, d]], right: [[a, e, c]], slab: [{ p: a, q: e, t: e1, from: d }, { p: e, q: b, t: e2, from: d }] }), size: [380, 330],
+        solution: `A diameter perpendicular to a chord bisects the chord, so ${a}${e} = ${e}${b}.\n${sol0}` };
+    }
+    if (kind === 'arc') {
+      if (v > 80) continue; const mid = st, ends = { [a]: g10P(mid - v), [b]: g10P(mid + v), [c]: g10P(mid), [d]: g10P(mid + 180) }, M = g10P(mid, Math.cos((v * Math.PI) / 180));
+      return { topic: 'Perpendicular diameters and arcs', stem: `Diameter ${g10seg(c + d)} is perpendicular to chord ${g10seg(a + b)}. Find the value of x.`, ...ch, fr: g10Num('x =', x),
+        draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], ...ends, _m: M }, noDot: ['_m'], segs: [[a, b], [c, d]], right: [[a, '_m', d]], arcs: [{ a0: mid - v, a1: mid, lab: `(${e1})°` }, { a0: mid, a1: mid + v, lab: `(${e2})°` }] }), size: [400, 330],
+        solution: `A diameter perpendicular to a chord bisects the chord's arc, so the two arcs are equal.\n${sol0}` };
+    }
+    const dd = 0.55, s1 = st, s2 = st + ri(r, 120, 200), half = Math.acos(dd) * 180 / Math.PI;
+    const P1 = [g10P(s1 - half), g10P(s1 + half)], P2 = [g10P(s2 - half), g10P(s2 + half)], M1 = g10P(s1, dd), M2 = g10P(s2, dd);
+    return { topic: 'Chords equidistant from the center', stem: `In ⊙${cn}, the chords ${g10seg(a + b)} and ${g10seg(c + d)} are the same distance from the center. Find the value of x.`, ...ch, fr: g10Num('x =', x),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], [a]: P1[0], [b]: P1[1], [c]: P2[0], [d]: P2[1], _e: M1, _f: M2 }, noDot: ['_e', '_f'], segs: [[a, b], [c, d], [cn, '_e'], [cn, '_f']], right: [[a, '_e', cn], [c, '_f', cn]], ticks: [[cn, '_e', 1], [cn, '_f', 1]],
+        slab: [{ p: a, q: b, t: e1 }, { p: c, q: d, t: e2 }] }), size: [380, 340],
+      solution: `Equidistant Chords Theorem: chords that are the same distance from the center are congruent, so ${a}${b} = ${c}${d}.\n${sol0}` };
+  }
+};
+TEMPLATES.g103Radius = (r) => {
+  const [cn, a, b] = g10Letters(r, 3), [p, q, h] = pick(r, G9TRIPLES), m = pick(r, [1, 1, 2]), half = p * m, dist = q * m, rad = h * m, st = ri(r, 0, 359), ang = (Math.atan2(half, dist) * 180) / Math.PI;
+  const k = 1 / rad, M = g10P(st, dist * k), giveFull = r() < 0.6, chord = 2 * half;
+  return { topic: 'Finding a radius from a chord', stem: `Chord ${g10seg(a + b)} is ${chord} units long and is ${dist} units from the center of ⊙${cn}. Find the radius of ⊙${cn}.`, ...g10NumChoices(r, rad, [Math.round(Math.sqrt(chord * chord + dist * dist) * 10) / 10, half + dist, chord, Math.round(Math.sqrt(Math.abs(dist * dist - half * half)) * 10) / 10 || rad + 3]),
+    fr: g10Num('Radius:', rad), draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [cn]: [0, 0], [a]: g10P(st - ang), [b]: g10P(st + ang), _m: M }, noDot: ['_m'], segs: [[a, b], [cn, '_m'], [cn, b]], right: [[b, '_m', cn]],
+      slab: [{ p: cn, q: '_m', t: String(dist), side: 1 }, ...(giveFull ? [] : [{ p: '_m', q: b, t: String(half), from: cn }]), { p: cn, q: b, t: 'r', from: a }] }), size: [360, 330],
+    solution: `The perpendicular from the center to a chord bisects the chord, so half the chord is ${chord} ÷ 2 = ${half}.\nr² = ${half}² + ${dist}² = ${half * half + dist * dist}\nr = ${rad}` };
+};
+TEMPLATES.g103Diameter = (r) => {
+  const [a, b, c, d, e] = g10Letters(r, 5), yes = r() < 0.5, st = ri(r, 0, 359), sh = yes ? 0 : pick(r, [0.3, -0.3, 0.4]);
+  const u = [Math.cos((st * Math.PI) / 180), Math.sin((st * Math.PI) / 180)], nn = [-u[1], u[0]], off = 0.35;
+  // chord CD perpendicular to AB; AB passes through E on CD
+  const E = [u[0] * off + nn[0] * sh, u[1] * off + nn[1] * sh], hc = Math.sqrt(1 - off * off), Cp = [u[0] * off - nn[0] * hc, u[1] * off - nn[1] * hc], Dp = [u[0] * off + nn[0] * hc, u[1] * off + nn[1] * hc];
+  const perp = E[0] * nn[0] + E[1] * nn[1], L = Math.sqrt(1 - perp * perp);
+  const Ap = [nn[0] * perp + u[0] * L, nn[1] * perp + u[1] * L], Bp = [nn[0] * perp - u[0] * L, nn[1] * perp - u[1] * L];
+  const ce = Math.hypot(E[0] - Cp[0], E[1] - Cp[1]), ed = Math.hypot(E[0] - Dp[0], E[1] - Dp[1]), unit = pick(r, [3, 4, 5, 6]) / ce, cT = fmt(Math.round(ce * unit)), dT = fmt(Math.round(ed * unit));
+  const ans = yes ? `Yes; ${g10seg(a + b)} is the perpendicular bisector of chord ${g10seg(c + d)}, so it passes through the center.` : `No; ${g10seg(a + b)} is perpendicular to ${g10seg(c + d)} but does not bisect it (${cT} ≠ ${dT}).`;
+  return { topic: 'Is the chord a diameter?', stem: `Determine whether ${g10seg(a + b)} is a diameter of the circle. Explain your reasoning.`,
+    ...buildChoices(r, ans, [yes ? `No; ${g10seg(a + b)} is perpendicular to ${g10seg(c + d)} but does not bisect it.` : `Yes; ${g10seg(a + b)} is the perpendicular bisector of chord ${g10seg(c + d)}, so it passes through the center.`, `Yes; any chord perpendicular to another chord is a diameter.`, `No; a diameter can never be perpendicular to a chord.`], () => null),
+    fr: FR.select('Diameter?', ['Yes', 'No'], yes ? 'Yes' : 'No'),
+    draw: g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts: { [a]: Ap, [b]: Bp, [c]: Cp, [d]: Dp, [e]: E }, segs: [[a, b], [c, d]], right: [[c, e, a]], slab: [{ p: c, q: e, t: cT, from: a }, { p: e, q: d, t: dT, from: a }], labDir: { [e]: [-u[0] - nn[0], -u[1] - nn[1]] } }), size: [360, 330],
+    solution: `Perpendicular Chord Bisector Converse: if one chord is a perpendicular bisector of another chord, the first chord is a diameter.\n${yes ? `${c}${e} = ${e}${d} = ${cT}, so ${g10seg(a + b)} bisects ${g10seg(c + d)} at a right angle. It is a diameter.` : `${c}${e} = ${cT} and ${e}${d} = ${dT}, so ${g10seg(a + b)} does not bisect ${g10seg(c + d)}. It is not a diameter.`}` };
+};
+
+/* ---------- 10.4 Inscribed Angles and Polygons ---------- */
+TEMPLATES.g104Measure = (r) => {
+  const [a, b, c, d] = g10Letters(r, 4), kind = pick(r, ['angle', 'angle', 'arc', 'semi', 'same']), st = ri(r, 0, 359);
+  if (kind === 'semi') {
+    const vB = st + ri(r, 40, 140);
+    return { topic: 'Inscribed angles', stem: `${g10seg(a + c)} is a diameter. Find m∠${a}${b}${c}.`, ...g10DegChoices(r, 90, [180, 45, 60]), fr: g10Num(`m∠${a}${b}${c} =`, 90, '°'),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], pts: { [a]: g10P(st), [b]: g10P(vB), [c]: g10P(st + 180) }, segs: [[a, b], [b, c], [a, c]] }), size: [340, 320], solution: `An angle inscribed in a semicircle is a right angle, so m∠${a}${b}${c} = 90°.` };
+  }
+  const arcM = ri(r, 8, 32) * 5 + (r() < 0.3 ? 2 : 0), ang = arcM / 2, vB = st + arcM + ri(r, 30, Math.max(31, 360 - arcM - 30));
+  const pts = { [a]: g10P(st), [c]: g10P(st + arcM), [b]: g10P(vB) };
+  if (kind === 'same') {
+    const vD = st + arcM + ri(r, 25, Math.max(26, 360 - arcM - 25)); if (Math.abs(vD - vB) < 20) return TEMPLATES.g104Measure(r);
+    return { topic: 'Inscribed angles', stem: `Find m∠${a}${d}${c}.`, ...g10DegChoices(r, ang, [arcM, 180 - ang, 90 - ang]), fr: g10Num(`m∠${a}${d}${c} =`, ang, '°'),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts: { ...pts, [d]: g10P(vD) }, segs: [[a, b], [b, c], [a, d], [d, c]], angs: [{ v: b, p: a, q: c, lab: deg(ang), r: 26 }] }), size: [340, 320],
+      solution: `∠${a}${b}${c} and ∠${a}${d}${c} intercept the same arc, so they are congruent: m∠${a}${d}${c} = ${deg(ang)}.` };
+  }
+  const draw = g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts, segs: [[a, b], [b, c]], arcs: [{ a0: st, a1: st + arcM, lab: kind === 'angle' ? deg(arcM) : '' }], angs: kind === 'arc' ? [{ v: b, p: a, q: c, lab: deg(ang), r: 26 }] : [] });
+  if (kind === 'angle') return { topic: 'Inscribed angles', stem: `Find m∠${b}.`, ...g10DegChoices(r, ang, [arcM, 2 * arcM, 180 - arcM, 90 - ang]), fr: g10Num(`m∠${b} =`, ang, '°'), draw, size: [340, 320], solution: `An inscribed angle is half its intercepted arc: m∠${b} = ½ · ${arcM}° = ${deg(ang)}.` };
+  return { topic: 'Inscribed angles', stem: `Find the measure of arc ${a}${c}.`, ...g10DegChoices(r, arcM, [ang, 360 - arcM, 180 - ang, 2 * arcM]), fr: g10Num(`m(arc ${a}${c}) =`, arcM, '°'), draw, size: [340, 320], solution: `The intercepted arc is twice the inscribed angle: m(arc ${a}${c}) = 2 · ${deg(ang)} = ${arcM}°.` };
+};
+TEMPLATES.g104Quad = (r) => {
+  for (;;) {
+    const [a, b, c, d] = g10Letters(r, 4), A = ri(r, 12, 26) * 5, B = ri(r, 12, 26) * 5, k1 = ri(r, 2, 5), k2 = ri(r, 2, 5), C = 180 - A, D = 180 - B;
+    if (C % k1 || D % k2) continue; const x = C / k1, y = D / k2;
+    // arcs: angle A = half arc BCD ... build arcs from angles: arc AB = p, BC = q, CD = s, DA = t with A = (q + s)/2, B = (s + t)/2
+    const q = ri(r, 30, 150), s = 2 * A - q, t = 2 * B - s, p = 360 - q - s - t; if ([q, s, t, p].some((v) => v < 30)) continue;
+    const st = ri(r, 0, 359), angs = [st, st + p, st + p + q, st + p + q + s];
+    return { topic: 'Inscribed quadrilaterals', stem: `Quadrilateral ${a}${b}${c}${d} is inscribed in the circle. Find the values of x and y.`,
+      ...buildChoices(r, `x = ${x}, y = ${y}`, [`x = ${fmt(A / k1)}, y = ${fmt(B / k2)}`, `x = ${y}, y = ${x}`, `x = ${fmt((360 - A) / k1)}, y = ${fmt((360 - B) / k2)}`, `x = ${x + 5}, y = ${y}`], () => null),
+      fr: { fields: [{ kind: 'number', label: 'x =' }, { kind: 'number', label: 'y =' }], key: [String(x), String(y)], display: `x = ${x}, y = ${y}`, check: (v) => numEq(v[0], x) && numEq(v[1], y), score: (v) => (numEq(v[0], x) + numEq(v[1], y)) / 2 },
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts: { [a]: g10P(angs[0]), [b]: g10P(angs[1]), [c]: g10P(angs[2]), [d]: g10P(angs[3]) }, segs: [[a, b], [b, c], [c, d], [d, a]],
+        angs: [{ v: a, p: d, q: b, lab: deg(A), r: 22 }, { v: b, p: a, q: c, lab: deg(B), r: 22 }, { v: c, p: b, q: d, lab: `${k1}x°`, r: 22 }, { v: d, p: c, q: a, lab: `${k2}y°`, r: 22 }] }), size: [360, 330],
+      solution: `Opposite angles of an inscribed quadrilateral are supplementary.\n${k1}x + ${A} = 180  →  ${k1}x = ${C}  →  x = ${x}\n${k2}y + ${B} = 180  →  ${k2}y = ${D}  →  y = ${y}` };
+  }
+};
+TEMPLATES.g104Polygon = (r) => {
+  const T = [['right triangle', 'Yes', 'Every triangle can be inscribed in a circle; a right triangle’s hypotenuse is a diameter.'], ['rectangle', 'Yes', 'Its opposite angles are supplementary (all 90°), so it can always be inscribed.'],
+    ['square', 'Yes', 'Its opposite angles are supplementary (all 90°), so it can always be inscribed.'], ['isosceles trapezoid', 'Yes', 'Its base angles are congruent, so its opposite angles are always supplementary.'],
+    ['kite', 'No', 'Only kites with two opposite right angles can be inscribed; most kites’ opposite angles are not supplementary.'], ['rhombus', 'No', 'Only a square rhombus can be inscribed; otherwise opposite angles are congruent but not 90°, so they are not supplementary.'],
+    ['parallelogram', 'No', 'Only a rectangle can be inscribed; otherwise opposite angles are congruent but not 90°, so they are not supplementary.'], ['obtuse triangle', 'Yes', 'Every triangle can be inscribed in a circle (its circumcircle).']];
+  const [nm, ans, why] = pick(r, T), C = `${ans}; ${why}`;
+  const wr = T.filter((t) => t[1] !== ans).map((t) => `${t[1]}; ${t[2]}`).slice(0, 6);
+  return { topic: 'Polygons inscribed in circles', stem: `Determine whether every ${nm} can be inscribed inside a circle. Explain your reasoning.`, ...buildChoices(r, C, wr, () => null), fr: FR.select('Always inscribable?', ['Yes', 'No'], ans),
+    solution: `A quadrilateral can be inscribed in a circle exactly when its opposite angles are supplementary (and every triangle can be inscribed).\n${why}` };
+};
+TEMPLATES.g104Right = (r) => {
+  const [p, q, h] = pick(r, G9TRIPLES), m = pick(r, [1, 1, 2]), kind = pick(r, ['hyp', 'rad', 'rect']);
+  if (kind === 'hyp') { const rad = ri(r, 3, 20) + (r() < 0.3 ? 0.5 : 0); return { topic: 'Right triangles and rectangles in circles', stem: `A right triangle is inscribed in a circle with radius ${fmt(rad)} inches. Find the length of the hypotenuse.`, ...g10NumChoices(r, 2 * rad, [rad, rad * rad, rad / 2, 3 * rad]), fr: g10Num('Hypotenuse (in.):', 2 * rad), solution: `The hypotenuse of an inscribed right triangle is a diameter (the right angle intercepts a semicircle). Hypotenuse = 2 · ${fmt(rad)} = ${fmt(2 * rad)} in.` }; }
+  if (kind === 'rad') { const a = p * m, b = q * m, c = h * m; return { topic: 'Right triangles and rectangles in circles', stem: `A right triangle with legs ${a} and ${b} is inscribed in a circle. Find the radius of the circle.`, ...g10NumChoices(r, c / 2, [c, (a + b) / 2, a / 2, b / 2]), fr: g10Num('Radius:', c / 2), solution: `The hypotenuse is a diameter: √(${a}² + ${b}²) = ${c}. The radius is half of it: ${fmt(c / 2)}.` }; }
+  const a = p * m, b = q * m, c = h * m;
+  return { topic: 'Right triangles and rectangles in circles', stem: `A rectangle that is ${a} cm by ${b} cm is inscribed in a circle. Find the diameter of the circle.`, ...g10NumChoices(r, c, [c / 2, a + b, 2 * (a + b), Math.max(a, b)]), fr: g10Num('Diameter (cm):', c),
+    solution: `Each angle of the rectangle is a right angle, so each diagonal is a diameter.\nDiagonal = √(${a}² + ${b}²) = √${a * a + b * b} = ${c} cm` };
+};
+
+/* ---------- 10.5 Angle Relationships in Circles ---------- */
+TEMPLATES.g105Tangent = (r) => {
+  const [a, b] = g10Letters(r, 2), st = ri(r, 0, 359), kind = pick(r, ['arc', 'ang', 'ang', 'major']), big = kind === 'major';
+  let arcM = ri(r, 10, 34) * 5 + (r() < 0.3 ? 2 : 0); if (big) arcM = 360 - ri(r, 14, 30) * 5;
+  const A = g10P(st), B = g10P(st + arcM), tdir = [-Math.sin((st * Math.PI) / 180), Math.cos((st * Math.PI) / 180)], T1 = [A[0] + tdir[0] * 1.1, A[1] + tdir[1] * 1.1], T2 = [A[0] - tdir[0] * 1.1, A[1] - tdir[1] * 1.1];
+  const ang = arcM / 2, F = { circles: [{ c: [0, 0], r: 1, dot: false }], pts: { [a]: A, [b]: B, _t1: T1, _t2: T2 }, noDot: ['_t1', '_t2'], segs: [[a, b]], lines: [['_t2', '_t1', 0.15, 0.15]], txt: [{ at: T1, t: 't', dx: 10, dy: -10, font: 'italic 16px Georgia, serif' }] };
+  if (kind === 'arc') {
+    F.angs = [{ v: a, p: b, q: '_t1', lab: deg(ang), r: 24 }];
+    return { topic: 'Tangent and chord angles', stem: `Line t is tangent to the circle at ${a}. Find the measure of arc ${a}${b}.`, ...g10DegChoices(r, arcM, [ang, 360 - arcM, 180 - arcM, 2 * arcM]), fr: g10Num(`m(arc ${a}${b}) =`, arcM, '°'), draw: g10Fig(F), size: [360, 320],
+      solution: `The angle formed by a tangent and a chord is half the intercepted arc, so the arc is twice the angle: 2 · ${deg(ang)} = ${arcM}°.` };
+  }
+  F.arcs = [{ a0: st, a1: st + arcM, lab: `${arcM}°` }]; F.angs = [{ v: a, p: b, q: '_t1', lab: '1', red: true, r: 24 }];
+  return { topic: 'Tangent and chord angles', stem: `Line t is tangent to the circle at ${a}. Find m∠1.`, ...g10DegChoices(r, ang, [arcM, 180 - ang, 360 - arcM, 90 - ang / 2]), fr: g10Num('m∠1 =', ang, '°'), draw: g10Fig(F), size: [360, 320],
+    solution: `The angle formed by a tangent and a chord is half the intercepted arc: m∠1 = ½ · ${arcM}° = ${deg(ang)}.` };
+};
+TEMPLATES.g105Inside = (r) => {
+  for (;;) {
+    const [a, b, c, d] = g10Letters(r, 4), p = ri(r, 8, 30) * 5, q = ri(r, 8, 30) * 5, rest = 360 - p - q, u = ri(r, 30, rest - 30), w = rest - u; if (rest < 80 || w < 30) continue;
+    const st = ri(r, 0, 359), A = [st, st + p, st + p + u, st + p + u + q]; // A→B arc p, B→C arc u, C→D arc q, D→A arc w; chords AC and BD
+    const X = (p + q) / 2, find = r() < 0.65, pts = { [a]: g10P(A[0]), [b]: g10P(A[1]), [c]: g10P(A[2]), [d]: g10P(A[3]) };
+    // intersection of chords AC and BD
+    const P1 = pts[a], P2 = pts[c], Q1 = pts[b], Q2 = pts[d], den = (P1[0] - P2[0]) * (Q1[1] - Q2[1]) - (P1[1] - P2[1]) * (Q1[0] - Q2[0]), tt = ((P1[0] - Q1[0]) * (Q1[1] - Q2[1]) - (P1[1] - Q1[1]) * (Q1[0] - Q2[0])) / den, I = [P1[0] + tt * (P2[0] - P1[0]), P1[1] + tt * (P2[1] - P1[1])];
+    if (find) {
+      return { topic: 'Chords that intersect inside a circle', stem: 'Find the value of x.', ...g10NumChoices(r, X, [p + q, Math.abs(p - q) / 2, 180 - X, (u + w) / 2]), fr: g10Num('x =', X),
+        draw: g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts: { ...pts, _i: I }, noDot: ['_i'], segs: [[a, c], [b, d]], arcs: [{ a0: A[0], a1: A[1], lab: `${p}°` }, { a0: A[2], a1: A[3], lab: `${q}°` }], angs: [{ v: '_i', p: a, q: b, lab: 'x°', r: 18 }] }), size: [360, 320],
+        solution: `When two chords intersect inside a circle, each angle is half the sum of the arcs intercepted by it and its vertical angle.\nx = ½(${p} + ${q}) = ${fmt(X)}` };
+    }
+    return { topic: 'Chords that intersect inside a circle', stem: `Find the measure of arc ${c}${d}.`, ...g10DegChoices(r, q, [2 * X + p, X, 2 * X, Math.abs(2 * X - 2 * p)]), fr: g10Num(`m(arc ${c}${d}) =`, q, '°'),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts: { ...pts, _i: I }, noDot: ['_i'], segs: [[a, c], [b, d]], arcs: [{ a0: A[0], a1: A[1], lab: `${p}°` }, { a0: A[2], a1: A[3], red: true }], angs: [{ v: '_i', p: a, q: b, lab: deg(X), r: 18 }] }), size: [360, 320],
+      solution: `${fmt(X)} = ½(${p} + arc ${c}${d})\n${fmt(2 * X)} = ${p} + arc ${c}${d}\nm(arc ${c}${d}) = ${q}°` };
+  }
+};
+const g10Inter = (p1, p2, q1, q2) => { const den = (p1[0] - p2[0]) * (q1[1] - q2[1]) - (p1[1] - p2[1]) * (q1[0] - q2[0]); if (Math.abs(den) < 1e-9) return null; const t = ((p1[0] - q1[0]) * (q1[1] - q2[1]) - (p1[1] - q1[1]) * (q1[0] - q2[0])) / den; return [p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1])]; };
+TEMPLATES.g105Outside = (r) => {
+  for (;;) {
+    const L = g10Letters(r, 5), [a, b, c, d, v] = L, kind = pick(r, ['ss', 'ss', 'st', 'tt', 'alg']), st = ri(r, 0, 359);
+    let far, near, F, how;
+    if (kind === 'tt') {
+      const minor = ri(r, 14, 32) * 5, major = 360 - minor, A2 = (major - minor) / 2, tA = g10P(st - minor / 2), tB = g10P(st + minor / 2), V2 = g10P(st, 1 / Math.cos(((minor / 2) * Math.PI) / 180));
+      if (Math.hypot(...V2) > 3.4) continue;
+      return { topic: 'Angles outside a circle', stem: `${g10seg(v + a)} and ${g10seg(v + b)} are tangent to the circle. Find the value of x.`, ...g10NumChoices(r, A2, [minor, minor / 2, 180 - minor / 2, major / 2]), fr: g10Num('x =', A2),
+        draw: g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts: { [a]: tA, [b]: tB, [v]: V2 }, segs: [[v, a], [v, b]], arcs: [{ a0: st + minor / 2, a1: st + 360 - minor / 2, lab: `${major}°` }], angs: [{ v, p: a, q: b, lab: 'x°', r: 22 }] }), size: [420, 300],
+        solution: `The angle formed by two tangents is half the difference of the intercepted arcs. The small arc is 360° − ${major}° = ${minor}°.\nx = ½(${major} − ${minor}) = ${fmt(A2)}` };
+    }
+    far = ri(r, 16, 40) * 5; near = ri(r, 3, 15) * 5; if (far - near < 30 || far + near > 320) continue;
+    const side = (360 - far - near) / 2, ang = (far - near) / 2;
+    if (kind === 'st') { // tangent at T, secant through N (near) and Fp (far); ccw order: T, N, Fp (arc N→Fp = side), back to T = far
+      const sd = 360 - far - near, T = g10P(st), N = g10P(st + near), Fp = g10P(st + near + sd), tdir = [-Math.sin((st * Math.PI) / 180), Math.cos((st * Math.PI) / 180)];
+      const V = g10Inter(T, [T[0] + tdir[0], T[1] + tdir[1]], N, Fp); if (!V || Math.hypot(...V) > 3.2 || Math.hypot(...V) < 1.45) continue;
+      F = { circles: [{ c: [0, 0], r: 1, dot: false }], pts: { [a]: T, [b]: N, [c]: Fp, [v]: V }, segs: [[v, a], [v, c]], arcs: [{ a0: st + near + sd, a1: st + 360, lab: `${far}°` }, { a0: st, a1: st + near, lab: `${near}°` }], angs: [{ v, p: a, q: c, lab: 'x°', r: 24 }] };
+      how = `A tangent and a secant meet outside the circle, so the angle is half the difference of the intercepted arcs:\nx = ½(${far} − ${near}) = ${fmt(ang)}`;
+    } else { // two secants; ccw order: N1, N2 (near), F2 (side), F1 (far), back to N1 (side)
+      const N1 = g10P(st), N2 = g10P(st + near), F2 = g10P(st + near + side), F1 = g10P(st + near + side + far), V = g10Inter(N1, F1, N2, F2); if (!V || Math.hypot(...V) > 3.2 || Math.hypot(...V) < 1.45) continue;
+      F = { circles: [{ c: [0, 0], r: 1, dot: false }], pts: { [a]: F1, [b]: N1, [c]: F2, [d]: N2, [v]: V }, segs: [[v, a], [v, c]], arcs: [{ a0: st + near + side, a1: st + near + side + far, lab: `${far}°` }, { a0: st, a1: st + near, lab: `${near}°` }], angs: [{ v, p: a, q: c, lab: 'x°', r: 24 }] };
+      how = `Two secants meet outside the circle, so the angle is half the difference of the intercepted arcs:\nx = ½(${far} − ${near}) = ${fmt(ang)}`;
+    }
+    if (kind === 'alg') {
+      const m = ri(r, 2, 5), c0 = ri(r, -12, 12), xv = (ang - c0) / m; if (!Number.isInteger(xv) || xv < 2 || c0 === 0) continue;
+      F.angs = [{ v, p: a, q: c, lab: `(${g10lin(m, c0)})°`, r: 24, far: 34 }];
+      return { topic: 'Angles outside a circle', stem: 'Find the value of x.', ...g10NumChoices(r, xv, [(far + near) / 2 / m, ang, (far - near - c0) / m, xv + 2]), fr: g10Num('x =', xv), draw: g10Fig(F), size: [440, 320],
+        solution: `The angle formed by two secants outside a circle is half the difference of the intercepted arcs:\n${g10lin(m, c0)} = ½(${far} − ${near}) = ${fmt(ang)}\n${m}x = ${fmt(ang - c0)}  →  x = ${xv}` };
+    }
+    if (r() < 0.3) { // find the far arc instead
+      F.arcs[0] = { ...F.arcs[0], lab: '', red: true }; F.angs[0].lab = deg(ang);
+      return { topic: 'Angles outside a circle', stem: `Find the measure of the red arc.`, ...g10DegChoices(r, far, [2 * ang, near + ang, 2 * ang - near, far - near]), fr: g10Num('Arc measure:', far, '°'), draw: g10Fig(F), size: [440, 320],
+        solution: `${fmt(ang)} = ½(arc − ${near})\n${fmt(2 * ang)} = arc − ${near}\narc = ${far}°` };
+    }
+    return { topic: 'Angles outside a circle', stem: 'Find the value of x.', ...g10NumChoices(r, ang, [(far + near) / 2, far - near, far / 2, 180 - ang]), fr: g10Num('x =', ang), draw: g10Fig(F), size: [440, 320], solution: how };
+  }
+};
+// the "classic" diagram: BZ tangent to ⊙O at B, AC a diameter, arcs BC, CD, DE given; find each numbered angle
+function g105ClassicFig(BC, CD, DE) {
+  const A = g10P(180), C = g10P(0), B = g10P(BC), D = g10P(-CD), E = g10P(-CD - DE), O = [0, 0];
+  const tdir = [-Math.sin((BC * Math.PI) / 180), Math.cos((BC * Math.PI) / 180)], Z = [B[0] - tdir[0] * 1.15, B[1] - tdir[1] * 1.15], Y = [B[0] + tdir[0] * 1.15, B[1] + tdir[1] * 1.15];
+  const inter = (p1, p2, q1, q2) => { const den = (p1[0] - p2[0]) * (q1[1] - q2[1]) - (p1[1] - p2[1]) * (q1[0] - q2[0]), t = ((p1[0] - q1[0]) * (q1[1] - q2[1]) - (p1[1] - q1[1]) * (q1[0] - q2[0])) / den; return [p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1])]; };
+  const Pi = inter(B, D, C, E), M = inter(B, D, A, C), Q = inter(B, D, A, E);
+  return { A, B, C, D, E, O, Z, Y, P: Pi, M, Q };
+}
+TEMPLATES.g105Classic = (r) => {
+  for (;;) {
+    const BC = pick(r, [80, 85, 90, 90, 90, 95, 100]), CD = ri(r, 4, 9) * 5, DE = ri(r, 3, 7) * 5, AB = 180 - BC, AE = 180 - CD - DE;
+    if (DE >= AB - 10) continue;
+    const G = g105ClassicFig(BC, CD, DE); if (Math.hypot(...G.Q) > 2.6) continue;
+    const ANG = {
+      1: [AB, `∠1 is a central angle, so it equals its arc: m∠1 = m(arc AB) = 180° − ${BC}° = ${AB}°.`],
+      2: [90, `∠2 is inscribed in a semicircle (arc ABC), so m∠2 = 90°.`],
+      3: [(CD + DE) / 2, `∠3 is inscribed and intercepts arc CE: m∠3 = ½(${CD} + ${DE}) = ${fmt((CD + DE) / 2)}°.`],
+      4: [AE / 2, `∠4 is inscribed and intercepts arc AE = 180° − ${CD}° − ${DE}° = ${AE}°: m∠4 = ½ · ${AE} = ${fmt(AE / 2)}°.`],
+      5: [(BC + DE) / 2, `∠5 is formed by chords crossing inside the circle; it and its vertical angle intercept arcs BC and DE: m∠5 = ½(${BC} + ${DE}) = ${fmt((BC + DE) / 2)}°.`],
+      6: [180 - (BC + DE) / 2, `∠6 and ∠5 form a linear pair: m∠6 = 180° − ${fmt((BC + DE) / 2)}° = ${fmt(180 - (BC + DE) / 2)}°. (Or ½(arc CD + arc EAB) = ½(${CD} + ${AE + AB}).)`],
+      7: [(AB - DE) / 2, `∠7 is formed by two secants outside the circle: m∠7 = ½(arc AB − arc DE) = ½(${AB} − ${DE}) = ${fmt((AB - DE) / 2)}°.`],
+      8: [(AB + CD) / 2, `∠8 is formed by chords BD and AC crossing inside the circle; it and its vertical angle intercept arcs AB and CD: m∠8 = ½(${AB} + ${CD}) = ${fmt((AB + CD) / 2)}°.`],
+      9: [90, `A tangent is perpendicular to the radius at the point of tangency, so m∠9 = 90°.`],
+      10: [(BC + CD) / 2, `∠10 is formed by the tangent and chord BD, so it is half the intercepted arc BCD: m∠10 = ½(${BC} + ${CD}) = ${fmt((BC + CD) / 2)}°.`],
+    };
+    const k = ri(r, 1, 10), [ans, why] = ANG[k];
+    const pts = { A: G.A, B: G.B, C: G.C, D: G.D, E: G.E, O: G.O, Z: G.Z, _y: G.Y, _p: G.P, _m: G.M, _q: G.Q };
+    const F = { circles: [{ c: [0, 0], r: 1, dot: false }], pts, noDot: ['_p', '_m', '_q', '_y'], segs: [['A', 'C'], ['O', 'B'], ['B', '_q'], ['A', '_q'], ['C', 'E']], lines: [['_y', 'Z', 0.12, 0.12]],
+      angs: [{ v: 'O', p: 'A', q: 'B', lab: '1', red: true, r: 14, mark: false }, { v: 'E', p: 'A', q: 'C', lab: '2', red: true, r: 14, mark: false }, { v: 'A', p: 'C', q: 'E', lab: '3', red: true, r: 26, mark: false },
+        { v: 'C', p: 'A', q: 'E', lab: '4', red: true, r: 14, mark: false }, { v: '_p', p: 'B', q: 'C', lab: '5', red: true, r: 10, mark: false }, { v: '_p', p: 'C', q: 'D', lab: '6', red: true, r: 10, mark: false },
+        { v: '_q', p: 'A', q: 'B', lab: '7', red: true, r: 14, mark: false }, { v: '_m', p: 'A', q: 'B', lab: '8', red: true, r: 10, mark: false }, { v: 'B', p: '_y', q: 'O', lab: '9', red: true, r: 22 }, { v: 'B', p: 'Z', q: 'D', lab: '10', red: true, r: 30 }],
+      labDir: { O: [0.3, -1], Z: [0.2, 1] } };
+    return { topic: 'Angles in circles (all together)', stem: `Line BZ is tangent to ⊙O at B, and ${g10seg('AC')} is a diameter.\nm(arc BC) = ${BC}°, m(arc CD) = ${CD}°, m(arc DE) = ${DE}°.\nFind m∠${k}.`,
+      ...g10DegChoices(r, ans, Object.values(ANG).map(([v]) => v).filter((v) => v !== ans)), fr: g10Num(`m∠${k} =`, ans, '°'), draw: g10Fig(F), size: [460, 380],
+      solution: `First find every arc: arc AB = 180° − ${BC}° = ${AB}° (AC is a diameter), arc AE = 180° − ${CD}° − ${DE}° = ${AE}°.\n${why}` };
+  }
+};
+TEMPLATES.g105Earth = (r) => {
+  const h = pick(r, [0.5, 0.8, 1.2, 1.5, 2, 3, 5]), R = 4000, th = (2 * Math.acos(R / (R + h)) * 180) / Math.PI;
+  return { topic: 'Tangents in real life', stem: `From a hot air balloon ${fmt(h)} miles above the ground, you can see the part of Earth between the two points where your lines of sight are tangent to Earth. Earth's radius is about ${R} miles. Find the measure of the arc of Earth you can see. Round to the nearest hundredth of a degree.`,
+    ...buildChoices(r, `≈ ${(Math.round(th * 100) / 100).toFixed(2)}°`, [th / 2, th * 2, 180 - th, th + 1].map((v) => `≈ ${(Math.round(v * 100) / 100).toFixed(2)}°`), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Arc measure:', suffix: '°' }], key: [(Math.round(th * 100) / 100).toFixed(2)], display: `≈ ${(Math.round(th * 100) / 100).toFixed(2)}°`, check: (v) => numOk(v[0], th, 0.0051 / th) },
+    solution: `Each line of sight is tangent to Earth, so it makes a right angle with the radius at the point of tangency.\nIn each right triangle, cos θ = ${R} / ${fmt(R + h)}, so θ ≈ ${(th / 2).toFixed(3)}°.\nThe two central angles together are the arc: 2θ ≈ ${(Math.round(th * 100) / 100).toFixed(2)}°.` };
+};
+
+/* ---------- 10.6 Segment Relationships in Circles ---------- */
+TEMPLATES.g106Chords = (r) => {
+  for (;;) {
+    const [a, b, c, d] = g10Letters(r, 4), p = ri(r, 2, 15), q = ri(r, 2, 15), s = ri(r, 2, 15); if ((p * q) % s) continue; const t = (p * q) / s; if (t > 30 || t < 2) continue;
+    const alg = r() < 0.4, k = ri(r, 1, 6); let lab = 'x', x = t, sol;
+    if (alg) { x = t - k; if (x < 1) continue; lab = `x + ${k}`; }
+    const st = ri(r, 0, 359), pts = { [a]: g10P(st), [b]: g10P(st + 160 + ri(r, 0, 40)), [c]: g10P(st + 60 + ri(r, 0, 30)), [d]: g10P(st + 240 + ri(r, 0, 40)) };
+    const P1 = pts[a], P2 = pts[b], Q1 = pts[c], Q2 = pts[d], den = (P1[0] - P2[0]) * (Q1[1] - Q2[1]) - (P1[1] - P2[1]) * (Q1[0] - Q2[0]), tt = ((P1[0] - Q1[0]) * (Q1[1] - Q2[1]) - (P1[1] - Q1[1]) * (Q1[0] - Q2[0])) / den, I = [P1[0] + tt * (P2[0] - P1[0]), P1[1] + tt * (P2[1] - P1[1])];
+    sol = `Segments of Chords Theorem: the products of the parts of the two chords are equal.\n${p} · ${q} = ${s} · ${alg ? `(${lab})` : 'x'}\n${p * q} = ${alg ? `${s}x + ${s * k}` : `${s}x`}\nx = ${fmt(x)}`;
+    return { topic: 'Segments of chords', stem: 'Find the value of x.', ...g10NumChoices(r, x, [t, p + q - s, (p * s) / q, x + 2]), fr: g10Num('x =', x),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts: { _a: P1, _b: P2, _c: Q1, _d: Q2, _i: I }, noDot: ['_i'], segs: [['_a', '_b'], ['_c', '_d']], slab: [{ p: '_a', q: '_i', t: String(p), from: '_c' }, { p: '_i', q: '_b', t: String(q), from: '_d' }, { p: '_c', q: '_i', t: String(s), from: '_b' }, { p: '_i', q: '_d', t: lab, from: '_a' }] }), size: [360, 320], solution: sol };
+  }
+};
+TEMPLATES.g106Secants = (r) => {
+  for (;;) {
+    const e1 = ri(r, 2, 12), w1 = e1 + ri(r, 3, 15), e2 = ri(r, 2, 12); if ((e1 * w1) % e2 || e2 === e1) continue; const w2 = (e1 * w1) / e2; if (w2 <= e2 + 2 || w2 > 40) continue;
+    const inner2 = w2 - e2, askWhole = r() < 0.3;
+    // figure: point V outside; secant 1 through the near point N1 (e1 away) and the far point F1; same for secant 2
+    const ang = ri(r, 14, 24), s = 1 / 10, V = [-2.2, 0];
+    const meet = (dir) => { const u = [Math.cos((dir * Math.PI) / 180), Math.sin((dir * Math.PI) / 180)], b = V[0] * u[0] + V[1] * u[1], c = V[0] * V[0] + V[1] * V[1] - 1, disc = b * b - c; const t1 = -b - Math.sqrt(disc), t2 = -b + Math.sqrt(disc); return [[V[0] + t1 * u[0], V[1] + t1 * u[1]], [V[0] + t2 * u[0], V[1] + t2 * u[1]]]; };
+    const [N1, F1] = meet(ang), [N2, F2] = meet(-ang);
+    const lab1 = [String(e1), String(w1 - e1)], lab2 = askWhole ? [String(e2), 'x'] : ['x', String(inner2)], x = askWhole ? inner2 : e2; // askWhole: x is the inside part
+    return { topic: 'Segments of secants', stem: 'Find the value of x.', ...g10NumChoices(r, x, [(e1 * (w1 - e1)) / (askWhole ? e2 : inner2), w2, e1 + w1 - (askWhole ? e2 : inner2), x + 3]), fr: g10Num('x =', x),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts: { _v: V, _n1: N1, _f1: F1, _n2: N2, _f2: F2 }, noDot: [], segs: [['_v', '_f1'], ['_v', '_f2']], slab: [{ p: '_v', q: '_n1', t: lab1[0], side: 1, from: '_n2' }, { p: '_n1', q: '_f1', t: lab1[1], from: '_n2' }, { p: '_v', q: '_n2', t: lab2[0], from: '_n1' }, { p: '_n2', q: '_f2', t: lab2[1], from: '_n1' }] }), size: [440, 300],
+      solution: `Segments of Secants Theorem: (outside part) · (whole secant) is the same for both secants.\n${e1} · ${w1} = ${askWhole ? `${e2} · (${e2} + x)` : `x · (x + ${inner2})`}\n${askWhole ? `${e1 * w1} = ${e2 * e2} + ${e2}x  →  x = ${x}` : `${e1 * w1} = x² + ${inner2}x  →  x = ${x} (the positive solution)`}` };
+  }
+};
+TEMPLATES.g106Tangent = (r) => {
+  for (;;) {
+    const t = ri(r, 4, 18), divs = [...Array(t - 1)].map((_, i) => i + 1).filter((e) => e >= 2 && (t * t) % e === 0 && t * t / e - e >= 2); if (!divs.length) continue;
+    const e = pick(r, divs), w = (t * t) / e, askT = r() < 0.55; if (w - e > 40) continue;
+    const V = [-2.2, 0], ang = ri(r, 12, 22), u = [Math.cos((ang * Math.PI) / 180), Math.sin((ang * Math.PI) / 180)], b = V[0] * u[0] + V[1] * u[1], c = V[0] * V[0] - 1, disc = b * b - c;
+    const N = [V[0] + (-b - Math.sqrt(disc)) * u[0], V[1] + (-b - Math.sqrt(disc)) * u[1]], Fp = [V[0] + (-b + Math.sqrt(disc)) * u[0], V[1] + (-b + Math.sqrt(disc)) * u[1]];
+    const tg = (Math.acos(1 / 2.2) * 180) / Math.PI, Tp = g10P(180 + tg);
+    const labs = askT ? { tan: 'x', out: String(e), in: String(w - e) } : { tan: String(t), out: String(e), in: 'x' }, x = askT ? t : w - e;
+    return { topic: 'Segments of secants and tangents', stem: 'Find the value of x.', ...g10NumChoices(r, x, askT ? [e * w, e + w, w - e, x + 2, Math.round(Math.sqrt(e * (w - e)))] : [t * t - e, t - e, w, x + 3, Math.round((t * t) / (w - e))]), fr: g10Num('x =', x),
+      draw: g10Fig({ circles: [{ c: [0, 0], r: 1, dot: false }], pts: { _v: V, _n: N, _f: Fp, _t: Tp }, segs: [['_v', '_f'], ['_v', '_t']], slab: [{ p: '_v', q: '_t', t: labs.tan, from: '_n' }, { p: '_v', q: '_n', t: labs.out, from: '_t' }, { p: '_n', q: '_f', t: labs.in, from: '_t' }] }), size: [440, 300],
+      solution: `Segments of a Secant and Tangent Theorem: (tangent)² = (outside part of the secant) · (whole secant).\n${askT ? `x² = ${e} · ${w} = ${e * w}  →  x = ${x}` : `${t}² = ${e} · (${e} + x)\n${t * t} = ${e * e} + ${e}x  →  x = ${x}`}` };
+  }
+};
+
+/* ---------- 10.7 Circles in the Coordinate Plane ---------- */
+const g107Eq = (h, k, R2) => `${sqT('x', h)} + ${sqT('y', k)} = ${fmt(R2)}`;
+const g107EqL = (h, k, R2) => `${sqL2('x', h)}+${sqL2('y', k)}=${fmt(R2)}`;
+// typed equation is the circle in standard form: (x − h)² + (y − k)² = r² (either side)
+function g107Ok(raw, h, k, R2) {
+  const s = String(raw || '').replace(/\\left|\\right/g, ''); const parts = s.split('='); if (parts.length !== 2) return false;
+  const [L, R] = parts.map((q) => pxParse(q, ['x', 'y'], '')); if (!L || !R) return false;
+  const G = (x, y) => (x - h) ** 2 + (y - k) ** 2, pts = [[1.3, 2.7], [-2.1, 0.6], [3.7, -1.9], [0.45, 4.2], [-3.3, -2.8]];
+  const same = (F, T) => pts.every(([x, y]) => { const a = F({ x, y }), b = T(x, y); return isFinite(a) && Math.abs(a - b) <= 1e-7 * Math.max(1, Math.abs(b)); });
+  const once = (t) => (t.match(/x/g) || []).length === 1 && (t.match(/y/g) || []).length === 1;
+  return (same(R, () => R2) && same(L, G) && once(parts[0])) || (same(L, () => R2) && same(R, G) && once(parts[1]));
+}
+const g107FR = (h, k, R2) => ({ fields: [{ kind: 'expr', keys: 'func', label: 'Equation:' }], key: [g107EqL(h, k, R2)], display: g107Eq(h, k, R2), check: (v) => g107Ok(v[0], h, k, R2) });
+const g107Choices = (r, h, k, R2, rad) => buildChoices(r, g107Eq(h, k, R2), [g107Eq(-h, -k, R2), g107Eq(h, k, rad), g107Eq(k, h, R2), g107Eq(-h, k, R2), g107Eq(h, -k, rad)].filter((x, i, X) => X.indexOf(x) === i && x !== g107Eq(h, k, R2)), () => null);
+TEMPLATES.g107Write = (r) => {
+  for (;;) {
+    const kind = pick(r, ['cr', 'cp', 'cp', 'diam', 'graph']), h = ri(r, -8, 8), k = ri(r, -8, 8);
+    if (kind === 'cr') { const rad = ri(r, 1, 12); return { topic: 'Writing the equation of a circle', stem: `Write the standard equation of the circle with center ${pt([h, k])} and radius ${rad}.`, ...g107Choices(r, h, k, rad * rad, rad), fr: g107FR(h, k, rad * rad), solution: `(x − h)² + (y − k)² = r² with (h, k) = ${pt([h, k])} and r = ${rad}:\n${g107Eq(h, k, rad * rad)}` }; }
+    if (kind === 'cp') { const px = ri(r, -10, 10), py = ri(r, -10, 10), R2 = (px - h) ** 2 + (py - k) ** 2; if (!R2 || R2 > 200) continue;
+      return { topic: 'Writing the equation of a circle', stem: `The center of a circle is ${pt([h, k])}, and a point on the circle is ${pt([px, py])}. Write the standard equation of the circle.`, ...g107Choices(r, h, k, R2, Math.round(Math.sqrt(R2) * 100) / 100), fr: g107FR(h, k, R2),
+        solution: `The radius is the distance from the center to the point:\nr² = (${g10minus(px, h)})² + (${g10minus(py, k)})² = ${R2}\n${g107Eq(h, k, R2)}` }; }
+    if (kind === 'diam') { const dx = ri(r, -7, 7), dy = ri(r, -7, 7); if (!dx && !dy) continue; const P1 = [h - dx, k - dy], P2 = [h + dx, k + dy], R2 = dx * dx + dy * dy;
+      return { topic: 'Writing the equation of a circle', stem: `The endpoints of a diameter of a circle are ${pt(P1)} and ${pt(P2)}. Write the standard equation of the circle.`, ...g107Choices(r, h, k, R2, 4 * R2), fr: g107FR(h, k, R2),
+        solution: `The center is the midpoint of the diameter: ${pt([h, k])}.\nr² = (${g10minus(P2[0], h)})² + (${g10minus(P2[1], k)})² = ${R2}\n${g107Eq(h, k, R2)}` }; }
+    const rad = ri(r, 1, 5), hh = ri(r, -3, 3), kk = ri(r, -3, 3), lo = Math.min(-1, hh - rad - 1, kk - rad - 1), hi = Math.max(1, hh + rad + 1, kk + rad + 1);
+    return { topic: 'Writing the equation of a circle', stem: 'Write the standard equation of the circle.', ...g107Choices(r, hh, kk, rad * rad, rad), fr: g107FR(hh, kk, rad * rad),
+      draw: plotQ({ xr: [lo, hi], yr: [lo, hi], step: 1, curves: [{ param: [(t) => [hh + rad * Math.cos(t), kk + rad * Math.sin(t)], 0, 2 * Math.PI] }], pts: [{ p: [hh, kk] }] }), size: [340, 340],
+      solution: `The center is ${pt([hh, kk])} and the radius is ${rad}.\n${g107Eq(hh, kk, rad * rad)}` };
+  }
+};
+const g107Rad = (R2) => { const s = Math.round(Math.sqrt(R2)); return s * s === R2 ? { t: String(s), l: String(s), v: s } : g9rad(R2); };
+TEMPLATES.g107Center = (r) => {
+  const h = ri(r, -12, 12), k = ri(r, -12, 12), R2 = r() < 0.7 ? ri(r, 1, 12) ** 2 : pick(r, [8, 12, 18, 20, 27, 32, 45, 50, 72]), rad = g107Rad(R2);
+  const C = `Center ${pt([h, k])}, radius ${rad.t}`;
+  return { topic: 'Center and radius from an equation', stem: `Find the center and radius of the circle.   ${g107Eq(h, k, R2)}`,
+    ...buildChoices(r, C, [`Center ${pt([-h, -k])}, radius ${rad.t}`, `Center ${pt([h, k])}, radius ${R2}`, `Center ${pt([k, h])}, radius ${rad.t}`, `Center ${pt([-h, -k])}, radius ${R2}`].filter((x, i, X) => x !== C && X.indexOf(x) === i), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Center:', prefix: '' }, { kind: 'expr', keys: 'num', label: 'Radius:' }], key: [`(${h},${k})`, rad.l], display: C,
+      check: (v) => a3ptOk(v[0], [h, k]) && numOk(v[1], rad.v), score: (v) => (a3ptOk(v[0], [h, k]) + numOk(v[1], rad.v)) / 2 },
+    solution: `Compare with (x − h)² + (y − k)² = r²: h = ${fmt(h)}, k = ${fmt(k)}, r² = ${R2}.\nCenter ${pt([h, k])}, radius √${R2} = ${rad.t}` };
+};
+// sketch a circle: place the center, then a point on the circle
+SKETCH.circ = { roles: ['the center', 'a point on the circle'], short: ['C', ''], mirror: true,
+  fit: ([[h, k], [x, y]]) => { const R = Math.hypot(x - h, y - k); if (!R) return null; const S = (t) => { const u = R * R - (t - h) ** 2; return u >= -1e-9 ? k + Math.sqrt(Math.max(0, u)) : NaN; }; S.mk = k; return S; } };
+TEMPLATES.g107Graph = (r) => {
+  for (;;) {
+    const h = ri(r, -5, 5), k = ri(r, -5, 5), rad = ri(r, 1, 6), diam = r() < 0.3, W = skWin([[h - rad, k - rad], [h + rad, k + rad]]); if (!W || !skOk(W, [[h - rad, k], [h + rad, k], [h, k - rad], [h, k + rad]])) continue;
+    W.mirrorK = k; W.edge = null;
+    const T = (t) => { const u = rad * rad - (t - h) ** 2; return u >= -1e-9 ? k + Math.sqrt(Math.max(0, u)) : NaN; };
+    const given = diam ? (() => { const ang = pick(r, [0, 90]); const d = ang ? [0, rad] : [rad, 0]; return `the circle with a diameter from ${pt([h - d[0], k - d[1]])} to ${pt([h + d[0], k + d[1]])}`; })() : g107Eq(h, k, rad * rad);
+    return skQ({ topic: 'Graphing circles', stem: `Find the center and radius, then graph ${diam ? given : 'the circle'}: place the center, then one point on the circle.${diam ? '' : `   ${given}`}`, family: 'circ', target: T, keyPts: [[h, k], [h + rad, k]], win: W,
+      display: `center ${pt([h, k])}, radius ${rad}`, solution: `${diam ? `The center is the midpoint of the diameter, ${pt([h, k])}, and the radius is half its length, ${rad}.` : `Compare with (x − h)² + (y − k)² = r²: center ${pt([h, k])}, r² = ${rad * rad}, so r = ${rad}.`}\nPlot the center, then a point ${rad} unit${rad === 1 ? '' : 's'} away, such as ${pt([h + rad, k])}, and draw the circle.` });
+  }
+};
+TEMPLATES.g107OnCircle = (r) => {
+  for (;;) {
+    const kind = r() < 0.5 ? 'rad' : 'pt', P = [ri(r, -9, 9), ri(r, -9, 9)], d2 = P[0] ** 2 + P[1] ** 2; if (!P[0] || !P[1]) continue;
+    const yes = r() < 0.5;
+    if (kind === 'rad') {
+      const rad2 = yes ? d2 : d2 + pick(r, [-3, -1, 1, 2, 4]); if (rad2 <= 0) continue; const radT = g107Rad(rad2).t;
+      const C = yes ? `Yes; the point is √${d2} = ${g107Rad(d2).t} units from the origin, which equals the radius.` : `No; the point is ${g107Rad(d2).t} units from the origin, not ${radT}.`;
+      return { topic: 'Is the point on the circle?', stem: `Prove or disprove: The point ${pt(P)} lies on the circle centered at the origin with radius ${radT}.`, ...buildChoices(r, C, [yes ? `No; the point is ${g107Rad(d2 + 3).t} units from the origin, not ${radT}.` : `Yes; the point is ${radT} units from the origin, which equals the radius.`, `Yes; both coordinates are less than the radius.`, `No; a point on a circle must be on an axis.`], () => null),
+        fr: FR.select('On the circle?', ['Yes', 'No'], yes ? 'Yes' : 'No'), solution: `The distance from the origin to ${pt(P)} is √(${g10sq(P[0])} + ${g10sq(P[1])}) = √${d2}${g107Rad(d2).t !== `√${d2}` ? ` = ${g107Rad(d2).t}` : ''}.\n${yes ? 'That equals the radius, so the point lies on the circle.' : `The radius is ${radT}, so the point does not lie on the circle.`}` };
+    }
+    const Q = [ri(r, -9, 9), ri(r, -9, 9)], q2 = Q[0] ** 2 + Q[1] ** 2; if (!q2 || (yes ? q2 !== d2 : q2 === d2) || (Q[0] === P[0] && Q[1] === P[1])) continue;
+    const C = yes ? `Yes; both points are ${g107Rad(d2).t} units from the origin.` : `No; ${pt(P)} is ${g107Rad(d2).t} units from the origin, but the radius is ${g107Rad(q2).t}.`;
+    return { topic: 'Is the point on the circle?', stem: `Prove or disprove: The point ${pt(P)} lies on the circle centered at the origin and containing the point ${pt(Q)}.`, ...buildChoices(r, C, [yes ? `No; ${pt(P)} is ${g107Rad(d2).t} units from the origin, but the radius is ${g107Rad(q2 + 1).t}.` : `Yes; both points are ${g107Rad(q2).t} units from the origin.`, `Yes; both points are in the same quadrant.`, `No; the points have different x-coordinates.`], () => null),
+      fr: FR.select('On the circle?', ['Yes', 'No'], yes ? 'Yes' : 'No'), solution: `The radius is the distance to ${pt(Q)}: √${q2}${g107Rad(q2).t !== `√${q2}` ? ` = ${g107Rad(q2).t}` : ''}.\nThe distance to ${pt(P)} is √${d2}${g107Rad(d2).t !== `√${d2}` ? ` = ${g107Rad(d2).t}` : ''}.\n${yes ? 'They are equal, so the point lies on the circle.' : 'They are not equal, so the point does not lie on the circle.'}` };
+  }
+};
+TEMPLATES.g107Zone = (r) => {
+  for (;;) {
+    const r1 = pick(r, [2, 3, 4]), r2 = r1 + ri(r, 2, 4), P = [ri(r, -8, 8), ri(r, -8, 8)], d = Math.hypot(...P); if (!P[0] || !P[1] || Math.abs(d - r1) < 0.15 || Math.abs(d - r2) < 0.15 || d > r2 + 4) continue;
+    const z = d < r1 ? 'Zone 1' : d < r2 ? 'Zone 2' : 'Zone 3';
+    return { topic: 'Circles in real life', stem: `A city's commuter system has three zones. Zone 1 serves people living within ${r1} miles of the city's center. Zone 2 serves those between ${r1} and ${r2} miles from the center. Zone 3 serves those more than ${r2} miles from the center. On a coordinate plane in miles with the city's center at the origin, which zone serves a home at ${pt(P)}?`,
+      ...buildChoices(r, z, ['Zone 1', 'Zone 2', 'Zone 3'].filter((x) => x !== z), () => null), fr: FR.select('Zone:', ['Zone 1', 'Zone 2', 'Zone 3'], z),
+      solution: `Distance from the center: √(${g10sq(P[0])} + ${g10sq(P[1])}) = √${P[0] ** 2 + P[1] ** 2} ${Number.isInteger(d) ? '=' : '≈'} ${Number.isInteger(d) ? d : g9r(d)} miles.\n${d < r1 ? `That is within ${r1} miles: Zone 1.` : d < r2 ? `That is between ${r1} and ${r2} miles: Zone 2.` : `That is more than ${r2} miles: Zone 3.`}` };
+  }
+};
+/* ==== GEOMETRY CH10 END ==== */
+/* ==== GEOMETRY CH1 BEGIN ==== */
+/* ---------- Geometry (Big Ideas Math), Chapter 1: Basics of Geometry ---------- */
+const g1ray = (a, b) => `ray ${a}${b}`, g1line = (a, b) => `line ${a}${b}`;
+const g1Sel = (label, choices, ans) => FR.select(label, choices, ans);
+const G1LOWER = 'abcdefghjkmnpqrstuvwz'.split('');
+
+/* ---------- 1.1 Points, Lines, and Planes ---------- */
+TEMPLATES.g11Name = (r) => {
+  const [R, Q, S, T, U, W, V] = g10Letters(r, 7), [f, g] = shuffle(r, G1LOWER).slice(0, 2);
+  const pts = { [R]: [-1.6, -0.3], [Q]: [0.2, 0], [S]: [1.9, 0.29], [T]: [1.2, -0.75], [U]: [-1.3, 0.75], [W]: [-0.55, 1.85] };
+  const d = [0.75, -1.85], Z1 = [0.2 + d[0] * 0.65, -1.2], Z2 = [0.2 + d[0] * 1.15, d[1] * 1.15], up = [-0.55 - d[0] * 0.25, 1.85 - d[1] * 0.25];
+  const draw = g10Fig({ polys: [{ pts: [[-3.1, -1.2], [2.1, -1.2], [3.5, 1.2], [-1.7, 1.2]] }], pts: { ...pts, _z1: Z1, _z2: Z2, _up: up, _f1: [-2.6, -0.47], _f2: [2.9, 0.46] }, noDot: ['_z1', '_z2', '_up', '_f1', '_f2'],
+    segs: [[W, Q]], dsegs: [[Q, '_z1']], lines: [['_f1', '_f2', 0.04, 0.04], ['_z1', '_z2', 0, 0.12], [W, '_up', 0, 0.3]],
+    txt: [{ at: [2.95, 0.68], t: f, font: 'italic 17px Georgia, serif' }, { at: [-0.95, 2.35], t: g, font: 'italic 17px Georgia, serif' }, { at: [-2.6, -0.95], t: V, font: 'italic 18px Georgia, serif' }] });
+  const asks = [
+    [`Give another name for line ${R}${S}.`, pick(r, [g1line(Q, S), `line ${f}`, g1line(S, R)]), [`line ${g}`, g1line(R, T), g1line(W, Q)], `${R}, ${Q}, and ${S} are all on line ${f}, so line ${R}${S} is also line ${f}, line ${Q}${S}, line ${S}${R}, …`],
+    [`Give another name for plane ${V}.`, pick(r, [`plane ${R}${S}${T}`, `plane ${Q}${T}${U}`, `plane ${S}${U}${T}`]), [`plane ${R}${Q}${S}`, `plane ${W}${R}${S}`, `plane ${f}`], `A plane can be named by three points in it that are not on one line. ${R}, ${Q}, and ${S} are on one line, and ${W} is not in plane ${V}.`],
+    ['Name three collinear points.', `${R}, ${Q}, and ${S}`, [`${R}, ${Q}, and ${T}`, `${W}, ${Q}, and ${S}`, `${R}, ${S}, and ${T}`], `Collinear points lie on the same line: ${R}, ${Q}, and ${S} are on line ${f}.`],
+    [`Name a point that is not coplanar with ${R}, ${S}, and ${T}.`, W, [Q, U], `${R}, ${S}, and ${T} are in plane ${V}. Every point shown is in plane ${V} except ${W}.`],
+    [`Name the intersection of line ${g} and plane ${V}.`, `point ${Q}`, [`point ${W}`, `line ${f}`, `point ${R}`], `Line ${g} passes through plane ${V} at point ${Q}.`],
+    [`Name the intersection of lines ${f} and ${g}.`, `point ${Q}`, [`point ${W}`, `point ${S}`, `plane ${V}`], `Lines ${f} and ${g} cross at point ${Q}.`],
+  ];
+  const [stem, ans, wr, why] = pick(r, asks), ch = buildChoices(r, ans, wr, () => null);
+  return { topic: 'Points, lines, and planes', stem: `Use the diagram. ${stem}`, ...ch, fr: g1Sel('Answer:', ch.choices, ans), draw, size: [420, 320], solution: why };
+};
+TEMPLATES.g11Rays = (r) => {
+  const [A, E, C, D, B] = g10Letters(r, 5), [s, t] = shuffle(r, G1LOWER).slice(0, 2), a1 = ri(r, -20, 15), a2 = a1 + ri(r, 55, 110);
+  const P = (deg, k) => g10P(deg, k), pts = { [A]: P(a1 + 180, 1.1), [E]: [0, 0], [C]: P(a1, 1.3), [D]: P(a2 + 180, 1.2), [B]: P(a2, 1.0) };
+  const draw = g10Fig({ pts, lines: [[A, C, 0.35, 0.3], [D, B, 0.3, 0.45]], txt: [{ at: P(a1, 2.05), t: s, font: 'italic 17px Georgia, serif', dy: -12 }, { at: P(a2, 2.0), t: t, font: 'italic 17px Georgia, serif', dx: 12 }], margin: 30 });
+  const asks = [
+    [`What is another name for ${g10seg(B + D)}?`, g10seg(D + B), [g10seg(B + E), g1ray(B, D), g1line(B, D)], `A segment can be named by its endpoints in either order: ${g10seg(B + D)} = ${g10seg(D + B)}.`],
+    [`What is another name for ray ${A}${E}?`, g1ray(A, C), [g1ray(E, A), g1ray(C, A), g1ray(A, D)], `Ray ${A}${E} starts at ${A} and goes through ${E} and on through ${C}, so it is also ray ${A}${C}.`],
+    [`Name all rays with endpoint ${E}.`, `${g1ray(E, A)}, ${g1ray(E, B)}, ${g1ray(E, C)}, ${g1ray(E, D)}`, [`${g1ray(E, A)}, ${g1ray(E, C)}`, `${g1ray(A, E)}, ${g1ray(B, E)}, ${g1ray(C, E)}, ${g1ray(D, E)}`, `${g1ray(E, A)}, ${g1ray(E, B)}, ${g1ray(E, C)}`], `From ${E}, a ray goes toward each of ${A}, ${B}, ${C}, and ${D}.`],
+    ['Name a pair of opposite rays.', pick(r, [`${g1ray(E, A)} and ${g1ray(E, C)}`, `${g1ray(E, B)} and ${g1ray(E, D)}`]), [`${g1ray(E, A)} and ${g1ray(E, B)}`, `${g1ray(A, E)} and ${g1ray(E, C)}`, `${g1ray(E, C)} and ${g1ray(E, D)}`], `Opposite rays share an endpoint and point in opposite directions along one line: ${g1ray(E, A)} and ${g1ray(E, C)}, or ${g1ray(E, B)} and ${g1ray(E, D)}.`],
+    ['Name a pair of rays that are not opposite rays.', pick(r, [`${g1ray(E, A)} and ${g1ray(E, B)}`, `${g1ray(E, C)} and ${g1ray(E, D)}`]), [`${g1ray(E, A)} and ${g1ray(E, C)}`, `${g1ray(E, B)} and ${g1ray(E, D)}`, `${g1ray(E, D)} and ${g1ray(E, B)}`], `Rays on different lines are not opposite rays, for example ${g1ray(E, A)} and ${g1ray(E, B)}.`],
+  ];
+  const [stem, ans, wr, why] = pick(r, asks), ch = buildChoices(r, ans, wr, () => null);
+  return { topic: 'Segments and rays', stem: `Use the diagram. ${stem}`, ...ch, fr: g1Sel('Answer:', ch.choices, ans), draw, size: [400, 300], solution: why };
+};
+// a box: top A B C D, bottom E F G H (front-left, front-right, back-right, back-left); the back-bottom-left corner is hidden
+const G1CUBE = { A: [0, 0, 1], B: [1, 0, 1], C: [1, 1, 1], D: [0, 1, 1], E: [0, 0, 0], F: [1, 0, 0], G: [1, 1, 0], H: [0, 1, 0] };
+const G1FACES = [['A', 'B', 'F', 'E'], ['D', 'C', 'G', 'H'], ['A', 'D', 'H', 'E'], ['B', 'C', 'G', 'F'], ['A', 'B', 'C', 'D'], ['E', 'F', 'G', 'H']];
+TEMPLATES.g11Cube = (r) => {
+  const L = g10Letters(r, 8), nm = Object.fromEntries('ABCDEFGH'.split('').map((k, i) => [k, L[i]])), pr = ([x, y, z]) => [x * 1.6 + y * 0.75, z * 1.6 + y * 0.6];
+  const pts = Object.fromEntries(Object.entries(G1CUBE).map(([k, v]) => [nm[k], pr(v)]));
+  const edges = [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A'], ['E', 'F'], ['F', 'G'], ['A', 'E'], ['B', 'F'], ['C', 'G']], hidden = [['E', 'H'], ['H', 'G'], ['D', 'H']];
+  const draw = g10Fig({ pts, segs: edges.map(([a, b]) => [nm[a], nm[b]]), dsegs: hidden.map(([a, b]) => [nm[a], nm[b]]), margin: 34 });
+  const fn = (f) => f.map((k) => nm[k]), three = (f) => shuffle(r, fn(f)).slice(0, 3);
+  const kind = pick(r, ['inter', 'cop', 'notcop', 'notcop']);
+  if (kind === 'inter') {
+    for (;;) {
+      const f1 = pick(r, G1FACES), f2 = pick(r, G1FACES), common = f1.filter((k) => f2.includes(k)); if (common.length !== 2) continue;
+      const p1 = three(f1), p2 = three(f2), ans = `line ${nm[common[0]]}${nm[common[1]]}`, others = edges.concat(hidden).filter(([a, b]) => !(common.includes(a) && common.includes(b))).map(([a, b]) => `line ${nm[a]}${nm[b]}`);
+      const ch = buildChoices(r, ans, [...shuffle(r, others).slice(0, 2), `point ${nm[common[0]]}`], () => null);
+      return { topic: 'Intersections of planes', stem: `Use the diagram. Name the intersection of plane ${p1.join('')} and plane ${p2.join('')}.`, ...ch, fr: g1Sel('Intersection:', ch.choices, ans), draw, size: [360, 320],
+        solution: `Plane ${p1.join('')} is the face ${fn(f1).join('')} and plane ${p2.join('')} is the face ${fn(f2).join('')}. Two planes intersect in a line: the edge they share, line ${nm[common[0]]}${nm[common[1]]}.` };
+    }
+  }
+  const f = pick(r, G1FACES), p = three(f), fourth = fn(f).find((k) => !p.includes(k)), opp = Object.values(nm).filter((k) => !fn(f).includes(k));
+  if (kind === 'cop') {
+    const ch = buildChoices(r, fourth, shuffle(r, opp).slice(0, 3), () => null);
+    return { topic: 'Coplanar points', stem: `Use the diagram. Name a point that is coplanar with points ${p[0]}, ${p[1]}, and ${p[2]}.`, ...ch, fr: g1Sel('Point:', ch.choices, fourth), draw, size: [360, 320],
+      solution: `${p[0]}, ${p[1]}, and ${p[2]} are corners of the face ${fn(f).join('')}. The fourth corner of that face, ${fourth}, is in the same plane.` };
+  }
+  const ans = opp.slice().sort().join(', '), alt = [[...opp.slice(0, 3), fourth], opp.slice(0, 3), [...opp, fourth]].map((x) => x.slice().sort().join(', '));
+  const ch = buildChoices(r, ans, alt, () => null);
+  return { topic: 'Coplanar points', stem: `Use the diagram. Name all the points that are not coplanar with points ${p[0]}, ${p[1]}, and ${p[2]}.`, ...ch, fr: g1Sel('Points:', ch.choices, ans), draw, size: [360, 320],
+    solution: `${p[0]}, ${p[1]}, and ${p[2]} lie on the face ${fn(f).join('')} (so ${fourth} is coplanar with them). The other four corners, ${ans}, are not in that plane.` };
+};
+TEMPLATES.g11Term = (r) => {
+  const items = [['the tip of a sharpened pencil', 'Point'], ['a star in the night sky', 'Point'], ['the surface of a TV screen', 'Plane'], ['the floor of a gym', 'Plane'], ['a sheet of paper', 'Plane'], ['the string of a yo-yo', 'Segment'], ['the edge of a ruler', 'Segment'],
+    ['the beam of a flashlight', 'Ray'], ['a laser beam shining out of a laser pointer', 'Ray'], ['a dart thrown in a straight path from the thrower', 'Ray'], ['a straight railroad track that goes on and on in both directions', 'Line'], ['the corner where two walls of a room meet', 'Segment']];
+  const [obj, ans] = pick(r, items), opts = ['Point', 'Line', 'Ray', 'Segment', 'Plane'];
+  return { topic: 'Geometric terms in real life', stem: `Name the geometric term modeled by ${obj}.`, ...buildChoices(r, ans, opts.filter((x) => x !== ans), () => null), fr: g1Sel('Term:', opts, ans),
+    solution: { Point: 'It marks a single location.', Plane: 'It is a flat surface.', Segment: 'It is straight and has two endpoints.', Ray: 'It starts at one point and goes on in one direction.', Line: 'It is straight and goes on in both directions.' }[ans] + ` So it models a ${ans.toLowerCase()}.` };
+};
+TEMPLATES.g11Intersect = (r) => {
+  const Q = [['two different planes that intersect', 'A line', 'When two planes intersect, they meet in a line.'], ['two different lines that intersect', 'A point', 'Two lines that cross meet at exactly one point.'],
+    ['a line and a plane, when the line crosses the plane but does not lie in it', 'A point', 'The line passes through the plane at a single point.'], ['a plane and a line that lies in the plane', 'The whole line', 'Every point of the line is in the plane, so the intersection is the line itself.'],
+    ['two planes that are parallel', 'They do not intersect', 'Parallel planes never meet.']];
+  const [what, ans, why] = pick(r, Q), opts = ['A point', 'A line', 'The whole line', 'A plane', 'They do not intersect'];
+  return { topic: 'Intersections', stem: `What is the intersection of ${what}?`, ...buildChoices(r, ans, opts.filter((x) => x !== ans), () => null), fr: g1Sel('Intersection:', opts, ans), solution: why };
+};
+
+/* ---------- 1.2 Measuring and Constructing Segments ---------- */
+function g12RulerDraw(cv, { a, b, L, A, B }) {
+  const ctx = cv._ctx, W = cv._w, H = cv._h, m = 22, u = (W - 2 * m) / L, X = (v) => m + v * u, y0 = 110;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#f4e3a1'; ctx.strokeStyle = '#8a7a3a'; ctx.lineWidth = 1.2; ctx.fillRect(m - 10, y0, W - 2 * m + 20, 46); ctx.strokeRect(m - 10, y0, W - 2 * m + 20, 46);
+  ctx.strokeStyle = '#3a3320'; ctx.fillStyle = '#3a3320'; ctx.font = '12px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let k = 0; k <= L * 10; k++) { const x = X(k / 10), h = k % 10 === 0 ? 16 : k % 5 === 0 ? 11 : 7; ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + h); ctx.stroke(); if (k % 10 === 0 && k) ctx.fillText(String(k / 10), x, y0 + 19); }
+  ctx.textAlign = 'left'; ctx.fillText('cm', X(0) + 3, y0 + 19);
+  ctx.strokeStyle = G10INK; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(X(a), y0 - 6); ctx.lineTo(X(b), y0 - 6); ctx.stroke();
+  ctx.fillStyle = G10INK; [a, b].forEach((v) => { ctx.beginPath(); ctx.arc(X(v), y0 - 6, 3.5, 0, 2 * Math.PI); ctx.fill(); });
+  ctx.font = 'italic 18px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(A, X(a), y0 - 14); ctx.fillText(B, X(b), y0 - 14);
+}
+TEMPLATES.g12Ruler = (r) => {
+  const [A, B] = g10Letters(r, 2), L = 7, a = ri(r, 0, 25) / 10, len = ri(r, 15, 10 * (L - a) - 2) / 10, b = Math.round((a + len) * 10) / 10;
+  const ch = buildChoices(r, `${fmt(len)} cm`, [`${fmt(b)} cm`, `${fmt(Math.round((len + 1) * 10) / 10)} cm`, `${fmt(Math.round((len - 0.5) * 10) / 10)} cm`, `${fmt(Math.round((len + 0.2) * 10) / 10)} cm`].filter((x) => x !== `${fmt(len)} cm`), () => null);
+  return { topic: 'Measuring segments', stem: `Use the ruler to find the length of ${g10seg(A + B)} to the nearest tenth of a centimeter.`, ...ch,
+    fr: g10Num(`${A}${B} =`, len, ' cm'), draw: (cv) => g12RulerDraw(cv, { a, b, L, A, B }), size: [420, 190],
+    solution: `${A} is at ${fmt(a)} cm and ${B} is at ${fmt(b)} cm.\n${A}${B} = |${g10minus(b, a)}| = ${fmt(len)} cm` };
+};
+TEMPLATES.g12Congruent = (r) => {
+  for (;;) {
+    const L = ri(r, 2, 9), same = r() < 0.5, L2 = same ? L : L + pick(r, [-2, -1, 1, 2, 3]); if (L2 < 1) continue;
+    const mk = (len) => { const x = ri(r, -9, 9), y = ri(r, -9, 9), h = r() < 0.5, s = r() < 0.5 ? 1 : -1; return [[x, y], h ? [x + s * len, y] : [x, y + s * len]]; };
+    const [A, B] = mk(L), [C, D] = mk(L2); if ([A, B, C, D].some((p) => Math.abs(p[0]) > 10 || Math.abs(p[1]) > 10)) continue;
+    const ans = same ? 'Yes' : 'No', C1 = same ? `Yes; AB = CD = ${L}` : `No; AB = ${L} and CD = ${L2}`;
+    return { topic: 'Congruent segments', stem: `Plot the points A${pt(A)}, B${pt(B)}, C${pt(C)}, and D${pt(D)} in a coordinate plane. Then determine whether ${g10seg('AB')} and ${g10seg('CD')} are congruent.`,
+      ...buildChoices(r, C1, [same ? `No; AB = ${L} and CD = ${L + 1}` : `Yes; AB = CD = ${L}`, same ? `No; AB = ${L * 2} and CD = ${L}` : `Yes; AB = CD = ${L2}`, `No; they are not both horizontal`], () => null),
+      fr: g1Sel('Congruent?', ['Yes', 'No'], ans),
+      solution: `${A[1] === B[1] ? 'AB is horizontal' : 'AB is vertical'}: AB = ${A[1] === B[1] ? `|${g10minus(B[0], A[0])}|` : `|${g10minus(B[1], A[1])}|`} = ${L}.\n${C[1] === D[1] ? 'CD is horizontal' : 'CD is vertical'}: CD = ${L2}.\n${same ? 'The lengths are equal, so the segments are congruent.' : 'The lengths are different, so the segments are not congruent.'}` };
+  }
+};
+TEMPLATES.g12Add = (r) => {
+  for (;;) {
+    const [F, G, H] = g10Letters(r, 3), ang = ri(r, -25, 25), kind = pick(r, ['sum', 'part', 'alg']), p = ri(r, 3, 30), q = ri(r, 3, 30);
+    const k = 1 / (p + q), P0 = [0, 0], P1 = g10P(ang, p * k * 4), P2 = g10P(ang, 4), pts = { [F]: P0, [G]: P1, [H]: P2 };
+    if (kind === 'sum') return { topic: 'Segment Addition Postulate', stem: `Find ${F}${H}.`, ...g10NumChoices(r, p + q, [Math.abs(p - q), p * q, p + q + 1, 2 * q]), fr: g10Num(`${F}${H} =`, p + q),
+      draw: g10Fig({ pts, segs: [[F, H]], slab: [{ p: F, q: G, t: String(p), side: 1 }, { p: G, q: H, t: String(q), side: 1 }], margin: 30 }), size: [420, 200], solution: `Segment Addition Postulate: ${F}${H} = ${F}${G} + ${G}${H} = ${p} + ${q} = ${p + q}` };
+    if (kind === 'part') return { topic: 'Segment Addition Postulate', stem: `${F}${H} = ${p + q}. Find ${F}${G}.`, ...g10NumChoices(r, p, [p + 2 * q, q, p + q, Math.abs(p - q) || p + 3]), fr: g10Num(`${F}${G} =`, p),
+      draw: g10Fig({ pts, segs: [[F, H]], slab: [{ p: F, q: G, t: '?', side: 1 }, { p: G, q: H, t: String(q), side: 1 }], margin: 30 }), size: [420, 200], solution: `${F}${H} = ${F}${G} + ${G}${H}\n${p + q} = ${F}${G} + ${q}\n${F}${G} = ${p}` };
+    const x = ri(r, 2, 9), a1 = ri(r, 2, 6), a2 = ri(r, 1, 5), b1 = p - a1 * x, b2 = q - a2 * x; if (p - a1 * x === 0 || q - a2 * x === 0 || p < a1 * x - 20 || q < a2 * x - 20 || p <= 0 || q <= 0) continue;
+    const e1 = g10lin(a1, b1), e2 = g10lin(a2, b2);
+    return { topic: 'Segment Addition Postulate', stem: `${F}${H} = ${p + q}. Find the value of x. Then find ${F}${G} and ${G}${H}.`,
+      ...buildChoices(r, `x = ${x}; ${F}${G} = ${p}, ${G}${H} = ${q}`, [`x = ${x + 1}; ${F}${G} = ${p + a1}, ${G}${H} = ${q + a2}`, `x = ${x}; ${F}${G} = ${q}, ${G}${H} = ${p}`, `x = ${fmt((p + q) / (a1 + a2))}; ${F}${G} = ${fmt((a1 * (p + q)) / (a1 + a2))}, ${G}${H} = ${fmt((a2 * (p + q)) / (a1 + a2))}`], () => null),
+      fr: { fields: [{ kind: 'number', label: 'x =' }, { kind: 'number', label: `${F}${G} =` }, { kind: 'number', label: `${G}${H} =` }], key: [String(x), String(p), String(q)], display: `x = ${x}; ${F}${G} = ${p}, ${G}${H} = ${q}`,
+        check: (v) => numEq(v[0], x) && numEq(v[1], p) && numEq(v[2], q), score: (v) => (numEq(v[0], x) + numEq(v[1], p) + numEq(v[2], q)) / 3 },
+      draw: g10Fig({ pts, segs: [[F, H]], slab: [{ p: F, q: G, t: e1, side: 1 }, { p: G, q: H, t: e2, side: 1 }], margin: 30 }), size: [420, 200],
+      solution: `${F}${G} + ${G}${H} = ${F}${H}\n${e1} + ${e2} = ${p + q}\n${g10lin(a1 + a2, b1 + b2)} = ${p + q}\n${a1 + a2}x = ${p + q - b1 - b2}  →  x = ${x}\n${F}${G} = ${p}, ${G}${H} = ${q}` };
+  }
+};
+
+/* ---------- 1.3 Using Midpoint and Distance Formulas ---------- */
+TEMPLATES.g13Bisector = (r) => {
+  for (;;) {
+    const [R, M, S] = g10Letters(r, 3), k = pick(r, G1LOWER), ang = ri(r, -12, 12), tilt = ang + pick(r, [1, -1]) * ri(r, 45, 75), alg = r() < 0.55;
+    const pts = { [R]: g10P(ang + 180, 1.6), [M]: [0, 0], [S]: g10P(ang, 1.6), _k1: g10P(tilt + 180, 1.0), _k2: g10P(tilt, 1.0) };
+    const F = { pts, noDot: ['_k1', '_k2'], segs: [[R, S]], lines: [['_k1', '_k2', 0.15, 0.25]], ticks: [[R, M, 1], [M, S, 1]], txt: [{ at: g10P(tilt, 1.35), t: k, font: 'italic 17px Georgia, serif', dx: 10 }], margin: 30 };
+    if (!alg) { const h = ri(r, 3, 40); F.slab = [{ p: R, q: M, t: String(h), side: 1 }];
+      return { topic: 'Segment bisectors', stem: `Line ${k} bisects ${g10seg(R + S)} at ${M}. Find ${R}${S}.`, ...g10NumChoices(r, 2 * h, [h, h / 2, h + 2, 3 * h]), fr: g10Num(`${R}${S} =`, 2 * h), draw: g10Fig(F), size: [400, 240],
+        solution: `A bisector cuts the segment into two congruent halves, so ${M}${S} = ${R}${M} = ${h}.\n${R}${S} = ${h} + ${h} = ${2 * h}` }; }
+    const x = ri(r, 2, 12), m1 = ri(r, 2, 9), m2 = ri(r, 2, 9); if (m1 === m2) continue; const c1 = ri(r, -10, 20), h = m1 * x + c1, c2 = h - m2 * x; if (h < 5 || Math.abs(c2) > 40) continue;
+    const e1 = g10lin(m1, c1), e2 = g10lin(m2, c2), askHalf = r() < 0.5; F.slab = [{ p: R, q: M, t: e1, side: 1 }, { p: M, q: S, t: e2, side: 1 }];
+    return { topic: 'Segment bisectors', stem: `Line ${k} bisects ${g10seg(R + S)} at ${M}. Find ${askHalf ? `${R}${M}` : `${R}${S}`}.`, ...g10NumChoices(r, askHalf ? h : 2 * h, [x, askHalf ? 2 * h : h, h + m1, 2 * h + 2]), fr: g10Num(`${askHalf ? R + M : R + S} =`, askHalf ? h : 2 * h),
+      draw: g10Fig(F), size: [420, 240], solution: `${R}${M} = ${M}${S}\n${g10solve(m1, c1, m2, c2, x)}\n${R}${M} = ${e1.replace('x', `(${x})`)} = ${h}${askHalf ? '' : `\n${R}${S} = 2 · ${h} = ${2 * h}`}` };
+  }
+};
+const g10paren2 = (n) => (n < 0 ? `(${fmt(n)})` : fmt(n));
+const g13pt = (p) => `(${fmt(p[0])}, ${fmt(p[1])})`, g13ptL = (p) => `(${String(Math.round(p[0] * 100) / 100)},${String(Math.round(p[1] * 100) / 100)})`;
+const g13FRpt = (label, P) => ({ fields: [{ kind: 'expr', keys: 'num', label }], key: [g13ptL(P)], display: g13pt(P), check: (v) => a3ptOk(v[0], P) });
+TEMPLATES.g13Midpoint = (r) => {
+  const C = [ri(r, -10, 10), ri(r, -10, 10)], D = [ri(r, -10, 10), ri(r, -10, 10)]; if ((C[0] === D[0] && C[1] === D[1]) || [...C, ...D].includes(0)) return TEMPLATES.g13Midpoint(r);
+  const M = [(C[0] + D[0]) / 2, (C[1] + D[1]) / 2], ans = g13pt(M);
+  return { topic: 'The Midpoint Formula', stem: `The endpoints of ${g10seg('CD')} are C${pt(C)} and D${pt(D)}. Find the coordinates of the midpoint M.`,
+    ...buildChoices(r, ans, [g13pt([(D[0] - C[0]) / 2, (D[1] - C[1]) / 2]), g13pt([C[0] + D[0], C[1] + D[1]]), g13pt([M[1], M[0]]), g13pt([(C[0] + D[1]) / 2, (C[1] + D[0]) / 2])].filter((x) => x !== ans), () => null), fr: g13FRpt('M =', M),
+    solution: `M = ((x₁ + x₂)/2, (y₁ + y₂)/2) = ((${fmt(C[0])} + ${D[0] < 0 ? `(${fmt(D[0])})` : fmt(D[0])})/2, (${fmt(C[1])} + ${D[1] < 0 ? `(${fmt(D[1])})` : fmt(D[1])})/2) = ${ans}` };
+};
+TEMPLATES.g13Endpoint = (r) => {
+  const G = [ri(r, -10, 10), ri(r, -10, 10)], M = [ri(r, -9, 9) + (r() < 0.2 ? 0.5 : 0), ri(r, -9, 9)]; if ((G[0] === M[0] && G[1] === M[1]) || [...G, ...M].includes(0)) return TEMPLATES.g13Endpoint(r);
+  const H = [2 * M[0] - G[0], 2 * M[1] - G[1]], ans = g13pt(H), [g, h] = g10Letters(r, 2, ['M']);
+  return { topic: 'Finding an endpoint', stem: `The midpoint M and one endpoint ${g} of ${g10seg(g + h)} are given. Find the coordinates of the other endpoint ${h}.   ${g}${pt(G)} and M${pt(M)}`,
+    ...buildChoices(r, ans, [g13pt([(G[0] + M[0]) / 2, (G[1] + M[1]) / 2]), g13pt([2 * G[0] - M[0], 2 * G[1] - M[1]]), g13pt([M[0] - G[0], M[1] - G[1]]), g13pt([H[1], H[0]])].filter((x) => x !== ans), () => null), fr: g13FRpt(`${h} =`, H),
+    solution: `M is halfway, so ${h} = (2 · ${g10paren2(M[0])} − ${g10paren2(G[0])}, 2 · ${g10paren2(M[1])} − ${g10paren2(G[1])}) = ${ans}` };
+};
+TEMPLATES.g13Distance = (r) => {
+  const P = [ri(r, -9, 13), ri(r, -9, 10)], Q = [ri(r, -9, 13), ri(r, -9, 10)], dx = Q[0] - P[0], dy = Q[1] - P[1]; if (!dx || !dy) return TEMPLATES.g13Distance(r);
+  const d2 = dx * dx + dy * dy, d = Math.sqrt(d2), [a, b] = g10Letters(r, 2), exact = Number.isInteger(d);
+  return { topic: 'The Distance Formula', stem: `Find the distance between ${a}${pt(P)} and ${b}${pt(Q)}. Round to the nearest tenth if necessary.`,
+    ...buildChoices(r, exact ? String(d) : `≈ ${g9r(d)}`, [Math.abs(dx) + Math.abs(dy), Math.sqrt(Math.abs(dx * dx - dy * dy)) || d + 2, d2, Math.sqrt(dx * dx + dy * dy + 2 * Math.abs(dx * dy))].map((v) => (Number.isInteger(v) ? String(v) : `≈ ${g9r(v)}`)).filter((x, i, X) => X.indexOf(x) === i && x !== (exact ? String(d) : `≈ ${g9r(d)}`)), (i) => `≈ ${g9r(d + i + 1)}`),
+    fr: exact ? g10Num(`${a}${b} =`, d) : g10NumT(`${a}${b} ≈`, d),
+    solution: `d = √((x₂ − x₁)² + (y₂ − y₁)²) = √(${g10sq(dx)} + ${g10sq(dy)}) = √${d2}${exact ? ` = ${d}` : ` ≈ ${g9r(d)}`}` };
+};
+
+/* ---------- 1.4 Perimeter and Area in the Coordinate Plane ---------- */
+const G1POLY = { 3: 'Triangle', 4: 'Quadrilateral', 5: 'Pentagon', 6: 'Hexagon', 7: 'Heptagon', 8: 'Octagon' };
+TEMPLATES.g14Classify = (r) => {
+  const n = ri(r, 3, 8), concave = n > 3 && r() < 0.4, regular = !concave && r() < 0.4, st = ri(r, 0, 359), P = [];
+  for (let i = 0; i < n; i++) P.push(regular ? g10P(st + (360 * i) / n) : g10P(st + (360 * i) / n + ri(r, -9, 9), 1 + ri(r, -14, 14) / 100));
+  if (concave) { const i = ri(r, 0, n - 1); P[i] = g10P(st + (360 * i) / n, n === 4 ? 0.15 : 0.35); }
+  const cr = P.map((p, i) => { const a = P[(i + n - 1) % n], b = P[(i + 1) % n]; return Math.sign((p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0])); });
+  if (new Set(cr).size > 1 !== concave) return TEMPLATES.g14Classify(r);
+  if (!regular) { const L = P.map((p, i) => g14Len(p, P[(i + 1) % n])); if (Math.max(...L) - Math.min(...L) < 0.12) return TEMPLATES.g14Classify(r); } // clearly not all the same length
+  const names = [...Array(n)].map((_, i) => `_${i}`), pts = Object.fromEntries(names.map((k, i) => [k, P[i]])), kind = concave ? 'Concave' : 'Convex', reg = regular ? 'Regular' : 'Irregular';
+  const T = (nm, k, g) => `${nm}; ${k.toLowerCase()}; ${g.toLowerCase()}`, ans = T(G1POLY[n], kind, reg), other = G1POLY[n === 8 ? 7 : n + 1];
+  const alts = [T(G1POLY[n], kind, regular ? 'Irregular' : 'Regular'), T(G1POLY[n], concave ? 'Convex' : 'Concave', reg), T(other, kind, reg), T(G1POLY[n === 3 ? 4 : n - 1], kind, reg), T(other, concave ? 'Convex' : 'Concave', regular ? 'Irregular' : 'Regular')];
+  const F = { pts, noDot: names, segs: names.map((k, i) => [k, names[(i + 1) % n]]), margin: 26 };
+  if (regular) { F.ticks = names.map((k, i) => [k, names[(i + 1) % n], 1]); F.angs = names.map((k, i) => ({ v: k, p: names[(i + n - 1) % n], q: names[(i + 1) % n], r: 13 })); }
+  return { topic: 'Classifying polygons', stem: 'Classify the polygon by the number of sides. Tell whether it is convex or concave, and whether it is regular or irregular.', ...buildChoices(r, ans, alts.filter((x, i, X) => x !== ans && X.indexOf(x) === i), () => null),
+    fr: { fields: [{ kind: 'select', label: 'Name:', options: Object.values(G1POLY) }, { kind: 'select', label: 'Type:', options: ['Convex', 'Concave'] }, { kind: 'select', label: 'Regular?', options: ['Regular', 'Irregular'] }], key: [G1POLY[n], kind, reg], display: ans,
+      check: (v) => v[0] === G1POLY[n] && v[1] === kind && v[2] === reg, score: (v) => ((v[0] === G1POLY[n]) + (v[1] === kind) + (v[2] === reg)) / 3 },
+    draw: g10Fig(F), size: [300, 260],
+    solution: `It has ${n} sides, so it is a ${G1POLY[n].toLowerCase()}.\n${concave ? 'At least one interior angle is more than 180° (a side, extended, passes inside the polygon), so it is concave.' : 'No line containing a side passes through the inside of the polygon, so it is convex.'}\n${regular ? 'The marks show all sides congruent and all angles congruent, so it is regular.' : concave ? 'A concave polygon can never be regular, so it is irregular.' : 'Its sides (and angles) are not all congruent, so it is irregular.'}` };
+};
+const g14Plot = (V, names) => { const xs = V.map((p) => p[0]), ys = V.map((p) => p[1]), lo = Math.min(-1, ...xs, ...ys) - 1, hi = Math.max(1, ...xs, ...ys) + 1, n = V.length;
+  return plotQ({ xr: [lo, hi], yr: [lo, hi], step: hi - lo > 16 ? 2 : 1, curves: [{ param: [(t) => { const i = Math.min(n - 1, Math.floor(t)), u = t - i, a = V[i], b = V[(i + 1) % n]; return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]; }, 0, n] }], pts: V.map((p, i) => ({ p, label: `${names[i]}${pt(p)}` })) }); };
+function g14Shape(r) { // a triangle with a horizontal or vertical side, a rectangle, or a right triangle
+  const kind = pick(r, ['rect', 'rtri', 'tri', 'tri']), x = ri(r, -6, 2), y = ri(r, -6, 2), w = ri(r, 2, 8), h = ri(r, 2, 7);
+  if (kind === 'rect') return { kind, V: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]] };
+  if (kind === 'rtri') return { kind, V: [[x, y], [x + w, y], [x, y + h]] };
+  const px = x + ri(r, -2, w + 2); return { kind, V: [[x, y], [x + w, y], [px, y + h]] };
+}
+const g14Len = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+TEMPLATES.g14Perimeter = (r) => {
+  const { kind, V } = g14Shape(r), names = g10Letters(r, V.length), sides = V.map((p, i) => g14Len(p, V[(i + 1) % V.length])), P = sides.reduce((a, b) => a + b, 0), exact = sides.every((s) => Number.isInteger(Math.round(s * 1e9) / 1e9));
+  const show = r() < 0.5, list = names.map((n, i) => `${n}${pt(V[i])}`).join(', ');
+  const sT = sides.map((s, i) => `${names[i]}${names[(i + 1) % V.length]} = ${Number.isInteger(Math.round(s * 1e9) / 1e9) ? fmt(s) : `√${Math.round(s * s)} ≈ ${g9r(s)}`}`).join(', ');
+  return { topic: 'Perimeter in the coordinate plane', stem: `Find the perimeter of the polygon${show ? '.' : ` with the given vertices.   ${list}`} Round to the nearest tenth if necessary.`,
+    ...buildChoices(r, exact ? fmt(P) : `≈ ${g9r(P)}`, [P + 2, P - 1.5, sides.slice(0, 2).reduce((a, b) => a + b, 0) * 2, P * 1.5].map((v) => (exact ? fmt(Math.round(v)) : `≈ ${g9r(v)}`)).filter((x, i, X) => X.indexOf(x) === i && x !== (exact ? fmt(P) : `≈ ${g9r(P)}`)), (i) => `≈ ${g9r(P + i + 3)}`),
+    fr: exact ? g10Num('Perimeter:', P, ' units') : g10NumT('Perimeter:', P, ' units'), draw: show ? g14Plot(V, names) : undefined, size: show ? [360, 360] : undefined,
+    solution: `Find each side length (count, or use the Distance Formula for slanted sides): ${sT}.\nPerimeter = ${exact ? fmt(P) : `≈ ${g9r(P)}`} units` };
+};
+TEMPLATES.g14Area = (r) => {
+  const { kind, V } = g14Shape(r), names = g10Letters(r, V.length), show = r() < 0.5, list = names.map((n, i) => `${n}${pt(V[i])}`).join(', ');
+  const w = V[1][0] - V[0][0], h = V[V.length - 1][1] - V[0][1], A = kind === 'rect' ? w * h : (w * h) / 2;
+  return { topic: 'Area in the coordinate plane', stem: `Find the area of the polygon${show ? '.' : ` with the given vertices.   ${list}`}`, ...g10NumChoices(r, A, [w * h, 2 * A, A + w, w + h, 2 * (w + h)]), fr: g10Num('Area:', A, ' square units'),
+    draw: show ? g14Plot(V, names) : undefined, size: show ? [360, 360] : undefined,
+    solution: kind === 'rect' ? `It is a rectangle: length ${w} and width ${h}.\nA = ℓw = ${w} · ${h} = ${A} square units` : `Use ${names[0]}${names[1]} as the base: b = ${w}. The height is the vertical distance to ${names[2]}: h = ${h}.\nA = ½bh = ½ · ${w} · ${h} = ${fmt(A)} square units` };
+};
+
+/* ---------- 1.5 Measuring and Constructing Angles ---------- */
+const g15ang = (v, p, q) => `∠${p}${v}${q}`;
+TEMPLATES.g15Names = (r) => {
+  const [P, V, Q] = g10Letters(r, 3), n = ri(r, 1, 9), a0 = ri(r, -20, 40), a1 = a0 + ri(r, 40, 120);
+  const pts = { [P]: g10P(a1, 1.1), [V]: [0, 0], [Q]: g10P(a0, 1.2) };
+  const good = shuffle(r, [g15ang(V, P, Q), g15ang(V, Q, P), `∠${V}`, `∠${n}`]).slice(0, 3), bad = [`∠${V}${P}${Q}`, `∠${P}${Q}${V}`, `∠${P}`, `∠${Q}`, `∠${Q}${P}${V}`];
+  const ans = good.join(', '), alts = [0, 1, 2].map((i) => { const g = good.slice(); g[i] = bad[(i + ri(r, 0, 4)) % 5]; return g.join(', '); });
+  const ch = buildChoices(r, ans, alts.filter((x, i, X) => X.indexOf(x) === i && x !== ans), () => null);
+  return { topic: 'Naming angles', stem: 'Which list gives three correct names for the angle?', ...ch, fr: g1Sel('Names:', ch.choices, ans),
+    draw: g10Fig({ pts, lines: [[V, P, 0, 0.3], [V, Q, 0, 0.3]], angs: [{ v: V, p: P, q: Q, lab: String(n), red: true, r: 20, mark: false }], margin: 30 }), size: [340, 240],
+    solution: `An angle can be named by its vertex (∠${V}), by a number inside it (∠${n}), or by three points with the vertex in the middle (∠${P}${V}${Q} or ∠${Q}${V}${P}).` };
+};
+const g15Class = (m) => (m === 90 ? 'Right' : m === 180 ? 'Straight' : m < 90 ? 'Acute' : 'Obtuse');
+function g15ProtDraw(cv, { rays, sel }) {
+  const ctx = cv._ctx, W = cv._w, H = cv._h, cx = W / 2, cy = H - 46, R = Math.min(W / 2 - 40, H - 80);
+  ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round';
+  ctx.fillStyle = 'rgba(226,236,248,0.85)'; ctx.strokeStyle = '#6d88aa'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI, 2 * Math.PI); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, R * 0.55, Math.PI, 2 * Math.PI); ctx.stroke();
+  ctx.strokeStyle = '#3a4a5c'; ctx.fillStyle = '#3a4a5c';
+  for (let d = 0; d <= 180; d += 1) { const t = (d * Math.PI) / 180, L = d % 10 === 0 ? 12 : d % 5 === 0 ? 8 : 4; ctx.lineWidth = d % 10 ? 0.7 : 1.1; ctx.beginPath(); ctx.moveTo(cx + R * Math.cos(t), cy - R * Math.sin(t)); ctx.lineTo(cx + (R - L) * Math.cos(t), cy - (R - L) * Math.sin(t)); ctx.stroke(); }
+  ctx.font = '9.5px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let d = 0; d <= 180; d += 10) { const t = (d * Math.PI) / 180; ctx.fillText(String(d), cx + (R - 20) * Math.cos(t), cy - (R - 20) * Math.sin(t)); ctx.fillStyle = '#7a8796'; ctx.fillText(String(180 - d), cx + (R - 32) * Math.cos(t), cy - (R - 32) * Math.sin(t)); ctx.fillStyle = '#3a4a5c'; }
+  // baseline and rays
+  ctx.strokeStyle = G10INK; ctx.lineWidth = 2;
+  const arrow = (x, y, t) => { ctx.beginPath(); ctx.moveTo(x - 10 * Math.cos(t) + 5 * Math.sin(t), y + 10 * Math.sin(t) + 5 * Math.cos(t)); ctx.lineTo(x, y); ctx.lineTo(x - 10 * Math.cos(t) - 5 * Math.sin(t), y + 10 * Math.sin(t) - 5 * Math.cos(t)); ctx.stroke(); };
+  rays.forEach(([nm, d]) => { const t = (d * Math.PI) / 180, L = R + 30, x = cx + L * Math.cos(t), y = cy - L * Math.sin(t); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y); ctx.stroke(); arrow(x, y, t);
+    const px = cx + R * 0.78 * Math.cos(t), py = cy - R * 0.78 * Math.sin(t); ctx.fillStyle = G10INK; ctx.beginPath(); ctx.arc(px, py, 3.2, 0, 2 * Math.PI); ctx.fill();
+    ctx.font = 'italic 17px Georgia, serif'; ctx.fillStyle = 'rgba(255,255,255,0.85)'; const lx = px + 13 * Math.cos(t + 0.5), ly = py - 13 * Math.sin(t + 0.5) - (d === 0 || d === 180 ? 12 : 0); ctx.fillRect(lx - 7, ly - 9, 14, 18); ctx.fillStyle = G10INK; ctx.fillText(nm, lx, ly); });
+  ctx.fillStyle = G10INK; ctx.beginPath(); ctx.arc(cx, cy, 3.2, 0, 2 * Math.PI); ctx.fill(); ctx.font = 'italic 17px Georgia, serif'; ctx.fillText(sel, cx, cy + 16);
+}
+TEMPLATES.g15Protractor = (r) => {
+  for (;;) {
+    const [A, B, C, D, E, O] = g10Letters(r, 6), ds = [ri(r, 2, 34) * 5, ri(r, 2, 34) * 5, ri(r, 2, 34) * 5].sort((a, b) => b - a); if (ds[0] - ds[1] < 15 || ds[1] - ds[2] < 15) continue;
+    const rays = [[A, 180], [C, ds[0]], [D, ds[1]], [E, ds[2]], [B, 0]], i = ri(r, 0, 4); let j = ri(r, 0, 4); if (i === j) continue;
+    const [p, q] = [rays[i], rays[j]], m = Math.abs(p[1] - q[1]), cls = g15Class(m), ans = `${m}°; ${cls.toLowerCase()}`;
+    return { topic: 'Measuring and classifying angles', stem: `Use the protractor. Find m∠${p[0]}${O}${q[0]}. Then classify the angle.`,
+      ...buildChoices(r, ans, [...(m < 180 ? [`${180 - m}°; ${g15Class(180 - m).toLowerCase()}`] : []), `${m}°; ${(m < 90 ? 'obtuse' : 'acute')}`, ...(Math.max(p[1], q[1]) > 0 && Math.max(p[1], q[1]) <= 180 ? [`${Math.max(p[1], q[1])}°; ${g15Class(Math.max(p[1], q[1])).toLowerCase()}`] : []), `${m === 180 ? 90 : m + 10}°; ${g15Class(m === 180 ? 90 : m + 10).toLowerCase()}`].filter((x, k, X) => X.indexOf(x) === k && x !== ans), () => null),
+      fr: { fields: [{ kind: 'number', label: `m∠${p[0]}${O}${q[0]} =`, suffix: '°' }, { kind: 'select', label: 'Type:', options: ['Acute', 'Right', 'Obtuse', 'Straight'] }], key: [String(m), cls], display: ans,
+        check: (v) => numEq(v[0], m) && v[1] === cls, score: (v) => (numEq(v[0], m) + (v[1] === cls)) / 2 },
+      draw: (cv) => g15ProtDraw(cv, { rays, sel: O }), size: [440, 280],
+      solution: `Read both rays on the same scale: ${O}${p[0]} is at ${p[1]}° and ${O}${q[0]} is at ${q[1]}°.\nm∠${p[0]}${O}${q[0]} = |${g10minus(p[1], q[1])}| = ${m}°, so it is ${cls === 'Acute' ? 'an acute' : cls === 'Obtuse' ? 'an obtuse' : cls === 'Right' ? 'a right' : 'a straight'} angle.` };
+  }
+};
+// three rays from a vertex: P at a0 + big, D in between, Q at a0
+const g15Fig = (V, P, D, Q, a0, big, part, labs, extra = {}) => g10Fig({ pts: { [V]: [0, 0], [P]: g10P(a0 + big, 1.15), [D]: g10P(a0 + part, 1.0), [Q]: g10P(a0, 1.2) }, lines: [[V, P, 0, 0.3], [V, D, 0, 0.3], [V, Q, 0, 0.3]],
+  angs: [{ v: V, p: D, q: P, lab: labs[0], r: 34 + (labs[0].length > 5 ? 8 : 0), far: labs[0].length > 5 ? 26 : 15 }, { v: V, p: Q, q: D, lab: labs[1], r: 24 + (labs[1].length > 5 ? 6 : 0), far: labs[1].length > 5 ? 26 : 15 }, ...(labs[2] ? [{ v: V, p: Q, q: P, lab: labs[2], r: 56 }] : [])], margin: 30, ...extra });
+TEMPLATES.g15Add = (r) => {
+  const [P, V, D, Q] = g10Letters(r, 4), a = ri(r, 12, 70), b = ri(r, 12, 70), a0 = ri(r, -10, 20), kind = pick(r, ['sum', 'part', 'straight']);
+  if (kind === 'straight') { const m = ri(r, 25, 155);
+    return { topic: 'Angle Addition Postulate', stem: `∠${P}${V}${Q} is a straight angle. Find m∠${D}${V}${Q}.`, ...g10DegChoices(r, 180 - m, [m, 90 - m / 2, 360 - m]), fr: g10Num(`m∠${D}${V}${Q} =`, 180 - m, '°'),
+      draw: g10Fig({ pts: { [V]: [0, 0], [P]: g10P(180, 1.2), [D]: g10P(180 - m, 1.0), [Q]: g10P(0, 1.2) }, lines: [[P, Q, 0.25, 0.25], [V, D, 0, 0.3]], angs: [{ v: V, p: D, q: P, lab: deg(m), r: 24 }], margin: 30 }), size: [380, 220],
+      solution: `A straight angle measures 180°.\nm∠${D}${V}${Q} = 180° − ${m}° = ${180 - m}°` }; }
+  if (kind === 'sum') return { topic: 'Angle Addition Postulate', stem: `Find m∠${P}${V}${Q}.`, ...g10DegChoices(r, a + b, [Math.abs(a - b), 180 - a - b, a + b + 10, 2 * a]), fr: g10Num(`m∠${P}${V}${Q} =`, a + b, '°'),
+    draw: g15Fig(V, P, D, Q, a0, a + b, b, [deg(a), deg(b)]), size: [360, 280], solution: `Angle Addition Postulate: m∠${P}${V}${Q} = m∠${P}${V}${D} + m∠${D}${V}${Q} = ${a}° + ${b}° = ${a + b}°` };
+  return { topic: 'Angle Addition Postulate', stem: `m∠${P}${V}${Q} = ${a + b}°. Find m∠${P}${V}${D}.`, ...g10DegChoices(r, a, [a + 2 * b, b, a + b, Math.abs(a - b) || a + 5]), fr: g10Num(`m∠${P}${V}${D} =`, a, '°'),
+    draw: g15Fig(V, P, D, Q, a0, a + b, b, ['', deg(b)]), size: [360, 280], solution: `m∠${P}${V}${D} + m∠${D}${V}${Q} = m∠${P}${V}${Q}\nm∠${P}${V}${D} + ${b}° = ${a + b}°\nm∠${P}${V}${D} = ${a}°` };
+};
+TEMPLATES.g15AddAlg = (r) => {
+  for (;;) {
+    const [P, V, D, Q] = g10Letters(r, 4), tot = pick(r, [90, 180, ri(r, 60, 150)]), x = ri(r, 2, 15), m1 = ri(r, -4, 9), m2 = ri(r, 2, 9); if (!m1) continue;
+    const a = ri(r, 15, tot - 15), b = tot - a, c1 = a - m1 * x, c2 = b - m2 * x; if (!c1 || !c2 || Math.abs(c1) > 90 || Math.abs(c2) > 90) continue;
+    const e1 = `(${g10lin(m1, c1)})°`, e2 = `(${g10lin(m2, c2)})°`, a0 = 0;
+    const draw = tot === 180 ? g10Fig({ pts: { [V]: [0, 0], [P]: g10P(180, 1.2), [D]: g10P(b, 1.0), [Q]: g10P(0, 1.2) }, lines: [[P, Q, 0.25, 0.25], [V, D, 0, 0.3]], angs: [{ v: V, p: D, q: P, lab: e1, r: 26, far: 34 }, { v: V, p: Q, q: D, lab: e2, r: 26, far: 34 }], margin: 30 })
+      : g15Fig(V, P, D, Q, a0, tot, b, [e1, e2], tot === 90 ? { right: [[P, V, Q]] } : {});
+    const given = tot === 180 ? `∠${P}${V}${Q} is a straight angle.` : tot === 90 ? `∠${P}${V}${Q} is a right angle.` : `m∠${P}${V}${Q} = ${tot}°.`;
+    return { topic: 'Angle Addition with algebra', stem: `${given} Find m∠${P}${V}${D} and m∠${D}${V}${Q}.`,
+      ...buildChoices(r, `${a}° and ${b}°`, [`${b}° and ${a}°`, `${fmt(a + m1)}° and ${fmt(b + m2)}°`, `${x}° and ${tot - x}°`, `${fmt(tot / 2)}° and ${fmt(tot / 2)}°`].filter((s, i, X) => X.indexOf(s) === i && s !== `${a}° and ${b}°`), () => null),
+      fr: { fields: [{ kind: 'number', label: `m∠${P}${V}${D} =`, suffix: '°' }, { kind: 'number', label: `m∠${D}${V}${Q} =`, suffix: '°' }], key: [String(a), String(b)], display: `${a}° and ${b}°`, check: (v) => numEq(v[0], a) && numEq(v[1], b), score: (v) => (numEq(v[0], a) + numEq(v[1], b)) / 2 },
+      draw, size: [380, tot === 180 ? 230 : 290],
+      solution: `${g10lin(m1, c1)} + ${g10lin(m2, c2)} = ${tot}\n${g10lin(m1 + m2, c1 + c2)} = ${tot}${m1 + m2 === 1 ? '' : `\n${g10lin(m1 + m2, 0)} = ${tot - c1 - c2}`}\nx = ${x}\nm∠${P}${V}${D} = ${a}°, m∠${D}${V}${Q} = ${b}°` };
+  }
+};
+TEMPLATES.g15Bisect = (r) => {
+  for (;;) {
+    const [E, F, H, G] = g10Letters(r, 4), kind = pick(r, ['half', 'whole', 'alg', 'alg']);
+    if (kind !== 'alg') {
+      const h = ri(r, 10, 85) + (kind === 'whole' && r() < 0.4 ? 0.5 : 0), w = 2 * h, give = kind === 'half';
+      return { topic: 'Angle bisectors', stem: `Ray ${F}${H} bisects ∠${E}${F}${G}. ${give ? `m∠${E}${F}${H} = ${fmt(h)}°. Find m∠${G}${F}${H} and m∠${E}${F}${G}.` : `m∠${E}${F}${G} = ${fmt(w)}°. Find m∠${E}${F}${H} and m∠${G}${F}${H}.`}`,
+        ...buildChoices(r, give ? `${fmt(h)}° and ${fmt(w)}°` : `${fmt(h)}° and ${fmt(h)}°`, give ? [`${fmt(h)}° and ${fmt(h / 2)}°`, `${fmt(180 - h)}° and ${fmt(w)}°`, `${fmt(w)}° and ${fmt(h)}°`] : [`${fmt(w)}° and ${fmt(w)}°`, `${fmt(h / 2)}° and ${fmt(h / 2)}°`, `${fmt(180 - w)}° and ${fmt(w)}°`], () => null),
+        fr: { fields: give ? [{ kind: 'number', label: `m∠${G}${F}${H} =`, suffix: '°' }, { kind: 'number', label: `m∠${E}${F}${G} =`, suffix: '°' }] : [{ kind: 'number', label: `m∠${E}${F}${H} =`, suffix: '°' }, { kind: 'number', label: `m∠${G}${F}${H} =`, suffix: '°' }],
+          key: give ? [fmt(h), fmt(w)] : [fmt(h), fmt(h)], display: give ? `${fmt(h)}° and ${fmt(w)}°` : `${fmt(h)}° and ${fmt(h)}°`, check: (v) => numEq(v[0], h) && numEq(v[1], give ? w : h), score: (v) => (numEq(v[0], h) + numEq(v[1], give ? w : h)) / 2 },
+        solution: `A bisector splits the angle into two congruent angles.\n${give ? `m∠${G}${F}${H} = m∠${E}${F}${H} = ${fmt(h)}°, and m∠${E}${F}${G} = 2 · ${fmt(h)}° = ${fmt(w)}°` : `m∠${E}${F}${H} = m∠${G}${F}${H} = ${fmt(w)}° ÷ 2 = ${fmt(h)}°`}` };
+    }
+    const x = ri(r, 2, 15), m1 = ri(r, 2, 9), m2 = ri(r, 2, 9); if (m1 === m2) continue; const c1 = ri(r, -15, 30), h = m1 * x + c1, c2 = h - m2 * x; if (h < 12 || h > 85 || Math.abs(c2) > 60 || !c1 || !c2) continue;
+    const e1 = `(${g10lin(m1, c1)})°`, e2 = `(${g10lin(m2, c2)})°`, [A, B, D, C] = [E, F, H, G];
+    return { topic: 'Angle bisectors', stem: `Ray ${B}${D} bisects ∠${A}${B}${C}. Find m∠${A}${B}${D}, m∠${C}${B}${D}, and m∠${A}${B}${C}.`,
+      ...buildChoices(r, `${h}°, ${h}°, ${2 * h}°`, [`${x}°, ${x}°, ${2 * x}°`, `${h}°, ${h}°, ${h}°`, `${h + m1}°, ${h + m1}°, ${2 * h + 2 * m1}°`, `${fmt(2 * h)}°, ${fmt(2 * h)}°, ${4 * h}°`], () => null),
+      fr: { fields: [{ kind: 'number', label: `m∠${A}${B}${D} =`, suffix: '°' }, { kind: 'number', label: `m∠${C}${B}${D} =`, suffix: '°' }, { kind: 'number', label: `m∠${A}${B}${C} =`, suffix: '°' }], key: [String(h), String(h), String(2 * h)], display: `${h}°, ${h}°, ${2 * h}°`,
+        check: (v) => numEq(v[0], h) && numEq(v[1], h) && numEq(v[2], 2 * h), score: (v) => (numEq(v[0], h) + numEq(v[1], h) + numEq(v[2], 2 * h)) / 3 },
+      draw: g15Fig(B, A, D, C, ri(r, -5, 15), 2 * h, h, [e1, e2]), size: [380, 290],
+      solution: `The bisector makes m∠${A}${B}${D} = m∠${C}${B}${D}.\n${g10solve(m1, c1, m2, c2, x)}\nm∠${A}${B}${D} = m∠${C}${B}${D} = ${h}°, m∠${A}${B}${C} = ${2 * h}°` };
+  }
+};
+
+/* ---------- 1.6 Describing Pairs of Angles ---------- */
+TEMPLATES.g16Vertical = (r) => {
+  const a = ri(r, 25, 80) + (r() < 0.5 ? 0 : 60), rot = ri(r, -15, 15), dirs = [rot, rot + a, rot + 180, rot + 180 + a]; // ∠1 between dirs[0] and dirs[1], then 2, 3, 4 counterclockwise
+  const pts = { _o: [0, 0], _a: g10P(dirs[0], 1.2), _b: g10P(dirs[1], 1.2), _c: g10P(dirs[2], 1.2), _d: g10P(dirs[3], 1.2) };
+  const angs = [['_a', '_b'], ['_b', '_c'], ['_c', '_d'], ['_d', '_a']].map(([p, q], i) => ({ v: '_o', p, q, lab: String(i + 1), red: true, r: 18, mark: false }));
+  const draw = g10Fig({ pts, noDot: ['_o', '_a', '_b', '_c', '_d'], lines: [['_a', '_c', 0.1, 0.1], ['_b', '_d', 0.1, 0.1]], angs, margin: 24 });
+  const m = [a, 180 - a, a, 180 - a], kind = pick(r, ['find', 'find', 'vert', 'pair']), k = ri(r, 1, 4);
+  if (kind === 'find') { const g = ri(r, 1, 4), want = ((g + ri(r, 0, 2)) % 4) + 1; return { topic: 'Vertical angles and linear pairs', stem: `m∠${g} = ${m[g - 1]}°. Find m∠${want}.`, ...g10DegChoices(r, m[want - 1], [180 - m[want - 1], 90 - (m[want - 1] % 90), 360 - m[want - 1]]), fr: g10Num(`m∠${want} =`, m[want - 1], '°'), draw, size: [340, 260],
+    solution: `${Math.abs(g - want) === 2 ? `∠${g} and ∠${want} are vertical angles, so they are congruent: m∠${want} = ${m[want - 1]}°.` : `∠${g} and ∠${want} form a linear pair, so they are supplementary: m∠${want} = 180° − ${m[g - 1]}° = ${m[want - 1]}°.`}` }; }
+  const v = ((k + 1) % 4) + 1, l1 = (k % 4) + 1, l2 = ((k + 2) % 4) + 1;
+  if (kind === 'vert') { const ans = `∠${v}`; return { topic: 'Vertical angles and linear pairs', stem: `Which angle forms a pair of vertical angles with ∠${k}?`, ...buildChoices(r, ans, [`∠${l1}`, `∠${l2}`, `∠${k}`].filter((x) => x !== ans), () => null), fr: g1Sel('Angle:', ['∠1', '∠2', '∠3', '∠4'].filter((x) => x !== `∠${k}`), ans), draw, size: [340, 260],
+    solution: `Vertical angles are opposite each other where two lines cross: ∠${k} and ∠${v}.` }; }
+  const ans = `∠${k} and ∠${Math.min(l1, l2)}; ∠${k} and ∠${Math.max(l1, l2)}`;
+  const ch = buildChoices(r, ans, [`∠${k} and ∠${v}`, `∠${k} and ∠${l1}`, `∠${k} and ∠${v}; ∠${k} and ∠${l2}`], () => null);
+  return { topic: 'Vertical angles and linear pairs', stem: `Identify all the linear pairs that include ∠${k}.`, ...ch, fr: g1Sel('Linear pairs:', ch.choices, ans), draw, size: [340, 260],
+    solution: `A linear pair is two adjacent angles whose outside sides are opposite rays. ∠${k} forms a linear pair with each angle next to it: ∠${l1} and ∠${l2}.` };
+};
+TEMPLATES.g16Comp = (r) => {
+  const sup = r() < 0.5, a = sup ? ri(r, 15, 165) : ri(r, 8, 82), ans = (sup ? 180 : 90) - a, [p, q] = shuffle(r, [1, 2, 3, 4, 5, 6, 7, 8]).slice(0, 2);
+  return { topic: 'Complementary and supplementary angles', stem: `∠${p} is a ${sup ? 'supplement' : 'complement'} of ∠${q}, and m∠${p} = ${a}°. Find m∠${q}.`, ...g10DegChoices(r, ans, [sup ? 90 - a : 180 - a, a, 360 - a]), fr: g10Num(`m∠${q} =`, ans, '°'),
+    solution: `${sup ? 'Supplementary angles add to 180°' : 'Complementary angles add to 90°'}: m∠${q} = ${sup ? 180 : 90}° − ${a}° = ${ans}°` };
+};
+TEMPLATES.g16Alg = (r) => {
+  for (;;) {
+    const sup = r() < 0.55, tot = sup ? 180 : 90, x = ri(r, 2, 15), m1 = ri(r, 1, 12), m2 = ri(r, 1, 12), a = ri(r, 12, tot - 12), b = tot - a, c1 = a - m1 * x, c2 = b - m2 * x; if (!c1 || !c2 || Math.abs(c1) > 60 || Math.abs(c2) > 60) continue;
+    const [P, V, D, Q] = g10Letters(r, 4), e1 = `(${g10lin(m1, c1)})°`, e2 = `(${g10lin(m2, c2)})°`, pic = r() < 0.6;
+    const draw = !pic ? undefined : sup ? g10Fig({ pts: { [V]: [0, 0], [P]: g10P(180, 1.2), [D]: g10P(b, 1.0), [Q]: g10P(0, 1.2) }, lines: [[P, Q, 0.25, 0.25], [V, D, 0, 0.3]], angs: [{ v: V, p: D, q: P, lab: e1, r: 26, far: 34 }, { v: V, p: Q, q: D, lab: e2, r: 26, far: 34 }], margin: 30 })
+      : g15Fig(V, P, D, Q, 0, 90, b, [e1, e2], { right: [[P, V, Q]] });
+    const stem = pic ? `Find m∠${P}${V}${D} and m∠${D}${V}${Q}.` : `∠${P}${V}${D} and ∠${D}${V}${Q} are ${sup ? 'supplementary' : 'complementary'} angles, m∠${P}${V}${D} = ${e1}, and m∠${D}${V}${Q} = ${e2}. Find the measure of each angle.`;
+    return { topic: 'Pairs of angles with algebra', stem, ...buildChoices(r, `${a}° and ${b}°`, [`${b}° and ${a}°`, `${x}° and ${tot - x}°`, `${fmt(a + m1)}° and ${fmt(b + m2)}°`, `${fmt(tot / 2)}° and ${fmt(tot / 2)}°`].filter((s, i, X) => X.indexOf(s) === i && s !== `${a}° and ${b}°`), () => null),
+      fr: { fields: [{ kind: 'number', label: `m∠${P}${V}${D} =`, suffix: '°' }, { kind: 'number', label: `m∠${D}${V}${Q} =`, suffix: '°' }], key: [String(a), String(b)], display: `${a}° and ${b}°`, check: (v) => numEq(v[0], a) && numEq(v[1], b), score: (v) => (numEq(v[0], a) + numEq(v[1], b)) / 2 },
+      draw, size: pic ? [380, sup ? 230 : 290] : undefined,
+      solution: `The angles are ${sup ? 'supplementary (a linear pair)' : 'complementary'}, so they add to ${tot}°.\n${g10lin(m1, c1)} + ${g10lin(m2, c2)} = ${tot}\n${g10lin(m1 + m2, c1 + c2)} = ${tot}  →  x = ${x}\nm∠${P}${V}${D} = ${a}°, m∠${D}${V}${Q} = ${b}°` };
+  }
+};
+TEMPLATES.g16Word = (r) => {
+  for (;;) {
+    const kind = pick(r, ['linK', 'linFrac', 'compFrac', 'compK', 'ratio']);
+    const sup = kind === 'linK' || kind === 'linFrac' || (kind === 'ratio' && r() < 0.5), tot = sup ? 180 : 90;
+    let stem, a, b, how;
+    if (kind === 'linK' || kind === 'compK') { const k = ri(r, 2, 9); a = tot / (k + 1); b = k * a; if (!Number.isInteger(a * 2)) continue; stem = kind === 'linK' ? `Two angles form a linear pair. The measure of one angle is ${k} times the measure of the other angle. Find the measure of each angle.` : `The measure of an angle is ${k} times the measure of its complement. Find the measure of the angle and its complement.`; how = `x + ${k}x = ${tot}  →  ${k + 1}x = ${tot}  →  x = ${fmt(a)}`; if (kind === 'compK') [a, b] = [b, a]; }
+    else if (kind === 'linFrac' || kind === 'compFrac') { const k = ri(r, 2, 8); b = (tot * k) / (k + 1); a = tot / (k + 1); if (!Number.isInteger(a * 2)) continue; stem = kind === 'linFrac' ? `Two angles form a linear pair. The measure of one angle is 1/${k} the measure of the other angle. Find the measure of each angle.` : `The measure of an angle is 1/${k} the measure of its complement. Find the measure of the angle and its complement.`; how = `Let the larger angle be x: x + x/${k} = ${tot}  →  x = ${fmt(b)}`; }
+    else { const p = ri(r, 1, 9), q = ri(r, 1, 9); if (p === q || (tot * p) % (p + q)) continue; a = (tot * p) / (p + q); b = tot - a; stem = `The ratio of the measure of an angle to the measure of its ${sup ? 'supplement' : 'complement'} is ${p}:${q}. Find the measure of the angle and its ${sup ? 'supplement' : 'complement'}.`; how = `${g10lin(p, 0)} + ${g10lin(q, 0)} = ${tot}  →  x = ${fmt(tot / (p + q))}`; }
+    const first = kind.startsWith('lin') ? 'Smaller angle:' : 'The angle:', second = kind.startsWith('lin') ? 'Larger angle:' : sup ? 'Its supplement:' : 'Its complement:';
+    if (kind.startsWith('lin') && a > b) [a, b] = [b, a];
+    return { topic: 'Pairs of angles in words', stem, ...buildChoices(r, `${fmt(a)}° and ${fmt(b)}°`, [`${fmt(b)}° and ${fmt(a)}°`, `${fmt(tot - a / 2)}° and ${fmt(a / 2)}°`, `${fmt((sup ? 90 : 180) * a / tot)}° and ${fmt((sup ? 90 : 180) * b / tot)}°`].filter((s) => s !== `${fmt(a)}° and ${fmt(b)}°`), () => null),
+      fr: { fields: [{ kind: 'number', label: first, suffix: '°' }, { kind: 'number', label: second, suffix: '°' }], key: [fmt(a), fmt(b)], display: `${fmt(a)}° and ${fmt(b)}°`, check: (v) => numEq(v[0], a) && numEq(v[1], b), score: (v) => (numEq(v[0], a) + numEq(v[1], b)) / 2 },
+      solution: `${sup ? 'A linear pair (supplementary angles) adds to 180°' : 'Complementary angles add to 90°'}.\n${how}\nThe angles are ${fmt(a)}° and ${fmt(b)}°.` };
+  }
+};
+/* ==== GEOMETRY CH1 END ==== */
+/* ==== GEOMETRY CH11 BEGIN ==== */
+/* ---------- Geometry (Big Ideas Math), Chapter 11: Circumference and Area ---------- */
+const g11h = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('-', MINUS); // nearest hundredth
+// a rounded answer: accepts the exact value (12π) or a decimal that is close (3.14 for π is fine)
+const g11FR = (label, val, unit = '') => ({ fields: [{ kind: 'expr', keys: 'num', label, suffix: unit ? ' ' + unit : '' }], key: [g11h(val)], display: `≈ ${g11h(val)}${unit ? ' ' + unit : ''}`,
+  check: (v) => numOk(v[0], val, Math.max(0.0051, 0.0012 * Math.abs(val)) / Math.max(1, Math.abs(val))) });
+const g11Ch = (r, val, alts, unit = '') => { const u = unit ? ' ' + unit : '', c = `≈ ${g11h(val)}${u}`; return buildChoices(r, c, [...new Set(alts.filter((x) => x > 0 && Math.abs(x - val) > 0.02).map((x) => `≈ ${g11h(x)}${u}`))].filter((x) => x !== c), (i) => `≈ ${g11h(val * (1.2 + i / 5))}${u}`); };
+const g11pi = (k) => (k === 1 ? 'π' : `${fmt(k)}π`);
+
+/* ---------- 11.1 Circumference and Arc Length ---------- */
+TEMPLATES.g111Circ = (r) => {
+  const kind = pick(r, ['Cr', 'Cd', 'dC', 'rCpi']), u = pick(r, ['inches', 'feet', 'meters', 'centimeters']), ab = { inches: 'in.', feet: 'ft', meters: 'm', centimeters: 'cm' }[u];
+  if (kind === 'Cr') { const rad = ri(r, 2, 25) / (r() < 0.3 ? 2 : 1), C = 2 * Math.PI * rad; return { topic: 'Circumference', stem: `Find the circumference of a circle with a radius of ${fmt(rad)} ${u}. Round to the nearest hundredth.`, ...g11Ch(r, C, [Math.PI * rad, Math.PI * rad * rad, 2 * rad * 3, 4 * Math.PI * rad], ab), fr: g11FR('C ≈', C, ab), solution: `C = 2πr = 2π(${fmt(rad)}) = ${g11pi(2 * rad)} ≈ ${g11h(C)} ${ab}` }; }
+  if (kind === 'Cd') { const d = ri(r, 2, 40), C = Math.PI * d; return { topic: 'Circumference', stem: `Find the circumference of a circle with a diameter of ${d} ${u}. Round to the nearest hundredth.`, ...g11Ch(r, C, [2 * Math.PI * d, (Math.PI * d * d) / 4, Math.PI * d * d], ab), fr: g11FR('C ≈', C, ab), solution: `C = πd = π(${d}) = ${g11pi(d)} ≈ ${g11h(C)} ${ab}` }; }
+  if (kind === 'dC') { const C = ri(r, 10, 120), d = C / Math.PI; return { topic: 'Circumference', stem: `Find the diameter of a circle with a circumference of ${C} ${u}. Round to the nearest hundredth.`, ...g11Ch(r, d, [d / 2, C / 2, C * Math.PI, 2 * d], ab), fr: g11FR('d ≈', d, ab), solution: `C = πd, so d = C/π = ${C}/π ≈ ${g11h(d)} ${ab}` }; }
+  const rad = ri(r, 2, 30), C = 2 * rad;
+  return { topic: 'Circumference', stem: `Find the radius of a circle with a circumference of ${g11pi(C)} ${u}.`, ...g10NumChoices(r, rad, [C, C / 4, 2 * C, rad + 2]), fr: g10Num('r =', rad, ' ' + ab), solution: `C = 2πr, so ${g11pi(C)} = 2πr and r = ${rad} ${ab}.` };
+};
+TEMPLATES.g111Arc = (r) => {
+  const [P, A, B] = g10Letters(r, 3), kind = pick(r, ['len', 'len', 'meas', 'circ', 'rad']), m = ri(r, 6, 60) * 5, st = ri(r, 0, 359), rad = ri(r, 3, 20) + (r() < 0.25 ? 0.5 : 0), u = pick(r, ['in.', 'ft', 'm', 'cm']);
+  const L = (m / 360) * 2 * Math.PI * rad, Cfull = 2 * Math.PI * rad;
+  const F = { circles: [{ c: [0, 0], r: 1 }], pts: { [P]: [0, 0], [A]: g10P(st), [B]: g10P(st + m) }, segs: [[P, A], [P, B]], arcs: [{ a0: st, a1: st + m, red: true }], angs: [{ v: P, p: A, q: B, lab: '', r: 18, big: m > 180 }] };
+  if (kind === 'len') { F.angs[0].lab = `${m}°`; F.slab = [{ p: P, q: A, t: `${fmt(rad)} ${u}`, from: B }];
+    return { topic: 'Arc length', stem: `Find the length of the red arc ${A}${B}. Round to the nearest hundredth.`, ...g11Ch(r, L, [(m / 360) * Math.PI * rad, (m / 180) * Math.PI * rad * 2, m * rad, Cfull - L], u), fr: g11FR(`Arc length ≈`, L, u), draw: g10Fig(F), size: [340, 300],
+      solution: `Arc length = (m/360°) · 2πr = (${m}/360) · 2π(${fmt(rad)}) ≈ ${g11h(L)} ${u}` }; }
+  const Lr = Math.round(L * 100) / 100;
+  if (kind === 'meas') { F.slab = [{ p: P, q: A, t: `${fmt(rad)} ${u}`, from: B }]; F.txt = [{ at: g10P(st + m / 2, 1.28), t: `${g11h(Lr)} ${u}`, color: G10RED }];
+    return { topic: 'Arc length', stem: `The red arc is ${g11h(Lr)} ${u} long. Find the measure of arc ${A}${B}. Round to the nearest degree.`, ...g10DegChoices(r, m, [360 - m, m / 2, Math.round((Lr / rad) * 10), m + 15]), fr: { fields: [{ kind: 'number', label: `m(arc ${A}${B}) ≈`, suffix: '°' }], key: [String(m)], display: `≈ ${m}°`, check: (v) => { const n = parseNum(v[0]); return Math.abs(n - m) <= 1; } },
+      draw: g10Fig(F), size: [340, 300], solution: `${g11h(Lr)} = (m/360°) · 2π(${fmt(rad)})\nm = ${g11h(Lr)} · 360° / (2π · ${fmt(rad)}) ≈ ${m}°` }; }
+  if (kind === 'circ') { F.angs[0].lab = `${m}°`; F.txt = [{ at: g10P(st + m / 2, 1.28), t: `${g11h(Lr)} ${u}`, color: G10RED }];
+    return { topic: 'Arc length', stem: `The red arc is ${g11h(Lr)} ${u} long. Find the circumference of ⊙${P}. Round to the nearest hundredth.`, ...g11Ch(r, (Lr * 360) / m, [Lr * m / 360, (Lr * 360) / m / 2, Lr * 2], u), fr: g11FR('C ≈', (Lr * 360) / m, u), draw: g10Fig(F), size: [340, 300],
+      solution: `The arc is ${m}/360 of the circle, so C = ${g11h(Lr)} · 360/${m} ≈ ${g11h((Lr * 360) / m)} ${u}` }; }
+  F.angs[0].lab = `${m}°`; F.txt = [{ at: g10P(st + m / 2, 1.28), t: `${g11h(Lr)} ${u}`, color: G10RED }];
+  const R2 = (Lr * 360) / (m * 2 * Math.PI);
+  return { topic: 'Arc length', stem: `The red arc is ${g11h(Lr)} ${u} long. Find the radius of ⊙${P}. Round to the nearest hundredth.`, ...g11Ch(r, R2, [2 * R2, (Lr * 360) / m, R2 / 2, R2 + 3], u), fr: g11FR('r ≈', R2, u), draw: g10Fig(F), size: [340, 300],
+    solution: `${g11h(Lr)} = (${m}/360) · 2πr\nr = ${g11h(Lr)} · 360 / (${m} · 2π) ≈ ${g11h(R2)} ${u}` };
+};
+TEMPLATES.g111Wheel = (r) => {
+  if (r() < 0.5) { const d = pick(r, [8, 10, 12, 14, 16]), n = ri(r, 20, 150), inch = n * Math.PI * d, ft = inch / 12;
+    return { topic: 'Circumference in real life', stem: `A measuring wheel is used to find the length of a path. The diameter of the wheel is ${d} inches. The wheel makes ${n} complete revolutions along the path. How many feet long is the path? Round to the nearest hundredth.`,
+      ...g11Ch(r, ft, [inch, (n * d) / 12, (2 * Math.PI * d * n) / 12, ft / 2], 'ft'), fr: g11FR('Length ≈', ft, 'ft'), solution: `One revolution = the circumference = π(${d}) ≈ ${g11h(Math.PI * d)} in.\n${n} revolutions ≈ ${g11h(inch)} in. = ${g11h(inch)} ÷ 12 ≈ ${g11h(ft)} ft` }; }
+  const rcm = pick(r, [30, 32.5, 33, 35, 28]), D = ri(r, 2, 15) * 10, C = (2 * Math.PI * rcm) / 100, n = Math.floor(D / C);
+  return { topic: 'Circumference in real life', stem: `You ride your bicycle ${D} meters. The front wheel has a radius of ${fmt(rcm)} centimeters. How many complete revolutions does the front wheel make?`,
+    ...g10NumChoices(r, n, [Math.floor(D / (Math.PI * rcm / 100)), Math.ceil(D / C) + 1, Math.floor((D * 100) / rcm), n * 2]), fr: g10Num('Revolutions:', n),
+    solution: `Circumference = 2π(${fmt(rcm)}) ≈ ${g11h(2 * Math.PI * rcm)} cm ≈ ${g11h(C)} m.\n${D} ÷ ${g11h(C)} ≈ ${(D / C).toFixed(2)}, so the wheel makes ${n} complete revolutions.` };
+};
+TEMPLATES.g111Radians = (r) => {
+  if (r() < 0.5) { const dgs = pick(r, [15, 20, 30, 36, 40, 45, 50, 60, 70, 72, 80, 90, 100, 120, 135, 140, 150, 160, 210, 225, 240, 270, 300, 315, 330]), g = (a, b) => (b ? g(b, a % b) : a), k = g(dgs, 180), n = dgs / k, d = 180 / k;
+    const T = (nn, dd) => `${nn === 1 ? '' : nn}π${dd === 1 ? '' : `/${dd}`}`, ans = T(n, d);
+    return { topic: 'Converting degrees and radians', stem: `Convert ${dgs}° to radians. Write your answer in terms of π.`, ...buildChoices(r, `${ans} radians`, [T(d, n), T(n, 2 * d), T(2 * n, d), `${fmt(dgs / 180)}`].filter((x) => x !== ans).map((x) => `${x} radians`), () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Radians:' }], key: [n === 1 && d === 1 ? '\\pi' : `\\frac{${n === 1 ? '' : n}\\pi}{${d}}`], display: `${ans} radians`, check: (v) => numOk(v[0], (dgs * Math.PI) / 180, 1e-4) },
+      solution: `Multiply by π/180°: ${dgs}° · π/180° = ${ans} radians` }; }
+  const d = pick(r, [3, 4, 5, 6, 8, 9, 10, 12, 15, 18]), n = ri(r, 1, 2 * d - 1), dgs = (180 * n) / d; { const g = (a, b) => (b ? g(b, a % b) : a); if (g(n, d) > 1) return TEMPLATES.g111Radians(r); }
+  return { topic: 'Converting degrees and radians', stem: `Convert ${n === 1 ? '' : n}π/${d} radians to degrees.`, ...g10DegChoices(r, dgs, [dgs * 2, (n / d) * 57, dgs / 2, 360 - dgs]), fr: g10Num('Degrees:', dgs, '°'),
+    solution: `Multiply by 180°/π: (${n === 1 ? '' : n}π/${d}) · 180°/π = ${fmt(dgs)}°` };
+};
+TEMPLATES.g111Coord = (r) => {
+  if (r() < 0.55) { const h = ri(r, -5, 5), k = ri(r, -5, 5), rad = ri(r, 1, 10);
+    return { topic: 'Circumference from an equation', stem: `Find the circumference of the circle represented by the equation. Write the circumference in terms of π.   ${g107Eq(h, k, rad * rad)}`, ...buildChoices(r, g11pi(2 * rad), [g11pi(rad * rad), g11pi(rad), g11pi(2 * rad * rad), g11pi(4 * rad)].filter((x, i, X) => X.indexOf(x) === i && x !== g11pi(2 * rad)), () => null),
+      fr: { fields: [{ kind: 'expr', keys: 'num', label: 'C =' }], key: [`${2 * rad}\\pi`], display: g11pi(2 * rad), check: (v) => numOk(v[0], 2 * Math.PI * rad, 1e-6) }, solution: `r² = ${rad * rad}, so r = ${rad}.\nC = 2πr = ${g11pi(2 * rad)}` }; }
+  for (;;) { const P = [ri(r, -6, 6), ri(r, -6, 6)], Q = [ri(r, -6, 6), ri(r, -6, 6)], d = g14Len(P, Q); if (P[0] === Q[0] || P[1] === Q[1]) continue; const L = (Math.PI * d) / 2, ex = Number.isInteger(d);
+    return { topic: 'Circumference from an equation', stem: `A semicircle has endpoints ${pt(P)} and ${pt(Q)}. Find the arc length of the semicircle. Round to the nearest hundredth.`, ...g11Ch(r, L, [Math.PI * d, Math.PI * d * d / 4, d * 2, L / 2]), fr: g11FR('Arc length ≈', L),
+      solution: `The endpoints are the ends of a diameter: d = √(${g10sq(Q[0] - P[0])} + ${g10sq(Q[1] - P[1])}) = ${ex ? d : `√${Math.round(d * d)}`}.\nA semicircle is half the circumference: ½ · π · ${ex ? d : `√${Math.round(d * d)}`} ≈ ${g11h(L)}` }; }
+};
+// shaded composite regions: rectangle with semicircles cut out of (or added to) the short ends
+function g11TrackDraw(cv, { L, W, out, labL, labW }) {
+  const ctx = cv._ctx, Wc = cv._w, Hc = cv._h, tot = out ? L + W : L, s = Math.min((Wc - 60) / tot, (Hc - 60) / W), x0 = (Wc - L * s) / 2, y0 = (Hc - W * s) / 2, rr = (W / 2) * s, cy = y0 + rr;
+  ctx.clearRect(0, 0, Wc, Hc); ctx.beginPath();
+  if (out) { ctx.moveTo(x0, y0); ctx.lineTo(x0 + L * s, y0); ctx.arc(x0 + L * s, cy, rr, -Math.PI / 2, Math.PI / 2); ctx.lineTo(x0, y0 + W * s); ctx.arc(x0, cy, rr, Math.PI / 2, (3 * Math.PI) / 2); }
+  else { ctx.moveTo(x0, y0); ctx.lineTo(x0 + L * s, y0); ctx.arc(x0 + L * s, cy, rr, -Math.PI / 2, Math.PI / 2, true); ctx.lineTo(x0, y0 + W * s); ctx.arc(x0, cy, rr, Math.PI / 2, (3 * Math.PI) / 2, true); }
+  ctx.closePath(); ctx.fillStyle = 'rgba(120,175,220,0.45)'; ctx.fill(); ctx.strokeStyle = G10INK; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = G10BLUE; ctx.font = '15px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(labL, x0 + (L * s) / 2, y0 + W * s + 6);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(labW, x0 + L * s + (out ? rr : 0) + 8, cy);
+  if (!out) { ctx.strokeStyle = '#999'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x0 + L * s, y0); ctx.lineTo(x0 + L * s, y0 + W * s); ctx.stroke(); ctx.setLineDash([]); }
+}
+TEMPLATES.g111Perim = (r) => {
+  const L = ri(r, 8, 24), W = ri(r, 3, Math.min(12, L - 2)), out = r() < 0.5, P = 2 * L + Math.PI * W;
+  return { topic: 'Perimeter with arcs', stem: `Find the perimeter of the shaded region. ${out ? 'The ends are semicircles.' : 'Semicircles are cut out of both ends.'} Round to the nearest hundredth.`, ...g11Ch(r, P, [2 * L + 2 * W, 2 * L + 2 * Math.PI * W, L + Math.PI * W, 2 * L + Math.PI * W / 2]),
+    fr: g11FR('Perimeter ≈', P), draw: (cv) => g11TrackDraw(cv, { L, W, out, labL: String(L), labW: String(W) }), size: [400, 220],
+    solution: `The two straight sides add to 2 · ${L} = ${2 * L}.\nThe two semicircles each have diameter ${W}; together they make one full circle: π · ${W} ≈ ${g11h(Math.PI * W)}.\nPerimeter ≈ ${2 * L} + ${g11h(Math.PI * W)} = ${g11h(P)}` };
+};
+
+/* ---------- 11.2 Areas of Circles and Sectors ---------- */
+TEMPLATES.g112Area = (r) => {
+  const kind = pick(r, ['Ar', 'Ad', 'rA', 'dA', 'dApi']), u = pick(r, ['inches', 'feet', 'meters', 'centimeters']), ab = { inches: 'in.', feet: 'ft', meters: 'm', centimeters: 'cm' }[u];
+  if (kind === 'Ar') { const rad = ri(r, 2, 20), A = Math.PI * rad * rad; return { topic: 'Area of a circle', stem: `Find the area of a circle with a radius of ${rad} ${u}. Round to the nearest hundredth.`, ...g11Ch(r, A, [2 * Math.PI * rad, Math.PI * rad, Math.PI * 4 * rad * rad], `${ab}²`), fr: g11FR('A ≈', A, `${ab}²`), solution: `A = πr² = π(${rad})² = ${g11pi(rad * rad)} ≈ ${g11h(A)} ${ab}²` }; }
+  if (kind === 'Ad') { const d = ri(r, 2, 30), A = (Math.PI * d * d) / 4; return { topic: 'Area of a circle', stem: `Find the area of a circle with a diameter of ${d} ${u}. Round to the nearest hundredth.`, ...g11Ch(r, A, [Math.PI * d * d, Math.PI * d, (Math.PI * d * d) / 2], `${ab}²`), fr: g11FR('A ≈', A, `${ab}²`), solution: `r = ${d} ÷ 2 = ${fmt(d / 2)}.\nA = πr² = π(${fmt(d / 2)})² ≈ ${g11h(A)} ${ab}²` }; }
+  if (kind === 'rA') { const A = ri(r, 10, 500), rad = Math.sqrt(A / Math.PI); return { topic: 'Area of a circle', stem: `Find the radius of a circle with an area of ${A} square ${u}. Round to the nearest hundredth.`, ...g11Ch(r, rad, [A / Math.PI, Math.sqrt(A), 2 * rad, A / (2 * Math.PI)], ab), fr: g11FR('r ≈', rad, ab), solution: `A = πr², so r = √(A/π) = √(${A}/π) ≈ ${g11h(rad)} ${ab}` }; }
+  if (kind === 'dA') { const A = ri(r, 10, 400) / (r() < 0.4 ? 10 : 1), d = 2 * Math.sqrt(A / Math.PI); return { topic: 'Area of a circle', stem: `Find the diameter of a circle with an area of ${fmt(A)} square ${u}. Round to the nearest hundredth.`, ...g11Ch(r, d, [d / 2, A / Math.PI, Math.sqrt(A), 2 * A / Math.PI], ab), fr: g11FR('d ≈', d, ab), solution: `r = √(${fmt(A)}/π) ≈ ${g11h(d / 2)}, so d = 2r ≈ ${g11h(d)} ${ab}` }; }
+  const rad = ri(r, 2, 30);
+  return { topic: 'Area of a circle', stem: `Find the diameter of a circle with an area of ${g11pi(rad * rad)} square ${u}.`, ...g10NumChoices(r, 2 * rad, [rad, rad * rad, 4 * rad, rad + 2]), fr: g10Num('d =', 2 * rad, ' ' + ab), solution: `πr² = ${g11pi(rad * rad)}, so r² = ${rad * rad}, r = ${rad}, and d = ${2 * rad} ${ab}.` };
+};
+TEMPLATES.g112Sector = (r) => {
+  const [F, D, E, G] = g10Letters(r, 4), m = ri(r, 5, 35) * 5, st = ri(r, 0, 359), rad = ri(r, 3, 30), u = pick(r, ['in.', 'ft', 'm', 'cm']), big = r() < 0.35;
+  const As = (m / 360) * Math.PI * rad * rad, Ab = Math.PI * rad * rad - As, ans = big ? Ab : As;
+  const draw = g10Fig({ circles: [{ c: [0, 0], r: 1 }], sectors: [{ a0: st, a1: st + m, fill: 'rgba(230,140,90,0.55)' }, { a0: st + m, a1: st + 360, fill: 'rgba(110,160,215,0.45)' }], pts: { [F]: [0, 0], [D]: g10P(st), [E]: g10P(st + m), [G]: g10P(st + m + (360 - m) / 2) },
+    segs: [[F, D], [F, E]], angs: [{ v: F, p: D, q: E, lab: `${m}°`, r: 18 }], slab: [{ p: F, q: D, t: `${rad} ${u}`, from: E }] });
+  return { topic: 'Areas of sectors', stem: `Find the area of the ${big ? 'larger' : 'smaller'} sector formed by ∠${D}${F}${E}. Round to the nearest hundredth.`, ...g11Ch(r, ans, [big ? As : Ab, (m / 360) * 2 * Math.PI * rad, Math.PI * rad * rad, (m / 180) * Math.PI * rad * rad], `${u}²`),
+    fr: g11FR('Area ≈', ans, `${u}²`), draw, size: [340, 300],
+    solution: `Area of a sector = (arc measure / 360°) · πr².\n${big ? `The larger sector has arc 360° − ${m}° = ${360 - m}°.\nArea = (${360 - m}/360) · π(${rad})² ≈ ${g11h(Ab)} ${u}²` : `Area = (${m}/360) · π(${rad})² ≈ ${g11h(As)} ${u}²`}` };
+};
+TEMPLATES.g112FromSector = (r) => {
+  const [M, J, K] = g10Letters(r, 3), m = ri(r, 6, 60) * 5, rad = ri(r, 2, 15), As = Math.round((m / 360) * Math.PI * rad * rad * 100) / 100, st = ri(r, 0, 359), askR = r() < 0.5, u = pick(r, ['cm', 'm', 'in.', 'ft']);
+  const Ac = (As * 360) / m, R = Math.sqrt(Ac / Math.PI);
+  return { topic: 'Areas of sectors', stem: `The area of the shaded sector is ${g11h(As)} ${u}². Find the ${askR ? 'radius' : 'area'} of ⊙${M}. Round to the nearest hundredth.`, ...(askR ? g11Ch(r, R, [Ac / Math.PI, Math.sqrt(As / Math.PI), 2 * R, R + 1.5], u) : g11Ch(r, Ac, [(As * m) / 360, As * 2, Ac / 2, As + 360 / m], `${u}²`)),
+    fr: askR ? g11FR('r ≈', R, u) : g11FR('Area ≈', Ac, `${u}²`),
+    draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], sectors: [{ a0: st, a1: st + m, fill: 'rgba(120,190,130,0.55)' }], pts: { [M]: [0, 0], [J]: g10P(st), [K]: g10P(st + m) }, segs: [[M, J], [M, K]], angs: [{ v: M, p: J, q: K, lab: `${m}°`, r: 18, big: m > 180 }] }), size: [340, 300],
+    solution: `The sector is ${m}/360 of the circle: ${g11h(As)} = (${m}/360) · (area of ⊙${M}).\nArea of ⊙${M} = ${g11h(As)} · 360/${m} ≈ ${g11h(Ac)} ${u}²${askR ? `\nr = √(${g11h(Ac)}/π) ≈ ${g11h(R)} ${u}` : ''}` };
+};
+function g112ShadeDraw(cv, { kind, R, rr, lab1, lab2 }) {
+  const ctx = cv._ctx, W = cv._w, H = cv._h, cx = W / 2, cy = H / 2, s = (Math.min(W, H) / 2 - 30) / R, fill = 'rgba(110,160,215,0.5)';
+  ctx.clearRect(0, 0, W, H); ctx.strokeStyle = G10INK; ctx.lineWidth = 2;
+  if (kind === 'ring' || kind === 'half') {
+    ctx.beginPath(); if (kind === 'ring') { ctx.arc(cx, cy, R * s, 0, 2 * Math.PI); ctx.arc(cx, cy, rr * s, 0, 2 * Math.PI, true); } else { ctx.arc(cx, cy, R * s, -Math.PI / 2, Math.PI / 2); ctx.arc(cx, cy, rr * s, Math.PI / 2, -Math.PI / 2, true); ctx.closePath(); }
+    ctx.fillStyle = fill; ctx.fill('evenodd');
+    ctx.beginPath(); ctx.arc(cx, cy, R * s, 0, 2 * Math.PI); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy, rr * s, 0, 2 * Math.PI); ctx.stroke();
+    ctx.fillStyle = G10INK; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, 2 * Math.PI); ctx.fill();
+    ctx.strokeStyle = G10RED; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - rr * s * 0.71, cy - rr * s * 0.71); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - R * s * 0.71, cy + R * s * 0.71); ctx.stroke();
+    ctx.fillStyle = G10BLUE; ctx.font = '15px Georgia, serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText(lab1, cx - rr * s * 0.71 - 3, cy - rr * s * 0.71); ctx.textBaseline = 'top'; ctx.fillText(lab2, cx - R * s * 0.71 - 3, cy + R * s * 0.71);
+    return;
+  }
+  // a square with a circle inside it (square side = 2R): shade the corners, or a circle inside a square shaded
+  const sq = 2 * R * s; ctx.beginPath(); ctx.rect(cx - sq / 2, cy - sq / 2, sq, sq); ctx.arc(cx, cy, R * s, 0, 2 * Math.PI, true); ctx.fillStyle = fill; ctx.fill('evenodd');
+  ctx.strokeRect(cx - sq / 2, cy - sq / 2, sq, sq); ctx.beginPath(); ctx.arc(cx, cy, R * s, 0, 2 * Math.PI); ctx.stroke();
+  ctx.fillStyle = G10BLUE; ctx.font = '15px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(lab1, cx, cy + sq / 2 + 5);
+}
+TEMPLATES.g112Shaded = (r) => {
+  const kind = pick(r, ['ring', 'ring', 'half', 'square']), u = pick(r, ['m', 'cm', 'in.', 'ft']);
+  if (kind === 'square') { const s = ri(r, 4, 30) * 2, R = s / 2, A = s * s - Math.PI * R * R;
+    return { topic: 'Areas of shaded regions', stem: `A circle fits exactly inside a square with side length ${s} ${u}. Find the area of the shaded region. Round to the nearest hundredth.`, ...g11Ch(r, A, [s * s - Math.PI * s * s, Math.PI * R * R, s * s - 2 * Math.PI * R, 4 * s - Math.PI * s], `${u}²`), fr: g11FR('Area ≈', A, `${u}²`),
+      draw: (cv) => g112ShadeDraw(cv, { kind, R, lab1: `${s} ${u}` }), size: [300, 300], solution: `Square − circle = ${s}² − π(${fmt(R)})² = ${s * s} − ${g11pi(R * R)} ≈ ${g11h(A)} ${u}²` }; }
+  const R = ri(r, 8, 30), rr = ri(r, 2, R - 4), full = Math.PI * (R * R - rr * rr), A = kind === 'half' ? full / 2 : full;
+  return { topic: 'Areas of shaded regions', stem: `Find the area of the shaded region${kind === 'half' ? ' (half of the ring)' : ''}. The circles have the same center. Round to the nearest hundredth.`, ...g11Ch(r, A, [Math.PI * (R - rr) ** 2, kind === 'half' ? full : full / 2, Math.PI * R * R, 2 * Math.PI * (R - rr)], `${u}²`), fr: g11FR('Area ≈', A, `${u}²`),
+    draw: (cv) => g112ShadeDraw(cv, { kind, R, rr, lab1: `${rr} ${u}`, lab2: `${R} ${u}` }), size: [300, 300],
+    solution: `Big circle − small circle = π(${R})² − π(${rr})² = ${g11pi(R * R - rr * rr)}${kind === 'half' ? `.\nHalf of it: ${g11pi((R * R - rr * rr) / 2)}` : ''} ≈ ${g11h(A)} ${u}²` };
+};
+
+/* ---------- 11.3 Areas of Polygons ---------- */
+TEMPLATES.g113Kite = (r) => {
+  const kite = r() < 0.5, a = ri(r, 2, 12), c = kite ? ri(r, 2, 12) : a, b = ri(r, 2, 10), d1 = a + c, d2 = 2 * b, A = (d1 * d2) / 2, L = g10Letters(r, 4);
+  const pts = { [L[0]]: [-a, 0], [L[1]]: [0, b], [L[2]]: [c, 0], [L[3]]: [0, -b], _o: [0, 0] };
+  const showParts = r() < 0.5;
+  return { topic: 'Areas of kites and rhombuses', stem: `Find the area of the ${kite && a !== c ? 'kite' : 'rhombus'}.`, ...g10NumChoices(r, A, [d1 * d2, A / 2, a * b + c * b * 2, (d1 + d2) * 2]), fr: g10Num('Area:', A, ' square units'),
+    draw: g10Fig({ pts, noDot: ['_o'], segs: [[L[0], L[1]], [L[1], L[2]], [L[2], L[3]], [L[3], L[0]]], dsegs: [[L[0], L[2]], [L[1], L[3]]], right: [[L[2], '_o', L[1]]],
+      slab: showParts ? [{ p: L[0], q: '_o', t: String(a), side: 1 }, { p: '_o', q: L[2], t: String(c), side: 1 }, { p: '_o', q: L[1], t: String(b), side: -1 }, { p: '_o', q: L[3], t: String(b), side: -1 }] : [{ p: L[0], q: L[2], t: String(d1), side: 1 }, { p: L[1], q: L[3], t: String(d2), side: -1 }],
+      ticks: kite && a !== c ? [[L[0], L[1], 1], [L[0], L[3], 1], [L[1], L[2], 2], [L[2], L[3], 2]] : [[L[0], L[1], 1], [L[1], L[2], 1], [L[2], L[3], 1], [L[3], L[0], 1]], margin: 34 }), size: [360, 280],
+    solution: `The diagonals are ${showParts ? `${a} + ${c} = ${d1} and ${b} + ${b} = ${d2}` : `${d1} and ${d2}`}.\nA = ½d₁d₂ = ½ · ${d1} · ${d2} = ${fmt(A)} square units` };
+};
+const g11Poly = (n) => (n === 3 ? 'an equilateral triangle' : n === 4 ? 'a square' : `a regular ${G11NGON[n]}`);
+const G11NGON = { 3: 'equilateral triangle', 4: 'square', 5: 'pentagon', 6: 'hexagon', 7: 'heptagon', 8: 'octagon', 9: 'nonagon', 10: 'decagon', 12: 'dodecagon', 18: '18-gon', 20: '20-gon', 24: '24-gon', 36: '36-gon' };
+TEMPLATES.g113Central = (r) => {
+  const n = pick(r, [5, 6, 8, 9, 10, 12, 18, 20, 24, 36, 7]), c = 360 / n;
+  return { topic: 'Central angles of regular polygons', stem: `Find the measure of a central angle of a regular polygon with ${n} sides.`, ...g10DegChoices(r, Math.round(c * 100) / 100, [180 - c, ((n - 2) * 180) / n, c / 2, 2 * c].map((x) => Math.round(x * 100) / 100)), fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Central angle:', suffix: '°' }], key: [fmt(c)], display: `${fmt(c)}°`, check: (v) => numOk(v[0], c, 0.006 / c) },
+    solution: `A central angle of a regular n-gon is 360° ÷ n = 360° ÷ ${n} ${Number.isInteger(c) ? '=' : '≈'} ${fmt(c)}°` };
+};
+TEMPLATES.g113Angles = (r) => {
+  const n = pick(r, [5, 6, 8, 8, 10]), L = g10Letters(r, n + 2), J = L[n], K = L[n + 1], V = L.slice(0, n), c = 360 / n, i = ri(r, 0, n - 1), j = (i + 1) % n;
+  const st = 90 + 180 / n, P = V.map((_, k) => g10P(st - k * c)), Km = [(P[i][0] + P[j][0]) / 2, (P[i][1] + P[j][1]) / 2];
+  const asks = [[`∠${V[i]}${J}${V[j]}`, c, `It is a central angle: 360° ÷ ${n} = ${fmt(c)}°.`], [`∠${V[i]}${J}${K}`, c / 2, `The apothem ${g10seg(J + K)} bisects the central angle ∠${V[i]}${J}${V[j]}: ${fmt(c)}° ÷ 2 = ${fmt(c / 2)}°.`],
+    [`∠${K}${V[i]}${J}`, 90 - c / 2, `△${V[i]}${J}${K} has a right angle at ${K}, so m∠${K}${V[i]}${J} = 180° − 90° − ${fmt(c / 2)}° = ${fmt(90 - c / 2)}°.`], [`∠${V[(i + n - 1) % n]}${J}${V[j]}`, 2 * c, `It is made of two central angles: 2 · ${fmt(c)}° = ${fmt(2 * c)}°.`]];
+  const [nm, ans, why] = pick(r, asks);
+  return { topic: 'Angles in regular polygons', stem: `Find m${nm} in regular ${G11NGON[n]} ${V.join('')} with center ${J}.`, ...g10DegChoices(r, ans, [c, c / 2, 90 - c / 2, 2 * c, ((n - 2) * 180) / n]), fr: g10Num(`m${nm} =`, ans, '°'),
+    draw: g10Fig({ pts: { ...Object.fromEntries(V.map((v, k) => [v, P[k]])), [J]: [0, 0], [K]: Km }, segs: [...V.map((v, k) => [v, V[(k + 1) % n]]), [J, V[i]], [J, V[j]], [J, K]], right: [[V[i], K, J]], margin: 30 }), size: [340, 320],
+    solution: `In a regular ${n}-gon each central angle is 360° ÷ ${n} = ${fmt(c)}°.\n${why}` };
+};
+TEMPLATES.g113Area = (r) => {
+  const n = pick(r, [3, 4, 5, 6, 8, 10, 12, 9]), giveR = r() < 0.5, v = ri(r, 3, 20) + (r() < 0.3 ? 0.5 : 0), half = Math.PI / n, R = giveR ? v : v / Math.cos(half), a = giveR ? v * Math.cos(half) : v, s = 2 * R * Math.sin(half), A = 0.5 * a * n * s;
+  const show = r() < 0.5, P = [...Array(n)].map((_, k) => g10P(90 + 180 / n - (k * 360) / n)), M = [(P[0][0] + P[1][0]) / 2, (P[0][1] + P[1][1]) / 2], k = 1 / R;
+  const draw = show ? g10Fig({ pts: { ...Object.fromEntries(P.map((p, i) => [`_${i}`, p])), _c: [0, 0], _m: M }, noDot: [...P.map((_, i) => `_${i}`), '_m'], segs: [...P.map((_, i) => [`_${i}`, `_${(i + 1) % n}`]), giveR ? ['_c', '_1'] : ['_c', '_m']], right: giveR ? [] : [['_0', '_m', '_c']],
+    slab: [giveR ? { p: '_c', q: '_1', t: fmt(v), side: 1 } : { p: '_c', q: '_m', t: fmt(v), side: 1 }], margin: 30 }) : undefined;
+  return { topic: 'Areas of regular polygons', stem: `Find the area of ${g11Poly(n)} with ${giveR ? 'a radius' : 'an apothem'} of ${fmt(v)} units. Round to the nearest tenth.`, ...buildChoices(r, `≈ ${g9r(A)}`, [A / 2, n * s * R / 2, Math.PI * R * R, A * 1.25].map((x) => `≈ ${g9r(x)}`).filter((x, i, X) => X.indexOf(x) === i && x !== `≈ ${g9r(A)}`), (i) => `≈ ${g9r(A + i + 3)}`),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Area ≈', suffix: ' square units' }], key: [g9r(A)], display: `≈ ${g9r(A)} square units`, check: (x) => numOk(x[0], A, 0.06 / Math.max(1, A)) }, draw, size: show ? [320, 300] : undefined,
+    solution: `Each central angle is 360° ÷ ${n} = ${fmt(360 / n)}°, so half of it is ${fmt(180 / n)}°.\n${giveR ? `Apothem a = ${fmt(v)} · cos ${fmt(180 / n)}° ≈ ${g11h(a)}` : `Radius r = ${fmt(v)} ÷ cos ${fmt(180 / n)}° ≈ ${g11h(R)}`}\nSide s = 2 · ${g11h(R)} · sin ${fmt(180 / n)}° ≈ ${g11h(s)}, perimeter P ≈ ${g11h(n * s)}\nA = ½aP ≈ ½ · ${g11h(a)} · ${g11h(n * s)} ≈ ${g9r(A)} square units` };
+};
+TEMPLATES.g113Shaded = (r) => {
+  const kind = pick(r, ['sq', 'tri', 'hex']), R = ri(r, 3, 15), n = { sq: 4, tri: 3, hex: 6 }[kind], Ap = 0.5 * n * R * R * Math.sin((2 * Math.PI) / n), A = Math.PI * R * R - Ap;
+  const P = [...Array(n)].map((_, k) => g10P(90 + (k * 360) / n));
+  return { topic: 'Areas of shaded regions', stem: `${g11Poly(n)[0].toUpperCase()}${g11Poly(n).slice(1)} is inscribed in a circle with radius ${R}. Find the area of the shaded region (inside the circle but outside the polygon). Round to the nearest tenth.`,
+    ...buildChoices(r, `≈ ${g9r(A)}`, [Math.PI * R * R, Ap, Math.PI * R * R - Ap / 2, 2 * Math.PI * R - Ap].map((x) => `≈ ${g9r(x)}`).filter((x, i, X) => X.indexOf(x) === i && x !== `≈ ${g9r(A)}`), (i) => `≈ ${g9r(A + i + 2)}`),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Area ≈', suffix: ' square units' }], key: [g9r(A)], display: `≈ ${g9r(A)} square units`, check: (x) => numOk(x[0], A, 0.06 / Math.max(1, A)) },
+    draw: g10Fig({ circles: [{ c: [0, 0], r: 1 }], sectors: [{ a0: 0, a1: 360, fill: 'rgba(120,190,130,0.5)' }], polys: [{ pts: P, fill: '#ffffff', stroke: G10INK, over: true }], pts: { _c: [0, 0], _v: P[0] }, noDot: ['_v'], segs: [['_c', '_v']], slab: [{ p: '_c', q: '_v', t: String(R), side: 1 }], margin: 26 }), size: [300, 300],
+    solution: `Circle: π(${R})² ≈ ${g11h(Math.PI * R * R)}.\nThe ${G11NGON[n]} is ${n} triangles, each with two sides ${R} and an angle of ${fmt(360 / n)}°: area = ${n} · ½ · ${R} · ${R} · sin ${fmt(360 / n)}° ≈ ${g11h(Ap)}.\nShaded ≈ ${g11h(Math.PI * R * R)} − ${g11h(Ap)} ≈ ${g9r(A)}` };
+};
+
+/* ---------- 11.4 Modeling with Area ---------- */
+TEMPLATES.g114Density = (r) => {
+  const kind = pick(r, ['circle', 'rect', 'people', 'radius']);
+  if (kind === 'circle') { const pop = ri(r, 50, 900) * 1000, rad = ri(r, 3, 15), A = Math.PI * rad * rad, d = pop / A;
+    return { topic: 'Population density', stem: `About ${pop.toLocaleString('en-US')} people live in a circular region with a ${rad}-mile radius. Find the population density in people per square mile. Round to the nearest whole number.`,
+      ...g10NumChoices(r, Math.round(d), [Math.round(pop / (2 * Math.PI * rad)), Math.round(pop / (rad * rad)), Math.round(pop / (Math.PI * 4 * rad * rad)), Math.round(d * 2)]), fr: { fields: [{ kind: 'number', label: 'Density ≈', suffix: ' people per square mile' }], key: [String(Math.round(d))], display: `≈ ${Math.round(d)} people per square mile`, check: (v) => Math.abs(parseNum(v[0]) - d) <= 1.5 },
+      solution: `Area = π(${rad})² ≈ ${g11h(A)} square miles.\nDensity = ${pop.toLocaleString('en-US')} ÷ ${g11h(A)} ≈ ${Math.round(d)} people per square mile` }; }
+  if (kind === 'rect') { const pop = ri(r, 100, 3000) * 1000, L = ri(r, 10, 40) * 10, W = ri(r, 5, 30) * 10, d = pop / (L * W);
+    return { topic: 'Population density', stem: `A rectangular state is about ${L} miles long and ${W} miles wide and has a population of about ${pop.toLocaleString('en-US')} people. Find the population density in people per square mile. Round to the nearest tenth.`,
+      ...buildChoices(r, `≈ ${g9r(d)}`, [pop / (2 * (L + W)), pop / (L + W), d * 10].map((x) => `≈ ${g9r(x)}`).filter((x) => x !== `≈ ${g9r(d)}`), (i) => `≈ ${g9r(d + i + 1)}`), fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Density ≈', suffix: ' people per square mile' }], key: [g9r(d)], display: `≈ ${g9r(d)}`, check: (v) => numOk(v[0], d, 0.06 / Math.max(1, d)) },
+      solution: `Area = ${L} · ${W} = ${(L * W).toLocaleString('en-US')} square miles.\nDensity = ${pop.toLocaleString('en-US')} ÷ ${(L * W).toLocaleString('en-US')} ≈ ${g9r(d)} people per square mile` }; }
+  if (kind === 'people') { const rad = ri(r, 2, 10), dens = ri(r, 300, 8000), n = dens * Math.PI * rad * rad;
+    return { topic: 'Population density', stem: `A circular region with a ${rad}-mile radius has a population density of ${dens.toLocaleString('en-US')} people per square mile. Find the number of people who live in the region. Round to the nearest whole number.`,
+      ...g10NumChoices(r, Math.round(n), [Math.round(dens * 2 * Math.PI * rad), Math.round(dens * rad * rad), Math.round(dens * Math.PI * (2 * rad) ** 2), Math.round(n / 2)]), fr: { fields: [{ kind: 'number', label: 'People ≈' }], key: [String(Math.round(n))], display: `≈ ${Math.round(n).toLocaleString('en-US')}`, check: (v) => Math.abs(parseNum(String(v[0]).replace(/,/g, '')) - n) <= Math.max(2, n * 0.0005) },
+      solution: `Area = π(${rad})² ≈ ${g11h(Math.PI * rad * rad)} square miles.\nPeople = density · area = ${dens} · ${g11h(Math.PI * rad * rad)} ≈ ${Math.round(n).toLocaleString('en-US')}` }; }
+  const pop = ri(r, 20, 900) * 1000, dens = ri(r, 200, 6000), R = Math.sqrt(pop / dens / Math.PI);
+  return { topic: 'Population density', stem: `About ${pop.toLocaleString('en-US')} people live in a circular region with a population density of about ${dens.toLocaleString('en-US')} people per square mile. Find the radius of the region. Round to the nearest tenth.`,
+    ...buildChoices(r, `≈ ${g9r(R)} mi`, [pop / dens / Math.PI, Math.sqrt(pop / dens), 2 * R, pop / dens / (2 * Math.PI)].map((x) => `≈ ${g9r(x)} mi`).filter((x, i, X) => X.indexOf(x) === i && x !== `≈ ${g9r(R)} mi`), (i) => `≈ ${g9r(R + i + 1)} mi`),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Radius ≈', suffix: ' mi' }], key: [g9r(R)], display: `≈ ${g9r(R)} mi`, check: (v) => numOk(v[0], R, 0.06 / Math.max(1, R)) },
+    solution: `Area = people ÷ density = ${pop.toLocaleString('en-US')} ÷ ${dens.toLocaleString('en-US')} ≈ ${g11h(pop / dens)} square miles.\nπr² = ${g11h(pop / dens)}, so r = √(${g11h(pop / dens)}/π) ≈ ${g9r(R)} mi` };
+};
+TEMPLATES.g114Units = (r) => {
+  if (r() < 0.5) { const a = ri(r, 2, 6), b = ri(r, a, 9), knots = a * b * 144 * ri(r, 40, 160), d = knots / (a * b * 144);
+    return { topic: 'Density in real life', stem: `One measure of rug quality is knot density. A rug that is ${a} feet by ${b} feet is made of ${knots.toLocaleString('en-US')} knots. Find the knot density in knots per square inch.`,
+      ...g10NumChoices(r, d, [knots / (a * b), knots / (a * b * 12), d * 2, Math.round(knots / ((a + b) * 24))]), fr: g10Num('Knots per square inch:', d),
+      solution: `${a} ft = ${12 * a} in. and ${b} ft = ${12 * b} in., so the area is ${12 * a} · ${12 * b} = ${a * b * 144} square inches.\nDensity = ${knots.toLocaleString('en-US')} ÷ ${a * b * 144} = ${fmt(d)} knots per square inch` }; }
+  const b1 = ri(r, 4, 9) * 100, b2 = b1 + ri(r, 1, 4) * 50, h = ri(r, 5, 9) * 100, per = pick(r, [30000, 32000, 36000, 34000]), area = ((b1 + b2) / 2) * h, acres = area / 43560, seeds = Math.round(acres * per);
+  return { topic: 'Density in real life', stem: `A farmer wants to plant corn so that there are ${per.toLocaleString('en-US')} plants per acre in a field shaped like a trapezoid with bases ${b1} feet and ${b2} feet and height ${h} feet. How many seeds does the farmer need? (1 acre = 43,560 ft²) Round to the nearest whole number.`,
+    ...g10NumChoices(r, seeds, [Math.round(((b1 + b2) * h * per) / 43560), Math.round((b1 * h * per) / 43560), Math.round(area * per / 4356), Math.round(seeds / 2)]), fr: { fields: [{ kind: 'number', label: 'Seeds ≈' }], key: [String(seeds)], display: `≈ ${seeds.toLocaleString('en-US')}`, check: (v) => Math.abs(parseNum(String(v[0]).replace(/,/g, '')) - acres * per) <= Math.max(3, seeds * 0.0005) },
+    solution: `Area = ½(${b1} + ${b2}) · ${h} = ${area.toLocaleString('en-US')} ft² ≈ ${(acres).toFixed(3)} acres.\nSeeds = ${per.toLocaleString('en-US')} · ${(acres).toFixed(3)} ≈ ${seeds.toLocaleString('en-US')}` };
+};
+TEMPLATES.g114Max = (r) => {
+  if (r() < 0.5) { const s = ri(r, 10, 80), A = s * s;
+    return { topic: 'Maximizing and minimizing', stem: `A rectangular exhibit must cover ${A.toLocaleString('en-US')} square feet. What dimensions use the least amount of fencing?`,
+      ...buildChoices(r, `${s} ft by ${s} ft`, [[s / 2, 2 * s], [s - (s % 5 ? 1 : 5) || 1, A / (s - (s % 5 ? 1 : 5) || 1)], [A / 10, 10]].filter(([a, b]) => Number.isInteger(a) && Number.isInteger(b) && a !== b).map(([a, b]) => `${fmt(a)} ft by ${fmt(b)} ft`), (i) => `${s + i + 1} ft by ${fmt(A / (s + i + 1))} ft`),
+      fr: { fields: [{ kind: 'number', label: 'Length:', suffix: ' ft' }, { kind: 'number', label: 'Width:', suffix: ' ft' }], key: [String(s), String(s)], display: `${s} ft by ${s} ft`, check: (v) => numEq(v[0], s) && numEq(v[1], s) },
+      solution: `For a fixed area, a square has the smallest perimeter. √${A} = ${s}, so use a ${s} ft by ${s} ft square (perimeter ${4 * s} ft).` }; }
+  const P = ri(r, 10, 100) * 4, s = P / 4;
+  return { topic: 'Maximizing and minimizing', stem: `A rectangular field has a perimeter of ${P} yards. What dimensions give the greatest possible area, and what is that area?`,
+    ...buildChoices(r, `${s} yd by ${s} yd; ${(s * s).toLocaleString('en-US')} yd²`, [`${s / 2} yd by ${1.5 * s} yd; ${(0.75 * s * s).toLocaleString('en-US')} yd²`, `${P / 2} yd by ${P / 2} yd; ${((P / 2) ** 2).toLocaleString('en-US')} yd²`, `${s - 1} yd by ${s + 1} yd; ${(s * s - 1).toLocaleString('en-US')} yd²`], () => null),
+    fr: { fields: [{ kind: 'number', label: 'Length:', suffix: ' yd' }, { kind: 'number', label: 'Width:', suffix: ' yd' }, { kind: 'number', label: 'Area:', suffix: ' yd²' }], key: [String(s), String(s), String(s * s)], display: `${s} yd by ${s} yd; ${s * s} yd²`, check: (v) => numEq(v[0], s) && numEq(v[1], s) && numEq(v[2], s * s) },
+    solution: `With ℓ + w = ${P / 2}, the area ℓ(${P / 2} − ℓ) is greatest when ℓ = w = ${s}.\nA square ${s} yd by ${s} yd has area ${(s * s).toLocaleString('en-US')} yd².` };
+};
+/* ==== GEOMETRY CH11 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -22073,6 +23311,26 @@ Object.assign(SETS, {
   'geo-9-5': { subject: 'geometry', title: '9.5 The Sine and Cosine Ratios', items: [['g95Ratios', 4], ['g95Cofunction', 3], ['g95FindVars', 4]] },
   'geo-9-6': { subject: 'geometry', title: '9.6 Solving Right Triangles', items: [['g96Which', 2], ['g96Inverse', 3], ['g96Solve', 5], ['g96Word', 2]] },
   'geo-9-7': { subject: 'geometry', title: '9.7 Law of Sines and Law of Cosines', items: [['g97Calc', 2], ['g97Area', 3], ['g97SinesAAS', 2], ['g97SinesSSA', 1], ['g97CosSSS', 2], ['g97CosSAS', 2]] },
+  // ----- Geometry, Chapter 1: Basics of Geometry -----
+  'geo-1-1': { subject: 'geometry', title: '1.1 Points, Lines, and Planes', items: [['g11Name', 4], ['g11Rays', 3], ['g11Cube', 3], ['g11Term', 2], ['g11Intersect', 2]] },
+  'geo-1-2': { subject: 'geometry', title: '1.2 Measuring and Constructing Segments', items: [['g12Ruler', 3], ['g12Congruent', 3], ['g12Add', 5]] },
+  'geo-1-3': { subject: 'geometry', title: '1.3 Using Midpoint and Distance Formulas', items: [['g13Bisector', 4], ['g13Midpoint', 3], ['g13Endpoint', 3], ['g13Distance', 3]] },
+  'geo-1-4': { subject: 'geometry', title: '1.4 Perimeter and Area in the Coordinate Plane', items: [['g14Classify', 3], ['g14Perimeter', 4], ['g14Area', 4]] },
+  'geo-1-5': { subject: 'geometry', title: '1.5 Measuring and Constructing Angles', items: [['g15Names', 2], ['g15Protractor', 3], ['g15Add', 3], ['g15AddAlg', 3], ['g15Bisect', 3]] },
+  'geo-1-6': { subject: 'geometry', title: '1.6 Describing Pairs of Angles', items: [['g16Vertical', 3], ['g16Comp', 3], ['g16Alg', 3], ['g16Word', 3]] },
+  // ----- Geometry, Chapter 10: Circles -----
+  'geo-10-1': { subject: 'geometry', title: '10.1 Lines and Segments That Intersect Circles', items: [['g101Name', 3], ['g101CommonTan', 2], ['g101IsTangent', 2], ['g101Radius', 2], ['g101TwoTan', 3]] },
+  'geo-10-2': { subject: 'geometry', title: '10.2 Finding Arc Measures', items: [['g102MinorMajor', 2], ['g102Identify', 2], ['g102Find', 2], ['g102Graph', 1], ['g102Congruent', 2], ['g102Algebra', 2]] },
+  'geo-10-3': { subject: 'geometry', title: '10.3 Using Chords', items: [['g103ArcChord', 3], ['g103FindX', 4], ['g103Diameter', 2], ['g103Radius', 2]] },
+  'geo-10-4': { subject: 'geometry', title: '10.4 Inscribed Angles and Polygons', items: [['g104Measure', 5], ['g104Quad', 3], ['g104Polygon', 2], ['g104Right', 2]] },
+  'geo-10-5': { subject: 'geometry', title: '10.5 Angle Relationships in Circles', items: [['g105Tangent', 3], ['g105Inside', 3], ['g105Outside', 4], ['g105Classic', 3], ['g105Earth', 1]] },
+  'geo-10-6': { subject: 'geometry', title: '10.6 Segment Relationships in Circles', items: [['g106Chords', 4], ['g106Secants', 4], ['g106Tangent', 4]] },
+  'geo-10-7': { subject: 'geometry', title: '10.7 Circles in the Coordinate Plane', items: [['g107Write', 4], ['g107Center', 3], ['g107Graph', 2], ['g107OnCircle', 2], ['g107Zone', 1]] },
+  // ----- Geometry, Chapter 11: Circumference and Area -----
+  'geo-11-1': { subject: 'geometry', title: '11.1 Circumference and Arc Length', items: [['g111Circ', 3], ['g111Arc', 4], ['g111Wheel', 2], ['g111Perim', 2], ['g111Radians', 3], ['g111Coord', 1]] },
+  'geo-11-2': { subject: 'geometry', title: '11.2 Areas of Circles and Sectors', items: [['g112Area', 4], ['g112Sector', 4], ['g112FromSector', 2], ['g112Shaded', 3]] },
+  'geo-11-3': { subject: 'geometry', title: '11.3 Areas of Polygons', items: [['g113Kite', 3], ['g113Central', 2], ['g113Angles', 3], ['g113Area', 4], ['g113Shaded', 2]] },
+  'geo-11-4': { subject: 'geometry', title: '11.4 Modeling with Area', items: [['g114Density', 6], ['g114Units', 2], ['g114Max', 2]] },
 });
 QUESTION_TYPES.push(
   { id: 'a11Eval', subject: 'algebra1', section: '1.1 Evaluating Algebraic Expressions', label: 'One variable', desc: '#1–6' },
@@ -22728,11 +23986,86 @@ QUESTION_TYPES.push(
   { id: 'g97SinesAAS', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Law of Sines (two angles and a side)', desc: '#13–20' },
   { id: 'g97SinesSSA', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Law of Sines (two sides and an angle)', desc: '#13–20' },
   { id: 'g97CosSSS', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Law of Cosines (three sides)', desc: '#21–26' },
-  { id: 'g97CosSAS', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Law of Cosines (two sides, included angle)', desc: '#21–26' }
+  { id: 'g97CosSAS', subject: 'geometry', section: '9.7 Law of Sines and Law of Cosines', label: 'Law of Cosines (two sides, included angle)', desc: '#21–26' },
+  { id: 'g11Name', subject: 'geometry', section: '1.1 Points, Lines, and Planes', label: 'Naming points, lines, and planes', desc: 'Another name, collinear, coplanar, intersections (#1–8)' },
+  { id: 'g11Rays', subject: 'geometry', section: '1.1 Points, Lines, and Planes', label: 'Segments and rays', desc: 'Other names, opposite rays (#9–14)' },
+  { id: 'g11Cube', subject: 'geometry', section: '1.1 Points, Lines, and Planes', label: 'Points and planes in a box', desc: 'Coplanar points, intersecting planes (#25–32, 41–44)' },
+  { id: 'g11Term', subject: 'geometry', section: '1.1 Points, Lines, and Planes', label: 'Geometric terms in real life', desc: 'Point, line, ray, segment, or plane (#37–40)' },
+  { id: 'g11Intersect', subject: 'geometry', section: '1.1 Points, Lines, and Planes', label: 'What is the intersection?', desc: 'Two planes, two lines, a line and a plane' },
+  { id: 'g12Ruler', subject: 'geometry', section: '1.2 Measuring and Constructing Segments', label: 'Measure with a ruler', desc: 'Nearest tenth of a centimeter (#1–4)' },
+  { id: 'g12Congruent', subject: 'geometry', section: '1.2 Measuring and Constructing Segments', label: 'Congruent segments', desc: 'Coordinates: compare lengths (#7–12)' },
+  { id: 'g12Add', subject: 'geometry', section: '1.2 Measuring and Constructing Segments', label: 'Segment Addition Postulate', desc: 'Find FH or a part, with algebra (#13–20)' },
+  { id: 'g13Bisector', subject: 'geometry', section: '1.3 Using Midpoint and Distance Formulas', label: 'Segment bisectors', desc: 'Find the length, with algebra (#1–8)' },
+  { id: 'g13Midpoint', subject: 'geometry', section: '1.3 Using Midpoint and Distance Formulas', label: 'The Midpoint Formula', desc: 'From the endpoints (#13–16)' },
+  { id: 'g13Endpoint', subject: 'geometry', section: '1.3 Using Midpoint and Distance Formulas', label: 'Find the other endpoint', desc: 'From the midpoint and one endpoint (#17–20)' },
+  { id: 'g13Distance', subject: 'geometry', section: '1.3 Using Midpoint and Distance Formulas', label: 'The Distance Formula', desc: 'Nearest tenth (#21–28)' },
+  { id: 'g14Classify', subject: 'geometry', section: '1.4 Perimeter and Area in the Coordinate Plane', label: 'Classify the polygon', desc: 'Number of sides; convex or concave; regular or irregular (#1–4)' },
+  { id: 'g14Perimeter', subject: 'geometry', section: '1.4 Perimeter and Area in the Coordinate Plane', label: 'Perimeter in the coordinate plane', desc: 'Vertices or a graph (#5–10, 15–18)' },
+  { id: 'g14Area', subject: 'geometry', section: '1.4 Perimeter and Area in the Coordinate Plane', label: 'Area in the coordinate plane', desc: 'Vertices or a graph (#11–18)' },
+  { id: 'g15Names', subject: 'geometry', section: '1.5 Measuring and Constructing Angles', label: 'Naming angles', desc: 'Three names for an angle (#1–4)' },
+  { id: 'g15Protractor', subject: 'geometry', section: '1.5 Measuring and Constructing Angles', label: 'Protractor: measure and classify', desc: 'Acute, right, obtuse, straight (#7–10)' },
+  { id: 'g15Add', subject: 'geometry', section: '1.5 Measuring and Constructing Angles', label: 'Angle Addition Postulate', desc: 'Find the whole or a part (#19–22)' },
+  { id: 'g15AddAlg', subject: 'geometry', section: '1.5 Measuring and Constructing Angles', label: 'Angle Addition with algebra', desc: 'Find each angle (#23–28)' },
+  { id: 'g15Bisect', subject: 'geometry', section: '1.5 Measuring and Constructing Angles', label: 'Angle bisectors', desc: 'With and without algebra (#31–38)' },
+  { id: 'g16Vertical', subject: 'geometry', section: '1.6 Describing Pairs of Angles', label: 'Vertical angles and linear pairs', desc: 'Find an angle, name pairs (#13–16)' },
+  { id: 'g16Comp', subject: 'geometry', section: '1.6 Describing Pairs of Angles', label: 'Complements and supplements', desc: 'Find the other angle (#5–8)' },
+  { id: 'g16Alg', subject: 'geometry', section: '1.6 Describing Pairs of Angles', label: 'Pairs of angles with algebra', desc: 'Find each angle (#9–12)' },
+  { id: 'g16Word', subject: 'geometry', section: '1.6 Describing Pairs of Angles', label: 'Pairs of angles in words', desc: 'Linear pairs, ratios (#19–24)' },
+  { id: 'g101Name', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Parts of a circle', desc: 'Name a radius, chord, diameter, secant, tangent (#1–6)' },
+  { id: 'g101CommonTan', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Common tangents', desc: 'How many common tangents? (#7–10)' },
+  { id: 'g101IsTangent', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Is the segment tangent?', desc: 'Converse of the Pythagorean Theorem (#11–14)' },
+  { id: 'g101Radius', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Find the radius', desc: 'Tangent ⊥ radius (#15–18)' },
+  { id: 'g101TwoTan', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Tangent segments from one point', desc: 'Find x (#23–28)' },
+  { id: 'g102MinorMajor', subject: 'geometry', section: '10.2 Finding Arc Measures', label: 'Minor and major arcs', desc: 'Name and measure (#1–6)' },
+  { id: 'g102Identify', subject: 'geometry', section: '10.2 Finding Arc Measures', label: 'Major, minor, or semicircle?', desc: 'Identify and measure (#7–10)' },
+  { id: 'g102Find', subject: 'geometry', section: '10.2 Finding Arc Measures', label: 'Arc Addition', desc: 'Find each arc (#11–12)' },
+  { id: 'g102Graph', subject: 'geometry', section: '10.2 Finding Arc Measures', label: 'Arcs in a circle graph', desc: 'Percent → degrees (#13)' },
+  { id: 'g102Congruent', subject: 'geometry', section: '10.2 Finding Arc Measures', label: 'Are the arcs congruent?', desc: 'Same or congruent circles (#15–18)' },
+  { id: 'g102Algebra', subject: 'geometry', section: '10.2 Finding Arc Measures', label: 'Arcs with algebra', desc: 'Find x, then the red arc (#21–22)' },
+  { id: 'g103ArcChord', subject: 'geometry', section: '10.3 Using Chords', label: 'Congruent chords and arcs', desc: 'Find the red arc or chord (#1–4)' },
+  { id: 'g103FindX', subject: 'geometry', section: '10.3 Using Chords', label: 'Find x with chords', desc: 'Perpendicular diameters, equidistant chords (#5–8)' },
+  { id: 'g103Diameter', subject: 'geometry', section: '10.3 Using Chords', label: 'Is it a diameter?', desc: 'Perpendicular bisector of a chord (#11–12)' },
+  { id: 'g103Radius', subject: 'geometry', section: '10.3 Using Chords', label: 'Radius from a chord', desc: 'Chord length and distance (#13–14)' },
+  { id: 'g104Measure', subject: 'geometry', section: '10.4 Inscribed Angles and Polygons', label: 'Inscribed angles and arcs', desc: 'Find the angle or arc (#1–8)' },
+  { id: 'g104Quad', subject: 'geometry', section: '10.4 Inscribed Angles and Polygons', label: 'Inscribed quadrilaterals', desc: 'Find x and y (#9–12)' },
+  { id: 'g104Polygon', subject: 'geometry', section: '10.4 Inscribed Angles and Polygons', label: 'Can it be inscribed?', desc: 'Right triangle, kite, rhombus… (#16)' },
+  { id: 'g104Right', subject: 'geometry', section: '10.4 Inscribed Angles and Polygons', label: 'Right triangles and rectangles in circles', desc: 'Hypotenuse or diagonal = diameter (#17–18)' },
+  { id: 'g105Tangent', subject: 'geometry', section: '10.5 Angle Relationships in Circles', label: 'Tangent and chord', desc: 'Find the angle or arc (#1–4)' },
+  { id: 'g105Inside', subject: 'geometry', section: '10.5 Angle Relationships in Circles', label: 'Chords that cross inside', desc: '½(sum of arcs) (#5–6)' },
+  { id: 'g105Outside', subject: 'geometry', section: '10.5 Angle Relationships in Circles', label: 'Angles outside a circle', desc: 'Secants and tangents: ½(difference) (#7–12)' },
+  { id: 'g105Classic', subject: 'geometry', section: '10.5 Angle Relationships in Circles', label: 'Find each numbered angle', desc: 'One diagram, angles 1–10' },
+  { id: 'g105Earth', subject: 'geometry', section: '10.5 Angle Relationships in Circles', label: 'Hot air balloon view', desc: 'Tangents in real life (#15)' },
+  { id: 'g106Chords', subject: 'geometry', section: '10.6 Segment Relationships in Circles', label: 'Segments of chords', desc: 'Find x (#1–4)' },
+  { id: 'g106Secants', subject: 'geometry', section: '10.6 Segment Relationships in Circles', label: 'Segments of secants', desc: 'Find x (#5–8)' },
+  { id: 'g106Tangent', subject: 'geometry', section: '10.6 Segment Relationships in Circles', label: 'Secant and tangent', desc: 'Find x (#9–12)' },
+  { id: 'g107Write', subject: 'geometry', section: '10.7 Circles in the Coordinate Plane', label: 'Write the equation', desc: 'Center and radius, a point, a diameter, or a graph (#1–12)' },
+  { id: 'g107Center', subject: 'geometry', section: '10.7 Circles in the Coordinate Plane', label: 'Center and radius', desc: 'From the equation (#13–15)' },
+  { id: 'g107Graph', subject: 'geometry', section: '10.7 Circles in the Coordinate Plane', label: 'Graph the circle (students graph)', desc: 'Center, then a point on the circle (#13–18)', sketch: true },
+  { id: 'g107OnCircle', subject: 'geometry', section: '10.7 Circles in the Coordinate Plane', label: 'Is the point on the circle?', desc: 'Prove or disprove (#19–22)' },
+  { id: 'g107Zone', subject: 'geometry', section: '10.7 Circles in the Coordinate Plane', label: 'Commuter zones', desc: 'Distance from the center (#23)' },
+  { id: 'g111Circ', subject: 'geometry', section: '11.1 Circumference and Arc Length', label: 'Circumference', desc: 'Find C, d, or r (#1–4)' },
+  { id: 'g111Arc', subject: 'geometry', section: '11.1 Circumference and Arc Length', label: 'Arc length', desc: 'Find the arc length, arc measure, circumference, or radius (#5–8)' },
+  { id: 'g111Wheel', subject: 'geometry', section: '11.1 Circumference and Arc Length', label: 'Wheels and revolutions', desc: 'Measuring wheel, bicycle (#11–12)' },
+  { id: 'g111Perim', subject: 'geometry', section: '11.1 Circumference and Arc Length', label: 'Perimeter with semicircles', desc: 'Shaded region (#13–16)' },
+  { id: 'g111Radians', subject: 'geometry', section: '11.1 Circumference and Arc Length', label: 'Degrees and radians', desc: 'Convert (#17–20)' },
+  { id: 'g111Coord', subject: 'geometry', section: '11.1 Circumference and Arc Length', label: 'Circumference from an equation', desc: 'Equation or semicircle endpoints (#21–23)' },
+  { id: 'g112Area', subject: 'geometry', section: '11.2 Areas of Circles and Sectors', label: 'Area of a circle', desc: 'Find A, r, or d (#1–6)' },
+  { id: 'g112Sector', subject: 'geometry', section: '11.2 Areas of Circles and Sectors', label: 'Area of a sector', desc: 'Smaller or larger sector (#7–10)' },
+  { id: 'g112FromSector', subject: 'geometry', section: '11.2 Areas of Circles and Sectors', label: 'From a sector to the circle', desc: 'Area or radius of the circle (#13–14)' },
+  { id: 'g112Shaded', subject: 'geometry', section: '11.2 Areas of Circles and Sectors', label: 'Shaded regions', desc: 'Rings and circles in squares (#15–18)' },
+  { id: 'g113Kite', subject: 'geometry', section: '11.3 Areas of Polygons', label: 'Kites and rhombuses', desc: '½d₁d₂ (#1–4)' },
+  { id: 'g113Central', subject: 'geometry', section: '11.3 Areas of Polygons', label: 'Central angle of a regular polygon', desc: '360° ÷ n (#9–12)' },
+  { id: 'g113Angles', subject: 'geometry', section: '11.3 Areas of Polygons', label: 'Angles in a regular polygon', desc: 'Central angle, apothem (#13–16)' },
+  { id: 'g113Area', subject: 'geometry', section: '11.3 Areas of Polygons', label: 'Area of a regular polygon', desc: 'From the radius or apothem (#17–24)' },
+  { id: 'g113Shaded', subject: 'geometry', section: '11.3 Areas of Polygons', label: 'Circle minus a polygon', desc: 'Shaded region (#27–30)' },
+  { id: 'g114Density', subject: 'geometry', section: '11.4 Modeling with Area', label: 'Population density', desc: 'Find density, people, or radius (#1–8)' },
+  { id: 'g114Units', subject: 'geometry', section: '11.4 Modeling with Area', label: 'Density with units', desc: 'Rug knots, seeds per acre (#13–14)' },
+  { id: 'g114Max', subject: 'geometry', section: '11.4 Modeling with Area', label: 'Best dimensions', desc: 'Least fencing, greatest area (#11–12)' }
 );
 { // keep each subject's question types together (stable)
   const first = {}; QUESTION_TYPES.forEach((t, i) => { if (!(t.subject in first)) first[t.subject] = i; });
-  QUESTION_TYPES.sort((a, b) => first[a.subject] - first[b.subject]);
+  const chOf = (t) => (t.subject === 'geometry' ? parseInt(t.section, 10) || 0 : 0); // geometry chapters in order (Chapter 1 was added last)
+  QUESTION_TYPES.sort((a, b) => first[a.subject] - first[b.subject] || chOf(a) - chOf(b));
 }
 /* ==== ALGEBRA CATALOG END ==== */
 
@@ -24849,7 +26182,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0), b = secs[sec].ids.reduce((a, id) => a + (bonusCounts[id] || 0), 0);
     return [n ? `${n} chosen` : '', b ? `★ ${b} bonus` : ''].filter(Boolean).join(' · '); };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
