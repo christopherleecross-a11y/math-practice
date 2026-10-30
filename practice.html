@@ -156,7 +156,9 @@
   .lp-tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #e8f0fa; color: #1f5fa8; }
   .lp-check { background: #f6f4ec; border-left: 3px solid #c9a227; padding: 6px 10px; }
   .lp-table { border-collapse: collapse; font-size: 14px; min-width: 520px; }
-  .lp-table th, .lp-table td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; white-space: nowrap; }
+  .lp-table th, .lp-table td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; }
+  .lp-table th { white-space: nowrap; }
+  .lp canvas { vertical-align: middle; }
   .lp-table th { background: #f3f1ea; }
   .lp-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   .tvshow { position: fixed; inset: 0; z-index: 9999; background: #fff; color: #1d1d1b; overflow: auto; display: flex; flex-direction: column; }
@@ -345,6 +347,7 @@ const SETS = {
   'geo-6-1':       { subject: 'geometry', title: '6.1 Perpendicular and Angle Bisectors', items: [['g61PerpBis', 3], ['g61PerpConclude', 2], ['g61AngBis', 3], ['g61AngConclude', 2], ['g61PerpEq', 3]] },
   'geo-6-2':       { subject: 'geometry', title: '6.2 Bisectors of Triangles', items: [['g62Centers', 6], ['g62CircumCoord', 4], ['g62WhichCenter', 2]] },
   'geo-6-3':       { subject: 'geometry', title: '6.3 Medians and Altitudes of Triangles', items: [['g63Centroid', 4], ['g63CentroidFind', 4], ['g63CentroidCoord', 2], ['g63Ortho', 3]] },
+  'geo-pre-6-4':   { subject: 'geometry', title: 'Pre-6.4 Midpoint, Distance, and Slope', items: [['gp64All', 3], ['gp64Mid', 2], ['gp64Dist', 2], ['gp64Slope', 2], ['gp64Endpoint', 2], ['gp64ParPerp', 2]] },
   'geo-6-4':       { subject: 'geometry', title: '6.4 The Triangle Midsegment Theorem', items: [['g64Coords', 2], ['g64FindX', 4], ['g64Complete', 4], ['g64Word', 2], ['g64Backward', 1, undefined, 'b']] },
   'geo-6-5':       { subject: 'geometry', title: '6.5 Indirect Proof and Inequalities in One Triangle', items: [['g65FirstStep', 2], ['g65OrderAngles', 3], ['g65OrderSides', 3], ['g65ThirdSide', 3], ['g65Possible', 3]] },
   'geo-6-6':       { subject: 'geometry', title: '6.6 Inequalities in Two Triangles', items: [['g66Hinge', 6], ['g66Flights', 2], ['g66PossibleX', 3]] },
@@ -22491,6 +22494,49 @@ TEMPLATES.g13Bisector = (r) => {
 const g10paren2 = (n) => (n < 0 ? `(${fmt(n)})` : fmt(n));
 const g13pt = (p) => `(${fmt(p[0])}, ${fmt(p[1])})`, g13ptL = (p) => `(${String(Math.round(p[0] * 100) / 100)},${String(Math.round(p[1] * 100) / 100)})`;
 const g13FRpt = (label, P) => ({ fields: [{ kind: 'expr', keys: 'num', label }], key: [g13ptL(P)], display: g13pt(P), check: (v) => a3ptOk(v[0], P) });
+/* ==== PRE 6.4 BEGIN ==== */
+// Pre-6.4 review: midpoint, distance, and slope (the tools the 6.4 midsegment discovery needs)
+TEMPLATES.gp64Mid = (r) => TEMPLATES.g13Midpoint(r);
+TEMPLATES.gp64Endpoint = (r) => TEMPLATES.g13Endpoint(r);
+TEMPLATES.gp64Slope = (r) => TEMPLATES.a36SlopePts(r);
+const gp64Legs = [[3, 4], [4, 3], [6, 8], [8, 6], [5, 12], [12, 5], [8, 15], [15, 8], [9, 12], [12, 9], [0, 5], [7, 0], [0, 9], [6, 0]];
+const gp64Neg = (n) => (n < 0 ? `(${fmt(n)})` : fmt(n));
+TEMPLATES.gp64Dist = (r) => { // exact distances (Pythagorean triples), like the review lesson
+  const [a0, b0] = pick(r, gp64Legs), dx = a0 * pick(r, [1, -1]), dy = b0 * pick(r, [1, -1]);
+  const P = [ri(r, -8, 6), ri(r, -8, 6)], Q = [P[0] + dx, P[1] + dy]; if (Math.max(...P.map(Math.abs), ...Q.map(Math.abs)) > 15 || [...P, ...Q].includes(0)) return TEMPLATES.gp64Dist(r);
+  const d = Math.hypot(dx, dy), [g, h] = g10Letters(r, 2, ['M']);
+  return { topic: 'The Distance Formula', stem: `Find the distance between ${g}${pt(P)} and ${h}${pt(Q)}.`,
+    ...buildChoices(r, fmt(d), [fmt(a0 + b0), fmt(a0 * a0 + b0 * b0), fmt(Math.abs(a0 - b0)), fmt(d / 2), fmt(2 * d)].filter((x) => x !== fmt(d) && x !== '0'), (i) => fmt(d + i + 1)), fr: FR.num(`${g}${h} =`, d),
+    solution: dx === 0 || dy === 0 ? `The segment is ${dx === 0 ? 'vertical, so d = |y₂ − y₁|' : 'horizontal, so d = |x₂ − x₁|'} = |${dx === 0 ? `${fmt(Q[1])} − ${gp64Neg(P[1])}` : `${fmt(Q[0])} − ${gp64Neg(P[0])}`}| = ${fmt(d)}`
+      : `d = √((x₂ − x₁)² + (y₂ − y₁)²) = √((${fmt(Q[0])} − ${gp64Neg(P[0])})² + (${fmt(Q[1])} − ${gp64Neg(P[1])})²) = √(${gp64Neg(dx)}² + ${gp64Neg(dy)}²) = √${fmt(a0 * a0 + b0 * b0)} = ${fmt(d)}` };
+};
+TEMPLATES.gp64All = (r) => { // one segment, all three: midpoint, length, slope
+  const [a0, b0] = pick(r, gp64Legs.filter(([a, b]) => a <= 8 && b <= 8)), dx = a0 * pick(r, [1, -1]), dy = b0 * pick(r, [1, -1]);
+  const P = [ri(r, -7, 5), ri(r, -7, 5)], Q = [P[0] + dx, P[1] + dy]; if (Math.max(...P.map(Math.abs), ...Q.map(Math.abs)) > 12 || [...P, ...Q].includes(0)) return TEMPLATES.gp64All(r);
+  const [g, h] = g10Letters(r, 2, ['M']), M = [(P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2], d = Math.hypot(dx, dy), m = dx === 0 ? null : dy / dx, mT = m === null ? 'undefined' : fracT(m);
+  const combo = (mm, dd, sl) => `M = ${g13pt(mm)},  d = ${fmt(dd)},  m = ${sl}`, ans = combo(M, d, mT);
+  return { topic: 'Midpoint, distance, and slope', stem: `${g}${pt(P)} and ${h}${pt(Q)}. Find the midpoint, the distance, and the slope of ${g10seg(g + h)}.`,
+    ...buildChoices(r, ans, [combo([dx / 2, dy / 2], d, mT), combo(M, a0 + b0, mT), combo(M, d, m === null ? '0' : m === 0 ? 'undefined' : fracT(1 / m)), combo(M, d, m === null ? '0' : fracT(-m))].filter((x) => x !== ans), () => null),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Midpoint M =' }, { kind: 'number', label: 'Distance d =' }, { kind: 'expr', keys: 'slope', label: 'Slope m =' }],
+      key: [g13ptL(M), fmt(d), m === null ? '\\text{undefined}' : fracL(m)], display: `M = ${g13pt(M)}, d = ${fmt(d)}, m = ${mT}`,
+      check: (v) => a3ptOk(v[0], M) && numEq(v[1], d) && (m === null ? /undefined|none|nosl/.test(pxWords(v[2])) : numOk(v[2], m)) },
+    solution: `Midpoint: M = ((${fmt(P[0])} + ${gp64Neg(Q[0])})/2, (${fmt(P[1])} + ${gp64Neg(Q[1])})/2) = ${g13pt(M)}\nDistance: ${dx === 0 || dy === 0 ? `the segment is ${dx === 0 ? 'vertical' : 'horizontal'}, so d = ${fmt(d)}` : `run ${fmt(dx)}, rise ${fmt(dy)}, so d = √(${gp64Neg(dx)}² + ${gp64Neg(dy)}²) = √${fmt(a0 * a0 + b0 * b0)} = ${fmt(d)}`}\nSlope: m = rise/run = ${m === null ? `${fmt(dy)}/0, undefined (vertical)` : `${gp64Neg(dy)}/${gp64Neg(dx)} = ${mT}`}` };
+};
+TEMPLATES.gp64ParPerp = (r) => { // two segments by their endpoints: parallel, perpendicular, or neither?
+  const want = pick(r, ['Parallel', 'Perpendicular', 'Neither']);
+  const run1 = pick(r, [1, 2, 3, 4]), rise1 = nz(r, -4, 4) * pick(r, [1, 1, 2]);
+  let run2, rise2;
+  if (want === 'Parallel') { const k = pick(r, [1, 2]); run2 = run1 * k; rise2 = rise1 * k; }
+  else if (want === 'Perpendicular') { const k = pick(r, [1, 2]); run2 = Math.abs(rise1) * k; rise2 = -Math.sign(rise1) * run1 * k; }
+  else { run2 = run1 + 1; rise2 = -rise1; }
+  const m1 = rise1 / run1, m2 = rise2 / run2, rel = relOf(m1, m2);
+  const A = [ri(r, -6, 4), ri(r, -6, 4)], B = [A[0] + run1, A[1] + rise1], C = [ri(r, -6, 4), ri(r, -6, 4)], D = [C[0] + run2, C[1] + rise2];
+  if (Math.max(...[A, B, C, D].flat().map(Math.abs)) > 12 || (A[0] === C[0] && A[1] === C[1])) return TEMPLATES.gp64ParPerp(r);
+  return { topic: 'Parallel, perpendicular, or neither', stem: `Segment 1 goes through ${pt(A)} and ${pt(B)}. Segment 2 goes through ${pt(C)} and ${pt(D)}. Are they parallel, perpendicular, or neither?`,
+    ...buildChoices(r, rel, ['Parallel', 'Perpendicular', 'Neither'].filter((x) => x !== rel), () => null), fr: FR.select('The segments are', ['Parallel', 'Perpendicular', 'Neither'], rel),
+    solution: `Slope 1 = ${gp64Neg(rise1)}/${fmt(run1)} = ${fracT(m1)}.   Slope 2 = ${gp64Neg(rise2)}/${fmt(run2)} = ${fracT(m2)}.\n${rel === 'Parallel' ? 'Same slope: parallel.' : rel === 'Perpendicular' ? `${fracT(m1)} · ${m2 < 0 ? `(${fracT(m2)})` : fracT(m2)} = −1: perpendicular.` : 'Not the same, and they don’t multiply to −1: neither.'}` };
+};
+/* ==== PRE 6.4 END ==== */
 TEMPLATES.g13Midpoint = (r) => {
   const C = [ri(r, -10, 10), ri(r, -10, 10)], D = [ri(r, -10, 10), ri(r, -10, 10)]; if ((C[0] === D[0] && C[1] === D[1]) || [...C, ...D].includes(0)) return TEMPLATES.g13Midpoint(r);
   const M = [(C[0] + D[0]) / 2, (C[1] + D[1]) / 2], ans = g13pt(M);
@@ -22970,6 +23016,12 @@ const QUESTION_TYPES = [
   { id: 'g63CentroidFind', subject: 'geometry', section: '6.3 Medians and Altitudes of Triangles', label: 'Centroid segment lengths', desc: 'BG, AF, AE given (#9–12)' },
   { id: 'g63CentroidCoord', subject: 'geometry', section: '6.3 Medians and Altitudes of Triangles', label: 'Centroid from coordinates', desc: '(#15–16)' },
   { id: 'g63Ortho', subject: 'geometry', section: '6.3 Medians and Altitudes of Triangles', label: 'Orthocenter', desc: 'Inside, on, or outside, and coordinates (#17–20)' },
+  { id: 'gp64All', subject: 'geometry', section: 'Pre-6.4 Midpoint, Distance, and Slope', label: 'Midpoint, distance, and slope', desc: 'All three for one segment (We Do #1–3)' },
+  { id: 'gp64Mid', subject: 'geometry', section: 'Pre-6.4 Midpoint, Distance, and Slope', label: 'The Midpoint Formula', desc: 'Average the x’s and the y’s' },
+  { id: 'gp64Dist', subject: 'geometry', section: 'Pre-6.4 Midpoint, Distance, and Slope', label: 'The Distance Formula', desc: 'Exact lengths (Pythagorean Theorem)' },
+  { id: 'gp64Slope', subject: 'geometry', section: 'Pre-6.4 Midpoint, Distance, and Slope', label: 'Slope from two points', desc: 'Includes 0 and undefined' },
+  { id: 'gp64Endpoint', subject: 'geometry', section: 'Pre-6.4 Midpoint, Distance, and Slope', label: 'Find the other endpoint', desc: 'Midpoint backwards (We Do #4)' },
+  { id: 'gp64ParPerp', subject: 'geometry', section: 'Pre-6.4 Midpoint, Distance, and Slope', label: 'Parallel, perpendicular, or neither?', desc: 'Compare slopes (We Do #5)' },
   { id: 'g64Coords', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Midpoints on the coordinate plane', desc: '(#1–4)' },
   { id: 'g64FindX', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Find x with a midsegment', desc: '(#7–10)' },
   { id: 'g64Complete', subject: 'geometry', section: '6.4 The Triangle Midsegment Theorem', label: 'Complete the statement', desc: 'Parallel and congruent segments (#11–16)' },
@@ -24195,7 +24247,7 @@ QUESTION_TYPES.push(
 );
 { // keep each subject's question types together (stable)
   const first = {}; QUESTION_TYPES.forEach((t, i) => { if (!(t.subject in first)) first[t.subject] = i; });
-  const chOf = (t) => (t.subject === 'geometry' ? parseInt(t.section, 10) || 0 : 0); // geometry chapters in order (Chapter 1 was added last)
+  const chOf = (t) => (t.subject === 'geometry' ? parseInt(t.section.replace(/^Pre-/, ''), 10) || 0 : 0); // geometry chapters in order (Chapter 1 was added last)
   QUESTION_TYPES.sort((a, b) => first[a.subject] - first[b.subject] || chOf(a) - chOf(b));
 }
 /* ==== ALGEBRA CATALOG END ==== */
@@ -25964,6 +26016,78 @@ function teacherNav(active) {
    Each plan is keyed by the section's assignment key. "show" lists question types the plan puts on the TV: they are made
    fresh from the same question types students practice, so there are always new numbers. */
 const LESSONS = {
+  'geo-pre-6-4': {
+    minutes: 45,
+    note: 'Review lesson for 4th hour Geometry, the class before the 6.4 discovery',
+    slides: 'https://claude.ai/artifact/745F7GcjoV6x46mD1Rx4dB',
+    objective: 'Review the three coordinate tools the 6.4 midsegment discovery needs: the midpoint (an average), the distance (the Pythagorean Theorem), and the slope (rise over run), and use slopes to compare lines.',
+    iCan: ['I can find the middle of a segment.', 'I can find the length of a segment.', 'I can find slopes and use them to compare lines.'],
+    vocab: [['Midpoint', 'M = ((x₁ + x₂)/2, (y₁ + y₂)/2): average the x’s and the y’s'], ['Distance', 'd = √((x₂ − x₁)² + (y₂ − y₁)²): the Pythagorean Theorem'], ['Slope', 'm = (y₂ − y₁)/(x₂ − x₁): rise over run'], ['Parallel / perpendicular', 'same slope / slopes multiply to −1']],
+    materials: 'Student sheet (double-sided, one per student), exit tickets (cut), slide deck on the TV, rulers, support copies of the formula box',
+    prior: 'Midpoint and distance (1.3), slope (Algebra 1)',
+    before: ['Print 1_Student_Sheets.pdf double-sided, one per student.', 'Print and cut 2_Exit_Tickets.pdf.', 'Enter the bell ringer in edia.app.', 'Open the slide deck on the TV computer.', 'Plan partner pairs; set out rulers.', 'Pull support copies of the formula box for students who need them.'],
+    steps: [
+      { time: '0–5', name: 'Bell ringer (ACT)',
+        teacher: 'ACT midpoint question on the TV (slide 2). Students work alone, then compare. Answer: B (1, 3).',
+        students: 'Work it alone, then compare with a neighbor; answer in edia.app.',
+        check: 'A = added but didn’t divide by 2. C = half the difference instead of the average. D = subtracted, which starts distance and slope, not midpoint. Note who picked C or D: they are mixing up the formulas, which is exactly what today fixes.',
+        say: '“Who picked A? What would you tell a friend who picked A?”',
+        show: [{ label: 'Bell ringer', fixed: { topic: 'ACT', stem: 'In the standard (x, y) coordinate plane, what is the midpoint of the segment with endpoints (−3, 7) and (5, −1)?', choices: ['(2, 6)', '(1, 3)', '(4, −4)', '(8, −8)'], answer: 1, solution: '((−3 + 5)/2, (7 + (−1))/2) = (1, 3).\nA = added but forgot to divide by 2.  C = half the difference instead of the average.  D = subtracted (that starts distance and slope, not midpoint).' }, more: 'gp64Mid', mode: 'mc' }] },
+      { time: '5–8', name: 'Targets and hook',
+        teacher: 'Go over choices A, C, and D (slide 2). Read the three learning targets aloud (slide 3); we come back to them for closure.',
+        students: 'Listen, explain the wrong choices, read the targets.',
+        check: 'Ask a student who picked a wrong answer to explain what they did, and a student who picked B to explain the fix.' },
+      { time: '8–18', name: 'I do: three formulas, one segment', tag: '#14 Adjusts based on monitoring',
+        teacher: 'The formulas (slide 4): each one answers a question; stress what each MEANS (average, Pythagorean Theorem, rise over run). Work one segment three ways (slide 5): A(−2, 1) and B(4, 9). Then “Look closer” (slide 6): which formulas subtract and which one adds?',
+        students: 'Copy the three rows onto the formula organizer. Turn and talk for 30 seconds on slide 6.',
+        check: 'Cold-call after the turn-and-talk. If many students picked C or D on the bell ringer, spend an extra minute on add vs. subtract.',
+        show: [
+          { label: 'The three formulas', fixed: { topic: 'Three questions, three formulas', stem: 'Where’s the middle?   M = ((x₁ + x₂)/2, (y₁ + y₂)/2)   Average the x’s and the y’s\nHow long is it?   d = √((x₂ − x₁)² + (y₂ − y₁)²)   The Pythagorean Theorem\nHow steep is it?   m = (y₂ − y₁)/(x₂ − x₁)   Rise over run\n \nLook closer: two formulas start by subtracting. One starts by adding. Which is which?', display: 'Distance and slope subtract. Midpoint adds.', solution: 'Distance and slope subtract: they measure a change.\nMidpoint adds: it is an average.' } },
+          { label: 'I do: A(−2, 1) and B(4, 9)', fixed: { topic: 'Watch me: one segment', stem: 'A(−2, 1) and B(4, 9). Find the middle, the length, and the slope.', display: 'M = (1, 5),  d = 10,  m = 4/3', solution: 'Middle: M = ((−2 + 4)/2, (1 + 9)/2) = (1, 5)\nLength: legs 6 across and 8 up, so d = √(6² + 8²) = √100 = 10\nSlope: rise/run = 8/6 = 4/3\nSame two legs give you the length and the slope.' }, more: 'gp64All', mode: 'fr' }] },
+      { time: '18–28', name: 'We do: Problems 1–5', tag: '#9 Involves all learners',
+        teacher: 'Problems 1–5 from the front of the student sheet (slides 7–9). 60–90 seconds of think time per problem, then everyone holds up their paper at once. Cold-call one student to explain each part before you reveal it. Model Problem 4 on the board.',
+        students: 'Work each problem, show answers all at once, explain when called on.',
+        check: 'Problem 2: dropping the negative (9 − (−3) = 12). Problem 3: a run of 0 means the slope is undefined. Problem 4 runs the midpoint formula backwards.',
+        show: [
+          { label: 'We do 1', fixed: { topic: 'Midpoint, distance, and slope', stem: '1.  P(−5, 2) and Q(3, 8). Find the midpoint, distance, and slope.', display: 'M = (−1, 5),  d = 10,  m = 3/4', solution: 'M = ((−5 + 3)/2, (2 + 8)/2) = (−1, 5)\nd = √(8² + 6²) = √(64 + 36) = 10\nm = 6/8 = 3/4' }, more: 'gp64All', mode: 'fr' },
+          { label: 'We do 2', fixed: { topic: 'Midpoint, distance, and slope', stem: '2.  R(0, −3) and S(5, 9). Find the midpoint, distance, and slope.', display: 'M = (2.5, 3),  d = 13,  m = 12/5', solution: 'M = ((0 + 5)/2, (−3 + 9)/2) = (2.5, 3)\nd = √(5² + 12²) = √(25 + 144) = 13\nm = (9 − (−3))/(5 − 0) = 12/5\nWatch for dropping the negative: 9 − (−3) = 12.' }, more: 'gp64All', mode: 'fr' },
+          { label: 'We do 3', fixed: { topic: 'Midpoint, distance, and slope', stem: '3.  T(3, −2) and U(3, 6). Find the midpoint, distance, and slope.', display: 'M = (3, 2),  d = 8,  slope undefined', solution: 'M = ((3 + 3)/2, (−2 + 6)/2) = (3, 2)\nd = 6 − (−2) = 8\nm = 8/0: a run of zero, so the slope is undefined (vertical).' }, more: 'gp64All', mode: 'fr' },
+          { label: 'We do 4', fixed: { topic: 'Find the other endpoint', stem: '4.  M(3, −1) is the midpoint of AB. A is (7, 4). Find B.', display: 'B = (−1, −6)', solution: 'Double the midpoint, then subtract the endpoint you know:\nB = (2 · 3 − 7, 2 · (−1) − 4) = (−1, −6)\nCheck: the average of 7 and −1 is 3, and the average of 4 and −6 is −1.' }, more: 'gp64Endpoint', mode: 'fr' },
+          { label: 'We do 5', fixed: { topic: 'Parallel, perpendicular, or neither?', stem: '5.  Segment 1 goes through (1, 2) and (4, 8). Segment 2 goes through (0, 5) and (4, 3). Are they parallel, perpendicular, or neither? Show the slopes.', display: 'Perpendicular', solution: 'Slope 1 = 6/3 = 2.   Slope 2 = −2/4 = −1/2.\n2 · (−1/2) = −1, so the segments are perpendicular.\nParallel: same slope.  Perpendicular: slopes multiply to −1.' }, more: 'gp64ParPerp', mode: 'fr' }] },
+      { time: '28–40', name: 'Partner task: Is ABCD a square?', tag: '#9 Involves all learners',
+        teacher: 'Back of the student sheet (slides 10–11). Partner A finds the lengths, Partner B finds the slopes, then they swap and check before step 5. Circulate and ask: “What do the slopes tell you about the corners?” “What does it mean that both diagonals have the same midpoint?” Then have one pair present the lengths and another the slopes.',
+        students: 'Plot ABCD, split the work, check each other, find the diagonal midpoints together, and prove whether it is a square.',
+        check: 'Watch for the bell ringer mistakes on the diagonal midpoints. Ask: “Which formula proved the sides are equal? Which proved the right angles? Which one did the diagonals need?”',
+        show: [{ label: 'Partner task key', fixed: { topic: 'Partner task', stem: 'Is ABCD a square?   A(−3, 1), B(1, 4), C(4, 0), D(0, −3)', display: 'Yes: four sides of 5 and four right angles', solution: 'AB = √(4² + 3²) = 5, slope 3/4.   BC = √(3² + 4²) = 5, slope −4/3.\nCD = √(4² + 3²) = 5, slope 3/4.   DA = √(3² + 4²) = 5, slope −4/3.\nOpposite sides have equal slopes (parallel), and 3/4 · (−4/3) = −1, so every corner is a right angle.\nDiagonals AC and BD both have midpoint (1/2, 1/2), so they bisect each other.\nDone early: AC = BD = √50 = 5√2 ≈ 7.07.' } }] },
+      { time: '40–45', name: 'Exit ticket and closure', tag: '#15 Establishes closure',
+        teacher: 'Exit ticket (slide 12), one question per learning target. Then fist-to-five on each target, and preview next class (slide 13) without naming the theorem: “Next class you’ll find midpoints, slopes, and lengths inside a triangle, and you’ll find a pattern nobody tells you about first.”',
+        students: 'Exit ticket on their own (4 minutes), turned in face down. Fist-to-five on each target.',
+        check: 'Sort the slips tonight (see below).',
+        show: [{ label: 'Exit ticket key', fixed: { topic: 'Exit ticket', stem: '1.  Find the midpoint of (−6, 3) and (2, −7).\n2.  Find the distance between (1, 1) and (4, 5).\n3.  Find the slope of the line through (−2, 5) and (2, −3).', display: '1. (−2, −2)     2. 5     3. −2', solution: '1.  ((−6 + 2)/2, (3 + (−7))/2) = (−2, −2)\n2.  √(3² + 4²) = √25 = 5\n3.  (−3 − 5)/(2 − (−2)) = −8/4 = −2' }, more: 'gp64All', mode: 'fr' }] },
+    ],
+    tables: [
+      { title: 'We Do answer key', head: ['#', 'Problem', 'Answer'], rows: [
+        ['1', 'P(−5, 2) and Q(3, 8)', 'M = (−1, 5);  d = √(64 + 36) = 10;  m = 6/8 = 3/4'],
+        ['2', 'R(0, −3) and S(5, 9)', 'M = (2.5, 3);  d = √(25 + 144) = 13;  m = 12/5'],
+        ['3', 'T(3, −2) and U(3, 6)', 'M = (3, 2);  d = 6 − (−2) = 8;  m = 8/0, undefined (vertical)'],
+        ['4', 'M(3, −1) is the midpoint of AB; A(7, 4)', 'B = (2 · 3 − 7, 2 · (−1) − 4) = (−1, −6)'],
+        ['5', '(1, 2)–(4, 8) and (0, 5)–(4, 3)', 'm₁ = 6/3 = 2, m₂ = −2/4 = −1/2;  2 · (−1/2) = −1, perpendicular']] },
+      { title: 'Partner task key: A(−3, 1), B(1, 4), C(4, 0), D(0, −3)', head: ['Side', 'Length', 'Slope'], rows: [
+        ['AB', '√(4² + 3²) = 5', '3/4'], ['BC', '√(3² + 4²) = 5', '−4/3'], ['CD', '√(4² + 3²) = 5', '3/4'], ['DA', '√(3² + 4²) = 5', '−4/3']] },
+      { title: 'Exit ticket key', head: ['#', 'Question', 'Answer'], rows: [
+        ['1', 'Midpoint of (−6, 3) and (2, −7)', '((−6 + 2)/2, (3 + (−7))/2) = (−2, −2)'],
+        ['2', 'Distance between (1, 1) and (4, 5)', '√(3² + 4²) = √25 = 5'],
+        ['3', 'Slope through (−2, 5) and (2, −3)', '(−3 − 5)/(2 − (−2)) = −8/4 = −2']] },
+      { title: 'Sorting the exit-ticket slips', head: ['Pile', 'Next step'], rows: [
+        ['3 of 3 correct', 'Ready for the 6.4 discovery.'],
+        ['Missed #1 (midpoint)', 'Quick midpoint check before the 6.4 discovery: the discovery starts by finding midpoints.'],
+        ['Missed #2 or #3', 'Pair them with a 3-of-3 student in the discovery so the slope and length steps don’t stall.'],
+        ['2 or more missed', 'Pull for a 5-minute reteach of the three formulas at the start of next class.']] },
+    ],
+    lists: [
+      { title: 'Watch for', items: ['Adding when they should subtract (bell ringer C and D).', 'Dropping negatives: 9 − (−3) = 12.', 'Problem 3: a run of 0 means the slope is undefined.', 'Problem 4 runs the midpoint formula backwards: model it.', 'Partner task square: AB and CD both 3/4, BC and DA both −4/3; diagonals share the midpoint (1/2, 1/2).'] },
+    ],
+  },
   'geo-6-4': {
     minutes: 45,
     note: 'Observation lesson: Wed., Nov. 4 · 4th hour · 10:40 · Observer: Mr. Noble · Feedback on #9, #14, #15',
@@ -26024,6 +26148,13 @@ const LESSONS = {
 };
 
 const LESSON = { key: null };
+// plan text with fractions or square roots: drawn as math (stacked fractions, full-length radicals)
+function lpMath(text, px = 15) {
+  const t = autoMath(String(text)); if (!hasM(t)) return text;
+  const probe = document.createElement('canvas').getContext('2d'); probe.font = `${px}px Georgia, serif`;
+  const w = Math.min(640, Math.ceil(probe.measureText(unM(t)).width) + 12), cv = textCanvas(t, w, `${px}px Georgia, "Times New Roman", serif`, Math.round(px * 1.5));
+  cv.style.display = 'inline-block'; return cv;
+}
 function lessonScreen(preKey) {
   teacherNav('lesson');
   document.getElementById('title').textContent = 'Lesson plans';
@@ -26056,7 +26187,7 @@ function lessonScreen(preKey) {
           all.length ? el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, 0) }, '📺 Examples and keys on the TV') : '')),
       h('Objective'), el('p', {}, L.objective),
       h('Students will say'), list(L.iCan),
-      h('Vocabulary'), el('ul', { class: 'lp-ul' }, ...L.vocab.map(([w, d]) => el('li', {}, el('b', {}, w), ' — ', d))),
+      h('Vocabulary'), el('ul', { class: 'lp-ul' }, ...L.vocab.map(([w, d]) => el('li', {}, el('b', {}, w), ' — ', lpMath(d, 16)))),
       el('div', { class: 'lp-two' }, el('div', {}, h('Materials'), el('p', {}, L.materials)), el('div', {}, h('Builds on'), el('p', {}, L.prior))),
       L.before ? h('Before class') : '', L.before ? el('ul', { class: 'lp-ul lp-check-list' }, ...L.before.map((x) => el('li', {}, x))) : '',
       h('Lesson flow'),
@@ -26072,7 +26203,7 @@ function lessonScreen(preKey) {
           s.practice ? el('div', { class: 'lp-btns noprint' },
             el('button', { class: 'btn secondary', type: 'button', onclick: () => lessonBuild(LESSON.key) }, `Build a ${S.title.split(' ')[0]} assignment`),
             el('button', { class: 'btn secondary', type: 'button', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard')) : ''))),
-      ...(L.tables || []).flatMap((t) => [h(t.title), el('div', { style: 'overflow-x:auto' }, el('table', { class: 'lp-table' }, el('tr', {}, ...t.head.map((c) => el('th', {}, c))), ...t.rows.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, c))))))]),
+      ...(L.tables || []).flatMap((t) => [h(t.title), el('div', { style: 'overflow-x:auto' }, el('table', { class: 'lp-table' }, el('tr', {}, ...t.head.map((c) => el('th', {}, c))), ...t.rows.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, lpMath(c)))))))]),
       ...(L.lists || []).flatMap((x) => [h(x.title), list(x.items)]),
       L.mistakes ? el('div', { class: 'lp-two' },
         el('div', {}, h('Watch for these mistakes'), list(L.mistakes)),
