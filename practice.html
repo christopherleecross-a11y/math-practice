@@ -22311,15 +22311,21 @@ TEMPLATES.g12Ruler = (r) => {
     fr: g10Num(`${A}${B} =`, len, ' cm'), draw: (cv) => g12RulerDraw(cv, { a, b, L, A, B }), size: [420, 190],
     solution: `${A} is at ${fmt(a)} cm and ${B} is at ${fmt(b)} cm.\n${A}${B} = |${g10minus(b, a)}| = ${fmt(len)} cm` };
 };
+// plot four labeled points (any order)
+SKETCH.pts4 = { roles: ['point A', 'point B', 'point C', 'point D'], short: ['A', 'B', 'C', 'D'], fit: () => null,
+  match: (pts, T, win) => pts.length === 4 && win.pts4.every((q) => pts.some((p) => skNear(p, q))) && new Set(pts.map(String)).size === 4 };
 TEMPLATES.g12Congruent = (r) => {
   for (;;) {
     const L = ri(r, 2, 9), same = r() < 0.5, L2 = same ? L : L + pick(r, [-2, -1, 1, 2, 3]); if (L2 < 1) continue;
     const mk = (len) => { const x = ri(r, -9, 9), y = ri(r, -9, 9), h = r() < 0.5, s = r() < 0.5 ? 1 : -1; return [[x, y], h ? [x + s * len, y] : [x, y + s * len]]; };
     const [A, B] = mk(L), [C, D] = mk(L2); if ([A, B, C, D].some((p) => Math.abs(p[0]) > 10 || Math.abs(p[1]) > 10)) continue;
+    const W = skWin([A, B, C, D]); if (!W || !skOk(W, [A, B, C, D]) || new Set([A, B, C, D].map(String)).size < 4) continue; // all four fit on one grid
     const ans = same ? 'Yes' : 'No', C1 = same ? `Yes; AB = CD = ${L}` : `No; AB = ${L} and CD = ${L2}`;
-    return { topic: 'Congruent segments', stem: `Plot the points A${pt(A)}, B${pt(B)}, C${pt(C)}, and D${pt(D)} in a coordinate plane. Then determine whether ${g10seg('AB')} and ${g10seg('CD')} are congruent.`,
+    return { topic: 'Congruent segments', frStem: `Plot the points A${pt(A)}, B${pt(B)}, C${pt(C)}, and D${pt(D)} on the grid. Then determine whether ${g10seg('AB')} and ${g10seg('CD')} are congruent.`,
+      stem: `Plot the points A${pt(A)}, B${pt(B)}, C${pt(C)}, and D${pt(D)} on the grid (use Draw). Then determine whether ${g10seg('AB')} and ${g10seg('CD')} are congruent.`,
       ...buildChoices(r, C1, [same ? `No; AB = ${L} and CD = ${L + 1}` : `Yes; AB = CD = ${L}`, same ? `No; AB = ${L * 2} and CD = ${L}` : `Yes; AB = CD = ${L2}`, `No; they are not both horizontal`], () => null),
-      fr: g1Sel('Congruent?', ['Yes', 'No'], ans),
+      fr: skFRplus({ family: 'pts4', target: null, keyPts: [A, B, C, D], win: { ...W, pts4: [A, B, C, D] }, display: `${C1}`, more: g1Sel('Congruent?', ['Yes', 'No'], ans) }),
+      draw: plotQ({ xr: W.xr, yr: W.yr, step: 1 }), size: [340, 340], frNoDraw: true,
       solution: `${A[1] === B[1] ? 'AB is horizontal' : 'AB is vertical'}: AB = ${A[1] === B[1] ? `|${g10minus(B[0], A[0])}|` : `|${g10minus(B[1], A[1])}|`} = ${L}.\n${C[1] === D[1] ? 'CD is horizontal' : 'CD is vertical'}: CD = ${L2}.\n${same ? 'The lengths are equal, so the segments are congruent.' : 'The lengths are different, so the segments are not congruent.'}` };
   }
 };
@@ -24118,7 +24124,7 @@ function registerCustomUrl(url) {
 function applyMode(q, mode) {
   if (q.twoPart) { q.mode = 'fr'; q.fr = mode === 'fr' ? q.twoPart.fr : q.twoPart.mc; return q; } // Part A + Part B
   if (q.proofQ || q.sketch) { q.mode = 'fr'; return q; } // proofs are always written out; sketches are drawn on a grid
-  if (mode === 'fr' && q.fr) { q.mode = 'fr'; if (q.frStem) q.stem = q.frStem; if (q._frSolution) q.solution = q._frSolution; }
+  if (mode === 'fr' && q.fr) { q.mode = 'fr'; if (q.frStem) q.stem = q.frStem; if (q._frSolution) q.solution = q._frSolution; if (q.frNoDraw) { delete q.draw; delete q.size; } } // frNoDraw: the answer grid replaces the picture
   else q.mode = 'mc';
   return q;
 }
