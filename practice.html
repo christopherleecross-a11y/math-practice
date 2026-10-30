@@ -219,6 +219,10 @@ const CONFIG = {
   // DESMOS = true puts a Desmos graphing calculator button on every assignment. Usually set per assignment instead:
   // desmos: true in SETS, or the builder's "Desmos calculator" box. Students open it beside the questions; it is never graded.
   DESMOS: false,
+  // SHARE_WORK = true shares each student's work Google Doc (their answers, the correct answers, and the solutions) with
+  // them, view-only, when they turn in any assignment. Usually set per assignment instead: shareWork: true in SETS, or the
+  // builder's "Share the work Doc" box. Needs SEND_WORK and the student's Classroom ID (Google sign-in or the roster list).
+  SHARE_WORK: false,
   // DESMOS_KEY = your Desmos API key (desmos.com/my-api). A trial key shows a small notice on the calculator.
   DESMOS_KEY: 'c80044b29fac4a34aad05e6df2542e5f',
   // AI_GRADING = true lets "Prove the identity" questions be graded by Claude through your Apps Script
@@ -24113,11 +24117,11 @@ function registerCustomUrl(url) {
   const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
   const checks = Math.max(1, Math.min(5, Math.floor(+q.get('checks') || 1)));
-  const same = q.get('same') === '1', hints = q.get('hints') === '1', desmos = q.get('desmos') === '1', redo = q.get('redo') === 'missed' ? 'missed' : 'all';
+  const same = q.get('same') === '1', hints = q.get('hints') === '1', desmos = q.get('desmos') === '1', shareWork = q.get('sw') === '1', redo = q.get('redo') === 'missed' ? 'missed' : 'all';
   const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, desmos, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, desmos, shareWork, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
 })();
 
 /* ---------- question generation ---------- */
@@ -24176,6 +24180,7 @@ const setting = (setKey, name) => {
   if (name === 'same') return !!CONFIG.SAME_FOR_EVERYONE;
   if (name === 'hints') return !!CONFIG.HINTS;
   if (name === 'desmos') return !!CONFIG.DESMOS;
+  if (name === 'shareWork') return !!CONFIG.SHARE_WORK;
   if (name === 'leaveLimit') return CONFIG.LEAVE_LIMIT || 0;
   if (name === 'redo') return CONFIG.REDO === 'missed' ? 'missed' : 'all';
   if (name === 'bonusPct') return CONFIG.BONUS_PERCENT || 5; // percent added for each bonus question answered right
@@ -25314,6 +25319,7 @@ async function send(pts) {
     minutes: Math.round((Date.now() - state.started) / 6000) / 10, tabAways: state.tabAways,
     version: state.version + (state.attempts > 1 ? ` · attempt ${state.attempt} of ${state.attempts}` : ''),
     work: CONFIG.SEND_WORK ? exportWork(pts) : null,
+    shareWork: CONFIG.SEND_WORK && setting(state.setKey, 'shareWork') && (state.rid || state.token) ? true : undefined,
   };
   try {
     await fetch(CONFIG.SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
@@ -25321,6 +25327,37 @@ async function send(pts) {
   } catch (e) { sub.saveStatus = 'fail'; }
   store.set(state.key, { ...(store.get(state.key) || {}), submitted: sub });
   refreshStatus();
+  if (payload.shareWork && sub.saveStatus === 'ok') { sub.workUrl = sub.workUrl || 'wait'; fetchWorkLink(payload, 10); refreshWorkLink(); }
+}
+// the work Doc is made and shared after the score is saved; ask for its link a few times
+let workPolling = 0;
+async function fetchWorkLink(payload, tries) {
+  const sub = state.submitted; workPolling++;
+  try {
+  for (let k = 0; k < tries; k++) {
+    await new Promise((ok) => setTimeout(ok, k ? 4000 : 3000));
+    if (state.submitted !== sub) return; // they moved on
+    try {
+      const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'myWork', rid: payload.rid, token: payload.token, set: payload.set, version: payload.version }) });
+      const j = await res.json();
+      if (j && j.url && /^https:\/\/docs\.google\.com\//.test(j.url)) { sub.workUrl = j.url; break; }
+    } catch (e) { /* try again */ }
+  }
+  } finally { workPolling--; }
+  if (sub.workUrl === 'wait') sub.workUrl = 'later';
+  store.set(state.key, { ...(store.get(state.key) || {}), submitted: sub });
+  refreshWorkLink();
+}
+function refreshWorkLink() {
+  const box = document.getElementById('workLink'); if (!box) return;
+  const sub = state.submitted, u = sub && sub.workUrl;
+  box.replaceChildren();
+  if (!u) return;
+  if (/^https:/.test(u)) box.append(el('a', { class: 'btn', href: u, target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none' }, '📄 Open your graded work (Google Doc)'),
+    el('div', { class: 'small', style: 'margin-top:6px' }, 'Your answers, the correct answers, and how to solve each one. It’s also in your Google Drive under “Shared with me.”'));
+  else if (u === 'wait' && workPolling) box.append(el('div', { class: 'small' }, '📄 Getting your graded work ready…'));
+  else box.append(el('div', { class: 'small' }, '📄 Your graded work will show up in your Google Drive under “Shared with me” in a few minutes. ',
+    el('button', { class: 'btn secondary', type: 'button', onclick: () => { sub.workUrl = 'wait'; fetchWorkLink({ rid: state.rid || undefined, token: state.token || undefined, set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, version: state.version + (state.attempts > 1 ? ` · attempt ${state.attempt} of ${state.attempts}` : '') }, 3); refreshWorkLink(); } }, 'Check again')));
 }
 function refreshStatus() {
   const s = document.getElementById('saveStatus'); if (!s) return;
@@ -25343,7 +25380,8 @@ function resultsCard() {
       return el('div', { style: 'font-weight:600;color:#8a6d0f' }, `${fmt(reg)} / ${total} correct (${Math.round((100 * reg) / total)}%)` + (b > 0 ? ` ★ plus ${fmt(b)}% bonus` : ' · ★ no bonus this time (nothing was taken off)')); })() : '',
     multi && scores.length > 1 ? el('div', { style: 'font-weight:600' }, `Best score so far: ${fmt(best)} / ${total}`) : '',
     el('div', { class: 'small' }, `Turned in ${new Date(at).toLocaleString()} · Version ${state.version}`),
-    el('div', { id: 'saveStatus', class: 'status wait' }, ''));
+    el('div', { id: 'saveStatus', class: 'status wait' }, ''),
+    el('div', { id: 'workLink', style: 'margin-top:10px' }));
   const missedOnly = setting(state.setKey, 'redo') === 'missed';
   const right = state.qs.map((q, i) => scoreOf(q, state.answers[i]) === 1), nMissed = right.filter((x) => !x).length;
   if (state.attempt < state.attempts && missedOnly && !nMissed) card.append(el('p', { class: 'small' }, 'You got every question right — nothing to redo.'));
@@ -25367,7 +25405,7 @@ function resultsCard() {
       begin(state.setKey, state.period, state.name, false, 1, state.rid); window.scrollTo(0, 0);
     } }, missedOnly ? `Start attempt ${next} of ${state.attempts} (redo the ${nMissed} you missed)` : `Start attempt ${next} of ${state.attempts} (new questions)`));
   } else if (multi) card.append(el('p', { class: 'small' }, 'You have used all of your attempts.'));
-  setTimeout(refreshStatus, 0);
+  setTimeout(() => { refreshStatus(); refreshWorkLink(); }, 0);
   return card;
 }
 
@@ -26035,6 +26073,8 @@ function builder() {
   const desmosIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   hintsIn.checked = !!saved.hints;
   desmosIn.checked = !!saved.desmos;
+  const shareIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
+  shareIn.checked = !!saved.shareWork;
   const redoSel = el('select', {}, el('option', { value: 'all' }, 'Redo every question (all new numbers)'), el('option', { value: 'missed' }, 'Redo only the questions they missed (correct answers carry over)'));
   redoSel.value = saved.redo === 'missed' ? 'missed' : 'all';
   // grayed out while attempts is 1 (it only matters for a second attempt)
@@ -26070,14 +26110,14 @@ function builder() {
     const q = u.searchParams, mix = q.get('mix');
     if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
-      retries: +q.get('retries') || 0, checks: +q.get('checks') || 1, bonusPct: bonusPctOf(q) || 5, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', desmos: q.get('desmos') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
+      retries: +q.get('retries') || 0, checks: +q.get('checks') || 1, bonusPct: bonusPctOf(q) || 5, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', desmos: q.get('desmos') === '1', shareWork: q.get('sw') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
       leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), gen: q.get('g') === '2' ? 2 : 1, note, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
     const S = SETS[key]; if (!S) return;
     store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m, b]) => [id, n, m === 'fr' ? 'fr' : 'mc', b])), bonusPct: S.bonusPct || 5, title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
-      retries: S.retries || 0, checks: S.checks || 1, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, desmos: !!S.desmos, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
+      retries: S.retries || 0, checks: S.checks || 1, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, desmos: !!S.desmos, shareWork: !!S.shareWork, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadEdit = () => loadFromUrl(editIn.value);
@@ -26181,7 +26221,9 @@ function builder() {
     el('label', {}, 'Hints'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
       el('span', { class: 'small' }, 'Adds a Hint button to every question (the first step of the solution, with the answer hidden). Hints do not change the score; the gradebook detail marks each question where a hint was used.')),
     el('label', {}, 'Desmos calculator'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, desmosIn,
-      el('span', { class: 'small' }, 'Adds a Desmos button at the bottom of the assignment. It opens the Desmos graphing calculator beside the questions (it is never graded).'))));
+      el('span', { class: 'small' }, 'Adds a Desmos button at the bottom of the assignment. It opens the Desmos graphing calculator beside the questions (it is never graded).')),
+    el('label', {}, 'Share the work Doc'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, shareIn,
+      el('span', { class: 'small' }, 'When a student turns it in, their “View work” Google Doc (their answers, the correct answers, and the solutions) is shared with their school account, view-only, and their results page gets a button to open it. Works for students who signed in with Google or picked their name from the class list.'))));
 
   const list = el('div', { class: 'card' });
   const totalEl = el('strong', {}, '0');
@@ -26312,6 +26354,7 @@ function builder() {
   sameIn.addEventListener('change', update);
   hintsIn.addEventListener('change', update);
   desmosIn.addEventListener('change', update);
+  shareIn.addEventListener('change', update);
   redoSel.addEventListener('change', update);
 
   function update() {
@@ -26333,7 +26376,7 @@ function builder() {
     const title = titleIn.value.trim() || 'Custom Practice';
     changedNow = false;
     const prevLast = store.get(TK('builder:last')) || {};
-    const nextLast = { counts, formats, frCounts, bonusCounts, bonusFormats, bonusPct: +bonusPctIn.value || 5, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
+    const nextLast = { counts, formats, frCounts, bonusCounts, bonusFormats, bonusPct: +bonusPctIn.value || 5, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, shareWork: shareIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
     const sig = draftSig(nextLast);
     if (sig === store.get(TK('builder:sentSig'))) nextLast.t = prevLast.t || 0;
     else if (opening) { // first look at what was already here: copy it only if it came from loading an assignment just now
@@ -26364,13 +26407,14 @@ function builder() {
     if (sameIn.checked) q.set('same', '1');
     if (hintsIn.checked) q.set('hints', '1');
     if (desmosIn.checked) q.set('desmos', '1');
+    if (shareIn.checked) q.set('sw', '1');
     if (!editId || saved.gen === 2) q.set('g', '2');
     if (editId) q.set('id', editId);
     const url = location.origin + location.pathname + '?' + q.toString();
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1'; shareA.value = shareLink(url, true); shareQ.value = shareLink(url, false);
     if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${[...items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`), ...bItems.map(([id, n, f]) => `['${id}', ${n}, '${f}', 'b']`)].join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${nBonus && bp !== 5 ? `, bonusPct: ${bp}` : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${desmosIn.checked ? ', desmos: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${[...items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`), ...bItems.map(([id, n, f]) => `['${id}', ${n}, '${f}', 'b']`)].join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${nBonus && bp !== 5 ? `, bonusPct: ${bp}` : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${hintsIn.checked ? ', hints: true' : ''}${desmosIn.checked ? ', desmos: true' : ''}${shareIn.checked ? ', shareWork: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
   }
   update(); opening = false;
 }
@@ -26435,7 +26479,7 @@ function viewScreen() {
     el('p', { class: 'small' }, `${total} question${total === 1 ? '' : 's'}: `, S.items.map(([id, n, m, b]) => `${b === 'b' ? '★ BONUS: ' : ''}${name(id)} (${n}${m === 'fr' ? ', free response' : ''})`).join('; '), '.',
       S.items.some((it) => it[3] === 'b') ? ` Bonus questions come last: +${fmt(setting(setKey, 'bonusPct'))}% added to the score for each one right, nothing off if wrong.` : ''),
     el('p', { class: 'small' }, `Every student gets ${setting(setKey, 'same') ? 'the same version' : 'their own version with different numbers'}${S.shuffle ? ', in a mixed-up order' : ''}. `,
-      `Tries per question: ${ret + 1}${ret && setting(setKey, 'checks') > 1 ? ` (typed answers: ${setting(setKey, 'checks')} checks per version)` : ''}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. Desmos calculator: ${yes(setting(setKey, 'desmos'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
+      `Tries per question: ${ret + 1}${ret && setting(setKey, 'checks') > 1 ? ` (typed answers: ${setting(setKey, 'checks')} checks per version)` : ''}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. Desmos calculator: ${yes(setting(setKey, 'desmos'))}. Work Doc shared with the student: ${yes(setting(setKey, 'shareWork'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
     el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
       el('button', { class: 'btn secondary', type: 'button', onclick: () => { sample++; draw(); } }, 'Show another version'),
       ans ? ansBtn : '',
@@ -26462,7 +26506,7 @@ function copyIntoBuilder(link) {
   const g = (k, d) => (q.has(k) ? q.get(k) : d);
   store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, bonusCounts: bc, bonusFormats: bf, bonusPct: (mix ? bonusPctOf(q) : set && set.bonusPct) || 5, title: g('title', set ? set.title : ''), subject: SUBJECTS[g('subject', set ? set.subject : '')] ? g('subject', set ? set.subject : '') : Object.keys(SUBJECTS)[0],
     order: g('order', set && set.shuffle ? 'mixed' : '') === 'mixed' ? 'mixed' : 'grouped', retries: +g('retries', set ? set.retries || 0 : 0) || 0, checks: +g('checks', set ? set.checks || 1 : 1) || 1, attempts: +g('attempts', set ? set.attempts || 1 : 1) || 1,
-    lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', desmos: g('desmos', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
+    lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', desmos: g('desmos', '') === '1', shareWork: g('sw', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
     note: 'This is a copy of a shared assignment. Check the title and settings, then copy your own student link below.', t: Date.now() });
   return true;
 }
