@@ -155,6 +155,9 @@
   .lp-name { font-weight: 700; font-size: 17px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .lp-tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #e8f0fa; color: #1f5fa8; }
   .lp-check { background: #f6f4ec; border-left: 3px solid #c9a227; padding: 6px 10px; }
+  .lp-table { border-collapse: collapse; font-size: 14px; min-width: 520px; }
+  .lp-table th, .lp-table td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; white-space: nowrap; }
+  .lp-table th { background: #f3f1ea; }
   .lp-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   .tvshow { position: fixed; inset: 0; z-index: 9999; background: #fff; color: #1d1d1b; overflow: auto; display: flex; flex-direction: column; }
   .tv-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid #ddd; background: #fafaf7; position: sticky; top: 0; }
@@ -9276,22 +9279,24 @@ function mParse(src) {
   while (i < S.length) {
     const r = S.slice(i); let m;
     if (r[0] === ' ') { i++; continue; }
-    if ((m = /^(sin|cos|tan|csc|sec|cot)[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*/.exec(r))) { toks.push({ t: 'fn', s: m[0] }); i += m[0].length; continue; }
-    if ((m = /^\d+(\.\d+)?[⁰¹²³⁴⁵⁶⁷⁸⁹]*/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
+    if ((m = /^(sin|cos|tan|csc|sec|cot|ln|log)[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*/.exec(r))) { toks.push({ t: 'fn', s: m[0] }); i += m[0].length; continue; }
+    if ((m = /^(opposite|adjacent|hypotenuse|opp|adj|hyp|period|rise|run)\b/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
+    if ((m = /^\d+(\.\d+)?[₀₁₂₃₄₅₆₇₈₉]*[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*°?/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
     if ((m = /^_+/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
-    if ((m = /^[A-Za-zθαβγπ][⁰¹²³⁴⁵⁶⁷⁸⁹]*/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
-    if ((m = /^\)[⁰¹²³⁴⁵⁶⁷⁸⁹]*/.exec(r))) { toks.push({ t: ')', s: m[0].slice(1) }); i += m[0].length; continue; }
-    if ('(+−-·=/'.includes(r[0])) { toks.push({ t: r[0] === '-' ? '−' : r[0] }); i++; continue; }
+    if ((m = /^[A-Za-zθαβγπ]′?[₀₁₂₃₄₅₆₇₈₉]*[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
+    if ((m = /^\)′?[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*/.exec(r))) { toks.push({ t: ')', s: m[0].slice(1) }); i += m[0].length; continue; }
+    if ('(+−-·=/√±×'.includes(r[0])) { toks.push({ t: r[0] === '-' ? '−' : r[0] === '×' ? '·' : r[0] }); i++; continue; }
     return null;
   }
   let k = 0; const is = (t) => k < toks.length && toks[k].t === t;
-  const startsPrim = () => k < toks.length && ['a', 'fn', '('].includes(toks[k].t);
+  const startsPrim = () => k < toks.length && ['a', 'fn', '(', '√'].includes(toks[k].t);
   const fail = () => { throw new Error('m'); };
   function prim() {
     const t = toks[k]; if (!t) fail();
     if (t.t === 'a') { k++; return { k: 't', s: t.s }; }
     if (t.t === '(') { k++; const e = expr(); if (!is(')')) fail(); const sup = toks[k].s; k++; return { k: 'par', c: e, sup }; }
     if (t.t === 'fn') { k++; const a = prim(); return { k: 'row', c: [{ k: 't', s: t.s }, { k: 'sp' }, a] }; }
+    if (t.t === '√') { k++; const a = prim(); return { k: 'sqrt', c: mStrip(a) }; } // the bar covers the whole radicand
     fail();
   }
   function unary() { if (is('−')) { k++; const u = unary(); return { k: 'row', c: [{ k: 't', s: '−' }, u] }; } return prim(); }
@@ -9305,7 +9310,7 @@ function mParse(src) {
     }
     return parts.length > 1 ? { k: 'row', c: mJoin(parts) } : parts[0];
   }
-  function expr() { const c = [term()]; while (is('+') || is('−')) { const op = toks[k++].t; c.push({ k: 't', s: ` ${op} ` }, term()); } return c.length > 1 ? { k: 'row', c } : c[0]; }
+  function expr() { const c = [term()]; while (is('+') || is('−') || is('±')) { const op = toks[k++].t; c.push({ k: 't', s: ` ${op} ` }, term()); } return c.length > 1 ? { k: 'row', c } : c[0]; }
   try { const c = [expr()]; while (is('=')) { k++; c.push({ k: 't', s: ' = ' }, expr()); } if (k !== toks.length) return null; return c.length > 1 ? { k: 'row', c } : c[0]; } catch { return null; }
 }
 // implicit products get a thin space; a parenthesized denominator or numerator loses its parentheses (the bar groups it)
@@ -9318,6 +9323,7 @@ function mBox(ctx, b, fs) { // returns { w, a, d }
   if (b.k === 'row') { let w = 0, a = fs * 0.75, d = fs * 0.25; for (const c of b.c) { const m = mBox(ctx, c, fs); w += m.w; a = Math.max(a, m.a); d = Math.max(d, m.d); } return { w, a, d }; }
   if (b.k === 'par') { const m = mBox(ctx, b.c, fs), tall = m.a + m.d > fs * 1.3; ctx.font = mFont(fs); const pw = tall ? fs * 0.4 : ctx.measureText('(').width, sw = b.sup ? ctx.measureText(b.sup).width : 0; return { w: m.w + 2 * pw + sw, a: Math.max(m.a, fs * 0.75) + (tall ? 2 : 0), d: Math.max(m.d, fs * 0.25) + (tall ? 2 : 0) }; }
   if (b.k === 'frac') { const f2 = fs * 0.88, n = mBox(ctx, b.n, f2), d = mBox(ctx, b.d, f2), ax = fs * 0.3; return { w: Math.max(n.w, d.w) + fs * 0.4, a: ax + 3 + n.a + n.d, d: d.a + d.d + 3 - ax }; }
+  if (b.k === 'sqrt') { const c = mBox(ctx, b.c, fs); return { w: c.w + fs * 0.62 + 2, a: c.a + 4, d: Math.max(c.d, fs * 0.22) + 1 }; }
   return { w: 0, a: 0, d: 0 };
 }
 function mDraw(ctx, b, x, y, fs) { // y = baseline
@@ -9338,13 +9344,105 @@ function mDraw(ctx, b, x, y, fs) { // y = baseline
     ctx.save(); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + fs * 0.12, ax); ctx.lineTo(x + m.w - fs * 0.12, ax); ctx.stroke(); ctx.restore();
     mDraw(ctx, b.n, x + (m.w - n.w) / 2, ax - 3 - n.d, f2);
     mDraw(ctx, b.d, x + (m.w - d.w) / 2, ax + 3 + d.a, f2);
+  } else if (b.k === 'sqrt') { // radical sign with a bar over everything under it
+    const c = mBox(ctx, b.c, fs), top = y - c.a - 2, bot = y + Math.max(c.d, fs * 0.22), lx = x + fs * 0.55;
+    ctx.save(); ctx.lineWidth = Math.max(1.1, fs * 0.06); ctx.lineJoin = 'round'; ctx.beginPath();
+    ctx.moveTo(x + fs * 0.04, y - fs * 0.28); ctx.lineTo(x + fs * 0.17, y - fs * 0.34); ctx.lineTo(x + fs * 0.33, bot); ctx.lineTo(lx, top); ctx.lineTo(lx + c.w + fs * 0.07, top); ctx.stroke(); ctx.restore();
+    mDraw(ctx, b.c, lx + fs * 0.04, y, fs);
   }
+}
+/* ---------- automatic math: "(y₂ − y₁)/(x₂ − x₁)", "3/4", "½" become stacked fractions and "√(5² + 1²)", "2√26" get a
+   radical whose bar covers the whole radicand. Only the drawing changes; the question's text (and the gradebook/Doc) stay as written. */
+const AM_SUB = '′₀₁₂₃₄₅₆₇₈₉⁰¹²³⁴⁵⁶⁷⁸⁹⁻°', AM_LET = /[A-Za-zθαβγπ]/, AM_OK = /^[0-9A-Za-zθαβγπ₀-₉⁰¹²³⁴⁵⁶⁷⁸⁹⁻°′ +−\-·×=/()√±.]*$/;
+const AM_WORDS = /^(opposite|adjacent|hypotenuse|opp|adj|hyp|period|rise|run)$/, AM_FN = /^(sin|cos|tan|csc|sec|cot|ln|log)[⁻¹²]* ?/;
+const AM_VULGAR = { '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4', '⅕': '1/5', '⅛': '1/8' };
+function amGroupOk(g) { // a parenthesized group that is really math (no words, commas, etc.)
+  if (!AM_OK.test(g)) return false;
+  return !/[A-Za-z]{2,} [A-Za-z]{2,}|[A-Za-z]{5,}/.test(g.replace(/sin|cos|tan|csc|sec|cot|ln|log|opposite|adjacent|hypotenuse/g, ''));
+}
+const AM_FNS = /^(sin|cos|tan|csc|sec|cot|ln|log)$/;
+function amOperandOk(op) { // letters in an operand are variables, function names, segment names, or a few words
+  const rich = /[\d(√∛⁰¹²³⁴⁵⁶⁷⁸⁹⁻₀-₉]/.test(op);
+  for (const run of op.match(/[A-Za-z]+/g) || []) {
+    if (run.length < 2 || AM_WORDS.test(run) || /^[A-Z]{2}$/.test(run)) continue;
+    if (AM_FNS.test(run) && /[(\d]/.test(op)) continue;
+    if (rich && run.length <= 4 && !/[aeiou]{2}/.test(run) && run === run.toLowerCase()) continue; // monomials like pz³, 2pyz
+    return false;
+  }
+  return true;
+}
+const amIsLet = (c) => !!c && AM_LET.test(c);
+function amRight(t, j) { // end of the operand starting at j, or -1
+  let k = j; if (/[−-]/.test(t[k]) && /[\d(√]/.test(t[k + 1] || '')) k++;
+  const st = k;
+  for (;;) {
+    const c = t[k]; if (c === undefined) break;
+    if (c === '√' || c === '∛') { k++; if (t[k] === '−' && /[\d(]/.test(t[k + 1] || '')) k++; continue; }
+    if (k > st && /[\d)]/.test(t[k - 1] || '') && !/[√∛]/.test(t.slice(st, k)) && /^[\d.]+[⁰¹²³⁴⁵⁶⁷⁸⁹⁻°′]*$/.test(t.slice(st, k))) break; // the number ends the denominator
+    if (c === '(') { let dep = 0, e = k; for (; e < t.length; e++) { if (t[e] === '(') dep++; else if (t[e] === ')' && --dep === 0) break; } if (e >= t.length || !amGroupOk(t.slice(k, e + 1))) return -1; k = e + 1; }
+    else if (/\d/.test(c)) { while (/[\d.]/.test(t[k] || '')) k++; if (t[k - 1] === '.') k--; }
+    else if (amIsLet(c)) { if (t[k + 1] === '̅') return -1; k++; }
+    else if (c === ' ' && AM_FNS.test((/[A-Za-z]+$/.exec(t.slice(st, k)) || [''])[0]) && /[\d(A-Za-zθπ]/.test(t[k + 1] || '')) { k++; continue; } // "tan 67°"
+    else break;
+    while (k < t.length && AM_SUB.includes(t[k])) k++;
+  }
+  if (k === st || /[√∛ ]$/.test(t.slice(st, k))) return -1;
+  const op = t.slice(st, k); if (!amOperandOk(op)) return -1;
+  const fnEnd = /(sin|cos|tan|csc|sec|cot|ln|log)$/.exec(op); if (fnEnd) return -1;
+  return k;
+}
+function amLeft(t, i) { // start of the operand that ends just before i, or -1
+  let k = i;
+  for (;;) {
+    while (k > 0 && AM_SUB.includes(t[k - 1])) k--;
+    const c = t[k - 1]; if (c === undefined) break;
+    if (c === ')') { let dep = 0, e = k - 1; for (; e >= 0; e--) { if (t[e] === ')') dep++; else if (t[e] === '(' && --dep === 0) break; } if (e < 0 || !amGroupOk(t.slice(e, k))) return -1; k = e; }
+    else if (/\d/.test(c)) { while (k > 0 && /[\d.]/.test(t[k - 1])) k--; }
+    else if (amIsLet(c)) { if (t[k] === '̅') return -1; k--; }
+    else if (c === '√' || c === '∛') k--;
+    else break;
+  }
+  if (k >= i) return -1;
+  const op = t.slice(k, i); if (/^ /.test(op) || !amOperandOk(op)) return -1;
+  if (/(ln|log) $/.test(t.slice(0, k))) return -1; // "log 12/log 5": leave it as written
+  return k;
+}
+function autoMath(text) {
+  if (typeof text !== 'string' || text.includes(NOWRAP) || !/[\/√½⅓⅔¼¾⅕⅛]/.test(text)) return text;
+  return text.split(/(\uE000[^\uE001]*\uE001)/).map((seg) => {
+    if (seg.startsWith(MB)) return seg;
+    let t = seg.replace(/[½⅓⅔¼¾⅕⅛]/g, (c) => AM_VULGAR[c]);
+    const spans = [], ins = {}; // ins: extra parentheses that keep a denominator like "JK" or "3x" together
+    const wrapDen = (a, b) => { const d = t.slice(a, b); if (/^[−-]?[\d.]+[⁰¹²³⁴⁵⁶⁷⁸⁹⁻°′]*$|^[A-Za-zθπ][′₀-₉⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*$/.test(d)) return; let dep = 0, whole = d[0] === '(';
+      if (whole) for (let q = 0; q < d.length; q++) { if (d[q] === '(') dep++; else if (d[q] === ')' && --dep === 0 && !/^[⁰¹²³⁴⁵⁶⁷⁸⁹⁻′]*$/.test(d.slice(q + 1))) { whole = false; break; } }
+      if (whole) return; ins[a] = (ins[a] || '') + '('; ins[b] = ')' + (ins[b] || ''); };
+    for (let i = 0; i < t.length; i++) {
+      if (t[i] === '√') { const e = amRight(t, i); if (e > i + 1) spans.push([i, e]); }
+      else if (t[i] === '/' && t[i - 1] === ' ' && t[i + 1] === ' ' && t[i - 2] === ')' && t[i + 2] === '(') { // "(…) / (…)"
+        const a = amLeft(t, i - 1), b = amRight(t, i + 2); if (a >= 0 && b > i + 2) { spans.push([a, b]); wrapDen(i + 2, b); }
+      } else if (t[i] === '/' && t[i - 1] !== ' ' && t[i + 1] !== ' ' && t[i + 1] !== '/' && t[i - 1] !== '/') {
+        const a = amLeft(t, i), b = amRight(t, i + 1);
+        if (a >= 0 && b > i + 1 && t[a - 1] !== '/' && t[b] !== '/') { spans.push([a, b]); wrapDen(i + 1, b); } // not a date like 10/30/2026
+      }
+    }
+    if (!spans.length) return seg;
+    spans.sort((u, v) => u[0] - v[0]);
+    const merged = [];
+    for (const sp of spans) { const last = merged[merged.length - 1]; if (last && sp[0] < last[1]) last[1] = Math.max(last[1], sp[1]); else merged.push(sp.slice()); }
+    let out = '', at = 0;
+    const withIns = (a, b) => { let o = ''; for (let q = a; q < b; q++) o += (ins[q] ? (q === a ? ins[q].replace(/^\)+/, '') : ins[q]) : '') + t[q]; return o + (ins[b] ? (/^\)+/.exec(ins[b]) || [''])[0] : ''); };
+    for (const [a, b] of merged) { const src = withIns(a, b); if (!mParse(src)) continue; out += t.slice(at, a) + MB + src + ME; at = b; }
+    return at ? out + t.slice(at) : seg;
+  }).join('');
 }
 // a canvas for text that contains marked expressions: fractions are stacked, and each line is as tall as it needs to be
 function mathTextCanvas(text, width, font, lh) {
   const fs = +((/(\d+(?:\.\d+)?)px/.exec(font) || [0, 17])[1]);
   const probe = document.createElement('canvas').getContext('2d'); probe.font = font;
-  const wrapped = wrapLines(probe, text.replace(/\uE000([^\uE001]*)\uE001/g, (m0, e) => MB + e.replace(/ /g, '\u00a0') + ME), width - 4);
+  const mw = { measureText: (str) => ({ width: str.split(/(\uE000[^\uE001]*\uE001)/).reduce((w, part) => {
+    if (part.startsWith(MB)) { const b = mParse(part.slice(1, -1)); if (b) return w + mBox(probe, b, fs).w; }
+    probe.font = font; return w + probe.measureText(part.replace(/[\uE000\uE001]/g, '')).width; }, 0) }) };
+  const wrapped = wrapLines(mw, text.replace(/\uE000([^\uE001]*)\uE001/g, (m0, e) => MB + e.replace(/ /g, '\u00a0') + ME), width - 4);
   const rows = wrapped.map((line) => {
     const parts = line.split(/(\uE000[^\uE001]*\uE001)/).filter((x) => x !== '').map((p) => {
       if (p.startsWith(MB)) { const src = p.slice(1, -1), b = mParse(src); if (b) return { b, m: mBox(probe, b, fs) }; return { s: src.replace(/\u00a0/g, ' ') }; }
@@ -9361,14 +9459,16 @@ function mathTextCanvas(text, width, font, lh) {
     const base = y + (row.h - row.a - row.d) / 2 + row.a; let x = 2;
     row.parts.forEach((q) => {
       if (q.b) { mDraw(ctx, q.b, x, base, fs); x += q.m.w; }
-      else { ctx.font = font; ctx.fillText(q.s, x, base); x += ctx.measureText(q.s).width; }
+      else { ctx.font = font; for (const part of q.s.split(/((?:.\u0305)+)/)) { if (!part) continue; const txt = part.replace(/\u0305/g, ''), w = ctx.measureText(txt).width; ctx.fillText(txt, x, base);
+        if (part !== txt) { ctx.save(); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + 1, base - fs * 0.78); ctx.lineTo(x + w - 1, base - fs * 0.78); ctx.stroke(); ctx.restore(); } x += w; } }
     });
     y += row.h;
   });
   return cv;
 }
-const solNode = (t) => el('div', { class: 'sol' }, hasM(t) ? mathTextCanvas(t, Math.max(280, contentWidth() - 30), '16px Georgia, "Times New Roman", serif', 24) : t);
+const solNode = (t0) => { const t = autoMath(t0); return el('div', { class: 'sol' }, hasM(t) ? mathTextCanvas(t, Math.max(280, contentWidth() - 30), '16px Georgia, "Times New Roman", serif', 24) : t); };
 function textCanvas(text, width, font = TEXT_FONT, lh = 26) {
+  text = autoMath(text);
   if (hasM(text)) return mathTextCanvas(text, width, font, lh);
   const probe = document.createElement('canvas').getContext('2d');
   probe.font = font;
@@ -25866,45 +25966,60 @@ function teacherNav(active) {
 const LESSONS = {
   'geo-6-4': {
     minutes: 45,
-    objective: 'Use midsegments of triangles in the coordinate plane, and use the Triangle Midsegment Theorem to find lengths and distances.',
-    iCan: ['I can find the midsegments of a triangle.', 'I can explain why a midsegment is parallel to the third side and half as long.', 'I can use the Triangle Midsegment Theorem to find missing lengths, including in real-life problems.'],
-    vocab: [['Midsegment of a triangle', 'a segment that connects the midpoints of two sides of a triangle'], ['Midsegment triangle', 'the triangle formed by the three midsegments'], ['Triangle Midsegment Theorem', 'a midsegment is parallel to the third side and is half as long as that side']],
-    materials: 'Chromebooks, TV, graph paper, small whiteboards or scratch paper, rulers',
-    prior: 'Midpoint Formula (1.3), slope of parallel lines (3.5), distance formula (1.3)',
+    note: 'Observation lesson: Wed., Nov. 4 · 4th hour · 10:40 · Observer: Mr. Noble · Feedback on #9, #14, #15',
+    slides: 'https://claude.ai/artifact/8JSp8bg54nWxRPK31tjeWN',
+    objective: 'Discover, then use, the Triangle Midsegment Theorem: a midsegment is parallel to the third side and half as long.',
+    iCan: ['I can find a midsegment of a triangle.', 'I can use the Triangle Midsegment Theorem to find unknown lengths.'],
+    vocab: [['Midsegment', 'a segment that connects the midpoints of two sides of a triangle'], ['Triangle Midsegment Theorem', 'the midsegment is parallel to the third side and is half as long (DE ∥ BC, DE = ½ BC)']],
+    materials: 'Discovery sheets (one triangle per pair; for about 24 students, 2 copies of the 6-page file), exit tickets (2 per page, cut on the dashed line), slides on the TV, Chromebooks',
+    prior: 'Midpoint, slope, and distance formulas (they are printed at the top of the discovery sheet)',
+    before: ['Print the discovery sheets (one triangle per pair) and the exit tickets (cut in half).', 'Open the slides on the TV computer and click Present.', 'Post the 6.4 practice link in 4th hour’s Google Classroom (the bonus is already included).', 'Enter the bell ringer in edia.app.', 'Have the Practice Results sheet (or the Results dashboard) open on your computer.'],
     steps: [
-      { time: '0–5', name: 'Bell ringer (ACT style)', tag: 'All learners',
-        teacher: 'Put the ACT-style midpoint question on the TV. Give 2 minutes, then have everyone hold up their letter (fingers or whiteboard) at the same time.',
-        students: 'Work it on paper and show their answer choice.',
-        check: 'Scan the room: who still mixes up adding vs. subtracting in the Midpoint Formula? Those students are your first stop during practice.',
-        show: [{ tpl: 'g13Midpoint', mode: 'mc', label: 'Bell ringer' }] },
-      { time: '5–13', name: 'Discover the pattern', tag: 'All learners',
-        teacher: 'Each student draws their own triangle on graph paper using even coordinates (so midpoints are whole numbers). Pairs find the midpoints of two sides, connect them, and compare the slope and length of that segment with the third side.',
-        students: 'Each pair reports their slopes and lengths. Every triangle is different, but every pair should find the same thing.',
-        check: 'Call on pairs at random (not volunteers) to share. Ask: “Did anyone get a different pattern?”',
-        say: 'Every one of us drew a different triangle. What stayed the same?' },
-      { time: '13–17', name: 'Name it: vocabulary and the theorem',
-        teacher: 'Students write the definition of a midsegment and the Triangle Midsegment Theorem in their notes, in their own words first, then compare with the book. Point out that every triangle has three midsegments, which form the midsegment triangle.',
-        students: 'Fill in: “A midsegment is ______ to the third side and ______ as long.”',
-        check: 'Have a few students read their sentence aloud before you show the book’s wording.' },
-      { time: '17–27', name: 'Examples: I do, we do, you do', tag: 'Monitor',
-        teacher: 'Example 1 (I do): think aloud through the coordinate example, checking slope and length. Example 2 (we do): students try the find-x problem on whiteboards first, then you reveal. Example 3 (you do): press “New numbers” and let them do one alone.',
-        students: 'Whiteboards up after each try. Pairs explain to each other which side is the “third side.”',
-        check: 'If more than a few boards are wrong on Example 2, do another with New numbers before moving on. The most common mistake is doubling when they should halve (or the reverse).',
-        show: [{ tpl: 'g64Coords', mode: 'fr', label: 'Example 1 (I do)' }, { tpl: 'g64FindX', mode: 'fr', label: 'Example 2 (we do)' }, { tpl: 'g64FindX', mode: 'fr', label: 'Example 3 (you do)' }] },
-      { time: '27–40', name: 'Practice on Chromebooks', tag: 'Monitor',
-        teacher: 'Students work the 6.4 assignment. Keep the Results dashboard open and pull a small group of anyone missing the find-x questions. Early finishers try the work-backwards bonus.',
-        students: 'Independent practice; every student gets different numbers.',
-        check: 'Watch “Correct so far” on the dashboard. Adjust: if most of a period is missing the same type, stop and reteach it on the TV with New numbers.',
+      { time: '0–5', name: 'Bell ringer (ACT)',
+        teacher: 'Students start the bell ringer as soon as they sit down. Midpoint of (−4, 7) and (10, −3). Answer: A (3, 2).',
+        students: 'Work it on paper and answer in edia.app.',
+        check: 'B = subtracted instead of added. C = forgot to divide by 2. D = sign error with the −3. Note who picked B, C, or D: they may need help in the discovery.',
+        say: '“You’ll use exactly this today to find something new about triangles.”',
+        show: [{ label: 'Bell ringer', fixed: { topic: 'ACT', stem: 'In the standard (x, y) coordinate plane, what is the midpoint of the segment with endpoints (−4, 7) and (10, −3)?', choices: ['(3, 2)', '(7, −5)', '(6, 4)', '(3, 5)'], answer: 0, solution: '((−4 + 10)/2, (7 + (−3))/2) = (3, 2).\nB = subtracted instead of added. C = forgot to divide by 2. D = sign error with the −3.' }, more: 'g13Midpoint', mode: 'mc' }] },
+      { time: '5–15', name: 'Discovery in pairs', tag: '#9 Involves all learners',
+        teacher: 'Hand out one triangle sheet per pair (duplicate triangles are fine; matching pairs can check each other). Circulate; make sure both partners write.',
+        students: 'Plot triangle ABC. Find D (midpoint of AB) and E (midpoint of AC); draw DE. Find the slopes of DE and BC and the lengths of DE and BC. Write one sentence about what they notice. Done early: find F, the midpoint of BC, and compare DF to AC.',
+        check: 'Watch for the midpoint mistakes from the bell ringer, and for pairs where one partner does all the work. Triangle 6 has a vertical BC: both slopes are undefined; lengths 6 and 12.' },
+      { time: '15–25', name: 'Debrief + model', tag: '#14 Adjusts based on monitoring',
+        teacher: 'Fill the table slide: call on one pair per triangle to read their four values, then reveal the key. Students state the rule before you name it (“A midsegment is ___ to the third side and ___ as long”). Then the theorem slide and Examples 1–3.',
+        students: 'Report values, state the pattern in one sentence, copy the theorem into notes, try each example before the reveal.',
+        check: 'Use the debrief questions below. On the examples, ask “Which one is the midsegment? Which side is it parallel to?” before revealing.',
+        show: [
+          { label: 'Example 1', fixed: { topic: 'Find a length', stem: 'D̅E̅ is a midsegment of △ABC.\na.  BC = 26. Find DE.\nb.  DE = 7.5. Find BC.', display: 'a.  DE = 13     b.  BC = 15', solution: 'a.  DE = ½ · 26 = 13\nb.  BC = 2 · 7.5 = 15\nThe midsegment is the short one: halve to get it, double to get the third side.', fig: ['', ''] }, more: 'g64FindX', mode: 'fr' },
+          { label: 'Example 2', fixed: { topic: 'Solve for x', stem: 'DE = 3x − 2 and BC = 4x + 6. Find x and DE.', display: 'x = 5,  DE = 13', solution: '2(3x − 2) = 4x + 6\n6x − 4 = 4x + 6\n2x = 10, so x = 5\nDE = 3(5) − 2 = 13   (check: BC = 26)\nCommon mistake: setting 3x − 2 = 4x + 6 gives x = −8, a negative length.', fig: ['3x − 2', '4x + 6'] }, more: 'g64FindX', mode: 'fr' },
+          { label: 'Example 3', fixed: { topic: 'Show it with coordinates', stem: 'A(−2, 4), B(−6, −4), C(4, −2). Show the midsegment DE is parallel to BC and half as long.', display: 'D(−4, 0), E(1, 1);  both slopes 1/5;  DE = √26, BC = 2√26', solution: 'D = ((−2 + (−6))/2, (4 + (−4))/2) = (−4, 0).   E = ((−2 + 4)/2, (4 + (−2))/2) = (1, 1).\nSlope DE = (1 − 0)/(1 − (−4)) = 1/5.   Slope BC = (−2 − (−4))/(4 − (−6)) = 2/10 = 1/5. Same slope → parallel.\nDE = √(5² + 1²) = √26.   BC = √(10² + 2²) = √104 = 2√26. DE is half of BC.' }, more: 'g64Coords', mode: 'fr' }] },
+      { time: '25–40', name: 'Practice on Chromebooks', tag: '#14 Adjusts based on monitoring',
+        teacher: 'Google Classroom → 6.4. Watch the Practice Results sheet (or the Results dashboard); help low scores first. If several students make the same mistake, stop the class for a one-minute reteach on the TV.',
+        students: 'Everyone has different numbers. Help each other with the method, not the answer. Finished? Try the bonus question at the end.',
+        check: 'Watch “Correct so far” for anyone stuck at a low score and go to them first.',
         practice: true },
-      { time: '40–45', name: 'Closure and exit ticket', tag: 'Closure',
-        teacher: 'Put two exit-ticket questions on the TV. Then ask students to finish the sentence frame from earlier without notes, and preview tomorrow (6.5, indirect proof and inequalities in one triangle).',
-        students: 'Answer the exit ticket on a half sheet; finish the sentence frame from memory.',
-        check: 'Sort exit tickets into “got it,” “almost,” “not yet” for tomorrow’s groups.',
-        show: [{ tpl: 'g64Complete', mode: 'fr', label: 'Exit ticket 1' }, { tpl: 'g64Word', mode: 'fr', label: 'Exit ticket 2' }] },
+      { time: '40–45', name: 'Exit ticket + closure', tag: '#15 Establishes closure',
+        teacher: 'Hand out exit tickets. Collect. Then students finish: “A midsegment is ___ and ___.” Revisit the two learning targets.',
+        students: 'Exit ticket on their own (4 minutes), turned in face down. Two or three students finish the sentence aloud; thumbs up / sideways / down on each target.',
+        check: 'Sort the exit tickets tonight (see below).',
+        show: [{ label: 'Exit ticket key', fixed: { topic: 'Exit ticket (D is the midpoint of AB, E is the midpoint of AC)', stem: '1.  If BC = 18, what is DE?\n2.  DE = 2x + 1 and BC = 5x − 4. Find x and the length of DE.\n3.  In one sentence, explain how you know DE is a midsegment of triangle ABC.', display: '1. DE = 9     2. x = 6, DE = 13', solution: '1.  DE = 9 (half of 18)\n2.  2(2x + 1) = 5x − 4 → 4x + 2 = 5x − 4 → x = 6.  DE = 13 (BC = 26).\n3.  DE connects the midpoints of two sides of the triangle (AB and AC).', fig: ['', ''] }, more: 'g64FindX', mode: 'fr' }] },
     ],
-    mistakes: ['Doubling when they should halve (or the reverse): ask “Which one is the midsegment? It’s the short one.”', 'Pairing the midsegment with the wrong side: the midsegment is parallel to the side it does not touch.', 'Midpoint Formula sign errors with negative coordinates.'],
-    support: ['Give a labeled diagram with the midsegment and its parallel side in the same color.', 'Keep the sentence frame on the board during practice.', 'Turn on Hints in the builder for this assignment.'],
-    extend: ['The work-backwards bonus: find a vertex from the three midpoints.', 'Prove the theorem with coordinates: put the vertices at (0, 0), (2a, 0), and (2b, 2c).'],
+    tables: [
+      { title: 'Discovery answer key (every triangle: DE ∥ BC and half as long)', head: ['#', 'A', 'B', 'C', 'D', 'E', 'slope DE', 'slope BC', 'DE', 'BC'], rows: [
+        ['1', '(2, 10)', '(0, 0)', '(6, 8)', '(1, 5)', '(4, 9)', '4/3', '4/3', '5', '10'],
+        ['2', '(−4, 6)', '(−6, −2)', '(2, −8)', '(−5, 2)', '(−1, −1)', '−3/4', '−3/4', '5', '10'],
+        ['3', '(4, −2)', '(−4, 4)', '(4, 10)', '(0, 1)', '(4, 4)', '3/4', '3/4', '5', '10'],
+        ['4', '(−8, 0)', '(0, 8)', '(6, 0)', '(−4, 4)', '(−1, 0)', '−4/3', '−4/3', '5', '10'],
+        ['5', '(0, −6)', '(−8, 2)', '(2, 2)', '(−4, −2)', '(1, −2)', '0', '0', '5', '10'],
+        ['6', '(10, 6)', '(2, −4)', '(2, 8)', '(6, 1)', '(6, 7)', 'undefined', 'undefined', '6', '12']] },
+      { title: 'Early-finisher extension (F = midpoint of BC; DF vs. AC)', head: ['#', 'F', 'DF', 'AC'], rows: [
+        ['1', '(3, 4)', '√5', '2√5'], ['2', '(−2, −5)', '√58', '2√58'], ['3', '(0, 7)', '6', '12'], ['4', '(3, 4)', '7', '14'], ['5', '(−3, 2)', '√17', '2√17'], ['6', '(2, 2)', '√17', '2√17']] },
+    ],
+    lists: [
+      { title: 'Debrief questions', items: ['What did every group find about the slopes? What does equal slope tell us?', 'What did every group find about the lengths?', 'Triangle 5 has a horizontal side and triangle 6 a vertical one. Did the pattern still hold?', 'Put it in one sentence: a midsegment is ______ to the third side and ______ as long.'] },
+      { title: 'What wrong exit-ticket answers tell you', items: ['#1 answered 36: doubled instead of halved. Mixed up which segment is shorter.', '#2 answered x = 5/3 (from 2x + 1 = 5x − 4): set them equal, forgot “half as long.”', '#2 answered x = 6 but DE = 26: found x, then gave BC instead of DE.', '#3 “it’s in the middle” or “it’s parallel”: describes a property, not the definition.'] },
+      { title: 'Sort the exit tickets for tomorrow', items: ['3/3: ready to move on.', '#1 right, #2 wrong: reteach setting up the equation with the factor of 2.', '#1 wrong: reteach the theorem itself with a picture before any algebra.'] },
+    ],
   },
 };
 
@@ -25925,7 +26040,7 @@ function lessonScreen(preKey) {
   app.append(el('div', { class: 'card noprint' },
     el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, el('label', { style: 'margin:0' }, 'Section'), pick,
       el('button', { class: 'btn secondary', type: 'button', onclick: () => window.print() }, '🖨 Print the plan')),
-    el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Buttons marked 📺 put a question on the TV with fresh numbers. Press “Show answer” when you’re ready, or “New numbers” for another one.')), out);
+    el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Buttons marked 📺 put the plan’s questions on the TV. Press “Show answer” when you’re ready, or “New numbers” for another one like it.')), out);
   pick.addEventListener('change', () => { LESSON.key = pick.value; draw(); });
   function draw() {
     out.innerHTML = '';
@@ -25934,12 +26049,16 @@ function lessonScreen(preKey) {
     const list = (arr) => el('ul', { class: 'lp-ul' }, ...arr.map((x) => el('li', {}, x)));
     const all = L.steps.flatMap((s) => s.show || []);
     out.append(el('div', { class: 'card lp' },
-      el('div', { class: 'lp-top' }, el('div', {}, el('h2', { style: 'margin:0' }, S.title), el('div', { class: 'small' }, `${SUBJECTS[S.subject] || ''} · ${L.minutes} minutes · ${CONFIG.TEACHER_NAME}`)),
-        all.length ? el('button', { class: 'btn noprint', type: 'button', onclick: () => tvShow(all, 0) }, '📺 Present the whole lesson') : ''),
+      el('div', { class: 'lp-top' }, el('div', {}, el('h2', { style: 'margin:0' }, S.title), el('div', { class: 'small' }, `${SUBJECTS[S.subject] || ''} · ${L.minutes} minutes · ${CONFIG.TEACHER_NAME}`),
+          L.note ? el('div', { class: 'small', style: 'font-weight:600;margin-top:4px' }, L.note) : ''),
+        el('div', { class: 'lp-btns noprint', style: 'margin:0' },
+          L.slides ? el('a', { class: 'btn', href: L.slides, target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none' }, '🖥 Open the slides') : '',
+          all.length ? el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, 0) }, '📺 Examples and keys on the TV') : '')),
       h('Objective'), el('p', {}, L.objective),
       h('Students will say'), list(L.iCan),
       h('Vocabulary'), el('ul', { class: 'lp-ul' }, ...L.vocab.map(([w, d]) => el('li', {}, el('b', {}, w), ' — ', d))),
       el('div', { class: 'lp-two' }, el('div', {}, h('Materials'), el('p', {}, L.materials)), el('div', {}, h('Builds on'), el('p', {}, L.prior))),
+      L.before ? h('Before class') : '', L.before ? el('ul', { class: 'lp-ul lp-check-list' }, ...L.before.map((x) => el('li', {}, x))) : '',
       h('Lesson flow'),
       ...L.steps.map((s) => el('div', { class: 'lp-step' },
         el('div', { class: 'lp-time' }, s.time, el('div', { class: 'small' }, 'min')),
@@ -25953,9 +26072,11 @@ function lessonScreen(preKey) {
           s.practice ? el('div', { class: 'lp-btns noprint' },
             el('button', { class: 'btn secondary', type: 'button', onclick: () => lessonBuild(LESSON.key) }, `Build a ${S.title.split(' ')[0]} assignment`),
             el('button', { class: 'btn secondary', type: 'button', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard')) : ''))),
-      el('div', { class: 'lp-two' },
+      ...(L.tables || []).flatMap((t) => [h(t.title), el('div', { style: 'overflow-x:auto' }, el('table', { class: 'lp-table' }, el('tr', {}, ...t.head.map((c) => el('th', {}, c))), ...t.rows.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, c))))))]),
+      ...(L.lists || []).flatMap((x) => [h(x.title), list(x.items)]),
+      L.mistakes ? el('div', { class: 'lp-two' },
         el('div', {}, h('Watch for these mistakes'), list(L.mistakes)),
-        el('div', {}, h('Support'), list(L.support), h('Extend'), list(L.extend)))));
+        el('div', {}, h('Support'), list(L.support || []), h('Extend'), list(L.extend || []))) : ''));
   }
   draw();
 }
@@ -25973,13 +26094,23 @@ function tvShow(list, at) {
   const old = document.getElementById('tvShow'); if (old) old.remove();
   const box = el('div', { id: 'tvShow', class: 'tvshow', role: 'dialog', 'aria-label': 'Question on the TV' });
   const body = el('div', { class: 'tv-body' });
-  const make = () => { const x = list[i]; q = applyMode(TEMPLATES[x.tpl](mulberry32((Date.now() ^ (Math.random() * 1e9)) >>> 0)), x.mode); q.tpl = x.tpl; shown = false; paint(); };
+  let fresh = false; // false = the plan's own question; true = New numbers made one from a question type
+  const make = () => {
+    const x = list[i]; shown = false;
+    if (x.fixed && !fresh) { const f = x.fixed; q = { topic: f.topic, stem: f.stem, choices: f.choices, answer: f.answer, mode: f.choices ? 'mc' : 'fr', fr: { display: f.display }, solution: f.solution };
+      if (f.fig) q.draw = (cv) => drawFigure(cv, { polys: [
+        { group: 'g', pts: [[3, 5], [1.5, 2.5], [5, 2.5]], names: ['A', 'D', 'E'], ticks: [1, 0, 2], slab: ['', f.fig[0], ''] },
+        { group: 'g', pts: [[1.5, 2.5], [0, 0], [7, 0], [5, 2.5]], names: ['D', 'B', 'C', 'E'], ticks: [1, 0, 2, 0], slab: ['', f.fig[1], '', ''] }] }), q.size = [400, 280];
+    } else { const t = x.tpl || x.more; q = applyMode(TEMPLATES[t](mulberry32((Date.now() ^ (Math.random() * 1e9)) >>> 0)), x.mode); q.tpl = t; }
+    paint();
+  };
+  const go = (k) => { i = k; fresh = false; make(); };
   const W = () => Math.max(320, Math.min(1100, window.innerWidth - 80));
   const font = '30px Georgia, "Times New Roman", serif';
   function paint() {
     body.innerHTML = '';
     const w = W();
-    body.append(el('div', { class: 'tv-label' }, `${list[i].label} · ${q.topic}`), textCanvas(q.stem, w, font, 42));
+    body.append(el('div', { class: 'tv-label' }, `${list[i].label}${fresh && list[i].fixed ? ' · new numbers' : ''} · ${q.topic}`), ...String(q.stem).split('\n').map((ln) => textCanvas(ln, w, font, 42)));
     if (q.draw) {
       const graph = q.topic.startsWith('Graphs'), sz = q.size || (graph ? [620, 330] : [560, 300]);
       const cv = makeCanvas(sz[0], sz[1]); cv._stack = false; try { q.draw(cv); } catch {}
@@ -25990,20 +26121,23 @@ function tvShow(list, at) {
     if (shown) {
       const ans = q.mode === 'fr' ? q.fr.display : `${LETTERS[q.answer]}. ${q.choices[q.answer]}`;
       body.append(el('div', { class: 'tv-ans' }, el('div', { class: 'tv-label' }, 'Answer'), textCanvas(ans, w - 40, 'bold ' + font, 42),
-        q.solution ? textCanvas(q.solution, w - 40, '24px Georgia, "Times New Roman", serif', 34) : ''));
+        ...(q.solution ? String(q.solution).split('\n').map((ln) => textCanvas(ln, w - 40, '24px Georgia, "Times New Roman", serif', 34)) : [])));
     }
     ansBtn.textContent = shown ? 'Hide answer' : 'Show answer';
     prevBtn.disabled = i === 0; nextBtn.disabled = i === list.length - 1;
     count.textContent = `${i + 1} of ${list.length}`;
+    origBtn.style.display = list[i].fixed && fresh ? '' : 'none';
   }
   const ansBtn = el('button', { class: 'btn', type: 'button', onclick: () => { shown = !shown; paint(); } }, 'Show answer');
-  const prevBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (i > 0) { i--; make(); } } }, '← Back');
-  const nextBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (i < list.length - 1) { i++; make(); } } }, 'Next →');
+  const prevBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (i > 0) go(i - 1); } }, '← Back');
+  const nextBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (i < list.length - 1) go(i + 1); } }, 'Next →');
   const count = el('span', { class: 'small', style: 'margin:0 4px' });
+  const origBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { fresh = false; make(); } }, 'Back to the original');
   const close = () => { box.remove(); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
   const keys = (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowRight') nextBtn.click(); else if (e.key === 'ArrowLeft') prevBtn.click(); else if (e.key === ' ' && e.target === document.body) { e.preventDefault(); ansBtn.click(); } };
   box.append(el('div', { class: 'tv-bar' }, prevBtn, count, nextBtn, el('span', { style: 'flex:1' }), ansBtn,
-    el('button', { class: 'btn secondary', type: 'button', onclick: make }, 'New numbers'),
+    el('button', { class: 'btn secondary', type: 'button', onclick: () => { fresh = true; make(); } }, 'New numbers'),
+    origBtn,
     el('button', { class: 'btn secondary', type: 'button', onclick: () => { const f = box.requestFullscreen || box.webkitRequestFullscreen; if (f) f.call(box); } }, 'Full screen'),
     el('button', { class: 'btn secondary', type: 'button', onclick: close }, 'Close ✕')), body);
   document.body.append(box); document.addEventListener('keydown', keys);
