@@ -155,6 +155,11 @@
   .lp-name { font-weight: 700; font-size: 17px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .lp-tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #e8f0fa; color: #1f5fa8; }
   .lp-check { background: #f6f4ec; border-left: 3px solid #c9a227; padding: 6px 10px; }
+  .lp-print { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 4px; }
+  .lp-printrow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .lp-printrow > * { margin: 0 !important; }
+  .onlyprint { display: none; }
+  @media print { .onlyprint { display: inline; } }
   .lp-table { border-collapse: collapse; font-size: 14px; min-width: 520px; }
   .lp-table th, .lp-table td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; }
   .lp-table th { white-space: nowrap; }
@@ -26020,6 +26025,10 @@ const LESSONS = {
     minutes: 45,
     note: 'Review lesson for 4th hour Geometry, the class before the 6.4 discovery',
     slides: 'https://claude.ai/artifact/745F7GcjoV6x46mD1Rx4dB',
+    printables: [
+      { label: 'Student sheet', file: 'handouts/geo-pre-6-4/student-sheets.pdf', note: '2 pages. Print double-sided, one per student.' },
+      { label: 'Exit tickets', file: 'handouts/geo-pre-6-4/exit-tickets.pdf', note: '2 tickets per page. Print half as many pages as students, then cut.' },
+      { label: 'Teacher packet', file: 'handouts/geo-pre-6-4/teacher-packet.pdf', note: '3 pages, one copy: lesson plan, bell ringer, and answer keys.' }],
     objective: 'Review the three coordinate tools the 6.4 midsegment discovery needs: the midpoint (an average), the distance (the Pythagorean Theorem), and the slope (rise over run), and use slopes to compare lines.',
     iCan: ['I can find the middle of a segment.', 'I can find the length of a segment.', 'I can find slopes and use them to compare lines.'],
     vocab: [['Midpoint', 'M = ((x₁ + x₂)/2, (y₁ + y₂)/2): average the x’s and the y’s'], ['Distance', 'd = √((x₂ − x₁)² + (y₂ − y₁)²): the Pythagorean Theorem'], ['Slope', 'm = (y₂ − y₁)/(x₂ − x₁): rise over run'], ['Parallel / perpendicular', 'same slope / slopes multiply to −1']],
@@ -26092,6 +26101,10 @@ const LESSONS = {
     minutes: 45,
     note: 'Observation lesson: Wed., Nov. 4 · 4th hour · 10:40 · Observer: Mr. Noble · Feedback on #9, #14, #15',
     slides: 'https://claude.ai/artifact/8JSp8bg54nWxRPK31tjeWN',
+    printables: [
+      { label: 'Discovery sheets', file: 'handouts/geo-6-4/discovery-sheets.pdf', note: '6 pages, one triangle per page. One page per pair; for about 24 students print 2 copies.' },
+      { label: 'Exit tickets', file: 'handouts/geo-6-4/exit-tickets.pdf', note: '2 tickets per page. Print half as many pages as students, then cut on the dashed line.' },
+      { label: 'Teacher packet', file: 'handouts/geo-6-4/teacher-packet.pdf', note: '3 pages, one copy: lesson plan, worked-example answers, and answer keys.' }],
     objective: 'Discover, then use, the Triangle Midsegment Theorem: a midsegment is parallel to the third side and half as long.',
     iCan: ['I can find a midsegment of a triangle.', 'I can use the Triangle Midsegment Theorem to find unknown lengths.'],
     vocab: [['Midsegment', 'a segment that connects the midpoints of two sides of a triangle'], ['Triangle Midsegment Theorem', 'the midsegment is parallel to the third side and is half as long (DE ∥ BC, DE = ½ BC)']],
@@ -26171,7 +26184,7 @@ function lessonScreen(preKey) {
   app.append(el('div', { class: 'card noprint' },
     el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, el('label', { style: 'margin:0' }, 'Section'), pick,
       el('button', { class: 'btn secondary', type: 'button', onclick: () => window.print() }, '🖨 Print the plan')),
-    el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Buttons marked 📺 put the plan’s questions on the TV. Press “Show answer” when you’re ready, or “New numbers” for another one like it.')), out);
+    el('p', { class: 'small', style: 'margin:8px 0 0' }, '🖨 buttons open a handout as a PDF; print it from there. Buttons marked 📺 put the plan’s questions on the TV. Press “Show answer” when you’re ready, or “New numbers” for another one like it.')), out);
   pick.addEventListener('change', () => { LESSON.key = pick.value; draw(); });
   function draw() {
     out.innerHTML = '';
@@ -26188,6 +26201,10 @@ function lessonScreen(preKey) {
       h('Objective'), el('p', {}, L.objective),
       h('Students will say'), list(L.iCan),
       h('Vocabulary'), el('ul', { class: 'lp-ul' }, ...L.vocab.map(([w, d]) => el('li', {}, el('b', {}, w), ' — ', lpMath(d, 16)))),
+      L.printables ? h('Print for this lesson') : '',
+      L.printables ? el('div', { class: 'lp-print' }, ...L.printables.map((x) => el('div', { class: 'lp-printrow' },
+        el('a', { class: 'btn noprint', href: x.file, target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none;min-width:190px;text-align:center' }, '🖨 ' + x.label),
+        el('span', { class: 'small', style: 'flex:1 1 260px;margin:0' }, el('b', { class: 'onlyprint' }, x.label + ': '), x.note)))) : '',
       el('div', { class: 'lp-two' }, el('div', {}, h('Materials'), el('p', {}, L.materials)), el('div', {}, h('Builds on'), el('p', {}, L.prior))),
       L.before ? h('Before class') : '', L.before ? el('ul', { class: 'lp-ul lp-check-list' }, ...L.before.map((x) => el('li', {}, x))) : '',
       h('Lesson flow'),
