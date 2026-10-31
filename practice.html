@@ -22986,6 +22986,471 @@ TEMPLATES.g114Max = (r) => {
     solution: `With ℓ + w = ${P / 2}, the area ℓ(${P / 2} − ℓ) is greatest when ℓ = w = ${s}.\nA square ${s} yd by ${s} yd has area ${(s * s).toLocaleString('en-US')} yd².` };
 };
 /* ==== GEOMETRY CH11 END ==== */
+/* ==== GEOMETRY CH12 BEGIN ==== */
+/* ---------- Chapter 12: Surface Area and Volume ----------
+   g12Draw(cv, S) draws a solid in an oblique view (back edges dashed, like the book):
+   S.kind: 'prism' (base polygon in the floor, extruded up), 'lprism' (base polygon standing in the front plane, extruded back),
+   'pyr' (base polygon in the floor, apex above), 'cyl', 'cone', 'sphere', 'hemi'.
+   S.labs: dimension labels; S.marks: height line / right-angle mark / radius line. */
+let G12A = 0.42, G12B = 0.27; // oblique projection: X = x + A z, Y = y + B z (y up, z = depth); S.proj changes it per figure
+const g12P = (p) => [p[0] + G12A * p[2], p[1] + G12B * p[2]];
+const g12sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], g12cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const g12dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+// polyhedron: vertices V (3D), faces F (index lists); an edge is dashed when every face it touches faces away from the viewer
+function g12Poly(V, F) {
+  const cen = V.reduce((s, p) => [s[0] + p[0] / V.length, s[1] + p[1] / V.length, s[2] + p[2] / V.length], [0, 0, 0]);
+  const view = [-G12A, -G12B, 1]; // projection direction (into the page)
+  const front = F.map((f) => {
+    let n = g12cross(g12sub(V[f[1]], V[f[0]]), g12sub(V[f[2]], V[f[0]]));
+    const fc = f.reduce((s, i) => [s[0] + V[i][0], s[1] + V[i][1], s[2] + V[i][2]], [0, 0, 0]).map((x) => x / f.length);
+    if (g12dot(n, g12sub(fc, cen)) < 0) n = n.map((x) => -x); // outward
+    return g12dot(n, view) < -1e-9;
+  });
+  const edges = new Map();
+  F.forEach((f, k) => f.forEach((a, j) => { const b = f[(j + 1) % f.length], key = a < b ? a + ',' + b : b + ',' + a; const e = edges.get(key) || { a: Math.min(a, b), b: Math.max(a, b), vis: false }; e.vis = e.vis || front[k]; edges.set(key, e); }));
+  return { V, F, front, edges: [...edges.values()] };
+}
+const g12Ngon = (n, rad, rot = 0) => Array.from({ length: n }, (_, i) => { const t = rot + (2 * Math.PI * i) / n; return [rad * Math.cos(t), rad * Math.sin(t)]; });
+function g12Draw(cv, S) {
+  [G12A, G12B] = S.proj || [0.42, 0.27];
+  const ctx = cv._ctx, W = cv._w, H = cv._h, segs = [], ells = [], labs = [], fills = [], rights = [];
+  const seg = (p, q, dash = false, color) => segs.push({ p: g12P(p), q: g12P(q), dash, color });
+  const lab = (p3, t, dx = 0, dy = 0, align, color = G10BLUE) => labs.push({ p: g12P(p3), t, dx, dy, align, color });
+  const L = S.labs || {};
+  if (S.kind === 'prism' || S.kind === 'lprism' || S.kind === 'pyr') {
+    const base = S.base, n = base.length; let V, F;
+    if (S.kind === 'prism') { V = [...base.map(([x, z]) => [x, 0, z]), ...base.map(([x, z]) => [x, S.h, z])]; F = [base.map((_, i) => i), base.map((_, i) => n + i), ...base.map((_, i) => [i, (i + 1) % n, n + (i + 1) % n, n + i])]; }
+    else if (S.kind === 'lprism') { V = [...base.map(([x, y]) => [x, y, 0]), ...base.map(([x, y]) => [x, y, S.d])]; F = [base.map((_, i) => i), base.map((_, i) => n + i), ...base.map((_, i) => [i, (i + 1) % n, n + (i + 1) % n, n + i])]; }
+    else { const ap = S.apex || [base.reduce((s, p) => s + p[0], 0) / n, S.h, base.reduce((s, p) => s + p[1], 0) / n]; V = [...base.map(([x, z]) => [x, 0, z]), ap]; F = [base.map((_, i) => i), ...base.map((_, i) => [i, (i + 1) % n, n])]; }
+    const P = g12Poly(V, F);
+    P.F.forEach((f, k) => { if (P.front[k]) fills.push(f.map((i) => g12P(V[i]))); });
+    P.edges.forEach((e) => seg(V[e.a], V[e.b], !e.vis));
+    (S.extra || []).forEach((e) => seg(e[0], e[1], e[2] !== false, e[3]));
+    (S.text || []).forEach((t) => lab(t[0], t[1], t[2] || 0, t[3] || 0, t[4]));
+    (S.rights || []).forEach((rt) => rights.push(rt.map(g12P)));
+  } else if (S.kind === 'cyl' || S.kind === 'cone' || S.kind === 'hemi' || S.kind === 'sphere') {
+    const r = S.r, h = S.h || 0, ry = r * 0.3, top = S.kind === 'cyl' ? h : 0;
+    if (S.kind === 'cyl') {
+      fills.push({ ell: true, cx: 0, cy: 0, rx: r, ry, h });
+      ells.push({ c: [0, 0], rx: r, ry, a0: Math.PI, a1: 2 * Math.PI }, { c: [0, 0], rx: r, ry, a0: 0, a1: Math.PI, dash: true }, { c: [0, h], rx: r, ry, a0: 0, a1: 2 * Math.PI });
+      segs.push({ p: [-r, 0], q: [-r, h] }, { p: [r, 0], q: [r, h] });
+    } else if (S.kind === 'cone') {
+      // tangent points of the apex lines on the base ellipse
+      // the tangent line from the apex (0, h) touches the ellipse (r cos φ, ry sin φ) where sin φ = ry / h (on the back half)
+      const t = Math.asin(Math.min(0.95, ry / Math.max(h, 1e-6))), tx = r * Math.cos(t), ty = ry * Math.sin(t);
+      const outline = [[0, h]]; for (let k = 0; k <= 40; k++) { const ph = t - (k / 40) * (Math.PI + 2 * t); outline.push([r * Math.cos(ph), ry * Math.sin(ph)]); }
+      fills.push(outline);
+      ells.push({ c: [0, 0], rx: r, ry, a0: Math.PI - t, a1: 2 * Math.PI + t }, { c: [0, 0], rx: r, ry, a0: t, a1: Math.PI - t, dash: true });
+      segs.push({ p: [-tx, ty], q: [0, h] }, { p: [tx, ty], q: [0, h] });
+    } else if (S.kind === 'sphere') {
+      fills.push({ circ: true, r });
+      ells.push({ c: [0, 0], rx: r, ry: r, a0: 0, a1: 2 * Math.PI }, { c: [0, 0], rx: r, ry, a0: Math.PI, a1: 2 * Math.PI }, { c: [0, 0], rx: r, ry, a0: 0, a1: Math.PI, dash: true });
+    } else { // hemisphere, flat face up
+      fills.push({ hemi: true, r, ry });
+      ells.push({ c: [0, 0], rx: r, ry, a0: 0, a1: 2 * Math.PI }, { c: [0, 0], rx: r, ry: r, a0: Math.PI, a1: 2 * Math.PI });
+    }
+    const cy = S.kind === 'cyl' ? h : 0; // the radius is drawn on the top (cylinder) or the base
+    if (S.radius !== false) { const dia = S.diam; segs.push({ p: [dia ? -r : 0, cy], q: [r, cy], color: '#b03a2e' }); labs.push({ p: [dia ? 0 : r / 2, cy], t: L.r || '', dx: 0, dy: -10, color: G10BLUE }); }
+    if (S.kind === 'cone' && S.height !== false) { segs.push({ p: [0, 0], q: [0, h], dash: true }); rights.push([[0, 0], [0, h], [r, 0]]); if (L.h) labs.push({ p: [0, h * 0.45], t: L.h, dx: -10, dy: 0, align: 'right', color: G10BLUE }); }
+    if (S.kind === 'cone' && L.s) { const tx = r, mid = [tx * 0.5 + 0.06 * r, h * 0.5]; labs.push({ p: mid, t: L.s, dx: 12, dy: 0, align: 'left', color: G10BLUE }); }
+    if (S.kind === 'cyl' && L.h) labs.push({ p: [r, h / 2], t: L.h, dx: 10, dy: 0, align: 'left', color: G10BLUE });
+    if (S.kind === 'sphere' || S.kind === 'hemi') { /* center dot */ labs.push({ p: [0, 0], t: '•', dx: 0, dy: 0, color: G10INK, dot: true }); }
+    if (S.circ) labs.push({ p: [r * 0.75, r * (S.kind === 'sphere' ? 0.75 : 0)], t: S.circ, dx: 12, dy: -12, align: 'left', color: G10BLUE });
+  } else if (S.kind === 'flat') { // 12.8: a flat region and an axis of rotation (2D)
+    (S.polys || []).forEach((poly) => fills.push(poly));
+    (S.polys || []).forEach((poly) => poly.forEach((p, i) => segs.push({ p, q: poly[(i + 1) % poly.length] })));
+    (S.arcs || []).forEach((a) => { ells.push({ c: a.c, rx: a.r, ry: a.r, a0: a.a0, a1: a.a1 }); fills.push({ sector: true, ...a }); });
+    (S.axis ? [S.axis] : []).forEach(([p, q]) => segs.push({ p, q, axis: true }));
+    (S.text || []).forEach((t) => labs.push({ p: t[0], t: t[1], dx: t[2] || 0, dy: t[3] || 0, color: G10BLUE }));
+    (S.rights || []).forEach((rt) => rights.push(rt));
+  }
+  // fit to the canvas
+  const pts = [];
+  segs.forEach((s) => pts.push(s.p, s.q)); ells.forEach((e) => pts.push([e.c[0] - e.rx, e.c[1] - e.ry], [e.c[0] + e.rx, e.c[1] + e.ry]));
+  fills.forEach((f) => { if (Array.isArray(f)) pts.push(...f); });
+  const bb = bbox(pts), m = S.margin ?? 44, sc = Math.min((W - 2 * m) / Math.max(1e-6, bb.x1 - bb.x0), (H - 2 * m) / Math.max(1e-6, bb.y1 - bb.y0));
+  const ox = (W - (bb.x1 - bb.x0) * sc) / 2, oy = (H - (bb.y1 - bb.y0) * sc) / 2, X = (p) => [ox + (p[0] - bb.x0) * sc, oy + (bb.y1 - p[1]) * sc];
+  ctx.clearRect(0, 0, W, H); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // light fill on the visible faces
+  ctx.fillStyle = 'rgba(120,175,225,0.22)';
+  fills.forEach((f) => {
+    ctx.beginPath();
+    if (Array.isArray(f)) { f.forEach((p, i) => { const q = X(p); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath(); }
+    else if (f.ell) { const c = X([0, 0]), c2 = X([0, f.h]); ctx.ellipse(c2[0], c2[1], f.rx * sc, f.ry * sc, 0, 0, 2 * Math.PI); ctx.fill(); ctx.beginPath(); ctx.moveTo(c[0] - f.rx * sc, c[1]); ctx.lineTo(c2[0] - f.rx * sc, c2[1]); ctx.lineTo(c2[0] + f.rx * sc, c2[1]); ctx.lineTo(c[0] + f.rx * sc, c[1]); ctx.ellipse(c[0], c[1], f.rx * sc, f.ry * sc, 0, 0, Math.PI); }
+    else if (f.circ) { const c = X([0, 0]); ctx.arc(c[0], c[1], f.r * sc, 0, 2 * Math.PI); }
+    else if (f.hemi) { const c = X([0, 0]); ctx.ellipse(c[0], c[1], f.r * sc, f.r * sc, 0, 0, Math.PI); ctx.ellipse(c[0], c[1], f.r * sc, f.ry * sc, 0, Math.PI, 0, true); }
+    else if (f.sector) { const c = X(f.c); ctx.moveTo(c[0], c[1]); ctx.arc(c[0], c[1], f.r * sc, -f.a1, -f.a0); ctx.closePath(); }
+    ctx.fill();
+  });
+  ctx.strokeStyle = G10INK; ctx.lineWidth = 1.6;
+  segs.forEach((s) => {
+    const a = X(s.p), b = X(s.q);
+    ctx.save(); if (s.dash) ctx.setLineDash([6, 5]); if (s.color) ctx.strokeStyle = s.color; if (s.axis) { ctx.lineWidth = 1.3; ctx.strokeStyle = '#444'; }
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore();
+    if (s.axis) { // arrowheads on both ends
+      [[a, b], [b, a]].forEach(([u, v]) => { const d = Math.hypot(u[0] - v[0], u[1] - v[1]), ux = (u[0] - v[0]) / d, uy = (u[1] - v[1]) / d; ctx.beginPath(); ctx.moveTo(u[0], u[1]); ctx.lineTo(u[0] - 10 * ux - 5 * uy, u[1] - 10 * uy + 5 * ux); ctx.lineTo(u[0] - 10 * ux + 5 * uy, u[1] - 10 * uy - 5 * ux); ctx.closePath(); ctx.fillStyle = '#444'; ctx.fill(); });
+    }
+  });
+  ells.forEach((e) => { const c = X(e.c); ctx.save(); if (e.dash) ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.ellipse(c[0], c[1], e.rx * sc, e.ry * sc, 0, -e.a1, -e.a0); ctx.stroke(); ctx.restore(); });
+  // right-angle marks: [corner, along1, along2] in drawing coordinates
+  ctx.save(); ctx.strokeStyle = G10RED; ctx.lineWidth = 1.2;
+  rights.forEach(([v, p, q]) => { const V = X(v), P = X(p), Q = X(q), u = (A) => { const d = Math.hypot(A[0] - V[0], A[1] - V[1]) || 1; return [(A[0] - V[0]) / d * 10, (A[1] - V[1]) / d * 10]; }, a = u(P), b = u(Q);
+    ctx.beginPath(); ctx.moveTo(V[0] + a[0], V[1] + a[1]); ctx.lineTo(V[0] + a[0] + b[0], V[1] + a[1] + b[1]); ctx.lineTo(V[0] + b[0], V[1] + b[1]); ctx.stroke(); });
+  ctx.restore();
+  ctx.font = '15px Georgia, "Times New Roman", serif'; ctx.textBaseline = 'middle';
+  labs.forEach((l) => { const p = X(l.p); if (l.dot) { ctx.fillStyle = G10INK; ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, 2 * Math.PI); ctx.fill(); return; }
+    if (!l.t) return; ctx.fillStyle = l.color || G10BLUE; ctx.textAlign = l.align || 'center'; ctx.fillText(l.t, p[0] + l.dx, p[1] + l.dy); });
+  // dot at the center of a circular base
+  if (['cyl', 'cone'].includes(S.kind) && S.radius !== false) { const c = X([0, S.kind === 'cyl' ? S.h : 0]); ctx.fillStyle = G10INK; ctx.beginPath(); ctx.arc(c[0], c[1], 3, 0, 2 * Math.PI); ctx.fill(); }
+}
+const g12Fig = (S) => (cv) => g12Draw(cv, S);
+// common solids with dimension labels
+const g12Box = (l, w, h, labs = {}) => ({ kind: 'prism', base: [[0, 0], [l, 0], [l, w], [0, w]], h, text: [[[l / 2, 0, 0], labs.l ?? '', 0, 14], [[l, 0, w / 2], labs.w ?? '', 8, 8, 'left'], [[l, h / 2, w], labs.h ?? '', 8, 0, 'left']] });
+// right triangular prism standing on a leg: legs a (along x) and b (up), length d going back
+const g12Tri = (a, b, d, labs = {}) => ({ kind: 'lprism', base: [[0, 0], [a, 0], [0, b]], d, rights: [[[0, 0, 0], [1, 0, 0], [0, 1, 0]]], text: [[[a / 2, 0, 0], labs.a ?? '', 0, 14], [[-0.02 * a, b / 2, 0], labs.b ?? '', -16, 0], [[a, 0, d / 2], labs.d ?? '', 20, 4], [[a / 2, b / 2, 0], labs.c ?? '', 16, -14]] });
+const g12Pyr = (s, h, labs = {}, marks = {}) => {
+  const c = [s / 2, 0, s / 2], top = [s / 2, h, s / 2], mf = [s / 2, 0, 0];
+  return { kind: 'pyr', base: [[0, 0], [s, 0], [s, s], [0, s]], h, apex: top,
+    extra: [...(marks.h ? [[c, top, true]] : []), ...(marks.slant ? [[top, mf, false, '#b03a2e']] : []), ...(marks.slant && marks.h ? [[c, mf, true]] : [])],
+    rights: marks.h ? [[c, [s / 2, 1, s / 2], [s / 2, 0, 0]]] : [],
+    text: [[[s / 2, 0, 0], labs.s ?? '', 0, 16], [[s / 2, h * 0.5, s / 2], labs.h ?? '', -8, 0, 'right'], [[s / 2, h / 2, s / 4], labs.l ?? '', 8, 0, 'left']] };
+};
+const G12U = ['in.', 'ft', 'cm', 'm', 'yd', 'mm'];
+const g12u = (r) => pick(r, G12U);
+const G12NG = { 3: 'triangular', 4: 'rectangular', 5: 'pentagonal', 6: 'hexagonal', 7: 'heptagonal', 8: 'octagonal' };
+const g12f = (x) => fmt(Math.round(x * 100) / 100);
+const g12eq = (x) => (Math.abs(x - Math.round(x * 100) / 100) < 1e-9 ? ' = ' : ' ≈ ') + g12f(x); // " = 12.5" when exact, " ≈ 8.17" when rounded
+const g12Cmp = (r, val, alts, unit) => buildChoices(r, `${g12f(val)} ${unit}`, [...new Set(alts.filter((x) => x > 0 && Math.abs(x - val) > 1e-6).map((x) => `${g12f(x)} ${unit}`))].filter((x) => x !== `${g12f(val)} ${unit}`), (i) => `${g12f(val + (i + 1) * Math.max(1, Math.round(val / 10)))} ${unit}`);
+const g12FR = (label, val, unit) => ({ fields: [{ kind: 'number', label, suffix: unit ? ' ' + unit : '' }], key: [String(Math.round(val * 100) / 100)], display: `${g12f(val)}${unit ? ' ' + unit : ''}`, check: (v) => numEq(v[0], val) });
+
+/* ---------- 12.1 Cross Sections of Solids ---------- */
+const G12SOLIDS = () => {
+  const out = [];
+  [3, 5, 6].forEach((n) => { out.push({ name: `${G12NG[n]} prism`, poly: true, S: { kind: 'prism', base: g12Ngon(n, 1, n === 3 ? -Math.PI / 2 : Math.PI / 2), h: 1.5, proj: [0, 0.35] } });
+    out.push({ name: `${G12NG[n]} pyramid`, poly: true, S: { kind: 'pyr', base: g12Ngon(n, 1, n === 3 ? Math.PI / 2 + 0.3 : Math.PI / 2 + (n === 6 ? Math.PI / 6 : 0)), h: 1.9, proj: [0, 0.35] } }); });
+  out.push({ name: 'rectangular prism', poly: true, S: g12Box(3, 1.6, 1.6) }, { name: 'rectangular pyramid', poly: true, S: g12Pyr(3, 2.4) },
+    { name: 'cylinder', poly: false, S: { kind: 'cyl', r: 1, h: 2, radius: false } }, { name: 'cone', poly: false, S: { kind: 'cone', r: 1.2, h: 2.2, radius: false, height: false } }, { name: 'sphere', poly: false, S: { kind: 'sphere', r: 1, radius: false } });
+  return out;
+};
+TEMPLATES.g121Name = (r) => {
+  const all = G12SOLIDS(), s = pick(r, all), ans = s.poly ? `Yes: ${s.name}` : `No: ${s.name} (not a polyhedron)`;
+  const wrong = s.poly ? [`No: ${s.name.includes('prism') ? 'cylinder' : 'cone'} (not a polyhedron)`, `Yes: ${s.name.replace(/prism|pyramid/, (w) => (w === 'prism' ? 'pyramid' : 'prism'))}`, `Yes: ${s.name.replace(/^\w+/, pick(r, Object.values(G12NG).filter((x) => !s.name.startsWith(x))))}`]
+    : [`Yes: ${s.name === 'cylinder' ? 'circular prism' : s.name === 'cone' ? 'circular pyramid' : 'round polyhedron'}`, ...all.filter((x) => x.name !== s.name && !x.poly).map((x) => `No: ${x.name} (not a polyhedron)`)];
+  const opts = ['Yes: triangular prism', 'Yes: rectangular prism', 'Yes: pentagonal prism', 'Yes: hexagonal prism', 'Yes: triangular pyramid', 'Yes: rectangular pyramid', 'Yes: pentagonal pyramid', 'Yes: hexagonal pyramid', 'No: cylinder (not a polyhedron)', 'No: cone (not a polyhedron)', 'No: sphere (not a polyhedron)'];
+  return { topic: 'Classifying solids', stem: 'Tell whether the solid is a polyhedron. If it is, name the polyhedron.', ...buildChoices(r, ans, wrong, () => null),
+    fr: FR.select('Answer:', opts, ans), draw: g12Fig(s.S), size: [300, 250],
+    solution: s.poly ? `Every face is a polygon, so it is a polyhedron. ${s.name.includes('prism') ? 'It has two congruent parallel bases, so it is a prism' : 'It has one base and triangular faces that meet at a vertex, so it is a pyramid'}; the base is ${/^[aeiou]/.test(G12NG[s.name.split(' ')[0]] || s.name) ? 'an' : 'a'} ${s.name.split(' ')[0].replace('rectangular', 'rectangle').replace('triangular', 'triangle').replace('pentagonal', 'pentagon').replace('hexagonal', 'hexagon')}: ${s.name}.`
+      : `A ${s.name} has a curved surface, so it is not a polyhedron.` };
+};
+TEMPLATES.g121Describe = (r) => {
+  const kind = pick(r, ['prism', 'pyramid']), n = ri(r, 3, 8), F = kind === 'prism' ? n + 2 : n + 1, E = kind === 'prism' ? 3 * n : 2 * n, V = kind === 'prism' ? 2 * n : n + 1;
+  const name = `${G12NG[n]} ${kind}`, what = pick(r, ['faces', 'edges', 'vertices']), num = { faces: F, edges: E, vertices: V }[what];
+  const opts = [];
+  [3, 4, 5, 6, 7, 8].forEach((k) => ['prism', 'pyramid'].forEach((t) => opts.push(`${G12NG[k]} ${t}`)));
+  const wrong = [`${G12NG[n]} ${kind === 'prism' ? 'pyramid' : 'prism'}`, ...[n - 1, n + 1, n + 2, n - 2].filter((k) => k >= 3 && k <= 8).map((k) => `${G12NG[k]} ${kind}`)];
+  const why = kind === 'prism' ? `A prism with an n-sided base has n + 2 faces, 3n edges, and 2n vertices.` : `A pyramid with an n-sided base has n + 1 faces, 2n edges, and n + 1 vertices.`;
+  const solve = what === 'faces' ? (kind === 'prism' ? `n + 2 = ${F}, so n = ${n}` : `n + 1 = ${F}, so n = ${n}`) : what === 'edges' ? (kind === 'prism' ? `3n = ${E}, so n = ${n}` : `2n = ${E}, so n = ${n}`) : (kind === 'prism' ? `2n = ${V}, so n = ${n}` : `n + 1 = ${V}, so n = ${n}`);
+  return { topic: 'Naming polyhedra', stem: `Name the figure: a ${kind} with ${num} ${what}.`, ...buildChoices(r, name, wrong, () => null), fr: FR.select('It is a', opts, name),
+    solution: `${why}\n${solve}: the base has ${n} sides, so it is a ${name}.` };
+};
+TEMPLATES.g121Euler = (r) => {
+  const P = pick(r, [['a cube', 6, 12, 8], ['a tetrahedron', 4, 6, 4], ['an octahedron', 8, 12, 6], ['a dodecahedron', 12, 30, 20], ['an icosahedron', 20, 30, 12],
+    ...[3, 4, 5, 6, 7, 8].map((n) => [`a ${G12NG[n]} prism`, n + 2, 3 * n, 2 * n]), ...[3, 4, 5, 6, 7, 8].map((n) => [`a ${G12NG[n]} pyramid`, n + 1, 2 * n, n + 1])]);
+  const [nm, F, E, V] = P, ask = pick(r, ['F', 'E', 'V']), val = { F, E, V }[ask], word = { F: 'faces', E: 'edges', V: 'vertices' };
+  const given = ['F', 'E', 'V'].filter((x) => x !== ask).map((x) => `${({ F, E, V })[x]} ${word[x]}`).join(' and ');
+  return { topic: "Euler's Formula", stem: `A polyhedron has ${given}. How many ${word[ask]} does it have? (Use Euler's Formula, F + V = E + 2.)`,
+    ...g6Choices(r, val, (x) => String(x)), fr: FR.num(`${word[ask][0].toUpperCase() + word[ask].slice(1)}:`, val),
+    solution: `F + V = E + 2:  ${ask === 'F' ? `F + ${V} = ${E} + 2, so F = ${F}` : ask === 'V' ? `${F} + V = ${E} + 2, so V = ${V}` : `${F} + ${V} = E + 2, so E = ${E}`}.\n(For example, ${nm} has ${F} faces, ${E} edges, and ${V} vertices.)` };
+};
+TEMPLATES.g121Cross = (r) => {
+  const C = pick(r, [
+    ['a cylinder', 'parallel to its bases', 'circle'], ['a cylinder', 'perpendicular to its bases, through the center', 'rectangle'],
+    ['a cone', 'parallel to its base', 'circle'], ['a cone', 'perpendicular to its base, through the vertex', 'triangle'],
+    ['a sphere', 'through its center', 'circle'], ['a cube', 'parallel to a face', 'square'],
+    ['a rectangular prism', 'perpendicular to its base', 'rectangle'], ['a square pyramid', 'parallel to its base', 'square'],
+    ['a square pyramid', 'perpendicular to its base, through the vertex', 'triangle'], ['a triangular prism', 'parallel to its bases', 'triangle'],
+    ['a hexagonal prism', 'parallel to its bases', 'hexagon'], ['a square pyramid', 'perpendicular to its base, not through the vertex', 'trapezoid'],
+    ['a pentagonal prism', 'parallel to its bases', 'pentagon']]);
+  const opts = ['circle', 'triangle', 'square', 'rectangle', 'trapezoid', 'pentagon', 'hexagon'];
+  const why = { circle: 'Every point of the cut is the same distance from the center line, so it is a circle.', rectangle: 'The cut runs straight up the solid, so it has two parallel straight sides and two ends: a rectangle.',
+    triangle: C[0].includes('prism') ? 'A cut parallel to the bases has the same shape as a base: a triangle.' : 'The cut meets the base in a segment and goes up to the vertex: a triangle.',
+    square: C[0] === 'a cube' ? 'A cut parallel to a face has the same shape as the face: a square.' : 'A cut parallel to the base has the same shape as the base (smaller): a square.',
+    trapezoid: 'The cut meets the base in a segment and two slanted faces, so the top edge is shorter than the bottom: a trapezoid.', hexagon: 'A cut parallel to the bases has the same shape as a base: a hexagon.', pentagon: 'A cut parallel to the bases has the same shape as a base: a pentagon.' };
+  return { topic: 'Cross sections', stem: `Describe the shape formed by the intersection of the plane and the solid: a plane cuts ${C[0]} ${C[1]}.`,
+    ...buildChoices(r, C[2], opts.filter((x) => x !== C[2]), () => null), fr: FR.select('Shape:', opts, C[2]), solution: why[C[2]] };
+};
+
+/* ---------- 12.2 Surface Areas of Prisms and Cylinders ---------- */
+const G12TRIP = [[3, 4, 5], [6, 8, 10], [5, 12, 13], [8, 15, 17], [9, 12, 15], [12, 16, 20], [7, 24, 25]];
+TEMPLATES.g122Prism = (r) => {
+  const u = g12u(r);
+  if (r() < 0.5) {
+    const l = ri(r, 3, 15), w = ri(r, 2, 10), h = ri(r, 2, 12), S = 2 * (l * w + l * h + w * h);
+    return { topic: 'Surface area of a prism', stem: 'Find the surface area of the right prism.', ...g12Cmp(r, S, [l * w + l * h + w * h, 2 * (l * h + w * h), l * w * h, 2 * l * w + l * h + w * h], `${u}²`),
+      fr: g12FR('S =', S, `${u}²`), draw: g12Fig(g12Box(l, w * 0.8, h * 0.8, { l: `${l} ${u}`, w: `${w} ${u}`, h: `${h} ${u}` })), size: [340, 240],
+      solution: `S = 2B + Ph. The base is ${l} by ${w}: B = ${l * w} and P = 2(${l}) + 2(${w}) = ${2 * (l + w)}.\nS = 2(${l * w}) + ${2 * (l + w)}(${h}) = ${2 * l * w} + ${2 * (l + w) * h} = ${S} ${u}²` };
+  }
+  const [a0, b0, c0] = pick(r, G12TRIP), sw = r() < 0.5, a = sw ? b0 : a0, b = sw ? a0 : b0, c = c0, d = ri(r, 3, 20), B = (a * b) / 2, S = 2 * B + (a + b + c) * d;
+  return { topic: 'Surface area of a prism', stem: 'Find the surface area of the right triangular prism.', ...g12Cmp(r, S, [B + (a + b + c) * d, 2 * a * b + (a + b + c) * d, (a + b + c) * d, B * d], `${u}²`),
+    fr: g12FR('S =', S, `${u}²`), draw: g12Fig(g12Tri(a, b, d * 0.7, { a: `${a} ${u}`, b: `${b} ${u}`, c: `${c} ${u}`, d: `${d} ${u}` })), size: [340, 260],
+    solution: `The bases are right triangles: B = ½(${a})(${b}) = ${g12f(B)}. The perimeter is ${a} + ${b} + ${c} = ${a + b + c}.\nS = 2B + Ph = 2(${g12f(B)}) + ${a + b + c}(${d}) = ${g12f(2 * B)} + ${(a + b + c) * d} = ${g12f(S)} ${u}²` };
+};
+TEMPLATES.g122Cyl = (r) => {
+  const u = g12u(r), rad = ri(r, 2, 15) / (r() < 0.3 ? 2 : 1), h = ri(r, 2, 20), useD = r() < 0.4, S = 2 * Math.PI * rad * rad + 2 * Math.PI * rad * h;
+  return { topic: 'Surface area of a cylinder', stem: `Find the surface area of the right cylinder${useD ? ` with a diameter of ${g12f(2 * rad)} ${u} and a height of ${h} ${u}` : ''}. Round to the nearest hundredth.`,
+    ...g11Ch(r, S, [Math.PI * rad * rad + 2 * Math.PI * rad * h, 2 * Math.PI * rad * h, 2 * Math.PI * 4 * rad * rad + 4 * Math.PI * rad * h, 2 * Math.PI * rad * rad + Math.PI * rad * h], `${u}²`),
+    fr: g11FR('S ≈', S, `${u}²`), draw: useD ? undefined : g12Fig({ kind: 'cyl', r: 1, h: Math.max(0.8, Math.min(2.6, h / rad)), labs: { r: `${g12f(rad)} ${u}`, h: `${h} ${u}` } }), size: [300, 260],
+    solution: `${useD ? `r = ${g12f(2 * rad)} ÷ 2 = ${g12f(rad)}.\n` : ''}S = 2πr² + 2πrh = 2π(${g12f(rad)})² + 2π(${g12f(rad)})(${h})${g12eq(2 * rad * rad + 2 * rad * h)}π ≈ ${g11h(S)} ${u}²` };
+};
+TEMPLATES.g122FindH = (r) => {
+  const u = g12u(r);
+  if (r() < 0.5) { const l = ri(r, 3, 12), w = ri(r, 2, 10), h = ri(r, 2, 15), S = 2 * (l * w + l * h + w * h);
+    return { topic: 'Missing dimensions', stem: `A right rectangular prism has a surface area of ${S} ${u}². Its base is ${l} ${u} by ${w} ${u}. Find the height h.`,
+      ...g12Cmp(r, h, [(S - l * w) / (2 * (l + w)), S / (2 * (l + w)), (S - 2 * l * w) / (l + w), h + 2], u), fr: g12FR('h =', h, u),
+      draw: g12Fig(g12Box(l, w * 0.8, h * 0.8, { l: `${l} ${u}`, w: `${w} ${u}`, h: 'h' })), size: [340, 240],
+      solution: `S = 2B + Ph:  ${S} = 2(${l * w}) + ${2 * (l + w)}h\n${S - 2 * l * w} = ${2 * (l + w)}h, so h = ${h} ${u}` }; }
+  const rad = ri(r, 2, 10), h = ri(r, 2, 15), k = 2 * rad * rad + 2 * rad * h;
+  return { topic: 'Missing dimensions', stem: `A right cylinder has a surface area of ${k}π ${u}² and a radius of ${rad} ${u}. Find the height h.`,
+    ...g12Cmp(r, h, [(k - rad * rad) / (2 * rad), k / (2 * rad), (k - 2 * rad * rad) / rad, h + 1], u), fr: g12FR('h =', h, u),
+    draw: g12Fig({ kind: 'cyl', r: 1, h: Math.max(0.8, Math.min(2.6, h / rad)), labs: { r: `${rad} ${u}`, h: 'h' } }), size: [300, 260],
+    solution: `S = 2πr² + 2πrh:  ${k}π = 2π(${rad})² + 2π(${rad})h = ${2 * rad * rad}π + ${2 * rad}πh\n${k - 2 * rad * rad}π = ${2 * rad}πh, so h = ${h} ${u}` };
+};
+// similar solids: surface areas scale by k², volumes by k³
+TEMPLATES.g122Similar = (r) => {
+  const u = g12u(r), solid = pick(r, ['prisms', 'cylinders', 'pyramids', 'cones']), a = ri(r, 2, 12), kk = pick(r, [2, 3, 4, 0.5, 1.5, 2.5, 3]), b = a * kk;
+  const SA = ri(r, 20, 400) * (Number.isInteger(kk) ? 1 : 4), SB = SA * kk * kk, part = solid === 'cylinders' || solid === 'cones' ? 'radius' : 'height';
+  return { topic: 'Similar solids', stem: `The ${solid} are similar. Solid A has a ${part} of ${a} ${u} and a surface area of ${SA} ${u}². Solid B has a ${part} of ${g12f(b)} ${u}. Find the surface area of solid B.`,
+    ...g12Cmp(r, SB, [SA * kk, SA * kk * kk * kk, SA + (b - a), SA / kk], `${u}²`), fr: g12FR('S =', SB, `${u}²`),
+    solution: `Scale factor k = ${g12f(b)}/${a} = ${g12f(kk)}. Surface areas of similar solids have the ratio k²:\nS = ${SA} · (${g12f(kk)})² = ${SA} · ${g12f(kk * kk)} = ${g12f(SB)} ${u}²` };
+};
+
+/* ---------- 12.3 Surface Areas of Pyramids and Cones ---------- */
+TEMPLATES.g123Pyr = (r) => {
+  const u = g12u(r);
+  if (r() < 0.55) { const s = ri(r, 3, 20), l = ri(r, Math.ceil(s / 2) + 1, 25), S = s * s + 2 * s * l;
+    return { topic: 'Surface area of a pyramid', stem: 'Find the surface area of the regular square pyramid.', ...g12Cmp(r, S, [s * s + 4 * s * l, 2 * s * l, s * s + s * l, 4 * s + 2 * s * l], `${u}²`),
+      fr: g12FR('S =', S, `${u}²`), draw: g12Fig(g12Pyr(4, Math.max(2.4, 4 * l / s * 0.8), { s: `${s} ${u}`, l: `${l} ${u}` }, { slant: true })), size: [320, 260],
+      solution: `S = B + ½Pℓ.  B = ${s}² = ${s * s}, P = 4(${s}) = ${4 * s}.\nS = ${s * s} + ½(${4 * s})(${l}) = ${s * s} + ${2 * s * l} = ${S} ${u}²` }; }
+  const [p, q, c] = pick(r, G12TRIP.slice(0, 5)), sw = r() < 0.5, half = sw ? q : p, h = sw ? p : q, s = 2 * half, l = c, S = s * s + 2 * s * l;
+  return { topic: 'Surface area of a pyramid', stem: `A regular square pyramid has a height of ${h} ${u} and a base edge length of ${s} ${u}. Find its surface area.`,
+    ...g12Cmp(r, S, [s * s + 2 * s * h, s * s + 4 * s * l, 2 * s * l, s * s + 2 * s * Math.hypot(s, h)], `${u}²`), fr: g12FR('S =', S, `${u}²`),
+    draw: g12Fig(g12Pyr(4, 4 * h / s, { s: `${s} ${u}`, h: `${h} ${u}` }, { h: true })), size: [320, 260],
+    solution: `First find the slant height ℓ: it is the hypotenuse of a right triangle with legs ${h} (the height) and ${half} (half the base edge).\nℓ = √(${h}² + ${half}²) = √${h * h + half * half} = ${l}\nS = B + ½Pℓ = ${s * s} + ½(${4 * s})(${l}) = ${S} ${u}²` };
+};
+TEMPLATES.g123Cone = (r) => {
+  const u = g12u(r);
+  if (r() < 0.5) { const rad = ri(r, 2, 15), l = ri(r, rad + 1, 30), S = Math.PI * rad * rad + Math.PI * rad * l;
+    return { topic: 'Surface area of a cone', stem: 'Find the surface area of the right cone. Round to the nearest hundredth.', ...g11Ch(r, S, [Math.PI * rad * l, 2 * Math.PI * rad * rad + Math.PI * rad * l, Math.PI * rad * rad + 2 * Math.PI * rad * l, Math.PI * rad * rad + Math.PI * rad * rad * l], `${u}²`),
+      fr: g11FR('S ≈', S, `${u}²`), draw: g12Fig({ kind: 'cone', r: 1.2, h: 1.2 * Math.sqrt(Math.max(0.5, (l / rad) ** 2 - 1)), height: false, labs: { r: `${rad} ${u}`, s: `${l} ${u}` } }), size: [300, 260],
+      solution: `S = πr² + πrℓ = π(${rad})² + π(${rad})(${l}) = ${rad * rad}π + ${rad * l}π = ${rad * rad + rad * l}π ≈ ${g11h(S)} ${u}²` }; }
+  const [p, q, c] = pick(r, G12TRIP.slice(0, 6)), sw = r() < 0.5, rad = sw ? q : p, h = sw ? p : q, l = c, S = Math.PI * rad * rad + Math.PI * rad * l;
+  return { topic: 'Surface area of a cone', stem: `A right cone has a radius of ${rad} ${u} and a height of ${h} ${u}. Find its surface area. Round to the nearest hundredth.`,
+    ...g11Ch(r, S, [Math.PI * rad * rad + Math.PI * rad * h, Math.PI * rad * l, Math.PI * rad * rad + 2 * Math.PI * rad * l], `${u}²`), fr: g11FR('S ≈', S, `${u}²`),
+    draw: g12Fig({ kind: 'cone', r: 1.2, h: 1.2 * h / rad, labs: { r: `${rad} ${u}`, h: `${h} ${u}` } }), size: [300, 260],
+    solution: `Slant height: ℓ = √(r² + h²) = √(${rad}² + ${h}²) = √${rad * rad + h * h} = ${l}\nS = πr² + πrℓ = π(${rad})² + π(${rad})(${l}) = ${rad * rad + rad * l}π ≈ ${g11h(S)} ${u}²` };
+};
+TEMPLATES.g123Similar = (r) => {
+  const u = g12u(r), solid = pick(r, ['pyramid', 'cone']), [num, den] = pick(r, [[2, 3], [5, 4], [3, 2], [1, 3], [4, 3], [3, 4], [1, 2]]), kk = num / den;
+  const SA = solid === 'cone' ? ri(r, 4, 60) * den * den : ri(r, 10, 120) * den * den, SB = SA * kk * kk;
+  const piT = solid === 'cone' ? 'π' : '';
+  return { topic: 'Similar solids', stem: `Solids A and B are similar ${solid}s. The surface area of ${solid} A is ${SA}${piT} ${u}², and the scale factor from A to B is k = ${num}/${den}. Find the surface area of ${solid} B.`,
+    ...buildChoices(r, `${g12f(SB)}${piT} ${u}²`, [SA * kk, SA * kk ** 3, SA / (kk * kk), SA + kk].map((x) => `${g12f(x)}${piT} ${u}²`).filter((x) => x !== `${g12f(SB)}${piT} ${u}²`), (i) => `${g12f(SB + i + 1)}${piT} ${u}²`),
+    fr: { fields: [{ kind: 'number', label: 'S =', suffix: `${piT} ${u}²` }], key: [String(Math.round(SB * 100) / 100)], display: `${g12f(SB)}${piT} ${u}²`, check: (v) => numEq(v[0], SB) },
+    solution: `Surface areas of similar solids have the ratio k² = (${num}/${den})² = ${num * num}/${den * den}.\nS = ${SA}${piT} · ${num * num}/${den * den} = ${g12f(SB)}${piT} ${u}²` };
+};
+
+/* ---------- 12.4 Volumes of Prisms and Cylinders ---------- */
+TEMPLATES.g124Prism = (r) => {
+  const u = g12u(r);
+  if (r() < 0.5) { const l = ri(r, 2, 15), w = ri(r, 2, 10), h = ri(r, 2, 12), V = l * w * h;
+    return { topic: 'Volume of a prism', stem: 'Find the volume of the prism.', ...g12Cmp(r, V, [2 * (l * w + l * h + w * h), l * w + h, (l * w * h) / 3, l * w * h * 2], `${u}³`),
+      fr: g12FR('V =', V, `${u}³`), draw: g12Fig(g12Box(l, w * 0.8, h * 0.8, { l: `${l} ${u}`, w: `${w} ${u}`, h: `${h} ${u}` })), size: [340, 240],
+      solution: `V = Bh = (${l} · ${w}) · ${h} = ${l * w} · ${h} = ${V} ${u}³` }; }
+  const [a0, b0, c0] = pick(r, G12TRIP), sw = r() < 0.5, a = sw ? b0 : a0, b = sw ? a0 : b0, d = ri(r, 2, 20), V = (a * b * d) / 2;
+  return { topic: 'Volume of a prism', stem: 'Find the volume of the right triangular prism.', ...g12Cmp(r, V, [a * b * d, (a * b * d) / 6, (a * c0 * d) / 2, (a + b + c0) * d], `${u}³`),
+    fr: g12FR('V =', V, `${u}³`), draw: g12Fig(g12Tri(a, b, d * 0.7, { a: `${a} ${u}`, b: `${b} ${u}`, d: `${d} ${u}` })), size: [340, 260],
+    solution: `The base is a right triangle: B = ½(${a})(${b}) = ${g12f((a * b) / 2)}.\nV = Bh = ${g12f((a * b) / 2)} · ${d} = ${g12f(V)} ${u}³` };
+};
+TEMPLATES.g124Cyl = (r) => {
+  const u = g12u(r), rad = ri(r, 2, 15) / (r() < 0.3 ? 2 : 1), h = ri(r, 2, 20), useD = r() < 0.4, V = Math.PI * rad * rad * h;
+  return { topic: 'Volume of a cylinder', stem: `Find the volume of the cylinder${useD ? ` with a diameter of ${g12f(2 * rad)} ${u} and a height of ${h} ${u}` : ''}. Round to the nearest hundredth.`,
+    ...g11Ch(r, V, [2 * Math.PI * rad * h, Math.PI * 4 * rad * rad * h, Math.PI * rad * h, (Math.PI * rad * rad * h) / 3], `${u}³`), fr: g11FR('V ≈', V, `${u}³`),
+    draw: useD ? undefined : g12Fig({ kind: 'cyl', r: 1, h: Math.max(0.8, Math.min(2.6, h / rad)), labs: { r: `${g12f(rad)} ${u}`, h: `${h} ${u}` } }), size: [300, 260],
+    solution: `${useD ? `r = ${g12f(2 * rad)} ÷ 2 = ${g12f(rad)}.\n` : ''}V = πr²h = π(${g12f(rad)})²(${h})${g12eq(rad * rad * h)}π ≈ ${g11h(V)} ${u}³` };
+};
+TEMPLATES.g124Missing = (r) => {
+  const u = g12u(r);
+  if (r() < 0.5) { const l = ri(r, 3, 12), w = ri(r, 2, 10), h = ri(r, 2, 15), V = l * w * h;
+    return { topic: 'Missing dimensions', stem: `The volume of the rectangular prism is ${V} ${u}³. Find the height h.`, ...g12Cmp(r, h, [V / (l + w), V - l * w, (V / (l * w)) * 2, h + 1], u),
+      fr: g12FR('h =', h, u), draw: g12Fig(g12Box(l, w * 0.8, h * 0.8, { l: `${l} ${u}`, w: `${w} ${u}`, h: 'h' })), size: [340, 240],
+      solution: `V = Bh:  ${V} = (${l} · ${w})h = ${l * w}h, so h = ${V} ÷ ${l * w} = ${h} ${u}` }; }
+  const rad = ri(r, 2, 12), h = ri(r, 2, 20), askR = r() < 0.5, k = rad * rad * h;
+  return { topic: 'Missing dimensions', stem: `The volume of a cylinder is ${k}π ${u}³. ${askR ? `Its height is ${h} ${u}. Find the radius.` : `Its radius is ${rad} ${u}. Find the height.`}`,
+    ...g12Cmp(r, askR ? rad : h, askR ? [k / h, Math.sqrt(k), rad * 2, rad + 1] : [k / rad, k / (2 * rad), h * 2, h + 1], u), fr: g12FR(askR ? 'r =' : 'h =', askR ? rad : h, u),
+    solution: askR ? `V = πr²h:  ${k}π = πr²(${h}), so r² = ${k / h} and r = ${rad} ${u}` : `V = πr²h:  ${k}π = π(${rad})²h = ${rad * rad}πh, so h = ${h} ${u}` };
+};
+TEMPLATES.g124Similar = (r) => {
+  const u = g12u(r), solid = pick(r, ['prisms', 'cylinders']), a = ri(r, 2, 10), kk = pick(r, [2, 3, 0.5, 1.5, 4]), b = a * kk, VA = ri(r, 10, 300) * (Number.isInteger(kk) ? 1 : 8), VB = VA * kk ** 3;
+  const part = solid === 'cylinders' ? 'radius' : 'height';
+  return { topic: 'Similar solids', stem: `The ${solid} are similar. Solid A has a ${part} of ${a} ${u} and a volume of ${VA} ${u}³. Solid B has a ${part} of ${g12f(b)} ${u}. Find the volume of solid B.`,
+    ...g12Cmp(r, VB, [VA * kk, VA * kk * kk, VA / kk ** 3, VA + b], `${u}³`), fr: g12FR('V =', VB, `${u}³`),
+    solution: `Scale factor k = ${g12f(b)}/${a} = ${g12f(kk)}. Volumes of similar solids have the ratio k³:\nV = ${VA} · (${g12f(kk)})³ = ${VA} · ${g12f(kk ** 3)} = ${g12f(VB)} ${u}³` };
+};
+
+/* ---------- 12.5 Volumes of Pyramids and Cones ---------- */
+TEMPLATES.g125Pyr = (r) => {
+  const u = g12u(r), rect = r() < 0.4, s = ri(r, 2, 15), w = rect ? ri(r, 2, 15) : s, h = ri(r, 2, 20), V = (s * w * h) / 3;
+  return { topic: 'Volume of a pyramid', stem: rect ? `A pyramid has a rectangular base that is ${s} ${u} by ${w} ${u} and a height of ${h} ${u}. Find its volume.` : 'Find the volume of the square pyramid.',
+    ...g12Cmp(r, V, [s * w * h, (s * w * h) / 2, (s * w + h) / 3, (s * s * h) / 3 + (rect ? 1 : s)], `${u}³`), fr: g12FR('V =', V, `${u}³`),
+    draw: rect ? undefined : g12Fig(g12Pyr(4, Math.max(1.8, Math.min(6, (4 * h) / s)), { s: `${s} ${u}`, h: `${h} ${u}` }, { h: true })), size: [320, 260],
+    solution: `V = ⅓Bh = ⅓(${s} · ${w})(${h}) = ⅓(${s * w * h})${g12eq(V)} ${u}³` };
+};
+TEMPLATES.g125Cone = (r) => {
+  const u = g12u(r), rad = ri(r, 2, 15) / (r() < 0.25 ? 2 : 1), h = ri(r, 2, 20), useD = r() < 0.4, V = (Math.PI * rad * rad * h) / 3;
+  return { topic: 'Volume of a cone', stem: `Find the volume of the cone${useD ? ` with a diameter of ${g12f(2 * rad)} ${u} and a height of ${h} ${u}` : ''}. Round to the nearest hundredth.`,
+    ...g11Ch(r, V, [Math.PI * rad * rad * h, (Math.PI * rad * h) / 3, (Math.PI * 4 * rad * rad * h) / 3, (Math.PI * rad * rad * h) / 2], `${u}³`), fr: g11FR('V ≈', V, `${u}³`),
+    draw: useD ? undefined : g12Fig({ kind: 'cone', r: 1.2, h: Math.max(0.9, Math.min(3, (1.2 * h) / rad)), labs: { r: `${g12f(rad)} ${u}`, h: `${h} ${u}` } }), size: [300, 260],
+    solution: `${useD ? `r = ${g12f(2 * rad)} ÷ 2 = ${g12f(rad)}.\n` : ''}V = ⅓πr²h = ⅓π(${g12f(rad)})²(${h})${g12eq((rad * rad * h) / 3)}π ≈ ${g11h(V)} ${u}³` };
+};
+TEMPLATES.g125Missing = (r) => {
+  const u = g12u(r), k = ri(r, 0, 2);
+  if (k === 0) { const s = ri(r, 2, 12), h = 3 * ri(r, 1, 6), V = (s * s * h) / 3;
+    return { topic: 'Missing dimensions', stem: `A pyramid with a square base has a volume of ${g12f(V)} ${u}³ and a height of ${h} ${u}. Find the side length of the base.`,
+      ...g12Cmp(r, s, [Math.sqrt(V / h), (3 * V) / h, s * 2, s + 1], u), fr: g12FR('Side =', s, u),
+      solution: `V = ⅓Bh:  ${g12f(V)} = ⅓s²(${h}), so s² = 3(${g12f(V)}) ÷ ${h} = ${s * s} and s = ${s} ${u}` }; }
+  const rad = ri(r, 2, 12), h = ri(r, 1, 8) * 3, kk = (rad * rad * h) / 3, askH = k === 1;
+  return { topic: 'Missing dimensions', stem: `A cone has a volume of ${g12f(kk)}π ${u}³ and ${askH ? `a radius of ${rad} ${u}. Find the height.` : `a height of ${h} ${u}. Find the radius.`}`,
+    ...g12Cmp(r, askH ? h : rad, askH ? [kk / (rad * rad), kk / rad, h * 2, h / 3] : [Math.sqrt(kk / h), kk / h, rad * 2, rad + 1], u), fr: g12FR(askH ? 'h =' : 'r =', askH ? h : rad, u),
+    solution: askH ? `V = ⅓πr²h:  ${g12f(kk)}π = ⅓π(${rad})²h, so h = 3(${g12f(kk)}) ÷ ${rad * rad} = ${h} ${u}` : `V = ⅓πr²h:  ${g12f(kk)}π = ⅓πr²(${h}), so r² = 3(${g12f(kk)}) ÷ ${h} = ${rad * rad} and r = ${rad} ${u}` };
+};
+TEMPLATES.g125Similar = (r) => {
+  const u = g12u(r), solid = pick(r, ['pyramids', 'cones']), hA = ri(r, 2, 6) * pick(r, [2, 3, 4]), kk = pick(r, [0.5, 1 / 3, 0.25, 2, 1.5]), hB = hA * kk, VA = ri(r, 2, 40) * 27 * 8, VB = VA * kk ** 3;
+  const ask = r() < 0.5, piT = solid === 'cones' ? 'π' : '';
+  if (ask) return { topic: 'Similar solids', stem: `The ${solid} are similar. ${solid === 'cones' ? 'Cone' : 'Pyramid'} A has a height of ${hA} ${u} and a volume of ${VA}${piT} ${u}³. ${solid === 'cones' ? 'Cone' : 'Pyramid'} B has a height of ${g12f(hB)} ${u}. Find the volume of B.`,
+    ...buildChoices(r, `${g12f(VB)}${piT} ${u}³`, [VA * kk, VA * kk * kk, VA / kk ** 3].map((x) => `${g12f(x)}${piT} ${u}³`).filter((x) => x !== `${g12f(VB)}${piT} ${u}³`), (i) => `${g12f(VB + i + 1)}${piT} ${u}³`),
+    fr: { fields: [{ kind: 'number', label: 'V =', suffix: `${piT} ${u}³` }], key: [String(Math.round(VB * 100) / 100)], display: `${g12f(VB)}${piT} ${u}³`, check: (v) => numEq(v[0], VB) },
+    solution: `k = ${g12f(hB)}/${hA} = ${fracT(kk)}. Volumes of similar solids have the ratio k³ = ${fracT(kk ** 3)}.\nV = ${VA}${piT} · ${fracT(kk ** 3)} = ${g12f(VB)}${piT} ${u}³` };
+  return { topic: 'Similar solids', stem: `The ${solid} are similar. A has a height of ${hA} ${u} and a volume of ${VA}${piT} ${u}³. B has a volume of ${g12f(VB)}${piT} ${u}³. Find the height of B.`,
+    ...g12Cmp(r, hB, [hA * kk ** 3, hA * kk * kk, hA / kk, hB + 1], u), fr: g12FR('Height =', hB, u),
+    solution: `V_B/V_A = ${g12f(VB)}/${VA} = ${fracT(kk ** 3)} = k³, so k = ∛(${fracT(kk ** 3)}) = ${fracT(kk)}.\nHeight of B = ${hA} · ${fracT(kk)} = ${g12f(hB)} ${u}` };
+};
+
+/* ---------- 12.6 Surface Areas and Volumes of Spheres ---------- */
+const g12SphereGiven = (r, u) => { const k = ri(r, 0, 2), rad = ri(r, 2, 20) / (r() < 0.25 ? 2 : 1);
+  if (k === 0) return { rad, txt: '', S: { kind: 'sphere', r: 1, labs: { r: `${g12f(rad)} ${u}` } }, step: '' };
+  if (k === 1) return { rad, txt: '', S: { kind: 'sphere', r: 1, diam: true, labs: { r: `${g12f(2 * rad)} ${u}` } }, step: `r = ${g12f(2 * rad)} ÷ 2 = ${g12f(rad)}\n` };
+  return { rad, txt: ` The circumference of a great circle is ${g12f(2 * rad)}π ${u}.`, S: { kind: 'sphere', r: 1, radius: false, circ: `C${g12eq(2 * rad)}π ${u}` }, step: `C = 2πr${g12eq(2 * rad)}π, so r = ${g12f(rad)}\n` }; };
+TEMPLATES.g126SA = (r) => {
+  const u = g12u(r), G = g12SphereGiven(r, u), rad = G.rad, S = 4 * Math.PI * rad * rad;
+  return { topic: 'Surface area of a sphere', stem: `Find the surface area of the sphere.${G.txt} Round to the nearest hundredth.`,
+    ...g11Ch(r, S, [Math.PI * rad * rad, 2 * Math.PI * rad * rad, 16 * Math.PI * rad * rad, (4 / 3) * Math.PI * rad ** 3], `${u}²`), fr: g11FR('S ≈', S, `${u}²`), draw: g12Fig(G.S), size: [280, 250],
+    solution: `${G.step}S = 4πr² = 4π(${g12f(rad)})²${g12eq(4 * rad * rad)}π ≈ ${g11h(S)} ${u}²` };
+};
+TEMPLATES.g126FindR = (r) => {
+  const u = g12u(r), rad = ri(r, 1, 20), askD = r() < 0.5, k = 4 * rad * rad, ans = askD ? 2 * rad : rad;
+  return { topic: 'Surface area of a sphere', stem: `Find the ${askD ? 'diameter' : 'radius'} of a sphere with a surface area of ${k}π square ${({ 'in.': 'inches', ft: 'feet', cm: 'centimeters', m: 'meters', yd: 'yards', mm: 'millimeters' })[u]}.`,
+    ...g12Cmp(r, ans, askD ? [rad, 4 * rad, Math.sqrt(k)] : [2 * rad, Math.sqrt(k), k / 4], u), fr: g12FR(askD ? 'd =' : 'r =', ans, u),
+    solution: `S = 4πr²:  ${k}π = 4πr², so r² = ${rad * rad} and r = ${rad}${askD ? `.\nd = 2r = ${2 * rad}` : ''} ${u}` };
+};
+TEMPLATES.g126Vol = (r) => {
+  const u = g12u(r), G = g12SphereGiven(r, u), rad = G.rad, V = (4 / 3) * Math.PI * rad ** 3;
+  return { topic: 'Volume of a sphere', stem: `Find the volume of the sphere.${G.txt} Round to the nearest hundredth.`,
+    ...g11Ch(r, V, [4 * Math.PI * rad * rad, (4 / 3) * Math.PI * rad * rad, Math.PI * rad ** 3, (4 / 3) * Math.PI * (2 * rad) ** 3], `${u}³`), fr: g11FR('V ≈', V, `${u}³`), draw: g12Fig(G.S), size: [280, 250],
+    solution: `${G.step}V = ⁴⁄₃πr³ = ⁴⁄₃π(${g12f(rad)})³${g12eq((4 / 3) * rad ** 3)}π ≈ ${g11h(V)} ${u}³` };
+};
+TEMPLATES.g126VolFromSA = (r) => {
+  const u = g12u(r), rad = ri(r, 1, 12), k = 4 * rad * rad, V = (4 / 3) * Math.PI * rad ** 3;
+  return { topic: 'Volume of a sphere', stem: `Find the volume of a sphere with a surface area of ${k}π ${u}². Round to the nearest hundredth.`,
+    ...g11Ch(r, V, [(4 / 3) * Math.PI * k ** 1.5, Math.PI * k, (4 / 3) * Math.PI * (k / 4), (4 / 3) * Math.PI * (2 * rad) ** 3], `${u}³`), fr: g11FR('V ≈', V, `${u}³`),
+    solution: `First find r:  4πr² = ${k}π, so r² = ${rad * rad} and r = ${rad}.\nV = ⁴⁄₃πr³ = ⁴⁄₃π(${rad})³${g12eq((4 / 3) * rad ** 3)}π ≈ ${g11h(V)} ${u}³` };
+};
+TEMPLATES.g126Hemi = (r) => {
+  const u = g12u(r), rad = ri(r, 2, 15), useD = r() < 0.5, askV = r() < 0.5, S = 3 * Math.PI * rad * rad, V = (2 / 3) * Math.PI * rad ** 3, ans = askV ? V : S;
+  return { topic: 'Hemispheres', stem: `Find the ${askV ? 'volume' : 'surface area'} of the hemisphere. Round to the nearest hundredth.`,
+    ...(askV ? g11Ch(r, V, [(4 / 3) * Math.PI * rad ** 3, (1 / 3) * Math.PI * rad ** 3, 2 * Math.PI * rad * rad], `${u}³`) : g11Ch(r, S, [2 * Math.PI * rad * rad, 4 * Math.PI * rad * rad, Math.PI * rad * rad], `${u}²`)),
+    fr: askV ? g11FR('V ≈', V, `${u}³`) : g11FR('S ≈', S, `${u}²`), draw: g12Fig({ kind: 'hemi', r: 1, diam: useD, labs: { r: `${useD ? 2 * rad : rad} ${u}` } }), size: [280, 220],
+    solution: `${useD ? `r = ${2 * rad} ÷ 2 = ${rad}\n` : ''}${askV ? `V = ½ · ⁴⁄₃πr³ = ⅔π(${rad})³${g12eq((2 / 3) * rad ** 3)}π ≈ ${g11h(V)} ${u}³` : `S = (half the sphere) + (the flat circle) = ½ · 4πr² + πr² = 3πr²\nS = 3π(${rad})² = ${3 * rad * rad}π ≈ ${g11h(S)} ${u}²`}` };
+};
+
+/* ---------- 12.7 Modeling with Surface Area and Volume (density) ---------- */
+TEMPLATES.g127Density = (r) => {
+  const k = ri(r, 0, 3);
+  const mats = [['ice', 0.92], ['aluminum', 2.7], ['steel', 7.8], ['silver', 10.5], ['oak wood', 0.75], ['glass', 2.5], ['gold', 19.3], ['copper', 8.96]];
+  const [mat, d] = pick(r, mats);
+  if (k === 0) { const l = ri(r, 2, 12), w = ri(r, 2, 10), h = ri(r, 1, 8), V = l * w * h, m = d * V;
+    return { topic: 'Density', stem: `A block of ${mat} is a rectangular prism ${l} cm by ${w} cm by ${h} cm. The density of ${mat} is about ${d} grams per cubic centimeter. Find the mass of the block. Round to the nearest hundredth.`,
+      ...g11Ch(r, m, [V / d, V, d * (l + w + h), 2 * d * (l * w + l * h + w * h)], 'g'), fr: g11FR('Mass ≈', m, 'g'),
+      draw: g12Fig(g12Box(l, w * 0.8, h * 0.8, { l: `${l} cm`, w: `${w} cm`, h: `${h} cm` })), size: [340, 230],
+      solution: `Volume: V = ${l} · ${w} · ${h} = ${V} cm³.\nDensity = mass ÷ volume, so mass = density · volume = ${d} · ${V} ≈ ${g11h(m)} g` }; }
+  if (k === 1) { const rad = ri(r, 2, 10) / 2, h = ri(r, 1, 6) / 2, V = Math.PI * rad * rad * h, m = d * V;
+    return { topic: 'Density', stem: `A ${mat} coin is a cylinder with a diameter of ${g12f(2 * rad)} cm and a thickness of ${g12f(h)} cm. The density of ${mat} is ${d} grams per cubic centimeter. Find the mass of the coin. Round to the nearest hundredth.`,
+      ...g11Ch(r, m, [Math.PI * 4 * rad * rad * h * d, V / d, V, 2 * Math.PI * rad * h * d], 'g'), fr: g11FR('Mass ≈', m, 'g'),
+      solution: `r = ${g12f(2 * rad)} ÷ 2 = ${g12f(rad)} cm.  V = πr²h = π(${g12f(rad)})²(${g12f(h)}) ≈ ${g11h(V)} cm³.\nmass = density · volume = ${d} · ${g11h(V)} ≈ ${g11h(m)} g` }; }
+  if (k === 2) { const C = ri(r, 6, 30), rad = C / (2 * Math.PI), V = (4 / 3) * Math.PI * rad ** 3, dd = pick(r, [0.46, 0.6, 0.85, 1.1]), m = dd * V;
+    return { topic: 'Density', stem: `A ball has a circumference of ${C} centimeters and a density of ${dd} gram per cubic centimeter. Find its mass. Round to the nearest hundredth.`,
+      ...g11Ch(r, m, [dd * 4 * Math.PI * rad * rad, V / dd, dd * (4 / 3) * Math.PI * C ** 3, V], 'g'), fr: g11FR('Mass ≈', m, 'g'),
+      solution: `C = 2πr, so r = ${C} ÷ (2π) ≈ ${g11h(rad)} cm.\nV = ⁴⁄₃πr³ ≈ ${g11h(V)} cm³.\nmass = density · volume = ${dd} · ${g11h(V)} ≈ ${g11h(m)} g` }; }
+  const m = ri(r, 20, 400), V = ri(r, 10, 200), dens = m / V;
+  return { topic: 'Density', stem: `An object has a mass of ${m} grams and a volume of ${V} cubic centimeters. Find its density. Round to the nearest hundredth.`,
+    ...g11Ch(r, dens, [V / m, m * V, m - V], 'g/cm³'), fr: g11FR('Density ≈', dens, 'g/cm³'),
+    solution: `Density = mass ÷ volume = ${m} ÷ ${V} ≈ ${g11h(dens)} grams per cubic centimeter.\n(Not volume ÷ mass: that would be cubic centimeters per gram.)` };
+};
+
+/* ---------- 12.8 Solids of Revolution ---------- */
+// a flat region next to its axis; returns the solid's description and drawing
+function g12RevFig(r) {
+  const k = ri(r, 0, 3);
+  if (k === 0) { const w = ri(r, 2, 9), h = ri(r, 2, 10); // rectangle rotated around its left side
+    return { solid: 'cylinder', rad: w, h, desc: `a cylinder with a radius of ${w} and a height of ${h}`, wrong: [`a cylinder with a radius of ${h} and a height of ${w}`, `a cone with a radius of ${w} and a height of ${h}`, `a cylinder with a radius of ${2 * w} and a height of ${h}`],
+      S: { kind: 'flat', polys: [[[0, 0], [w, 0], [w, h], [0, h]]], axis: [[0, -0.18 * h - 0.4], [0, 1.18 * h + 0.4]], text: [[[w / 2, 0], String(w), 0, 14], [[w, h / 2], String(h), 12, 0]], rights: [[[0, 0], [1, 0], [0, 1]]] },
+      V: Math.PI * w * w * h, Vt: `πr²h = π(${w})²(${h}) = ${w * w * h}π` }; }
+  if (k === 1) { const a = ri(r, 2, 9), b = ri(r, 3, 14); // right triangle, rotated around the vertical leg
+    return { solid: 'cone', rad: a, h: b, desc: `a cone with a radius of ${a} and a height of ${b}`, wrong: [`a cone with a radius of ${b} and a height of ${a}`, `a cylinder with a radius of ${a} and a height of ${b}`, `a cone with a radius of ${2 * a} and a height of ${b}`],
+      S: { kind: 'flat', polys: [[[0, 0], [a, 0], [0, b]]], axis: [[0, -0.15 * b - 0.4], [0, 1.15 * b + 0.4]], text: [[[a / 2, 0], String(a), 0, 14], [[0, b / 2], String(b), -12, 0]], rights: [[[0, 0], [1, 0], [0, 1]]] },
+      V: (Math.PI * a * a * b) / 3, Vt: `⅓πr²h = ⅓π(${a})²(${b})${g12eq((a * a * b) / 3)}π` }; }
+  if (k === 2) { const R = ri(r, 2, 12); // semicircle rotated around its diameter
+    return { solid: 'sphere', rad: R, desc: `a sphere with a radius of ${R}`, wrong: [`a sphere with a radius of ${2 * R}`, `a hemisphere with a radius of ${R}`, `a cylinder with a radius of ${R} and a height of ${2 * R}`],
+      S: { kind: 'flat', polys: [[[0, -R], [0, R]]], arcs: [{ c: [0, 0], r: R, a0: -Math.PI / 2, a1: Math.PI / 2 }], axis: [[0, -1.25 * R], [0, 1.25 * R]], text: [[[R / 2, 0], String(R), 0, -10]] , rights: [] },
+      V: (4 / 3) * Math.PI * R ** 3, Vt: `⁴⁄₃πr³ = ⁴⁄₃π(${R})³${g12eq((4 / 3) * R ** 3)}π` }; }
+  const a = ri(r, 2, 8), b = ri(r, 3, 12); // right triangle rotated around the horizontal leg
+  return { solid: 'cone', rad: b, h: a, desc: `a cone with a radius of ${b} and a height of ${a}`, wrong: [`a cone with a radius of ${a} and a height of ${b}`, `a cylinder with a radius of ${b} and a height of ${a}`, `a cone with a radius of ${b} and a height of ${2 * a}`],
+    S: { kind: 'flat', polys: [[[0, 0], [a, 0], [0, b]]], axis: [[-0.2 * a - 0.5, 0], [1.25 * a + 0.5, 0]], text: [[[a / 2, 0], String(a), 0, 14], [[0, b / 2], String(b), -12, 0]], rights: [[[0, 0], [1, 0], [0, 1]]] },
+    V: (Math.PI * b * b * a) / 3, Vt: `⅓πr²h = ⅓π(${b})²(${a})${g12eq((b * b * a) / 3)}π` };
+}
+TEMPLATES.g128Identify = (r) => {
+  const F = g12RevFig(r), ans = F.desc;
+  return { topic: 'Solids of revolution', stem: 'Identify and describe the solid produced by rotating the figure around the given axis.', ...buildChoices(r, ans, F.wrong, () => null),
+    fr: FR.select('The solid is', shuffle(r, [ans, ...F.wrong]), ans), draw: g12Fig(F.S), size: [300, 260],
+    solution: F.solid === 'cylinder' ? `The side on the axis stays fixed; the opposite side sweeps out the curved surface. The result is a cylinder: the side along the axis is the height (${F.h}) and the side perpendicular to it is the radius (${F.rad}).`
+      : F.solid === 'cone' ? `The leg on the axis becomes the height (${F.h}); the other leg sweeps out the circular base, so it is the radius (${F.rad}). The hypotenuse sweeps out the slanted surface of a cone.`
+      : `A semicircle rotated around its diameter sweeps out a sphere with the same radius (${F.rad}).` };
+};
+TEMPLATES.g128Volume = (r) => {
+  const F = g12RevFig(r);
+  return { topic: 'Solids of revolution', stem: 'Find the volume of the solid produced by rotating the figure around the given axis. Round to the nearest hundredth.',
+    ...g11Ch(r, F.V, [F.V * 3, F.V / 2, F.solid === 'cone' ? (Math.PI * F.h * F.h * F.rad) / 3 : F.V * 2], 'cubic units'), fr: g11FR('V ≈', F.V, 'cubic units'), draw: g12Fig(F.S), size: [300, 260],
+    solution: `The solid is ${F.desc}.\nV = ${F.Vt} ≈ ${g11h(F.V)} cubic units` };
+};
+TEMPLATES.g128Region = (r) => {
+  const m = pick(r, [-1, -2, -3, -0.5, 1, 2, 0.5, 3]), axis = pick(r, ['x', 'y']);
+  let eqs, R, H, desc;
+  if (m < 0) { const xi = ri(r, 2, 8), b = -m * xi; eqs = `x = 0, y = 0, y = ${m === -1 ? '−x' : `${fracT(m)}x`} + ${fmt(b)}`; // triangle with intercepts (xi, 0) and (0, b)
+    if (axis === 'x') { R = b; H = xi; } else { R = xi; H = b; } }
+  else { const xe = ri(r, 2, 8), ye = m * xe; eqs = `x = ${xe}, y = 0, y = ${m === 1 ? 'x' : `${fracT(m)}x`}`; // triangle (0,0),(xe,0),(xe,ye)
+    if (axis === 'x') { R = ye; H = xe; } else { R = xe; H = ye; } }
+  const coneAboutY = m > 0 && axis === 'y'; // that one is a cylinder with a cone removed
+  const V = coneAboutY ? Math.PI * R * R * H - (Math.PI * R * R * H) / 3 : (Math.PI * R * R * H) / 3;
+  desc = coneAboutY ? `a cylinder (radius ${fmt(R)}, height ${fmt(H)}) with a cone of the same radius and height removed` : `a cone with a radius of ${fmt(R)} and a height of ${fmt(H)}`;
+  return { topic: 'Solids of revolution', stem: `The region enclosed by ${eqs} is rotated around the ${axis}-axis. Find the volume of the solid. Round to the nearest hundredth.`,
+    ...g11Ch(r, V, [Math.PI * R * R * H, (Math.PI * H * H * R) / 3, coneAboutY ? (Math.PI * R * R * H) / 3 : (2 * Math.PI * R * R * H) / 3], 'cubic units'), fr: g11FR('V ≈', V, 'cubic units'),
+    solution: `Sketch the region: it is a right triangle${m < 0 ? ` with vertices (0, 0), (${fmt(axis === 'x' ? H : R)}, 0), and (0, ${fmt(axis === 'x' ? R : H)})` : ` with vertices (0, 0), (${fmt(axis === 'x' ? H : R)}, 0), and (${fmt(axis === 'x' ? H : R)}, ${fmt(axis === 'x' ? R : H)})`}.\nRotating it around the ${axis}-axis makes ${desc}.\n${coneAboutY ? `V = πr²h − ⅓πr²h = ⅔π(${fmt(R)})²(${fmt(H)})` : `V = ⅓πr²h = ⅓π(${fmt(R)})²(${fmt(H)})`} ≈ ${g11h(V)} cubic units` };
+};
+// "3 in.." → "3 in." wherever a sentence ends right after the unit
+['g121Name', 'g121Describe', 'g121Euler', 'g121Cross', 'g122Prism', 'g122Cyl', 'g122FindH', 'g122Similar', 'g123Pyr', 'g123Cone', 'g123Similar', 'g124Prism', 'g124Cyl', 'g124Missing', 'g124Similar',
+  'g125Pyr', 'g125Cone', 'g125Missing', 'g125Similar', 'g126SA', 'g126FindR', 'g126Vol', 'g126VolFromSA', 'g126Hemi', 'g127Density', 'g128Identify', 'g128Volume', 'g128Region'].forEach((id) => {
+  const f = TEMPLATES[id]; TEMPLATES[id] = (r) => { const q = f(r); ['stem', 'solution'].forEach((k) => { if (typeof q[k] === 'string') q[k] = q[k].replace(/ in\.\./g, ' in.'); }); return q; };
+});
+/* ==== GEOMETRY CH12 END ==== */
 /* ---------- question type catalog (used by the assignment builder) ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
@@ -23521,6 +23986,14 @@ Object.assign(SETS, {
   'geo-11-2': { subject: 'geometry', title: '11.2 Areas of Circles and Sectors', items: [['g112Area', 4], ['g112Sector', 4], ['g112FromSector', 2], ['g112Shaded', 3]] },
   'geo-11-3': { subject: 'geometry', title: '11.3 Areas of Polygons', items: [['g113Kite', 3], ['g113Central', 2], ['g113Angles', 3], ['g113Area', 4], ['g113Shaded', 2]] },
   'geo-11-4': { subject: 'geometry', title: '11.4 Modeling with Area', items: [['g114Density', 6], ['g114Units', 2], ['g114Max', 2]] },
+  'geo-12-1': { subject: 'geometry', title: '12.1 Cross Sections of Solids', items: [['g121Name', 4], ['g121Describe', 3], ['g121Euler', 2], ['g121Cross', 3]] },
+  'geo-12-2': { subject: 'geometry', title: '12.2 Surface Areas of Prisms and Cylinders', items: [['g122Prism', 3], ['g122Cyl', 3], ['g122FindH', 2], ['g122Similar', 2]] },
+  'geo-12-3': { subject: 'geometry', title: '12.3 Surface Areas of Pyramids and Cones', items: [['g123Pyr', 4], ['g123Cone', 4], ['g123Similar', 2]] },
+  'geo-12-4': { subject: 'geometry', title: '12.4 Volumes of Prisms and Cylinders', items: [['g124Prism', 3], ['g124Cyl', 3], ['g124Missing', 3], ['g124Similar', 2]] },
+  'geo-12-5': { subject: 'geometry', title: '12.5 Volumes of Pyramids and Cones', items: [['g125Pyr', 3], ['g125Cone', 3], ['g125Missing', 3], ['g125Similar', 2]] },
+  'geo-12-6': { subject: 'geometry', title: '12.6 Surface Areas and Volumes of Spheres', items: [['g126SA', 3], ['g126FindR', 2], ['g126Vol', 3], ['g126VolFromSA', 1], ['g126Hemi', 2]] },
+  'geo-12-7': { subject: 'geometry', title: '12.7 Modeling with Surface Area and Volume', items: [['g127Density', 6]] },
+  'geo-12-8': { subject: 'geometry', title: '12.8 Solids of Revolution', items: [['g128Identify', 4], ['g128Volume', 4], ['g128Region', 2]] },
 });
 QUESTION_TYPES.push(
   { id: 'a11Eval', subject: 'algebra1', section: '1.1 Evaluating Algebraic Expressions', label: 'One variable', desc: '#1–6' },
@@ -24250,7 +24723,35 @@ QUESTION_TYPES.push(
   { id: 'g113Shaded', subject: 'geometry', section: '11.3 Areas of Polygons', label: 'Circle minus a polygon', desc: 'Shaded region (#27–30)' },
   { id: 'g114Density', subject: 'geometry', section: '11.4 Modeling with Area', label: 'Population density', desc: 'Find density, people, or radius (#1–8)' },
   { id: 'g114Units', subject: 'geometry', section: '11.4 Modeling with Area', label: 'Density with units', desc: 'Rug knots, seeds per acre (#13–14)' },
-  { id: 'g114Max', subject: 'geometry', section: '11.4 Modeling with Area', label: 'Best dimensions', desc: 'Least fencing, greatest area (#11–12)' }
+  { id: 'g114Max', subject: 'geometry', section: '11.4 Modeling with Area', label: 'Best dimensions', desc: 'Least fencing, greatest area (#11–12)' },
+  { id: 'g121Name', subject: 'geometry', section: '12.1 Cross Sections of Solids', label: 'Polyhedron or not? Name it', desc: 'Classify the solid shown (#5–8)' },
+  { id: 'g121Describe', subject: 'geometry', section: '12.1 Cross Sections of Solids', label: 'Name the figure that is described', desc: '“a pyramid with 6 faces” (#15–18)' },
+  { id: 'g121Euler', subject: 'geometry', section: '12.1 Cross Sections of Solids', label: "Euler's Formula", desc: 'F + V = E + 2 (#39)' },
+  { id: 'g121Cross', subject: 'geometry', section: '12.1 Cross Sections of Solids', label: 'Cross sections', desc: 'Shape where a plane cuts a solid (#19–22)' },
+  { id: 'g122Prism', subject: 'geometry', section: '12.2 Surface Areas of Prisms and Cylinders', label: 'Surface area of a right prism', desc: 'Rectangular and triangular (#3–6)' },
+  { id: 'g122Cyl', subject: 'geometry', section: '12.2 Surface Areas of Prisms and Cylinders', label: 'Surface area of a right cylinder', desc: 'Nearest hundredth (#7–10)' },
+  { id: 'g122FindH', subject: 'geometry', section: '12.2 Surface Areas of Prisms and Cylinders', label: 'Find the height', desc: 'From the surface area (#21–24)' },
+  { id: 'g122Similar', subject: 'geometry', section: '12.2 Surface Areas of Prisms and Cylinders', label: 'Similar solids: surface area', desc: 'Ratio k² (#31–34)' },
+  { id: 'g123Pyr', subject: 'geometry', section: '12.3 Surface Areas of Pyramids and Cones', label: 'Surface area of a regular pyramid', desc: 'Slant height given or from the height (#1–4)' },
+  { id: 'g123Cone', subject: 'geometry', section: '12.3 Surface Areas of Pyramids and Cones', label: 'Surface area of a right cone', desc: 'Slant height given or from the height (#5–8)' },
+  { id: 'g123Similar', subject: 'geometry', section: '12.3 Surface Areas of Pyramids and Cones', label: 'Similar pyramids and cones', desc: 'Surface area with scale factor k (#11–12)' },
+  { id: 'g124Prism', subject: 'geometry', section: '12.4 Volumes of Prisms and Cylinders', label: 'Volume of a prism', desc: 'Rectangular and triangular (#1–4)' },
+  { id: 'g124Cyl', subject: 'geometry', section: '12.4 Volumes of Prisms and Cylinders', label: 'Volume of a cylinder', desc: 'Nearest hundredth (#5–8)' },
+  { id: 'g124Missing', subject: 'geometry', section: '12.4 Volumes of Prisms and Cylinders', label: 'Missing dimension', desc: 'From the volume (#13–18)' },
+  { id: 'g124Similar', subject: 'geometry', section: '12.4 Volumes of Prisms and Cylinders', label: 'Similar solids: volume', desc: 'Ratio k³ (#23–24)' },
+  { id: 'g125Pyr', subject: 'geometry', section: '12.5 Volumes of Pyramids and Cones', label: 'Volume of a pyramid', desc: 'V = ⅓Bh (#1–6)' },
+  { id: 'g125Cone', subject: 'geometry', section: '12.5 Volumes of Pyramids and Cones', label: 'Volume of a cone', desc: 'V = ⅓πr²h (#3–5)' },
+  { id: 'g125Missing', subject: 'geometry', section: '12.5 Volumes of Pyramids and Cones', label: 'Missing dimension', desc: 'Side, height, or radius from the volume (#9–16)' },
+  { id: 'g125Similar', subject: 'geometry', section: '12.5 Volumes of Pyramids and Cones', label: 'Similar pyramids and cones', desc: 'Volume or height with k³ (#17–20)' },
+  { id: 'g126SA', subject: 'geometry', section: '12.6 Surface Areas and Volumes of Spheres', label: 'Surface area of a sphere', desc: 'From r, d, or C (#1–4)' },
+  { id: 'g126FindR', subject: 'geometry', section: '12.6 Surface Areas and Volumes of Spheres', label: 'Radius or diameter from the surface area', desc: '(#5–8)' },
+  { id: 'g126Vol', subject: 'geometry', section: '12.6 Surface Areas and Volumes of Spheres', label: 'Volume of a sphere', desc: 'From r, d, or C (#9–14)' },
+  { id: 'g126VolFromSA', subject: 'geometry', section: '12.6 Surface Areas and Volumes of Spheres', label: 'Volume from the surface area', desc: '(#19–20)' },
+  { id: 'g126Hemi', subject: 'geometry', section: '12.6 Surface Areas and Volumes of Spheres', label: 'Hemispheres', desc: 'Surface area or volume (#17–18)' },
+  { id: 'g127Density', subject: 'geometry', section: '12.7 Modeling with Surface Area and Volume', label: 'Density', desc: 'Mass, density, and volume (#1–6)' },
+  { id: 'g128Identify', subject: 'geometry', section: '12.8 Solids of Revolution', label: 'Identify the solid of revolution', desc: 'Rotate a figure around an axis (#1–6)' },
+  { id: 'g128Volume', subject: 'geometry', section: '12.8 Solids of Revolution', label: 'Volume of a solid of revolution', desc: '(#17–22)' },
+  { id: 'g128Region', subject: 'geometry', section: '12.8 Solids of Revolution', label: 'Rotate a region bounded by lines', desc: 'x = 0, y = 0, y = mx + b (#23–26)' },
 );
 { // keep each subject's question types together (stable)
   const first = {}; QUESTION_TYPES.forEach((t, i) => { if (!(t.subject in first)) first[t.subject] = i; });
@@ -26700,7 +27201,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0), b = secs[sec].ids.reduce((a, id) => a + (bonusCounts[id] || 0), 0);
     return [n ? `${n} chosen` : '', b ? `★ ${b} bonus` : ''].filter(Boolean).join(' · '); };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
