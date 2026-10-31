@@ -23076,6 +23076,8 @@ function g12Draw(cv, S) {
     (S.polys || []).forEach((poly) => poly.forEach((p, i) => segs.push({ p, q: poly[(i + 1) % poly.length] })));
     (S.arcs || []).forEach((a) => { ells.push({ c: a.c, rx: a.r, ry: a.r, a0: a.a0, a1: a.a1 }); fills.push({ sector: true, ...a }); });
     (S.axis ? [S.axis] : []).forEach(([p, q]) => segs.push({ p, q, axis: true }));
+    (S.segs || []).forEach(([p, q, color]) => segs.push({ p, q, color }));
+    (S.dots || []).forEach((p) => labs.push({ p, t: '•', dx: 0, dy: 0, dot: true }));
     (S.text || []).forEach((t) => labs.push({ p: t[0], t: t[1], dx: t[2] || 0, dy: t[3] || 0, color: G10BLUE }));
     (S.rights || []).forEach((rt) => rights.push(rt));
   }
@@ -23469,7 +23471,7 @@ function g12RevFig(r) {
       V: (Math.PI * a * a * b) / 3, Vt: `⅓πr²h = ⅓π(${a})²(${b})${g12eq((a * a * b) / 3)}π` }; }
   if (k === 2) { const R = ri(r, 2, 12); // semicircle rotated around its diameter
     return { solid: 'sphere', rad: R, desc: `a sphere with a radius of ${R}`, wrong: [`a sphere with a radius of ${2 * R}`, `a hemisphere with a radius of ${R}`, `a cylinder with a radius of ${R} and a height of ${2 * R}`],
-      S: { kind: 'flat', polys: [[[0, -R], [0, R]]], arcs: [{ c: [0, 0], r: R, a0: -Math.PI / 2, a1: Math.PI / 2 }], axis: [[0, -1.25 * R], [0, 1.25 * R]], text: [[[R / 2, 0], String(R), 0, -10]] , rights: [] },
+      S: { kind: 'flat', polys: [[[0, -R], [0, R]]], arcs: [{ c: [0, 0], r: R, a0: -Math.PI / 2, a1: Math.PI / 2 }], axis: [[0, -1.25 * R], [0, 1.25 * R]], segs: [[[0, 0], [R, 0], '#b03a2e']], dots: [[0, 0]], text: [[[R / 2, 0], String(R), 0, -11]], rights: [] },
       V: (4 / 3) * Math.PI * R ** 3, Vt: `⁴⁄₃πr³ = ⁴⁄₃π(${R})³${g12eq((4 / 3) * R ** 3)}π` }; }
   const a = ri(r, 2, 8), b = ri(r, 3, 12); // right triangle rotated around the horizontal leg
   return { solid: 'cone', rad: b, h: a, desc: `a cone with a radius of ${b} and a height of ${a}`, wrong: [`a cone with a radius of ${a} and a height of ${b}`, `a cylinder with a radius of ${b} and a height of ${a}`, `a cone with a radius of ${b} and a height of ${2 * a}`],
