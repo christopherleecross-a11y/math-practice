@@ -176,6 +176,14 @@
   .tv-ch > div { display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 10px; font: 30px Georgia, serif; }
   .tv-right { background: #e4f2e4; outline: 2px solid #2e7d32; }
   .tv-ans { margin-top: 22px; padding: 16px 20px; background: #f6f4ec; border-left: 4px solid #c9a227; border-radius: 6px; }
+  .tv-timer { float: right; margin: 0 0 14px 24px; font: 700 64px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; padding: 10px 18px; background: #fff; border: 3px solid #1d1d1b; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+  .tv-timer.low { color: #b03a2e; border-color: #b03a2e; }
+  .tv-timer.done { color: #fff; background: #b03a2e; border-color: #b03a2e; animation: tvflash 1s steps(2) 4; }
+  .tv-timer.paused { opacity: .6; }
+  @keyframes tvflash { 50% { background: #fff; color: #b03a2e; } }
+  .tv-tm { display: inline-flex; gap: 4px; align-items: center; padding: 2px 6px; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+  .tv-tm .btn { padding: 6px 10px; }
+  .tv-tm b { font: 600 16px system-ui, sans-serif; font-variant-numeric: tabular-nums; min-width: 46px; text-align: center; }
   @media print { .tvshow { display: none !important; } }
   @media print {
     body.printing { background: #fff; }
@@ -26824,11 +26832,12 @@ function tvShow(list, at) {
     } else { const t = x.tpl || x.more; q = applyMode(TEMPLATES[t](mulberry32((Date.now() ^ (Math.random() * 1e9)) >>> 0)), x.mode); q.tpl = t; }
     paint();
   };
-  const go = (k) => { i = k; fresh = false; make(); };
-  const W = () => Math.max(320, Math.min(1100, window.innerWidth - 80));
+  const go = (k) => { i = k; fresh = false; if (/^bell ringer/i.test(list[i].label || '') && !T.on) { T.on = true; tmReset(); } make(); };
+  const W = () => Math.max(320, Math.min(1100, window.innerWidth - 80) - (T.on ? 250 : 0)); // room beside the timer
   const font = '30px Georgia, "Times New Roman", serif';
   function paint() {
     body.innerHTML = '';
+    if (T.on) body.append(big);
     const w = W();
     body.append(el('div', { class: 'tv-label' }, `${list[i].label}${fresh && list[i].fixed ? ' · new numbers' : ''}${q.topic && q.topic !== list[i].label ? ` · ${q.topic}` : ''}`), ...String(q.stem).split('\n').map((ln) => textCanvas(ln, w, font, 42)));
     if (q.draw) {
@@ -26856,14 +26865,45 @@ function tvShow(list, at) {
   const count = el('span', { class: 'small', style: 'margin:0 4px' });
   const newBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (list[i].tpl || list[i].more) { fresh = true; make(); } } }, 'New numbers');
   const origBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { fresh = false; make(); } }, 'Back to the original');
-  const close = () => { box.remove(); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  // countdown timer: shown on its own for bell ringer screens, or with the Timer button on any screen; it keeps running from screen to screen
+  const T = { len: Math.max(60, (() => { try { return +localStorage.getItem('tvTimerLen'); } catch { return 0; } })() || 180), left: 0, end: 0, run: false, on: false, id: null };
+  T.left = T.len;
+  const fmt = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  const big = el('div', { class: 'tv-timer', role: 'timer', 'aria-live': 'off' });
+  const tmTime = el('b', {}), tmGo = el('button', { class: 'btn', type: 'button', onclick: () => (T.run ? tmPause() : tmStart()) }, 'Start');
+  const tmBox = el('span', { class: 'tv-tm' },
+    el('button', { class: 'btn secondary', type: 'button', title: 'One minute less', onclick: () => tmAdd(-60) }, '−1'), tmTime,
+    el('button', { class: 'btn secondary', type: 'button', title: 'One minute more', onclick: () => tmAdd(60) }, '+1'), tmGo,
+    el('button', { class: 'btn secondary', type: 'button', title: 'Reset the timer', onclick: () => tmReset() }, '↺'),
+    el('button', { class: 'btn secondary', type: 'button', title: 'Hide the timer', onclick: () => { tmReset(); T.on = false; tmPaint(); paint(); } }, '✕'));
+  const tmBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { T.on = true; tmPaint(); paint(); } }, 'Timer');
+  let beeped = false;
+  const beep = () => { try { const A = new (window.AudioContext || window.webkitAudioContext)(); [0, 0.35, 0.7].forEach((t) => { const o = A.createOscillator(), g = A.createGain(); o.frequency.value = 880; o.connect(g); g.connect(A.destination); g.gain.setValueAtTime(0.25, A.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, A.currentTime + t + 0.3); o.start(A.currentTime + t); o.stop(A.currentTime + t + 0.3); }); setTimeout(() => A.close(), 1500); } catch {} };
+  function tmTick() { if (!T.run) return; T.left = Math.max(0, Math.ceil((T.end - Date.now()) / 1000)); if (T.left === 0) { T.run = false; clearInterval(T.id); if (!beeped) { beeped = true; beep(); } } tmPaint(); }
+  function tmStart() { if (T.left <= 0) T.left = T.len; beeped = false; T.end = Date.now() + T.left * 1000; T.run = true; clearInterval(T.id); T.id = setInterval(tmTick, 250); tmPaint(); }
+  function tmPause() { tmTick(); T.run = false; clearInterval(T.id); tmPaint(); }
+  function tmReset() { T.run = false; clearInterval(T.id); T.left = T.len; beeped = false; tmPaint(); }
+  function tmAdd(d) {
+    if (T.run) { T.end = Math.max(Date.now() + 1000, T.end + d * 1000); tmTick(); return; }
+    const atStart = T.left === T.len; T.len = Math.min(3600, Math.max(60, T.len + d)); try { localStorage.setItem('tvTimerLen', T.len); } catch {}
+    T.left = atStart || T.left <= 0 ? T.len : Math.max(1, T.left + d); beeped = false; tmPaint();
+  }
+  function tmPaint() {
+    tmBox.style.display = T.on ? '' : 'none'; tmBtn.style.display = T.on ? 'none' : '';
+    big.style.display = T.on ? '' : 'none';
+    tmTime.textContent = fmt(T.left); big.textContent = T.left === 0 ? 'Time!' : fmt(T.left);
+    tmGo.textContent = T.run ? 'Pause' : T.left > 0 && T.left < T.len ? 'Resume' : 'Start';
+    big.className = 'tv-timer' + (T.left === 0 ? ' done' : T.left <= 30 ? ' low' : '') + (!T.run && T.left > 0 && T.left < T.len ? ' paused' : '');
+  }
+  const close = () => { clearInterval(T.id); box.remove(); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
   const keys = (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowRight') nextBtn.click(); else if (e.key === 'ArrowLeft') prevBtn.click(); else if (e.key === ' ' && e.target === document.body) { e.preventDefault(); ansBtn.click(); } };
-  box.append(el('div', { class: 'tv-bar' }, prevBtn, count, nextBtn, el('span', { style: 'flex:1' }), ansBtn,
+  box.append(el('div', { class: 'tv-bar' }, prevBtn, count, nextBtn, el('span', { style: 'flex:1' }), tmBtn, tmBox, ansBtn,
     newBtn,
     origBtn,
     el('button', { class: 'btn secondary', type: 'button', onclick: () => { const f = box.requestFullscreen || box.webkitRequestFullscreen; if (f) f.call(box); } }, 'Full screen'),
     el('button', { class: 'btn secondary', type: 'button', onclick: close }, 'Close ✕')), body);
   document.body.append(box); document.addEventListener('keydown', keys);
+  T.on = /^bell ringer/i.test(list[i].label || ''); tmPaint();
   make();
 }
 /* ==== LESSON PLANS END ==== */
