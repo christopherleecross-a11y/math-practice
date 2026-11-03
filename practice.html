@@ -145,6 +145,12 @@
   .pkrow { display: grid; grid-template-columns: 34px 1fr; padding: 4px 0; border-bottom: 1px solid #eee; break-inside: avoid; font: 15px Georgia, serif; }
   .pkrow .psol { color: #333; font-size: 13px; white-space: pre-wrap; margin-top: 2px; }
   .lp p { margin: 6px 0; line-height: 1.45; }
+  .lp-ed { width: 100%; box-sizing: border-box; font: 15px system-ui, sans-serif; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  textarea.lp-ed { resize: vertical; line-height: 1.4; }
+  .lp-edcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 10px 0; background: #fff; }
+  .lp-edf { margin: 6px 0; }
+  .lp-edl { font: 600 13px system-ui, sans-serif; margin-bottom: 2px; }
+  .lp-edbar { position: sticky; bottom: 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 12px; background: #fafaf7; border-top: 1px solid var(--line); z-index: 5; }
   .lp-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
   .lp-h { font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6b6b66); margin: 18px 0 4px; }
   .lp-ul { margin: 4px 0; padding-left: 22px; line-height: 1.45; }
@@ -28168,17 +28174,19 @@ function lessonScreen(preKey) {
   app.innerHTML = '';
   const keys = Object.keys(LESSONS).filter((k) => SETS[k] && CONFIG.SUBJECTS.includes(SETS[k].subject)); // each teacher sees plans for the subjects they teach
   if (!LESSON.key || !LESSONS[LESSON.key]) LESSON.key = keys[0] || null;
+  const note = el('div', {});
+  const showNote = () => { note.innerHTML = ''; note.append(lessonEditNote(() => { showNote(); draw(); })); };
   const pick = el('select', {}, ...keys.map((k) => el('option', { value: k }, `${SUBJECTS[SETS[k].subject] || ''} — ${SETS[k].title}`)));
   if (LESSON.key) pick.value = LESSON.key;
   const out = el('div', {});
   app.append(el('div', { class: 'card noprint' },
     el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, el('label', { style: 'margin:0' }, 'Section'), pick,
       el('button', { class: 'btn secondary', type: 'button', onclick: () => window.print() }, '🖨 Print the plan')),
-    el('p', { class: 'small', style: 'margin:8px 0 0' }, '🖨 buttons open a handout as a PDF; print it from there. Buttons marked 📺 put the plan’s questions on the TV. Press “Show answer” when you’re ready, or “New numbers” for another one like it.')), out);
+    el('p', { class: 'small', style: 'margin:8px 0 0' }, '🖨 buttons open a handout as a PDF; print it from there. Buttons marked 📺 put the plan’s questions on the TV. Press “Show answer” when you’re ready, or “New numbers” for another one like it.'), note), out);
   pick.addEventListener('change', () => { LESSON.key = pick.value; draw(); });
   function draw() {
     out.innerHTML = '';
-    const L = LESSONS[LESSON.key], S = SETS[LESSON.key]; if (!L || !S) return;
+    const L = lessonOf(LESSON.key), S = SETS[LESSON.key]; if (!L || !S) return;
     const h = (t) => el('h3', { class: 'lp-h' }, t);
     const list = (arr) => el('ul', { class: 'lp-ul' }, ...arr.map((x) => el('li', {}, x)));
     const all = L.steps.flatMap((s) => s.show || []);
@@ -28187,7 +28195,9 @@ function lessonScreen(preKey) {
           L.note ? el('div', { class: 'small', style: 'font-weight:600;margin-top:4px' }, L.note) : ''),
         el('div', { class: 'lp-btns noprint', style: 'margin:0' },
           L.slides ? el('a', { class: 'btn', href: L.slides, target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none' }, '🖥 Open the slides') : '',
-          all.length ? el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, 0) }, '📺 Examples and keys on the TV') : '')),
+          all.length ? el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, 0) }, '📺 Examples and keys on the TV') : '',
+          LESSON_EDITS.status === 'ok' ? el('button', { class: 'btn secondary', type: 'button', onclick: () => lessonEdit(LESSON.key) }, '✏️ Edit this plan') : '',
+          LESSON_EDITS.data[LESSON.key] ? el('span', { class: 'small', style: 'align-self:center' }, '(your edited version)') : '')),
       h('Objective'), el('p', {}, L.objective),
       h('Students will say'), list(L.iCan),
       h('Vocabulary'), el('ul', { class: 'lp-ul' }, ...L.vocab.map(([w, d]) => el('li', {}, el('b', {}, w), ' — ', lpMath(d, 16)))),
@@ -28219,11 +28229,138 @@ function lessonScreen(preKey) {
         el('div', {}, h('Watch for these mistakes'), list(L.mistakes)),
         el('div', {}, h('Support'), list(L.support || []), h('Extend'), list(L.extend || []))) : ''));
   }
-  draw();
+  draw(); showNote();
+  if (LESSON_EDITS.status !== 'ok') lessonSync().then(() => { if (document.getElementById('title').textContent === 'Lesson plans') { showNote(); draw(); } });
+}
+/* ---------- editing lesson plans (saved in the teacher's Practice Results sheet, so the edits follow them to any computer) ---------- */
+const LESSON_EDITS = { data: {}, status: 'idle', version: null };
+const lessonOf = (k) => LESSON_EDITS.data[k] || LESSONS[k];
+const lpPost = async (body) => { const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...body, password: dashPw.get() }) }); return res.json(); };
+// the script must be version 8 or newer (older ones would treat the request as a student submission)
+async function lpVersion() {
+  if (LESSON_EDITS.version != null) return LESSON_EDITS.version;
+  try { const t = await (await fetch(CONFIG.SCRIPT_URL)).text(), m = /version (\d+)/.exec(t); LESSON_EDITS.version = m ? +m[1] : 0; } catch { return -1; }
+  return LESSON_EDITS.version;
+}
+async function lessonSync() {
+  if (!CONFIG.SCRIPT_URL) { LESSON_EDITS.status = 'noscript'; return; }
+  if (!dashPw.get()) { LESSON_EDITS.status = 'nopw'; return; }
+  const v = await lpVersion(); if (v < 0) { LESSON_EDITS.status = 'offline'; return; } if (v < 8) { LESSON_EDITS.status = 'old'; return; }
+  try {
+    const g = await lpPost({ action: 'lessonPlans' });
+    if (g.wrong) { dashPw.set(''); LESSON_EDITS.status = 'wrong'; return; }
+    if (g.locked) { LESSON_EDITS.status = 'locked'; return; }
+    if (g.setup) { LESSON_EDITS.status = 'setup'; return; }
+    if (!g.ok) { LESSON_EDITS.status = 'error'; return; }
+    const data = {}; Object.entries(g.plans || {}).forEach(([k, x]) => { try { data[k] = JSON.parse(x.data); } catch {} });
+    LESSON_EDITS.data = data; LESSON_EDITS.status = 'ok';
+  } catch { LESSON_EDITS.status = 'offline'; }
+}
+// the note above the plan: where edits are saved, or what to do so they can be
+function lessonEditNote(onChange) {
+  const st = LESSON_EDITS.status, box = el('div', { class: 'small noprint', style: 'margin:8px 0 0' });
+  const msg = { idle: 'Checking for your edits…', ok: 'Edits are saved in your Practice Results sheet, so they show up on any computer.', noscript: 'Editing needs the Practice Results sheet (CONFIG.SCRIPT_URL).', offline: 'Couldn’t reach your Practice Results sheet, so you’re seeing the original plans.',
+    old: 'To edit lesson plans, update the Apps Script in your Practice Results sheet: paste in the new PracticeResults.gs, then Deploy > Manage deployments > Edit > New version > Deploy.', setup: 'To edit lesson plans, set DASHBOARD_PASSWORD in the Apps Script’s Script properties first.',
+    locked: 'Too many wrong passwords. Wait 15 minutes and try again.', error: 'Your Practice Results sheet had a problem loading your edits.' }[st];
+  if (st === 'nopw' || st === 'wrong') {
+    const pw = el('input', { type: 'password', placeholder: 'Dashboard password', style: 'max-width:220px;margin:0 6px' });
+    const go = async () => { if (!pw.value) return; dashPw.set(pw.value); LESSON_EDITS.status = 'idle'; onChange(); await lessonSync(); onChange(); };
+    pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    box.append(st === 'wrong' ? 'That password didn’t match. ' : 'To edit plans (and see your edits), connect with your dashboard password:', pw, el('button', { class: 'btn secondary', type: 'button', onclick: go }, 'Connect'));
+  } else box.append(msg || '');
+  return box;
+}
+function lessonEdit(key) {
+  const orig = lessonOf(key), P = JSON.parse(JSON.stringify(orig)), S = SETS[key], edited = !!LESSON_EDITS.data[key];
+  document.getElementById('title').textContent = 'Edit lesson plan';
+  document.body.classList.remove('printing'); app.innerHTML = '';
+  let dirty = false; const touch = () => { dirty = true; };
+  const ta = (obj, k, rows = 2) => { const t = el('textarea', { class: 'lp-ed', rows: Math.max(rows, String(obj[k] ?? '').split('\n').reduce((n, l) => n + 1 + Math.floor(l.length / 95), 0)) }); t.value = obj[k] ?? ''; t.addEventListener('input', () => { obj[k] = t.value; touch(); }); return t; };
+  const inp = (obj, k, style = '') => { const t = el('input', { class: 'lp-ed', style }); t.value = obj[k] ?? ''; t.addEventListener('input', () => { obj[k] = t.value; touch(); }); return t; };
+  const lines = (obj, k, rows = 4) => { const t = el('textarea', { class: 'lp-ed', rows: Math.max(rows, (obj[k] || []).reduce((n, l) => n + 1 + Math.floor(l.length / 95), 0) + 1) }); t.value = (obj[k] || []).join('\n'); t.addEventListener('input', () => { obj[k] = t.value.split('\n').map((x) => x.trim()).filter(Boolean); touch(); }); return t; };
+  const pairs = (obj, k, sep, rows = 4) => { const t = el('textarea', { class: 'lp-ed', rows: Math.max(rows, (obj[k] || []).reduce((n, l) => n + 1 + Math.floor(l.join(sep).length / 95), 0) + 1) }); t.value = (obj[k] || []).map((p) => p.join(sep)).join('\n');
+    t.addEventListener('input', () => { obj[k] = t.value.split('\n').map((x) => x.trim()).filter(Boolean).map((x) => { const i = x.indexOf(sep.trim()); return i < 0 ? [x, ''] : [x.slice(0, i).trim(), x.slice(i + sep.trim().length).trim()]; }); touch(); }); return t; };
+  const field = (label, node, hint) => el('div', { class: 'lp-edf' }, el('div', { class: 'lp-edl' }, label, hint ? el('span', { class: 'small', style: 'font-weight:400;margin-left:6px' }, hint) : ''), node);
+  const small = (label, fn, danger) => el('button', { class: 'btn secondary', type: 'button', style: `padding:4px 10px;font-size:13px${danger ? ';color:#b03a2e' : ''}`, onclick: fn }, label);
+  const h = (t) => el('h3', { class: 'lp-h' }, t);
+  // one screen shown on the TV
+  const screenEd = (s, list, j, redraw) => {
+    const box = el('div', { class: 'lp-edcard', style: 'background:#fafaf7' });
+    const head = el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, el('b', {}, '📺 Screen'), inp(s, 'label', 'flex:1;min-width:160px'),
+      j > 0 ? small('↑', () => { [list[j - 1], list[j]] = [list[j], list[j - 1]]; touch(); redraw(); }) : '', j < list.length - 1 ? small('↓', () => { [list[j + 1], list[j]] = [list[j], list[j + 1]]; touch(); redraw(); }) : '',
+      small('Remove screen', () => { if (confirm('Remove this screen?')) { list.splice(j, 1); touch(); redraw(); } }, true));
+    box.append(head);
+    if (!s.fixed) { box.append(el('p', { class: 'small' }, 'This screen makes a fresh question each time from the practice question type, so there is nothing to edit here except its name.')); return box; }
+    const f = s.fixed;
+    box.append(field('Question', ta(f, 'stem', 3), 'Each line shows on its own line.'));
+    if (f.choices) {
+      const ch = el('textarea', { class: 'lp-ed', rows: 4 }); ch.value = f.choices.join('\n');
+      const right = el('select', {}, ...f.choices.map((_, i) => el('option', { value: i }, LETTERS[i])));
+      right.value = f.answer; right.addEventListener('change', () => { f.answer = +right.value; touch(); });
+      ch.addEventListener('input', () => { f.choices = ch.value.split('\n').map((x) => x.trim()).filter(Boolean); touch(); right.innerHTML = ''; f.choices.forEach((_, i) => right.append(el('option', { value: i }, LETTERS[i]))); if (f.answer >= f.choices.length) f.answer = 0; right.value = f.answer; });
+      box.append(field('Answer choices', ch, 'One per line.'), field('Correct choice', right));
+    } else box.append(field('Answer', ta(f, 'display', 1)));
+    box.append(field('Solution / notes', ta(f, 'solution', 3)));
+    if (f.figure || f.fig) box.append(el('p', { class: 'small', style: 'margin:4px 0 0' }, 'This screen has a diagram. It stays as it is (the diagram itself isn’t editable).'));
+    if (s.more || s.tpl) box.append(el('p', { class: 'small', style: 'margin:4px 0 0' }, '“New numbers” on the TV still makes fresh questions of this type.'));
+    return box;
+  };
+  const stepsBox = el('div', {});
+  const drawSteps = () => {
+    stepsBox.innerHTML = '';
+    P.steps.forEach((s, i) => {
+      const card = el('div', { class: 'lp-edcard' });
+      const shows = el('div', {});
+      const drawShows = () => { shows.innerHTML = ''; (s.show || []).forEach((x, j) => shows.append(screenEd(x, s.show, j, drawShows)));
+        shows.append(small('+ Add a TV screen', () => { (s.show = s.show || []).push({ label: 'New screen', fixed: { topic: s.name || '', stem: '', display: '', solution: '' } }); touch(); drawShows(); })); };
+      drawShows();
+      card.append(el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, el('b', {}, `Step ${i + 1}`),
+          i > 0 ? small('Move up', () => { [P.steps[i - 1], P.steps[i]] = [P.steps[i], P.steps[i - 1]]; touch(); drawSteps(); }) : '', i < P.steps.length - 1 ? small('Move down', () => { [P.steps[i + 1], P.steps[i]] = [P.steps[i], P.steps[i + 1]]; touch(); drawSteps(); }) : '',
+          small('Remove step', () => { if (confirm(`Remove step ${i + 1} (${s.name})?`)) { P.steps.splice(i, 1); touch(); drawSteps(); } }, true)),
+        el('div', { style: 'display:grid;grid-template-columns:120px 1fr 1fr;gap:8px' }, field('Minutes', inp(s, 'time')), field('Name', inp(s, 'name')), field('Tag', inp(s, 'tag'))),
+        field('Teacher', ta(s, 'teacher', 3)), field('Students', ta(s, 'students', 2)), field('Ask', ta(s, 'say', 1), 'Optional.'), field('Check for understanding', ta(s, 'check', 2)),
+        s.practice ? el('p', { class: 'small' }, 'This step keeps its “Build an assignment” and “Results dashboard” buttons.') : '', shows);
+      stepsBox.append(card);
+    });
+    stepsBox.append(small('+ Add a step', () => { P.steps.push({ time: '', name: 'New step', teacher: '', students: '', check: '' }); touch(); drawSteps(); }));
+  };
+  drawSteps();
+  const extra = el('div', {});
+  (P.tables || []).forEach((t) => { const rows = el('textarea', { class: 'lp-ed', rows: Math.max(3, t.rows.length + 1) }); rows.value = t.rows.map((r) => r.join(' | ')).join('\n');
+    rows.addEventListener('input', () => { t.rows = rows.value.split('\n').filter((x) => x.trim()).map((x) => x.split('|').map((c) => c.trim())); touch(); });
+    const head = el('input', { class: 'lp-ed' }); head.value = t.head.join(' | '); head.addEventListener('input', () => { t.head = head.value.split('|').map((c) => c.trim()); touch(); });
+    extra.append(el('div', { class: 'lp-edcard' }, field('Table title', inp(t, 'title')), field('Column headings', head, 'Separate with |'), field('Rows', rows, 'One row per line; separate cells with |'))); });
+  (P.keys || []).forEach((k) => { const items = el('div', {});
+    const drawItems = () => { items.innerHTML = ''; k.items.forEach((it, i) => { const o = { n: it[0], q: it[1], a: it[2] }, sync = () => { k.items[i] = [o.n, o.q, o.a]; };
+      const w = (key, rows) => { const t = rows ? el('textarea', { class: 'lp-ed', rows }) : el('input', { class: 'lp-ed', style: 'width:110px' }); t.value = o[key] || ''; t.addEventListener('input', () => { o[key] = t.value; sync(); touch(); }); return t; };
+      items.append(el('div', { style: 'display:grid;grid-template-columns:110px 1fr 1fr auto;gap:6px;align-items:start;margin:6px 0' }, w('n'), w('q', 2), w('a', 3), small('✕', () => { k.items.splice(i, 1); touch(); drawItems(); }, true))); });
+      items.append(small('+ Add an answer', () => { k.items.push([`${k.items.length + 1}.`, '', '']); touch(); drawItems(); })); };
+    drawItems();
+    extra.append(el('div', { class: 'lp-edcard' }, field('Answer key title', inp(k, 'title')), el('div', { class: 'small' }, 'Number · question · answer and work'), items)); });
+  (P.lists || []).forEach((x) => extra.append(el('div', { class: 'lp-edcard' }, field('List title', inp(x, 'title')), field('Items', lines(x, 'items', Math.max(3, x.items.length + 1)), 'One per line.'))));
+  ['mistakes', 'support', 'extend'].forEach((k) => { if (P[k]) extra.append(el('div', { class: 'lp-edcard' }, field({ mistakes: 'Watch for these mistakes', support: 'Support', extend: 'Extend' }[k], lines(P, k, Math.max(3, P[k].length + 1)), 'One per line.'))); });
+  const status = el('span', { class: 'small', style: 'margin-left:8px' });
+  const save = async () => {
+    status.textContent = 'Saving…';
+    try { const g = await lpPost({ action: 'saveLesson', key, data: JSON.stringify(P) });
+      if (g.ok) { LESSON_EDITS.data[key] = P; dirty = false; lessonScreen(key); return; }
+      status.textContent = g.wrong ? 'The dashboard password didn’t match. Nothing was saved.' : `Not saved: ${g.error || 'try again'}`; if (g.wrong) dashPw.set('');
+    } catch { status.textContent = 'Not saved: couldn’t reach your Practice Results sheet. Try again.'; }
+  };
+  const cancel = () => { if (!dirty || confirm('Discard your changes?')) lessonScreen(key); };
+  const reset = async () => { if (!confirm('Go back to the original plan? Your edits to this plan will be deleted.')) return; status.textContent = 'Resetting…';
+    try { const g = await lpPost({ action: 'resetLesson', key }); if (g.ok) { delete LESSON_EDITS.data[key]; lessonScreen(key); return; } status.textContent = `Not reset: ${g.error || 'try again'}`; } catch { status.textContent = 'Couldn’t reach your Practice Results sheet. Try again.'; } };
+  const bar = el('div', { class: 'lp-edbar' }, el('button', { class: 'btn', type: 'button', onclick: save }, 'Save'), el('button', { class: 'btn secondary', type: 'button', onclick: cancel }, 'Cancel'),
+    edited ? el('button', { class: 'btn secondary', type: 'button', style: 'color:#b03a2e', onclick: reset }, 'Reset to original') : '', status);
+  app.append(el('div', { class: 'card' }, el('h2', { style: 'margin:0 0 4px' }, `${S.title}`), el('div', { class: 'small' }, 'Change anything below, then Save. The TV screens and the printed plan use your version.'),
+    h('Note under the title'), inp(P, 'note'), h('Objective'), ta(P, 'objective', 2), h('Students will say (I can…)'), lines(P, 'iCan', 3), h('Vocabulary'), pairs(P, 'vocab', ' — ', 4),
+    el('div', { class: 'small' }, 'One per line: word — meaning'), h('Materials'), ta(P, 'materials', 2), h('Builds on'), ta(P, 'prior', 2), h('Before class'), lines(P, 'before', 3),
+    h('Lesson flow'), stepsBox, extra.childNodes.length ? h('Tables, answer keys, and lists') : '', extra), bar);
+  window.scrollTo(0, 0);
 }
 // start a fresh assignment in the builder with this section's question types
 function lessonBuild(key) {
-  const S = SETS[key], counts = {}, bonusCounts = {}, skip = (LESSONS[key] && LESSONS[key].skip) || []; // a plan can leave out question types it doesn't teach
+  const S = SETS[key], counts = {}, bonusCounts = {}, skip = (lessonOf(key) && lessonOf(key).skip) || []; // a plan can leave out question types it doesn't teach
   S.items.forEach(([id, n, , b]) => { if (skip.includes(id)) return; if (b === 'b') bonusCounts[id] = n; else counts[id] = n; });
   store.set(TK('builder:last'), { counts, formats: {}, frCounts: {}, bonusCounts, bonusFormats: {}, title: S.title, subject: S.subject, t: Date.now() });
   document.body.classList.remove('printing');
