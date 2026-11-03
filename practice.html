@@ -15768,6 +15768,24 @@ TEMPLATES.b54Quad = (r) => {
     solution: `Square both sides and solve the quadratic: ${v} = ${fmt(E.cands[0])} or ${v} = ${fmt(E.cands[1])}.\nCheck each in the original equation:\n${E.cands.map((x) => `${v} = ${fmt(x)}: √${fmt(E.a * x + E.b)} ${E.ok(x) ? '=' : '≠'} ${fmt(E.p * x + E.q)} ${E.ok(x) ? '✓' : '✗ (extraneous)'}`).join('\n')}\nSolution: ${b5list(E.sols)}` };
 };
 // #19–20: radical models solved for the input
+// radical inequalities (appended)
+TEMPLATES.b54Ineq = (r) => {
+  const v = pick(r, ['x', 'x', 'y', 'n', 'p']), idx = r() < 0.3 ? 3 : 2, op = pick(r, ['<', '≤', '>', '≥']);
+  const a = pick(r, [1, 1, 2, 3, 4]), d = r() < 0.5 ? nz(r, -9, 9) : 0, c = nz(r, -9, 9), s = idx === 3 ? nz(r, -4, 4) : ri(r, 1, 6);
+  const e = a * s + d, top = s ** idx - c, small = op === '<' || op === '≤';
+  const inner = `${v}${c > 0 ? '+' : '-'}${Math.abs(c)}`, innerT = `${v} ${c > 0 ? '+' : '−'} ${Math.abs(c)}`;
+  const opL = { '<': '<', '≤': '\\le', '>': '>', '≥': '\\ge' }[op];
+  const fig = a6tex(`${a === 1 ? '' : a}${a6rootL(idx, inner)}${d ? (d > 0 ? '+' : '-') + Math.abs(d) : ''}${opL}${e}`);
+  const S = idx === 2 && small ? [a2I(-c, top, true, op === '≤')] : a2S(op, top);
+  const rootT = idx === 2 ? `√(${innerT})` : `∛(${innerT})`;
+  const steps = [];
+  if (d) steps.push(`${d > 0 ? 'Subtract' : 'Add'} ${Math.abs(d)}: ${a === 1 ? '' : a}${rootT} ${op} ${a * s}`);
+  if (a !== 1) steps.push(`Divide by ${a}: ${rootT} ${op} ${s}`);
+  steps.push(`${idx === 2 ? 'Square' : 'Cube'} both sides: ${innerT} ${op} ${s ** idx}, so ${v} ${op} ${top}`);
+  if (idx === 2) steps.push(small ? `The radicand must be ≥ 0: ${innerT} ≥ 0, so ${v} ≥ ${-c}.` : `Every ${v} ${op} ${top} already makes the radicand positive.`);
+  return { ...a2Q(r, { topic: 'Solving radical inequalities', stem: 'Solve the inequality.', v, S, solution: `${steps.join('\n')}\nSolution: ${a2T(v, S)}`,
+      wrongs: [idx === 2 && small ? a2S(op, top) : a2rev(S), a2inc(S), a2S(op, s - c), idx === 2 && small ? [a2I(-c, top, false, op === '≤')] : a2S(op, s ** idx + c)] }), draw: fig.draw, size: fig.size };
+};
 TEMPLATES.b54Word = (r) => {
   if (r() < 0.5) {
     const t = pick(r, [2, 3, 4, 5, 6, 7, 8]), d = (4 * t) ** 2;
@@ -25301,7 +25319,7 @@ Object.assign(SETS, {
   'alg2-5-1': { subject: 'algebra2', title: '5.1 nth Roots and Rational Exponents', items: [['b51NthRoot', 2], ['b51Eval', 3], ['b51Match', 2], ['b51Calc', 2], ['b51Solve', 3], ['b51Word', 1]] },
   'alg2-5-2': { subject: 'algebra2', title: '5.2 Properties of Rational Exponents and Radicals', items: [['b52Props', 2], ['b52RadProd', 2], ['b52Simplest', 2], ['b52Conj', 1], ['b52Like', 2], ['b52Var', 2], ['b52RatVar', 1], ['b52LikeVar', 1]] },
   'alg2-5-3': { subject: 'algebra2', title: '5.3 Graphing Radical Functions', items: [['b53Domain', 3], ['b53Match', 2], ['b53Transform', 3], ['b53Sketch', 3], ['b53Word', 1]] },
-  'alg2-5-4': { subject: 'algebra2', title: '5.4 Solving Radical Equations and Inequalities', items: [['b54Solve', 4], ['b54TwoRad', 2], ['b54Cube', 2], ['b54Extraneous', 1], ['b54Quad', 2], ['b54Word', 1]] },
+  'alg2-5-4': { subject: 'algebra2', title: '5.4 Solving Radical Equations and Inequalities', items: [['b54Solve', 4], ['b54TwoRad', 2], ['b54Cube', 2], ['b54Extraneous', 1], ['b54Quad', 2], ['b54Word', 1], ['b54Ineq', 2]] },
   'alg2-5-5': { subject: 'algebra2', title: '5.5 Performing Function Operations', items: [['b55AddSub', 3], ['b55MulDiv', 4], ['b55Calc', 2], ['b55Domain', 1], ['b55Word', 1]] },
   'alg2-5-6': { subject: 'algebra2', title: '5.6 Composition of Functions', items: [['b56Compose', 3], ['b56Value', 3], ['b56Graph', 2], ['b56Table', 2], ['b56Word', 1], ['b56Pairs', 1]] },
   'alg2-5-7': { subject: 'algebra2', title: '5.7 Inverse of a Function', items: [['b57Inputs', 2], ['b57Linear', 3], ['b57Table', 1], ['b57Power', 4], ['b57Verify', 1], ['b57Word', 1], ['b57FromTable', 1], ['b57LinearSketch', 2], ['b57PowerSketch', 3]] },
