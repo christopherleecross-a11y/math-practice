@@ -28336,8 +28336,8 @@ const lessonOf = (k) => LESSON_EDITS.data[k] || LESSONS[k];
 const lpPost = async (body) => { const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...body, password: dashPw.get() }) }); return res.json(); };
 // the script must be version 8 or newer (older ones would treat the request as a student submission)
 async function lpVersion() {
-  if (LESSON_EDITS.version != null) return LESSON_EDITS.version;
-  try { const t = await (await fetch(CONFIG.SCRIPT_URL)).text(), m = /version (\d+)/.exec(t); LESSON_EDITS.version = m ? +m[1] : 0; } catch { return -1; }
+  if (LESSON_EDITS.version >= 8) return LESSON_EDITS.version; // an older answer is asked again (the script may have just been updated)
+  try { const t = await (await fetch(CONFIG.SCRIPT_URL + (CONFIG.SCRIPT_URL.includes('?') ? '&' : '?') + 'ts=' + Date.now(), { cache: 'no-store' })).text(), m = /version (\d+)/.exec(t); LESSON_EDITS.version = m ? +m[1] : 0; } catch { return -1; }
   return LESSON_EDITS.version;
 }
 async function lessonSync() {
