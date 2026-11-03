@@ -23729,6 +23729,352 @@ TEMPLATES.g35ParDist = (r) => {
   }
 };
 /* ==== GEOMETRY CH3 END ==== */
+/* ==== GEOMETRY CH4 BEGIN ==== */
+/* ---------- Geometry (Big Ideas Math), Chapter 4: Transformations ---------- */
+const G4PR = '′';
+// a polygon with integer vertices (n = 3 or 4), convex, not too thin, inside [lo, hi]
+function g4Poly(r, n, lo = -5, hi = 5) {
+  for (;;) {
+    const V = [...Array(n)].map(() => [ri(r, lo, hi), ri(r, lo, hi)]);
+    const c = [V.reduce((s, p) => s + p[0], 0) / n, V.reduce((s, p) => s + p[1], 0) / n];
+    V.sort((a, b) => Math.atan2(a[1] - c[1], a[0] - c[0]) - Math.atan2(b[1] - c[1], b[0] - c[0]));
+    let area = 0, convex = true;
+    for (let i = 0; i < n; i++) { const a = V[i], b = V[(i + 1) % n], d = V[(i + 2) % n]; area += a[0] * b[1] - b[0] * a[1]; if ((b[0] - a[0]) * (d[1] - b[1]) - (b[1] - a[1]) * (d[0] - b[0]) <= 0) convex = false; }
+    if (!convex || Math.abs(area) / 2 < (n === 3 ? 3 : 5)) continue;
+    if (new Set(V.map((p) => p.join())).size < n) continue;
+    const span = Math.max(...V.map((p) => p[0])) - Math.min(...V.map((p) => p[0])) + Math.max(...V.map((p) => p[1])) - Math.min(...V.map((p) => p[1])); if (span > 11) continue;
+    return V.reverse().map((p, i, A) => A[(i + 1) % n]); // start somewhere other than the sorted first point
+  }
+}
+const g4Z = (v) => (Object.is(v, -0) ? 0 : v);
+const g4P = (p) => `(${fmt(g4Z(p[0]))}, ${fmt(g4Z(p[1]))})`;
+const g4List = (names, V, prime = '') => V.map((p, i) => `${names[i]}${prime}${g4P(p)}`).join(', ');
+// free response: the image vertices in order, typed as points
+const g4FR = (names, Q, prime = G4PR) => {
+  const n = Q.length, ok = (raw) => { const s = pxPlain(raw) || ''; const pts = [...s.replace(/\s+/g, '').matchAll(/\(([^(),]+),([^(),]+)\)/g)].map((m) => [pxConst(m[1]), pxConst(m[2])]); return pts.length === n && Q.every((q, i) => Math.abs(pts[i][0] - q[0]) < 1e-9 && Math.abs(pts[i][1] - q[1]) < 1e-9); };
+  return { fields: [{ kind: 'expr', keys: 'pts2', label: `${names.map((c) => c + prime).join(', ')}:` }], key: [Q.map((q) => `\\left(${fmt(g4Z(q[0])).replace(MINUS, '-')},${fmt(g4Z(q[1])).replace(MINUS, '-')}\\right)`).join(',')], display: g4List(names, Q, prime), check: (v) => ok(v[0]) };
+};
+// coordinate grid with polygons, segments, arrows, and lines
+function g4Draw(cv, o) {
+  const ctx = cv._ctx, W = cv._w, H = cv._h, all = [...(o.polys || []).flatMap((q) => q.V), ...(o.pts || []).map((q) => q.p), ...(o.arrows || []).flatMap((a) => [a[0], a[1]]), [0, 0]];
+  let x0 = Math.min(...all.map((p) => p[0])) - 1, x1 = Math.max(...all.map((p) => p[0])) + 1, y0 = Math.min(...all.map((p) => p[1])) - 1, y1 = Math.max(...all.map((p) => p[1])) + 1;
+  if (o.noAxes) { x0 = Math.floor(x0); y0 = Math.floor(y0); x1 = Math.ceil(x1); y1 = Math.ceil(y1); }
+  const span = Math.max(x1 - x0, y1 - y0, 6); x1 = x0 + span; y1 = y0 + span;
+  const m = 18, sc = Math.min((W - 2 * m) / (x1 - x0), (H - 2 * m) / (y1 - y0)), ox = (W - sc * (x1 - x0)) / 2, oy = (H - sc * (y1 - y0)) / 2;
+  const X = (x) => ox + (x - x0) * sc, Y = (y) => oy + (y1 - y) * sc;
+  ctx.clearRect(0, 0, W, H); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#e4e1d9'; ctx.lineWidth = 1;
+  for (let k = Math.ceil(x0); k <= x1; k++) { ctx.beginPath(); ctx.moveTo(X(k), Y(y0)); ctx.lineTo(X(k), Y(y1)); ctx.stroke(); }
+  for (let k = Math.ceil(y0); k <= y1; k++) { ctx.beginPath(); ctx.moveTo(X(x0), Y(k)); ctx.lineTo(X(x1), Y(k)); ctx.stroke(); }
+  if (!o.noAxes) {
+    ctx.strokeStyle = '#1d1d1b'; ctx.lineWidth = 1.5;
+    if (y0 <= 0 && y1 >= 0) { ctx.beginPath(); ctx.moveTo(X(x0), Y(0)); ctx.lineTo(X(x1), Y(0)); ctx.stroke(); }
+    if (x0 <= 0 && x1 >= 0) { ctx.beginPath(); ctx.moveTo(X(0), Y(y0)); ctx.lineTo(X(0), Y(y1)); ctx.stroke(); }
+    ctx.fillStyle = '#5c5a55'; ctx.font = '11px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const lab = span > 14 ? 4 : 2;
+    for (let k = Math.ceil(x0 / lab) * lab; k <= x1; k += lab) if (k) ctx.fillText(fmt(k), X(k), Y(0) + 3);
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let k = Math.ceil(y0 / lab) * lab; k <= y1; k += lab) if (k) ctx.fillText(fmt(k), X(0) - 3, Y(k));
+    ctx.font = 'italic 14px Georgia, serif'; ctx.fillStyle = '#1d1d1b'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('x', X(x1) - 2, Y(0) - 2); ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('y', X(0) + 5, Y(y1) + 1);
+  }
+  ctx.save(); ctx.beginPath(); ctx.rect(X(x0), Y(y1), X(x1) - X(x0), Y(y0) - Y(y1)); ctx.clip();
+  (o.lines || []).forEach((L) => { ctx.strokeStyle = L.color || '#7a5aa6'; ctx.lineWidth = 2; ctx.setLineDash([7, 5]); ctx.beginPath();
+    if (L.x != null) { ctx.moveTo(X(L.x), Y(y0)); ctx.lineTo(X(L.x), Y(y1)); } else { ctx.moveTo(X(x0), Y(L.m * x0 + L.b)); ctx.lineTo(X(x1), Y(L.m * x1 + L.b)); } ctx.stroke(); ctx.setLineDash([]); });
+  ctx.restore();
+  const cent = (V) => [V.reduce((s, p) => s + p[0], 0) / V.length, V.reduce((s, p) => s + p[1], 0) / V.length];
+  (o.polys || []).forEach((q) => {
+    const col = q.color || '#1f5fa8'; ctx.strokeStyle = col; ctx.lineWidth = 2.4; ctx.setLineDash(q.dash ? [6, 4] : []); ctx.beginPath();
+    q.V.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])))); if (q.V.length > 2) ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = col; q.V.forEach((p) => { ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), 3.5, 0, 2 * Math.PI); ctx.fill(); });
+    if (q.names) { const c = cent(q.V); ctx.font = 'italic 15px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      q.V.forEach((p, i) => { let d = [p[0] - c[0], p[1] - c[1]]; const L = Math.hypot(...d) || 1; d = [d[0] / L, d[1] / L]; if (q.V.length === 2) d = [-0.5, 0.85];
+        const t = q.names[i] + (q.prime || '') + (q.coords ? g4P(p) : ''); const x = X(p[0]) + d[0] * (q.coords ? 30 : 13), y = Y(p[1]) - d[1] * 14;
+        ctx.font = q.coords ? '13px Georgia, serif' : 'italic 15px Georgia, serif'; const w = ctx.measureText(t).width; ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(x - w / 2 - 2, y - 8, w + 4, 16); ctx.fillStyle = col; ctx.fillText(t, x, y); }); }
+  });
+  (o.arrows || []).forEach(([P, Q, lab]) => { const a = [X(P[0]), Y(P[1])], b = [X(Q[0]), Y(Q[1])], d = VEC.norm(VEC.sub(b, a)), n = [-d[1], d[0]];
+    ctx.strokeStyle = '#1d1d1b'; ctx.fillStyle = '#1d1d1b'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(...b); ctx.lineTo(...VEC.add(b, VEC.add(VEC.mul(d, -11), VEC.mul(n, 5)))); ctx.lineTo(...VEC.add(b, VEC.add(VEC.mul(d, -11), VEC.mul(n, -5)))); ctx.closePath(); ctx.fill();
+    if (lab) { ctx.font = 'italic 16px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(lab[0], a[0] - d[0] * 12 + n[0] * 12, a[1] - d[1] * 12 + n[1] * 12); ctx.fillText(lab[1], b[0] + d[0] * 12 + n[0] * 12, b[1] + d[1] * 12 + n[1] * 12); } });
+  (o.pts || []).forEach(({ p, label, color }) => { ctx.fillStyle = color || '#1d1d1b'; ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), 3.5, 0, 2 * Math.PI); ctx.fill(); if (label) { ctx.font = '13px Georgia, serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillText(label, X(p[0]) + 6, Y(p[1]) - 3); } });
+}
+const g4Fig = (o) => (cv) => g4Draw(cv, o);
+const G4BLUE = '#1f5fa8', G4RED = '#c0392b', G4GREEN = '#2e8540';
+// transformations: [function, words, rule text]
+const g4Sg = (n) => (n < 0 ? `${MINUS} ${fmt(-n)}` : `+ ${fmt(n)}`);
+const g4Tr = (a, b) => [(p) => [p[0] + a, p[1] + b], `a translation ${Math.abs(a)} unit${Math.abs(a) === 1 ? '' : 's'} ${a < 0 ? 'left' : 'right'} and ${Math.abs(b)} unit${Math.abs(b) === 1 ? '' : 's'} ${b < 0 ? 'down' : 'up'}`.replace(/ 0 units (left|right) and/, '').replace(/ and 0 units (up|down)/, ''), `(x, y) → (${a ? `x ${g4Sg(a)}` : 'x'}, ${b ? `y ${g4Sg(b)}` : 'y'})`];
+const G4REF = {
+  xa: [(p) => [p[0], -p[1]], 'a reflection in the x-axis', '(x, y) → (x, −y)'], ya: [(p) => [-p[0], p[1]], 'a reflection in the y-axis', '(x, y) → (−x, y)'],
+  yx: [(p) => [p[1], p[0]], 'a reflection in the line y = x', '(x, y) → (y, x)'], ynx: [(p) => [-p[1], -p[0]], 'a reflection in the line y = −x', '(x, y) → (−y, −x)'] };
+const g4RefX = (a) => [(p) => [2 * a - p[0], p[1]], `a reflection in the line x = ${fmt(a)}`, `(x, y) → (${fmt(2 * a)} − x, y)`];
+const g4RefY = (b) => [(p) => [p[0], 2 * b - p[1]], `a reflection in the line y = ${fmt(b)}`, `(x, y) → (x, ${fmt(2 * b)} − y)`];
+const G4ROT = { 90: [(p) => [-p[1], p[0]], 'a 90° rotation about the origin', '(x, y) → (−y, x)'], 180: [(p) => [-p[0], -p[1]], 'a 180° rotation about the origin', '(x, y) → (−x, −y)'], 270: [(p) => [p[1], -p[0]], 'a 270° rotation about the origin', '(x, y) → (y, −x)'] };
+const g4Dil = (k) => [(p) => [p[0] * k, p[1] * k], `a dilation with center at the origin and scale factor ${fracT(k)}`, `(x, y) → (${fracT(k)}x, ${fracT(k)}y)`];
+const g4Nm = (r, n) => pick(r, [['A', 'B', 'C', 'D'], ['J', 'K', 'L', 'M'], ['P', 'Q', 'R', 'S'], ['D', 'E', 'F', 'G'], ['L', 'M', 'N', 'P'], ['W', 'X', 'Y', 'Z'], ['F', 'G', 'H', 'J']]).slice(0, n);
+// "graph the image" question: MC lists of image vertices plus a typed answer
+function g4ImageQ(r, { topic, stem, V, names, T, wrongTs, solution, show = true, prime = G4PR, extraPolys = [] }) {
+  const Q = V.map(T), ans = g4List(names, Q, prime), wr = wrongTs.map((f) => g4List(names, V.map(f), prime));
+  const ch = g2MC(r, ans, wr);
+  return { topic, stem, ...ch, fr: g4FR(names, Q, prime), draw: show ? g4Fig({ polys: [{ V, names, color: G4BLUE }, ...extraPolys] }) : undefined, size: show ? [340, 340] : undefined,
+    solution: `${solution}\n${V.map((p, i) => `${names[i]}${g4P(p)} → ${names[i]}${prime}${g4P(Q[i])}`).join('\n')}` };
+}
+
+/* ---------- 4.1 Translations ---------- */
+TEMPLATES.g41Vector = (r) => {
+  for (;;) {
+    const P = [ri(r, -4, 3), ri(r, -4, 4)], v = [nz(r, -6, 6), nz(r, -5, 5)], Q = [P[0] + v[0], P[1] + v[1]]; if (Math.abs(Q[0]) > 6 || Math.abs(Q[1]) > 6) continue;
+    const [A, B] = pick(r, [['C', 'D'], ['S', 'T'], ['J', 'K'], ['M', 'N'], ['F', 'G']]), comp = (u) => `⟨${fmt(u[0])}, ${fmt(u[1])}⟩`, ans = `vector ${A}${B}; ${comp(v)}`;
+    return g2Q(r, 'Vectors', 'Name the vector and write its component form.', ans, [`vector ${B}${A}; ${comp(v)}`, `vector ${A}${B}; ${comp([v[1], v[0]])}`, `vector ${A}${B}; ${comp([-v[0], -v[1]])}`, `vector ${B}${A}; ${comp([-v[0], -v[1]])}`],
+      { draw: g4Fig({ arrows: [[P, Q, [A, B]]], noAxes: true }), size: [320, 320], solution: `The vector starts at ${A} (initial point) and ends at ${B} (terminal point): vector ${A}${B}.\nHorizontal change: ${fmt(v[0])}; vertical change: ${fmt(v[1])}. Component form: ${comp(v)}` });
+  }
+};
+TEMPLATES.g41Image = (r) => {
+  const n = pick(r, [3, 3, 4]), V = g4Poly(r, n, -4, 4), names = g4Nm(r, n), a = nz(r, -5, 5), b = nz(r, -5, 5), useVec = r() < 0.5, [T, , rule] = g4Tr(a, b);
+  const how = useVec ? `the vector ⟨${fmt(a)}, ${fmt(b)}⟩` : `the translation ${rule}`;
+  return g4ImageQ(r, { topic: 'Translations', stem: `Translate the figure using ${how}. What are the coordinates of the image?\n${g4List(names, V)}`, V, names, T,
+    wrongTs: [g4Tr(-a, -b)[0], g4Tr(b, a)[0], g4Tr(a, -b)[0], g4Tr(-a, b)[0]], solution: `Add ${fmt(a)} to each x-coordinate and ${fmt(b)} to each y-coordinate.` });
+};
+TEMPLATES.g41Rule = (r) => {
+  for (;;) {
+    const n = 3, V = g4Poly(r, n, -6, 2), a = nz(r, -2, 7), b = nz(r, -4, 6), Q = V.map(g4Tr(a, b)[0]); if (Q.some((p) => Math.abs(p[0]) > 7 || Math.abs(p[1]) > 7)) continue;
+    const names = g4Nm(r, 3), rule = g4Tr(a, b)[2], graph = r() < 0.6;
+    const stem = graph ? `Write a rule for the translation of △${names.join('')} to △${names.map((c) => c + G4PR).join('')}.` : `Write a rule for the translation that maps ${names[0]}${g4P(V[0])} to ${names[0]}${G4PR}${g4P(Q[0])}.`;
+    return { topic: 'Translation rules', stem, ...g2MC(r, rule, [g4Tr(-a, -b)[2], g4Tr(b, a)[2], g4Tr(a, -b)[2], g4Tr(-a, b)[2]]),
+      fr: { fields: [{ kind: 'number', label: '(x, y) → (x +' }, { kind: 'number', label: ', y +' }], key: [String(a), String(b)], display: rule, check: (v) => numEq(v[0], a) && numEq(v[1], b), score: (v) => (numEq(v[0], a) + numEq(v[1], b)) / 2 },
+      draw: graph ? g4Fig({ polys: [{ V, names, color: G4BLUE }, { V: Q, names, prime: G4PR, color: G4RED }] }) : undefined, size: graph ? [340, 340] : undefined,
+      solution: `${names[0]}${g4P(V[0])} moves to ${names[0]}${G4PR}${g4P(Q[0])}: ${fmt(a)} horizontally and ${fmt(b)} vertically.\n${rule}` };
+  }
+};
+TEMPLATES.g41Point = (r) => {
+  const a = nz(r, -9, 9), b = nz(r, -9, 9), [T, , rule] = g4Tr(a, b), P = [ri(r, -8, 8), ri(r, -8, 8)], pre = r() < 0.5, nm = pick(r, ['A', 'B', 'C', 'D']);
+  const ans = pre ? [P[0] - a, P[1] - b] : T(P), wrong = pre ? [T(P), [P[0] + b, P[1] + a], [P[0] - a, P[1] + b], [P[0] + a, P[1] - b]] : [[P[0] - a, P[1] - b], [P[0] + b, P[1] + a], [P[0] + a, P[1] - b], [P[0] - a, P[1] + b]];
+  return { topic: 'Images and preimages', stem: `Use the translation ${rule}.\n${pre ? `What is the preimage of ${nm}${G4PR}${g4P(P)}?` : `What is the image of ${nm}${g4P(P)}?`}`, ...g2MC(r, g4P(ans), wrong.map(g4P)), fr: g13FRpt(pre ? `${nm} =` : `${nm}${G4PR} =`, ans),
+    solution: pre ? `Undo the translation: subtract ${fmt(a)} from x and ${fmt(b)} from y.\n${nm}${g4P(ans)}` : `Add ${fmt(a)} to x and ${fmt(b)} to y.\n${nm}${G4PR}${g4P(ans)}` };
+};
+TEMPLATES.g41Compose = (r) => {
+  const a1 = nz(r, -9, 12), b1 = nz(r, -9, 9), a2 = nz(r, -9, 9), b2 = nz(r, -9, 9), rule = g4Tr(a1 + a2, b1 + b2)[2];
+  return { topic: 'Compositions of translations', stem: `Write a single rule for the composition.\nTranslation: ${g4Tr(a1, b1)[2]}\nTranslation: ${g4Tr(a2, b2)[2]}`, ...g2MC(r, rule, [g4Tr(a1 - a2, b1 - b2)[2], g4Tr(a2 - a1, b2 - b1)[2], g4Tr(a1 + b1, a2 + b2)[2], g4Tr(a1 + a2, b1 - b2)[2]]),
+    fr: { fields: [{ kind: 'number', label: '(x, y) → (x +' }, { kind: 'number', label: ', y +' }], key: [String(a1 + a2), String(b1 + b2)], display: rule, check: (v) => numEq(v[0], a1 + a2) && numEq(v[1], b1 + b2), score: (v) => (numEq(v[0], a1 + a2) + numEq(v[1], b1 + b2)) / 2 },
+    solution: `Add the horizontal shifts: ${fmt(a1)} + ${g10paren2(a2)} = ${fmt(a1 + a2)}. Add the vertical shifts: ${fmt(b1)} + ${g10paren2(b2)} = ${fmt(b1 + b2)}.\n${rule}` };
+};
+
+/* ---------- 4.2 Reflections ---------- */
+const g4RefPick = (r, set) => { const k = pick(r, set); if (k === 'xc') return g4RefX(nz(r, -3, 3)); if (k === 'yc') return g4RefY(nz(r, -3, 3)); return G4REF[k]; };
+TEMPLATES.g42Image = (r) => {
+  const n = pick(r, [3, 3, 4]), V = g4Poly(r, n, -4, 4), names = g4Nm(r, n), R = g4RefPick(r, ['xa', 'ya', 'xc', 'yc', 'yx', 'yx', 'ynx']), [T, words, rule] = R;
+  const others = [G4REF.xa[0], G4REF.ya[0], G4REF.yx[0], G4REF.ynx[0], G4ROT[180][0], (p) => [p[0], p[1] * -1 + 1]];
+  return g4ImageQ(r, { topic: 'Reflections', stem: `Find the vertices of the image after ${words}.\n${g4List(names, V)}`, V, names, T, wrongTs: others.filter((f) => f !== T),
+    solution: `${g2Cap(words)}: ${rule}.` });
+};
+TEMPLATES.g42Which = (r) => {
+  for (;;) {
+    const P = [ri(r, -5, 5), ri(r, -5, 5)], kind = pick(r, ['xa', 'ya', 'yx', 'none']), names = ['A', 'B'];
+    let Q; if (kind === 'none') Q = [P[0] + nz(r, -3, 3), -P[1] + pick(r, [1, -1])]; else Q = G4REF[kind][0](P);
+    if (Q[0] === P[0] && Q[1] === P[1]) continue; if (kind === 'none' && (Q[0] === -P[0] && Q[1] === P[1] || Q[0] === P[0] && Q[1] === -P[1] || Q[0] === P[1] && Q[1] === P[0])) continue;
+    const ans = kind === 'none' ? 'Neither' : `A reflection in the ${{ xa: 'x-axis', ya: 'y-axis', yx: 'line y = x' }[kind]}`;
+    return g2Q(r, 'Identifying reflections', `Determine whether the coordinate plane shows a reflection in the x-axis, the y-axis, the line y = x, or neither. (B is the image of A.)`, ans, ['A reflection in the x-axis', 'A reflection in the y-axis', 'A reflection in the line y = x', 'Neither'],
+      { draw: g4Fig({ pts: [{ p: P, label: `A${g4P(P)}`, color: G4BLUE }, { p: Q, label: `B${g4P(Q)}`, color: G4RED }] }), size: [320, 320],
+        solution: kind === 'none' ? 'The image is not (x, −y), (−x, y), or (y, x), so it is not one of these reflections.' : `${g4P(P)} → ${g4P(Q)} follows ${G4REF[kind][2]}.` });
+  }
+};
+TEMPLATES.g42Glide = (r) => {
+  const n = 3, V = g4Poly(r, n, -4, 4), names = g4Nm(r, n), a = ri(r, -4, 4), b = a === 0 ? nz(r, -4, 4) : ri(r, -4, 4), [Tt, , rule] = g4Tr(a, b), R = g4RefPick(r, ['xa', 'ya', 'xc', 'yc']), T = (p) => R[0](Tt(p));
+  return g4ImageQ(r, { topic: 'Glide reflections', stem: `Find the vertices of the image after the glide reflection.\nTranslation: ${rule}\nReflection: ${R[1].replace('a reflection ', '')}\n${g4List(names, V)}`, V, names, T, prime: '″',
+    wrongTs: [Tt, (p) => Tt(R[0](p)), (p) => R[0](g4Tr(-a, -b)[0](p)), (p) => G4REF.yx[0](Tt(p))],
+    solution: `First translate: ${rule}. Then apply ${R[1]}: ${R[2]}.` });
+};
+TEMPLATES.g42Line = (r) => {
+  const kind = pick(r, ['v', 'h', 'yx']), B = [ri(r, -6, 6), ri(r, -6, 6)];
+  let Bp, ans, why;
+  if (kind === 'v') { const a = B[0] + nz(r, -4, 4); Bp = [2 * a - B[0], B[1]]; ans = `x = ${fmt(a)}`; why = `B and B′ have the same y-coordinate, so the line is vertical, halfway between x = ${fmt(B[0])} and x = ${fmt(Bp[0])}.`; }
+  else if (kind === 'h') { const b = B[1] + nz(r, -4, 4); Bp = [B[0], 2 * b - B[1]]; ans = `y = ${fmt(b)}`; why = `B and B′ have the same x-coordinate, so the line is horizontal, halfway between y = ${fmt(B[1])} and y = ${fmt(Bp[1])}.`; }
+  else { if (B[0] === B[1]) B[1] += 1; Bp = [B[1], B[0]]; ans = 'y = x'; why = 'The coordinates are switched: (x, y) → (y, x), a reflection in the line y = x.'; }
+  const mx = (B[0] + Bp[0]) / 2, my = (B[1] + Bp[1]) / 2;
+  return g2Q(r, 'Finding the line of reflection', `Point B′ is the image of point B after a reflection in a line. Write an equation of the line.\nB${g4P(B)}, B′${g4P(Bp)}`, ans, [`x = ${fmt(mx)}`, `y = ${fmt(my)}`, 'y = x', 'y = −x', `x = ${fmt(Bp[0] - B[0])}`, `y = ${fmt(Bp[1] - B[1])}`], { solution: why });
+};
+// line and rotational symmetry of shapes: name, points, lines of symmetry, rotation angles (≤ 180) that map it onto itself
+const G4SHAPES = (() => { const reg = (n, rot = 90) => [...Array(n)].map((_, i) => g10P(rot + (360 * i) / n));
+  return [['square', reg(4, 45), 4, [90, 180]], ['equilateral triangle', reg(3), 3, [120]], ['regular pentagon', reg(5), 5, [72, 144]], ['regular hexagon', reg(6, 0), 6, [60, 120, 180]], ['rectangle', [[-1.6, -1], [1.6, -1], [1.6, 1], [-1.6, 1]], 2, [180]],
+    ['isosceles triangle', [[-1, -1], [1, -1], [0, 1.6]], 1, []], ['scalene triangle', [[-1.4, -1], [1.3, -0.7], [0.3, 1.2]], 0, []], ['kite', [[0, 1.4], [-0.9, 0.4], [0, -1.6], [0.9, 0.4]], 1, []],
+    ['parallelogram', [[-1.6, -0.8], [0.8, -0.8], [1.6, 0.8], [-0.8, 0.8]], 0, [180]], ['rhombus', [[0, 1.2], [-0.8, 0], [0, -1.2], [0.8, 0]], 2, [180]], ['plus sign', [[-0.4, 1.2], [0.4, 1.2], [0.4, 0.4], [1.2, 0.4], [1.2, -0.4], [0.4, -0.4], [0.4, -1.2], [-0.4, -1.2], [-0.4, -0.4], [-1.2, -0.4], [-1.2, 0.4], [-0.4, 0.4]], 4, [90, 180]],
+    ['five-pointed star', [...Array(10)].map((_, i) => g10P(90 + 36 * i, i % 2 ? 0.45 : 1.2)), 5, [72, 144]], ['regular octagon', reg(8, 22.5), 8, [45, 90, 135, 180]],
+    ['trapezoid (isosceles)', [[-1.5, -0.9], [1.5, -0.9], [0.8, 0.9], [-0.8, 0.9]], 1, []]]; })();
+TEMPLATES.g42Symmetry = (r) => {
+  const [nm, P, k] = pick(r, G4SHAPES), ans = k === 0 ? 'No line symmetry' : `${k} line${k > 1 ? 's' : ''} of symmetry`;
+  const wr = [0, 1, 2, 3, 4, 5, 6, 8].filter((x) => x !== k).map((x) => (x === 0 ? 'No line symmetry' : `${x} line${x > 1 ? 's' : ''} of symmetry`));
+  return g2Q(r, 'Line symmetry', 'Determine whether the figure has line symmetry. If so, how many lines of symmetry does it have?', ans, shuffle(r, wr).slice(0, 5),
+    { draw: g10Fig({ polys: [{ pts: P, fill: 'rgba(31,95,168,0.12)' }], margin: 20 }), size: [220, 200], solution: `The figure is a ${nm}. ${k === 0 ? 'No line divides it into two mirror-image halves.' : `It can be folded onto itself along ${k} different line${k > 1 ? 's' : ''}.`}` });
+};
+
+/* ---------- 4.3 Rotations ---------- */
+TEMPLATES.g43Image = (r) => {
+  const n = pick(r, [3, 3, 4]), V = g4Poly(r, n, -5, 5), names = g4Nm(r, n), d = pick(r, [90, 180, 270]), [T, words, rule] = G4ROT[d];
+  return g4ImageQ(r, { topic: 'Rotations', stem: `Find the vertices of the image after ${words} (counterclockwise).\n${g4List(names, V)}`, V, names, T, wrongTs: [90, 180, 270].filter((x) => x !== d).map((x) => G4ROT[x][0]).concat([G4REF.yx[0], G4REF.ynx[0]]),
+    solution: `For ${words}: ${rule}.` });
+};
+TEMPLATES.g43Error = (r) => {
+  const C = [nz(r, -5, 5), nz(r, -5, 5)], D = [nz(r, -5, 5), nz(r, -5, 5)], d = pick(r, [90, 270]), T = G4ROT[d][0], wrongT = G4ROT[d === 90 ? 270 : 90][0];
+  const show = (f) => `C′${g4P(f(C))}, D′${g4P(f(D))}`, ans = show(T);
+  return g2Q(r, 'Error analysis: rotations', `The endpoints of ${g10seg('CD')} are C${g4P(C)} and D${g4P(D)}. A student rotates ${g10seg('CD')} ${d}° about the origin and gets ${show(wrongT)}. What are the correct coordinates?`, ans,
+    [show(wrongT), show(G4ROT[180][0]), show(G4REF.yx[0]), show(G4REF.ynx[0])], { solution: `The student used the rule for a ${d === 90 ? 270 : 90}° rotation. A ${d}° rotation uses ${G4ROT[d][2]}:\n${ans}` });
+};
+TEMPLATES.g43Compose = (r) => {
+  const n = pick(r, [2, 3]), V = n === 2 ? (() => { for (;;) { const a = [ri(r, -5, 5), ri(r, -5, 5)], b = [ri(r, -5, 5), ri(r, -5, 5)]; if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 3) return [a, b]; } })() : g4Poly(r, 3, -4, 4);
+  const names = n === 2 ? ['X', 'Y'] : g4Nm(r, 3), d = pick(r, [90, 180, 270]), firstRot = r() < 0.5, other = r() < 0.5 ? g4Tr(nz(r, -4, 4), nz(r, -4, 4)) : g4RefPick(r, ['xa', 'ya', 'yx']);
+  const [A, B] = firstRot ? [G4ROT[d], other] : [other, G4ROT[d]], T = (p) => B[0](A[0](p)), lab = (t) => (t[2].startsWith('(x, y) → (x') || /translation/.test(t[1]) ? `Translation: ${t[2]}` : /reflection/.test(t[1]) ? `Reflection: ${t[1].replace('a reflection ', '')}` : `Rotation: ${d}° about the origin`);
+  return g4ImageQ(r, { topic: 'Compositions with rotations', stem: `Find the image after the composition.\n${lab(A)}\n${lab(B)}\n${g4List(names, V)}`, V, names, T, prime: '″',
+    wrongTs: [(p) => A[0](B[0](p)), A[0], B[0], (p) => B[0](G4ROT[(d + 180) % 360 || 180][0](p)), (p) => B[0](G4ROT[d === 90 ? 270 : 90][0](p)), (p) => G4ROT[d === 90 ? 270 : 90][0](B[0](p)), (p) => [p[1], p[0]]], solution: `First ${A[1]} (${A[2]}). Then ${B[1]} (${B[2]}).` });
+};
+TEMPLATES.g43Symmetry = (r) => {
+  const [nm, P, , rot] = pick(r, G4SHAPES), ans = rot.length ? rot.map((a) => `${a}°`).join(', ') : 'No rotational symmetry';
+  const fake = [[90], [180], [120], [60, 120, 180], [72, 144], [90, 180], [45, 90, 135, 180], [30, 60, 90, 120, 150, 180]].map((x) => x.map((a) => `${a}°`).join(', '));
+  return g2Q(r, 'Rotational symmetry', 'Which angles of rotation (180° or less) about the center map the figure onto itself?', ans, [...shuffle(r, fake), 'No rotational symmetry'],
+    { draw: g10Fig({ polys: [{ pts: P, fill: 'rgba(31,95,168,0.12)' }], margin: 20 }), size: [220, 200], solution: rot.length ? `The figure is a ${nm}. It maps onto itself after turns of ${ans}${rot[0] && 360 % rot[0] === 0 ? ` (multiples of ${rot[0]}° = 360° ÷ ${360 / rot[0]})` : ''}.` : `The figure is a ${nm}. No turn less than 360° maps it onto itself.` });
+};
+TEMPLATES.g43Big = (r) => {
+  const a = pick(r, [90, 180, 270]), k = ri(r, 1, 3), D = a + 360 * k, P = [nz(r, -6, 6), nz(r, -6, 6)], ans = G4ROT[a][0](P);
+  return { topic: 'Rotations greater than 360°', stem: `What is the image of the point ${g4P(P)} after a rotation of ${D}° about the origin?`, ...g2MC(r, g4P(ans), [90, 180, 270].filter((x) => x !== a).map((x) => g4P(G4ROT[x][0](P))).concat([g4P(P)])), fr: g13FRpt('Image:', ans),
+    solution: `${D}° = ${k} full turn${k > 1 ? 's' : ''} (${360 * k}°) + ${a}°. Full turns bring the point back, so this is a ${a}° rotation: ${G4ROT[a][2]}.\n${g4P(P)} → ${g4P(ans)}` };
+};
+
+/* ---------- 4.4 Congruence and Transformations ---------- */
+function g4Rigid(r) {
+  const t = g4Tr(nz(r, -4, 4), nz(r, -4, 4)), R = g4RefPick(r, ['xa', 'ya', 'yx']), rot = G4ROT[pick(r, [90, 180, 270])];
+  return pick(r, [[t], [R], [rot], [t, R], [R, t], [rot, t]]);
+}
+const g4Desc = (L) => g2Cap(L.map((t) => t[1]).join(', followed by '));
+TEMPLATES.g44Describe = (r) => {
+  for (;;) {
+    const n = pick(r, [3, 4]), V = g4Poly(r, n, -4, 4), names = g4Nm(r, n), L = g4Rigid(r), T = (p) => L.reduce((q, t) => t[0](q), p), Q = V.map(T);
+    if (Q.some((p) => Math.abs(p[0]) > 7 || Math.abs(p[1]) > 7) || Q.every((p, i) => p[0] === V[i][0] && p[1] === V[i][1])) continue;
+    const alts = [g4Rigid(r), g4Rigid(r), g4Rigid(r), g4Rigid(r), g4Rigid(r), g4Rigid(r)].filter((A) => !V.every((p) => { const a = A.reduce((q, t) => t[0](q), p), b = T(p); return a[0] === b[0] && a[1] === b[1]; })).map(g4Desc);
+    return g2Q(r, 'Congruence transformations', `Describe a congruence transformation that maps the blue preimage to the green image.`, g4Desc(L), alts,
+      { draw: g4Fig({ polys: [{ V, names, color: G4BLUE }, { V: Q, names, prime: G4PR, color: G4GREEN }] }), size: [340, 340], solution: `${g4Desc(L)} maps each vertex to its image:\n${V.map((p, i) => `${names[i]}${g4P(p)} → ${names[i]}${G4PR}${g4P(Q[i])}`).join('\n')}` });
+  }
+};
+TEMPLATES.g44Congruent = (r) => {
+  for (;;) {
+    const n = pick(r, [3, 4]), V = g4Poly(r, n, -5, 5), L = g4Rigid(r), T = (p) => L.reduce((q, t) => t[0](q), p), Q = V.map(T), yes = r() < 0.6;
+    if (!yes) { const i = ri(r, 0, n - 1); Q[i] = [Q[i][0] + pick(r, [1, -1]), Q[i][1]]; }
+    const n1 = g4Nm(r, n), n2 = pick(r, [['P', 'Q', 'R', 'S'], ['W', 'X', 'Y', 'Z'], ['T', 'U', 'V', 'W']]).filter((c) => !n1.includes(c)).concat(['K', 'L', 'M', 'N']).slice(0, n);
+    const ans = yes ? `Yes. ${g4Desc(L)} maps one onto the other.` : 'No. No rigid motion maps one onto the other (a side length is different).';
+    const wr = [yes ? 'No. No rigid motion maps one onto the other (a side length is different).' : `Yes. ${g4Desc(L)} maps one onto the other.`, `Yes. ${g4Desc(g4Rigid(r))} maps one onto the other.`, `Yes. ${g4Desc(g4Rigid(r))} maps one onto the other.`, 'No. The figures are in different quadrants.'];
+    const len = (A) => A.map((p, i) => Math.hypot(A[(i + 1) % n][0] - p[0], A[(i + 1) % n][1] - p[1]));
+    return g2Q(r, 'Congruent figures', `Determine whether the polygons with the given vertices are congruent. Use transformations to explain your reasoning.\n${g4List(n1, V)} and\n${g4List(n2, Q)}`, ans, wr,
+      { solution: yes ? `${g4Desc(L)} maps ${n1.join('')} to ${n2.join('')}, and rigid motions preserve lengths and angles, so the polygons are congruent.` : `Compare side lengths: ${len(V).map((x) => g9r(x, 2)).join(', ')} vs. ${len(Q).map((x) => g9r(x, 2)).join(', ')}. They don't all match, so no rigid motion maps one polygon onto the other.` });
+  }
+};
+TEMPLATES.g44ReflAngle = (r) => {
+  const kind = pick(r, ['deg', 'deg', 'rule']);
+  if (kind === 'deg') { const d = 2 * ri(r, 10, 89); return { topic: 'Reflections in intersecting lines', stem: `A rotation of ${d}° maps C to C′. Find the measure of the acute or right angle formed by intersecting lines so that C can be mapped to C′ using two reflections.`, ...g10DegChoices(r, d / 2, [d, 180 - d, 2 * d, 90 - d / 2]), fr: g10Num('Angle =', d / 2, '°'), solution: `Reflecting in two lines that meet at an angle x° gives a rotation of 2x°. So 2x = ${d} and x = ${d / 2}°.` }; }
+  const [rule, deg2] = pick(r, [['(x, y) → (−x, −y)', 90], ['(x, y) → (y, −x)', 45], ['(x, y) → (−y, x)', 45]]);
+  return { topic: 'Reflections in intersecting lines', stem: `The rotation ${rule} maps C to C′. Find the measure of the acute or right angle formed by intersecting lines so that C can be mapped to C′ using two reflections.`, ...g10DegChoices(r, deg2, [deg2 * 2, 180, 135, 30]), fr: g10Num('Angle =', deg2, '°'),
+    solution: `${rule} is a rotation of ${deg2 === 90 ? '180°' : rule.includes('(y, −x)') ? '270° counterclockwise (90° clockwise), so the turn is 90°' : '90°'}. The lines meet at half of ${deg2 === 90 ? '180°' : '90°'}: ${deg2}°.` };
+};
+TEMPLATES.g44Parallel = (r) => {
+  const d = pick(r, [1.5, 2.6, 3, 4.2, 5, 7.5]), kind = pick(r, ['len', 'what', 'perp']);
+  if (kind === 'len') return { topic: 'Reflections in parallel lines', stem: `△ABC is reflected in line k, and △A′B′C′ is reflected in line m. Lines k and m are parallel. If the distance between k and m is ${fmt(d)} inches, what is the length of ${g10seg('CC')}″?`, ...g10NumChoices(r, 2 * d, [d, 4 * d, d / 2, 3 * d]), fr: g10Num('CC″ =', 2 * d, ' in.'),
+    solution: `Reflections in two parallel lines make a translation twice the distance between the lines: 2 × ${fmt(d)} = ${fmt(2 * d)} inches.` };
+  if (kind === 'what') return g2Q(r, 'Reflections in parallel lines', '△ABC is reflected in line k, and the image is reflected in line m, where k ∥ m. Which single transformation maps △ABC to △A″B″C″?', 'A translation', ['A rotation', 'A reflection', 'A dilation', 'A glide reflection'],
+    { solution: 'The composition of two reflections in parallel lines is a translation (Reflections in Parallel Lines Theorem).' });
+  return g2Q(r, 'Reflections in parallel lines', '△ABC is reflected in line k, and the image is reflected in line m, where k ∥ m. Which lines are perpendicular to the segment from A to A″?', 'Lines k and m', ['Line k only', 'Line m only', 'Neither line'],
+    { solution: 'Each reflection moves a point along a segment perpendicular to the line of reflection, so A, A′, and A″ lie on one line perpendicular to both k and m.' });
+};
+const G4ASN = [['A congruence transformation changes the size of a figure.', 'Never', 'Rigid motions preserve length and angle measure, so size never changes.'],
+  ['If two figures are congruent, then there is a rigid motion or a composition of rigid motions that maps one figure to the other.', 'Always', 'That is the definition of congruent figures.'],
+  ['The composition of two reflections results in a rotation.', 'Sometimes', 'Reflections in intersecting lines give a rotation; in parallel lines they give a translation.'],
+  ['The composition of two reflections results in a translation.', 'Sometimes', 'It is a translation only when the lines are parallel.'],
+  ['A translation maps a figure onto a congruent figure.', 'Always', 'A translation is a rigid motion.'], ['A dilation with scale factor 2 maps a figure onto a congruent figure.', 'Never', 'The image has sides twice as long, so the figures are similar but not congruent.'],
+  ['A reflection changes the orientation of a figure.', 'Always', 'A reflection flips the figure, reversing the order of its vertices.'], ['A rotation about the origin maps a point onto itself.', 'Sometimes', 'Only the origin itself (or a 360° rotation) stays fixed.']];
+TEMPLATES.g44Always = (r) => {
+  const [s, a, why] = pick(r, G4ASN);
+  return g2Q(r, 'Always, sometimes, or never', `Tell whether the statement is always, sometimes, or never true.\n${s}`, a, ['Always', 'Sometimes', 'Never'], { solution: `${a}. ${why}` });
+};
+
+/* ---------- 4.5 Dilations ---------- */
+TEMPLATES.g45Factor = (r) => {
+  for (;;) {
+    const a = ri(r, 2, 20), b = ri(r, 2, 30); if (a === b || gcd(a, b) === Math.min(a, b) && r() < 0.3) continue;
+    const k = b / a; if (!a4ok(k)) continue;
+    const ans = `k = ${fracT(k)}; ${k > 1 ? 'an enlargement' : 'a reduction'}`;
+    const ang = ri(r, 15, 35);
+    const P = g10P(ang, a), Pp = g10P(ang, b), T = g10P(ang + 22, a), Tp = g10P(ang + 22, b);
+    const draw = g10Fig({ pts: { C: [0, 0], P, ['P′']: Pp, _t: T, _tp: Tp }, noDot: ['_t', '_tp'], segs: [['C', 'P′'], ['P', '_t'], ['P′', '_tp'], ['C', '_tp']], slab: [{ p: 'C', q: 'P', t: String(a), side: 1 }, { p: 'C', q: 'P′', t: `CP′ = ${b}`, side: -1, shift: 0.15 }], margin: 24 });
+    return g2Q(r, 'Scale factors', `Find the scale factor of the dilation with center C that maps P to P′. Then tell whether the dilation is a reduction or an enlargement.\nCP = ${a}, CP′ = ${b}`, ans, [`k = ${fracT(1 / k)}; ${k > 1 ? 'a reduction' : 'an enlargement'}`, `k = ${fracT(k)}; ${k > 1 ? 'a reduction' : 'an enlargement'}`, `k = ${fracT(1 / k)}; ${k > 1 ? 'an enlargement' : 'a reduction'}`, `k = ${fmt(b - a)}; ${k > 1 ? 'an enlargement' : 'a reduction'}`],
+      { draw, size: [360, 220], solution: `k = CP′ / CP = ${b}/${a} = ${fracT(k)}. Since k ${k > 1 ? '> 1, it is an enlargement' : '< 1, it is a reduction'}.` });
+  }
+};
+TEMPLATES.g45Image = (r) => {
+  for (;;) {
+    const k = pick(r, [2, 3, 0.5, 1 / 3, 0.25, -2, -0.5, 1.5, -1 / 3]), n = pick(r, [3, 4]), V = g4Poly(r, n, -6, 6).map((p) => { const den = fracParts(k)[1]; return [Math.round(p[0] / den) * den, Math.round(p[1] / den) * den]; });
+    if (new Set(V.map((p) => p.join())).size < n || V.some((p, i) => { const a = V[(i + 1) % n], b = V[(i + 2) % n]; return (a[0] - p[0]) * (b[1] - p[1]) - (a[1] - p[1]) * (b[0] - p[0]) === 0; })) continue;
+    const names = g4Nm(r, n), [T, words, rule] = g4Dil(k), Q = V.map(T); if (Q.some((p) => Math.abs(p[0]) > 15 || Math.abs(p[1]) > 15)) continue;
+    return g4ImageQ(r, { topic: 'Dilations', stem: `Find the vertices of the image after a dilation with center at the origin and scale factor k = ${fracT(k)}.\n${g4List(names, V)}`, V, names, T, show: false,
+      wrongTs: [g4Dil(1 / k)[0], g4Dil(-k)[0], (p) => [p[1] * k, p[0] * k], (p) => [p[0] * k, p[1]]], solution: `Multiply each coordinate by ${fracT(k)}: ${rule}.${k < 0 ? ' A negative scale factor also rotates the figure 180° about the center.' : ''}` });
+  }
+};
+TEMPLATES.g45Missing = (r) => {
+  for (;;) {
+    const k = pick(r, [2, 3, 4, 0.5, 1.5, 2.5, 1 / 3, 0.25]), a = ri(r, 2, 24), b = ri(r, 2, 24), A = a * k, B = b * k; if (!Number.isInteger(A * 2) || !Number.isInteger(B * 2) || a === b) continue;
+    const red = r() < 0.5;
+    return { topic: 'Dilations: missing lengths', stem: `A dilation maps a figure to its image. A side of length ${fmt(a)} in the original figure has length ${fmt(A)} in the image. Another side has length ${fmt(b)} in the original. Find the length of that side in the image.`, ...g10NumChoices(r, B, [b / k, b + A - a, A * b, B + 1].filter((v) => v > 0 && Number.isInteger(v * 2))), fr: g10Num('Length =', B),
+      solution: `Scale factor: k = ${fmt(A)}/${fmt(a)} = ${fracT(k)}.\nImage length = ${fracT(k)} · ${fmt(b)} = ${fmt(B)}` };
+  }
+};
+TEMPLATES.g45Error = (r) => {
+  const a = ri(r, 2, 6), b = a * ri(r, 2, 5), ans = `The scale factor is CP′/CP, not CP/CP′. k = ${a}/${b} = ${fracT(a / b)}, a reduction.`;
+  return g2Q(r, 'Error analysis: scale factor', `A dilation with center C maps P to P′, where CP = ${b} and CP′ = ${a}. A student writes k = ${b}/${a} = ${fracT(b / a)}. Describe and correct the error.`, ans,
+    ['There is no error.', `The scale factor is ${b} − ${a} = ${b - a}.`, `The scale factor is ${a} · ${b} = ${a * b}.`], { solution: ans });
+};
+TEMPLATES.g45Closer = (r) => {
+  const k = pick(r, [3, 2, 1.2, 0.5, 0.1, 0.25, 4, 0.75]), where = pick(r, ['inside', 'outside']), ans = k > 1 ? 'The original figure' : 'The dilated figure';
+  return g2Q(r, 'Center of dilation', `Determine whether the dilated figure or the original figure is closer to the center of dilation.\nCenter of dilation: ${where} the figure; k = ${k === 1.2 ? '120%' : k === 0.75 ? '75%' : fracT(k)}`, ans, ['The original figure', 'The dilated figure', 'They are the same distance from the center'],
+    { solution: `Each image point is k times as far from the center as its preimage. With k ${k > 1 ? '> 1 the image is farther away' : '< 1 the image is closer'}, so ${ans.toLowerCase()} is closer (the location of the center does not change this).` });
+};
+TEMPLATES.g45Word = (r) => {
+  const kind = pick(r, ['mag', 'mag', 'photo', 'notes']);
+  if (kind === 'mag') { const [bug, len] = pick(r, [['emperor moth', 60], ['ladybug', 4.5], ['dragonfly', 47], ['carpenter ant', 12], ['honeybee', 15], ['grasshopper', 50]]), m = pick(r, [5, 10, 15, 20, 3]), ans = len * m;
+    return { topic: 'Dilations in real life', stem: `You use a magnifying glass with a magnification of ${m}×. A ${bug} is ${fmt(len)} millimeters long. How long does it look through the magnifying glass?`, ...g10NumChoices(r, ans, [len + m, len / m, ans / 2, ans + len].filter((v) => v > 0 && Number.isInteger(v * 10))), fr: g10Num('Length =', ans, ' mm'), solution: `The magnification is the scale factor: ${fmt(len)} × ${m} = ${fmt(ans)} millimeters.` }; }
+  if (kind === 'photo') { const [w, h, W] = pick(r, [[2.5, 3.5, 5], [2, 3, 8], [4, 6, 10], [3, 5, 6], [2.5, 3.5, 7.5]]), k = W / w;
+    return { topic: 'Dilations in real life', stem: `A photo is ${fmt(w)} inches by ${fmt(h)} inches. It is dilated so the ${fmt(w)}-inch side becomes ${fmt(W)} inches. What is the scale factor, and how long is the other side of the new photo?`, ...g2MC(r, `k = ${fracT(k)}; ${fmt(h * k)} in.`, [`k = ${fracT(1 / k)}; ${fmt(h / k)} in.`, `k = ${fracT(k)}; ${fmt(h + W - w)} in.`, `k = ${fmt(W - w)}; ${fmt(h + W - w)} in.`]),
+      fr: g10Num('Other side =', h * k, ' in.'), solution: `k = ${fmt(W)}/${fmt(w)} = ${fracT(k)}. Other side: ${fmt(h)} × ${fracT(k)} = ${fmt(h * k)} inches.` }; }
+  const [a, b, s] = pick(r, [[7.5, 10, 9], [6, 8, 9], [4, 6, 10], [5, 8, 7.5]]), k = s / a;
+  return { topic: 'Dilations in real life', stem: `Your notes cover ${fmt(a)} inches by ${fmt(b)} inches. On the enlarged copy, the smaller side is ${fmt(s)} inches. What is the scale factor of this dilation?`, ...g10NumChoices(r, k, [b / s, s - a, s / b, a / s].filter((v) => v > 0 && Number.isInteger(v * 100))), fr: g10Num('k =', k), solution: `k = ${fmt(s)}/${fmt(a)} = ${fmt(k)}` };
+};
+
+/* ---------- 4.6 Similarity and Transformations ---------- */
+TEMPLATES.g46Image = (r) => {
+  for (;;) {
+    const k = pick(r, [2, 3, 0.5, 0.25, 1.5]), den = fracParts(k)[1], V = g4Poly(r, 3, -4, 4).map((p) => [p[0] * den, p[1] * den]), names = ['F', 'G', 'H'];
+    if (V.some((p) => Math.abs(p[0]) > 10 || Math.abs(p[1]) > 10)) continue;
+    const D = g4Dil(k), other = r() < 0.4 ? g4Tr(nz(r, -4, 4), nz(r, -4, 4)) : r() < 0.6 ? g4RefPick(r, ['xa', 'ya']) : G4ROT[pick(r, [90, 180])], dilFirst = r() < 0.5;
+    const [A, B] = dilFirst ? [D, other] : [other, D], T = (p) => B[0](A[0](p)), lab = (t) => (t === D ? `Dilation: ${D[2]}` : /translation/.test(t[1]) ? `Translation: ${t[2]}` : /reflection/.test(t[1]) ? `Reflection: ${t[1].replace('a reflection ', '')}` : `Rotation: ${t[1].replace('a ', '').replace(' rotation', '')}`);
+    if (V.map(T).some((p) => !Number.isInteger(p[0]) || !Number.isInteger(p[1]))) continue;
+    return g4ImageQ(r, { topic: 'Similarity transformations', stem: `Find the vertices of the image of △FGH after the similarity transformation.\n${lab(A)}\n${lab(B)}\n${g4List(names, V)}`, V, names, T, prime: '″', show: false,
+      wrongTs: [(p) => A[0](B[0](p)), A[0], B[0], (p) => B[0](A[0]([p[1], p[0]]))], solution: `First ${A[1]}. Then ${B[1]}.` });
+  }
+};
+TEMPLATES.g46Similar = (r) => {
+  for (;;) {
+    const n = pick(r, [3, 4]), V = g4Poly(r, n, -4, 4), k = pick(r, [2, 3, 0.5, -1]), yes = r() < 0.6, L = [g4Dil(k === -1 ? 2 : k), ...g4Rigid(r).slice(0, 1)];
+    const T = (p) => L.reduce((q, t) => t[0](q), p), Q = V.map(T); if (Q.some((p) => !Number.isInteger(p[0] * 2) || !Number.isInteger(p[1] * 2))) continue;
+    if (!yes) { const i = ri(r, 0, n - 1); Q[i] = [Q[i][0] + pick(r, [1, 2]), Q[i][1]]; }
+    const n1 = g4Nm(r, n), n2 = ['P', 'Q', 'R', 'S', 'T'].filter((c) => !n1.includes(c)).slice(0, n);
+    const ans = yes ? `Yes. ${g4Desc(L)} maps one onto the other.` : 'No. The side lengths are not all in the same ratio.';
+    return g2Q(r, 'Similar figures', `Determine whether the polygons with the given vertices are similar. Use transformations to explain your reasoning.\n${g4List(n1, V)} and\n${g4List(n2, Q)}`, ans,
+      [yes ? 'No. The side lengths are not all in the same ratio.' : `Yes. ${g4Desc(L)} maps one onto the other.`, `Yes. ${g4Desc(g4Rigid(r))} maps one onto the other, so they are congruent.`, 'No. Similar figures must be in the same quadrant.'],
+      { solution: yes ? `${g4Desc(L)} maps ${n1.join('')} onto ${n2.join('')}. A dilation followed by rigid motions is a similarity transformation, so the figures are similar.` : 'Compare the side lengths: they are not all multiplied by the same scale factor, so no similarity transformation maps one figure onto the other.' });
+  }
+};
+TEMPLATES.g46Describe = (r) => {
+  for (;;) {
+    const V = g4Poly(r, 3, -3, 3), k = pick(r, [2, 0.5, 3]), other = r() < 0.5 ? g4Tr(nz(r, -3, 3), nz(r, -3, 3)) : g4RefPick(r, ['xa', 'ya']), L = [g4Dil(k), other], names = g4Nm(r, 3);
+    const T = (p) => L.reduce((q, t) => t[0](q), p), Q = V.map(T); if (Q.some((p) => !Number.isInteger(p[0]) || !Number.isInteger(p[1]) || Math.abs(p[0]) > 9 || Math.abs(p[1]) > 9)) continue;
+    const wr = [[g4Dil(1 / k), other], [g4Dil(k)], [other], [g4Dil(k), other === G4REF.xa ? G4REF.ya : G4REF.xa]].map(g4Desc);
+    return g2Q(r, 'Similarity transformations', 'Describe a similarity transformation that maps the blue preimage to the green image.', g4Desc(L), wr,
+      { draw: g4Fig({ polys: [{ V, names, color: G4BLUE }, { V: Q, names, prime: G4PR, color: G4GREEN }] }), size: [340, 340], solution: `${g4Desc(L)}:\n${V.map((p, i) => `${names[i]}${g4P(p)} → ${names[i]}${G4PR}${g4P(Q[i])}`).join('\n')}` });
+  }
+};
+/* ==== GEOMETRY CH4 END ==== */
 /* ==== GEOMETRY CH11 BEGIN ==== */
 /* ---------- Geometry (Big Ideas Math), Chapter 11: Circumference and Area ---------- */
 const g11h = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('-', MINUS); // nearest hundredth
@@ -25018,6 +25364,13 @@ Object.assign(SETS, {
   'geo-3-3': { subject: 'geometry', title: '3.3 Proofs with Parallel Lines', items: [['g33X', 4], ['g33Enough', 4], ['g33Parallel', 3], ['g33Proof', 3]] },
   'geo-3-4': { subject: 'geometry', title: '3.4 Proofs with Perpendicular Lines', items: [['g34Dist', 2], ['g34Parallel', 4], ['g34X', 2], ['g34Error', 1], ['g34Proof', 2]] },
   'geo-3-5': { subject: 'geometry', title: '3.5 Equations of Parallel and Perpendicular Lines', items: [['g35Partition', 3], ['g35Slopes', 3], ['g35ParLine', 2], ['g35PerpLine', 2], ['g35PtDist', 2], ['g35Bisector', 2], ['g35ParDist', 1]] },
+  // ----- Geometry, Chapter 4: Transformations -----
+  'geo-4-1': { subject: 'geometry', title: '4.1 Translations', items: [['g41Vector', 2], ['g41Image', 3], ['g41Rule', 3], ['g41Point', 2], ['g41Compose', 2]] },
+  'geo-4-2': { subject: 'geometry', title: '4.2 Reflections', items: [['g42Which', 2], ['g42Image', 4], ['g42Glide', 2], ['g42Line', 2], ['g42Symmetry', 2]] },
+  'geo-4-3': { subject: 'geometry', title: '4.3 Rotations', items: [['g43Image', 4], ['g43Error', 1], ['g43Compose', 3], ['g43Symmetry', 2], ['g43Big', 1]] },
+  'geo-4-4': { subject: 'geometry', title: '4.4 Congruence and Transformations', items: [['g44Describe', 3], ['g44Congruent', 3], ['g44ReflAngle', 2], ['g44Parallel', 2], ['g44Always', 2]] },
+  'geo-4-5': { subject: 'geometry', title: '4.5 Dilations', items: [['g45Factor', 3], ['g45Image', 3], ['g45Missing', 2], ['g45Error', 1], ['g45Closer', 1], ['g45Word', 2]] },
+  'geo-4-6': { subject: 'geometry', title: '4.6 Similarity and Transformations', items: [['g46Image', 3], ['g46Describe', 3], ['g46Similar', 4]] },
   // ----- Geometry, Chapter 10: Circles -----
   'geo-10-1': { subject: 'geometry', title: '10.1 Lines and Segments That Intersect Circles', items: [['g101Name', 3], ['g101CommonTan', 2], ['g101IsTangent', 2], ['g101Radius', 2], ['g101TwoTan', 3]] },
   'geo-10-2': { subject: 'geometry', title: '10.2 Finding Arc Measures', items: [['g102MinorMajor', 2], ['g102Identify', 2], ['g102Find', 2], ['g102Graph', 1], ['g102Congruent', 2], ['g102Algebra', 2]] },
@@ -25773,6 +26126,35 @@ QUESTION_TYPES.push(
   { id: 'g35PtDist', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Distance from a point to a line', desc: '#19–22' },
   { id: 'g35Bisector', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Midpoint and perpendicular bisector', desc: '#25–28' },
   { id: 'g35ParDist', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Distance between parallel lines', desc: '#29–30' },
+  { id: 'g41Vector', subject: 'geometry', section: '4.1 Translations', label: 'Name a vector and its component form', desc: '#1–2' },
+  { id: 'g41Image', subject: 'geometry', section: '4.1 Translations', label: 'Translate a figure', desc: 'Vector or rule (#3–6, 15–18)' },
+  { id: 'g41Rule', subject: 'geometry', section: '4.1 Translations', label: 'Write a translation rule', desc: '#7–10' },
+  { id: 'g41Point', subject: 'geometry', section: '4.1 Translations', label: 'Image or preimage of a point', desc: '#11–14' },
+  { id: 'g41Compose', subject: 'geometry', section: '4.1 Translations', label: 'Compose two translations', desc: '#21–24' },
+  { id: 'g42Which', subject: 'geometry', section: '4.2 Reflections', label: 'x-axis, y-axis, y = x, or neither?', desc: '#1–4' },
+  { id: 'g42Image', subject: 'geometry', section: '4.2 Reflections', label: 'Reflect a figure', desc: 'Axes, x = a, y = b, y = x, y = −x (#5–20)' },
+  { id: 'g42Glide', subject: 'geometry', section: '4.2 Reflections', label: 'Glide reflections', desc: '#21–24' },
+  { id: 'g42Line', subject: 'geometry', section: '4.2 Reflections', label: 'Find the line of reflection', desc: '#37–38' },
+  { id: 'g42Symmetry', subject: 'geometry', section: '4.2 Reflections', label: 'Line symmetry', desc: '#25–30' },
+  { id: 'g43Image', subject: 'geometry', section: '4.3 Rotations', label: 'Rotate a figure about the origin', desc: '90°, 180°, 270° (#5–8)' },
+  { id: 'g43Error', subject: 'geometry', section: '4.3 Rotations', label: 'Error analysis: rotations', desc: '#9–10' },
+  { id: 'g43Compose', subject: 'geometry', section: '4.3 Rotations', label: 'Compositions with rotations', desc: '#11–16' },
+  { id: 'g43Symmetry', subject: 'geometry', section: '4.3 Rotations', label: 'Rotational symmetry', desc: '#17–24' },
+  { id: 'g43Big', subject: 'geometry', section: '4.3 Rotations', label: 'Rotations over 360°', desc: '#31' },
+  { id: 'g44Describe', subject: 'geometry', section: '4.4 Congruence and Transformations', label: 'Describe a congruence transformation', desc: '#3–4' },
+  { id: 'g44Congruent', subject: 'geometry', section: '4.4 Congruence and Transformations', label: 'Congruent or not?', desc: 'From vertices (#5–8)' },
+  { id: 'g44ReflAngle', subject: 'geometry', section: '4.4 Congruence and Transformations', label: 'Angle between lines of reflection', desc: '#17–20' },
+  { id: 'g44Parallel', subject: 'geometry', section: '4.4 Congruence and Transformations', label: 'Reflections in parallel lines', desc: '#9–12' },
+  { id: 'g44Always', subject: 'geometry', section: '4.4 Congruence and Transformations', label: 'Always, sometimes, or never', desc: '#23–26' },
+  { id: 'g45Factor', subject: 'geometry', section: '4.5 Dilations', label: 'Scale factor: reduction or enlargement', desc: '#1–4' },
+  { id: 'g45Image', subject: 'geometry', section: '4.5 Dilations', label: 'Dilate a figure', desc: 'Including negative scale factors (#13–20)' },
+  { id: 'g45Missing', subject: 'geometry', section: '4.5 Dilations', label: 'Missing length after a dilation', desc: '#23–26' },
+  { id: 'g45Error', subject: 'geometry', section: '4.5 Dilations', label: 'Error analysis: scale factor', desc: '#27' },
+  { id: 'g45Closer', subject: 'geometry', section: '4.5 Dilations', label: 'Which figure is closer to the center?', desc: '#29–32' },
+  { id: 'g45Word', subject: 'geometry', section: '4.5 Dilations', label: 'Dilations in real life', desc: '#21–22, 33–36' },
+  { id: 'g46Image', subject: 'geometry', section: '4.6 Similarity and Transformations', label: 'Image after a similarity transformation', desc: '#1–4' },
+  { id: 'g46Describe', subject: 'geometry', section: '4.6 Similarity and Transformations', label: 'Describe a similarity transformation', desc: '#5–6' },
+  { id: 'g46Similar', subject: 'geometry', section: '4.6 Similarity and Transformations', label: 'Similar or not?', desc: 'From vertices (#7–10)' },
   { id: 'g101Name', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Parts of a circle', desc: 'Name a radius, chord, diameter, secant, tangent (#1–6)' },
   { id: 'g101CommonTan', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Common tangents', desc: 'How many common tangents? (#7–10)' },
   { id: 'g101IsTangent', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Is the segment tangent?', desc: 'Converse of the Pythagorean Theorem (#11–14)' },
@@ -28332,7 +28714,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 2: 'Reasoning and Proofs', 3: 'Parallel and Perpendicular Lines', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 2: 'Reasoning and Proofs', 3: 'Parallel and Perpendicular Lines', 4: 'Transformations', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0), b = secs[sec].ids.reduce((a, id) => a + (bonusCounts[id] || 0), 0);
     return [n ? `${n} chosen` : '', b ? `★ ${b} bonus` : ''].filter(Boolean).join(' · '); };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
