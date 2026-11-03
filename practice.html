@@ -26635,6 +26635,7 @@ function startScreen(teacher = false) {
         return g;
       }).filter((g) => g.children.length));
     card.append(el('label', { for: 'set' }, 'Assignment'), setSel);
+    if (!teacher) card.append(el('p', { class: 'small', style: 'margin:6px 0 0' }, 'Looking for the vocabulary crossword? ', el('a', { href: 'crossword.html', style: 'color:var(--accent);font-weight:600' }, 'Open it here')));
     const none = el('p', { class: 'small' }, teacher ? 'Loading the assignments you built…' : 'No assignments here yet.');
     if (!setSel.querySelector('option[value]:not([value=""])')) card.append(none);
     if (teacher) builderLibrary().then((lib) => { // answer key: the assignments you built come first
@@ -28060,6 +28061,7 @@ function teacherNav(active) {
     ['key', 'Look up an answer key', go(() => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); })],
     ['print', 'Print', go(() => printScreen())],
     ['lesson', 'Lesson plans', go(() => lessonScreen())],
+    ['crossword', 'Crossword', () => { location.href = 'crossword.html'; }],
   ];
   nav.innerHTML = '';
   tabs.forEach(([id, label, fn]) => nav.append(el('button', { type: 'button', onclick: fn, 'aria-current': id === active ? 'page' : 'false',
@@ -28581,7 +28583,8 @@ function teacherMenu() {
     el('button', { class: 'btn', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard'), ' ',
     el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key'), ' ',
     el('button', { class: 'btn secondary', onclick: () => printScreen() }, 'Print an assignment'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => lessonScreen() }, 'Lesson plans')));
+    el('button', { class: 'btn secondary', onclick: () => lessonScreen() }, 'Lesson plans'), ' ',
+    el('button', { class: 'btn secondary', onclick: () => { location.href = 'crossword.html'; } }, 'Vocabulary crossword')));
 }
 
 /* ---------- printing (teacher only): paper copies in one or more versions, with an answer key ---------- */
