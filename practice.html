@@ -28219,11 +28219,14 @@ function lessonScreen(preKey) {
   document.body.classList.add('printing');
   if (preKey) LESSON.key = preKey;
   app.innerHTML = '';
-  const keys = Object.keys(LESSONS).filter((k) => SETS[k] && CONFIG.SUBJECTS.includes(SETS[k].subject)); // each teacher sees plans for the subjects they teach
+  const setOrder = Object.keys(SETS), subjOrder = Object.keys(SUBJECTS);
+  const secNum = (k) => { const m = /^(Pre-)?(\d+)\.(\d+)/.exec(SETS[k].title); return m ? +m[2] * 1000 + +m[3] * 10 - (m[1] ? 5 : 0) : 1e9; }; // 'Pre-6.4' just before 6.4
+  const keys = Object.keys(LESSONS).filter((k) => SETS[k] && CONFIG.SUBJECTS.includes(SETS[k].subject)) // each teacher sees plans for the subjects they teach
+    .sort((a, b) => subjOrder.indexOf(SETS[a].subject) - subjOrder.indexOf(SETS[b].subject) || secNum(a) - secNum(b) || setOrder.indexOf(a) - setOrder.indexOf(b)); // by subject, then section order
   if (!LESSON.key || !LESSONS[LESSON.key]) LESSON.key = keys[0] || null;
   const note = el('div', {});
   const showNote = () => { note.innerHTML = ''; note.append(lessonEditNote(() => { showNote(); draw(); })); };
-  const pick = el('select', {}, ...keys.map((k) => el('option', { value: k }, `${SUBJECTS[SETS[k].subject] || ''} — ${SETS[k].title}`)));
+  const pick = el('select', {}, ...subjOrder.filter((sb) => keys.some((k) => SETS[k].subject === sb)).map((sb) => el('optgroup', { label: SUBJECTS[sb] }, ...keys.filter((k) => SETS[k].subject === sb).map((k) => el('option', { value: k }, SETS[k].title)))));
   if (LESSON.key) pick.value = LESSON.key;
   const out = el('div', {});
   app.append(el('div', { class: 'card noprint' },
