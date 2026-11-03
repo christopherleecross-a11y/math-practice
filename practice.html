@@ -27499,8 +27499,9 @@ async function send(pts) {
       const tr = (state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '') + (state.hintUsed && state.hintUsed[i] ? '(hint)' : '') + (q.bonus ? '(bonus)' : '');
       if (pts[i] === 1) return `${i + 1}✓${tr}` + (q.proofQ && state.ai[i] && state.ai[i].ai ? '(AI)' : '');
       if (!isAnswered(q, a)) return `${i + 1}✗${tr}–`;
-      if (q.proofQ) return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}(proof${state.ai[i] && state.ai[i].ai ? ', AI' : ''})`;
-      return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${tr}` + (q.mode === 'fr' ? '(' + a.filter((x) => x !== '').join(',').slice(0, 24) + ')' : LETTERS[a]); }).join(' ')
+      const part = pts[i] > 0 ? `(${Math.round(100 * pts[i]) / 100} pt)` : ''; // exact partial credit, so a teacher override adds the right amount
+      if (q.proofQ) return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${part}${tr}(proof${state.ai[i] && state.ai[i].ai ? ', AI' : ''})`;
+      return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${part}${tr}` + (q.mode === 'fr' ? '(' + a.filter((x) => x !== '').join(',').slice(0, 24) + ')' : LETTERS[a]); }).join(' ')
       + (state.unlocks ? ` · locked ${state.unlocks}× for leaving` : ''),
     minutes: Math.round((Date.now() - state.started) / 6000) / 10, tabAways: state.tabAways,
     version: state.version + (state.attempts > 1 ? ` · attempt ${state.attempt} of ${state.attempts}` : ''),
@@ -27730,7 +27731,7 @@ function parseDetail(s) {
   const out = [], re = /(?:^|\s)(\d+)([✓✗½])/g; let m; const idx = [];
   while ((m = re.exec(s))) idx.push({ n: +m[1], mark: m[2], at: m.index });
   idx.forEach((x, k) => { const seg = s.slice(x.at, k + 1 < idx.length ? idx[k + 1].at : s.length);
-    out.push({ n: x.n, pts: x.mark === '✓' ? 1 : x.mark === '½' ? 0.5 : 0, hint: seg.includes('(hint)'), bonus: seg.includes('(bonus)'), blank: /✗(\([^)]*\))*–/.test(seg) }); });
+    out.push({ n: x.n, pts: x.mark === '✓' ? 1 : x.mark === '½' ? 0.5 : 0, hint: seg.includes('(hint)'), bonus: seg.includes('(bonus)'), blank: /✗(\([^)]*\))*–/.test(seg), teacher: seg.includes('(teacher✓'), seg: seg.replace(/\s·\slocked.*$/, '').trim() }); });
   return out;
 }
 // question number → type name, when the order is the same for everyone
@@ -27761,6 +27762,44 @@ async function dashReset(s, btn) {
     btn.textContent = 'Reset ✓';
     setTimeout(dashboard, 900);
   } catch (e) { btn.disabled = false; btn.textContent = 'Try again'; }
+}
+// teacher override: mark a question right (or undo it) on one submission
+const adjustBtn = (r) => el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:5px 12px;font-size:14px', title: 'Mark a question correct', onclick: () => dashAdjust(r) }, '✎ Grade');
+function dashAdjust(r) {
+  const old = document.getElementById('dashAdj'); if (old) old.remove();
+  const labels = dashLabels(r.set || ''), list = el('div', {}), msg = el('p', { class: 'small', style: 'min-height:20px;margin:8px 0 0' });
+  const head = el('div', { style: 'font-weight:700;font-size:18px' });
+  const close = () => { box.remove(); dashRender(); };
+  const box = el('div', { id: 'dashAdj', role: 'dialog', 'aria-label': 'Change a grade', style: 'position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:40px 12px;overflow:auto', onclick: (e) => { if (e.target === box) close(); } },
+    el('div', { class: 'card', style: 'max-width:640px;width:100%;margin:0' }, head,
+      el('p', { class: 'small', style: 'margin:4px 0 10px' }, 'Mark a question correct to give full credit. The score, percent, and work Doc update in your Sheet, and the new grade goes to Google Classroom (Classroom keeps the student’s best). Each line shows the question type and the student’s answer.', r.work ? el('span', {}, ' ', el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'Open their work')) : ''),
+      list, msg, el('button', { class: 'btn', type: 'button', onclick: close }, 'Done')));
+  const draw = () => {
+    head.textContent = `${r.name} · ${r.period} period · ${r.title}: ${pctT(r.pct)} (${r.score}/${r.total})`;
+    list.innerHTML = '';
+    parseDetail(r.detail).forEach((q) => {
+      const mark = q.pts === 1 ? '✓' : q.pts > 0 ? '½' : '✗', color = q.pts === 1 ? '#2e7d32' : q.pts > 0 ? '#8a6d0f' : '#c0392b';
+      const btn = q.bonus ? el('span', { class: 'small' }, 'bonus (can’t change)') : q.teacher
+        ? el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:4px 12px;font-size:14px', onclick: (e) => send(q.n, true, e.target) }, 'Undo')
+        : q.pts < 1 ? el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:4px 12px;font-size:14px', onclick: (e) => send(q.n, false, e.target) }, 'Mark correct') : '';
+      list.append(el('div', { style: 'display:grid;grid-template-columns:62px 1fr auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)' },
+        el('div', { style: `font-weight:700;color:${color}` }, `#${q.n} ${mark}`),
+        el('div', { class: 'small', style: 'margin:0' }, [labels && labels[q.n - 1], q.seg.replace(/^\d+[✓✗½]/, '').replace(/\(([\d.]+) pt\)/, '').replace(/\s?\(teacher✓ was [✗½] \+[\d.]+\)/, '').replace(/–/, 'left blank').replace(/^\(([^()]*)\)/, '$1').trim(), q.teacher && 'marked correct by you'].filter(Boolean).join(' · ')), btn));
+    });
+  };
+  async function send(n, undo, b) {
+    b.disabled = true; b.textContent = 'Saving…'; msg.textContent = '';
+    try {
+      const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'override', password: dashPw.get(), tab: r.tab, t: r.t, name: r.name0 || r.name, period: r.period, n, undo: undo || undefined }) });
+      const g = await res.json();
+      if (!g.ok) throw new Error(g.error === 'unknown action' ? 'Your PracticeResults.gs needs updating (version 9) for this button.' : g.error || 'failed');
+      // update this submission everywhere it is shown
+      DASH.data.results.filter((x) => x.tab === r.tab && x.t === r.t && x.period === r.period).forEach((x) => Object.assign(x, { detail: g.detail, score: g.score, pct: g.pct, classroom: g.classroom || x.classroom }));
+      Object.assign(r, { detail: g.detail, score: g.score, pct: g.pct });
+      draw(); msg.textContent = (undo ? 'Undone. ' : 'Saved. ') + (g.classroom ? 'Classroom: ' + g.classroom : '');
+    } catch (e) { b.disabled = false; b.textContent = 'Try again'; msg.textContent = String(e.message || e); }
+  }
+  draw(); document.body.append(box);
 }
 const resetBtn = (s) => el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:5px 12px;font-size:14px', onclick: (e) => dashReset(s, e.target) }, 'Reset');
 async function dashUnlock(p, btn) {
@@ -27883,7 +27922,7 @@ function bestRows(rows) { // each student's best try (and how many tries); rows 
   rows.filter((r) => !/^RESET/.test(r.version || '')).forEach((r) => { const k = who(r.period, r.name), b = m[k];
     if (!b) m[k] = { ...r, tries: 1, lastT: r.t, shown: r.name }; else { b.tries++; b.lastT = Math.max(b.lastT, r.t); if (caps(r.name) > caps(b.shown)) b.shown = r.name;
       if (r.pct > b.pct || (r.pct === b.pct && r.t > b.t)) Object.assign(m[k], r, { tries: b.tries, lastT: b.lastT, shown: b.shown }); } });
-  return Object.values(m).map((b) => ({ ...b, name: b.shown })); // show the best-capitalized spelling the student typed
+  return Object.values(m).map((b) => ({ ...b, name0: b.name, name: b.shown })); // name0: the spelling on that row of the Sheet // show the best-capitalized spelling the student typed
 }
 function dashCsv(name, head, lines) {
   const q = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -27965,6 +28004,7 @@ function dashAssignment(a) {
     { k: 'away', t: 'Left tab', desc: true, bg: (r) => (r.away >= 3 ? '#fbf1dc' : '') },
     { k: 'hints', t: 'Hints', desc: true, sort: (r) => parseDetail(r.detail).filter((d) => d.hint).length, show: (r) => parseDetail(r.detail).filter((d) => d.hint).length || '' },
     { k: 'work', t: 'Work', sort: (r) => (r.work ? 1 : 0), show: (r) => (r.work ? el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'View') : '') },
+    { k: 'grade', t: '', sort: () => 0, show: (r) => adjustBtn(r) },
     { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn(r) },
   ], best));
   app.append(scard);
@@ -27999,6 +28039,7 @@ function dashStudent(s) {
       { k: 'minutes', t: 'Minutes', desc: true },
       { k: 'missed', t: 'Missed', sort: (r) => parseDetail(r.detail).filter((d) => d.pts < 1).length, show: (r) => parseDetail(r.detail).filter((d) => d.pts < 1).map((d) => '#' + d.n).join(' ') },
       { k: 'work', t: 'Work', sort: (r) => (r.work ? 1 : 0), show: (r) => (r.work ? el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'View') : '') },
+      { k: 'grade', t: '', sort: () => 0, show: (r) => adjustBtn(r) },
       { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn({ ...r, name: s.name, period: s.period }) },
     ], best) : el('p', {}, 'Nothing turned in yet.'),
     prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered${p.correct != null ? `, ${p.correct} correct` : ''}, ${dashDate(p.t)})`).join('; ')) : ''));
