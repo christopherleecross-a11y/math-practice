@@ -23384,6 +23384,351 @@ TEMPLATES.g26Error = (r) => {
   }
 };
 /* ==== GEOMETRY CH2 END ==== */
+/* ==== GEOMETRY CH3 BEGIN ==== */
+/* ---------- Geometry (Big Ideas Math), Chapter 3: Parallel and Perpendicular Lines ---------- */
+// Two lines cut by a transversal. Angles are numbered by position, textbook style:
+// top intersection 1 (upper left), 2 (upper right), 3 (lower left), 4 (lower right); bottom intersection 5, 6, 7, 8 the same way.
+// phi = the angle (degrees) of the transversal's upward direction, so angles 2, 3, 6, 7 measure phi and 1, 4, 5, 8 measure 180 − phi.
+const g3Meas = (i, phi) => ([1, 2].includes(i % 4) ? phi : 180 - phi);
+function g3TFig({ phi, labs = [], marks = [], arrows = true, names = null, bend = 0 }) {
+  const T1 = [0, 1.5], dn = g10P(phi + 180, 1.5 / Math.sin((phi * Math.PI) / 180)), T2 = [T1[0] + dn[0], 0];
+  const lo = Math.min(T1[0], T2[0]) - 1.7, hi = Math.max(T1[0], T2[0]) + 1.7;
+  const b2 = (x) => (x - T2[0]) * Math.tan((bend * Math.PI) / 180); // the bottom line tilts when the lines are not parallel
+  const pts = { _t1: T1, _t2: T2, _a1: [lo, 1.5], _b1: [hi, 1.5], _a2: [lo, b2(lo)], _b2: [hi, b2(hi)], _u: VEC.add(T1, g10P(phi, 0.85)), _d: VEC.add(T2, g10P(phi + 180, 0.85)) };
+  const rays = [['_u', '_a1', '_t1'], ['_b1', '_u', '_t1'], ['_a1', '_t2', '_t1'], ['_t2', '_b1', '_t1'], ['_t1', '_a2', '_t2'], ['_b2', '_t1', '_t2'], ['_a2', '_d', '_t2'], ['_d', '_b2', '_t2']];
+  const angs = [];
+  rays.forEach(([p, q, v], i) => {
+    const lab = labs[i] || '', num = /^\d{1,2}$/.test(lab);
+    if (lab) angs.push({ v, p, q, lab, red: num, mark: !num && marks.includes(i) ? true : false, r: num ? 15 : 24, far: num ? 12 : 26 });
+    else if (marks.includes(i)) angs.push({ v, p, q, r: 20, red: true });
+  });
+  const txt = [];
+  if (arrows) [[lo + 0.55, 1.5], [lo + 0.55, 0]].forEach((at) => txt.push({ at, t: '›', color: G10RED, font: 'bold 24px Georgia, serif', dy: -1 }));
+  if (names) { txt.push({ at: [hi, 1.5], t: names[0], font: 'italic 17px Georgia, serif', dx: 4, dy: -14 }, { at: [hi, b2(hi)], t: names[1], font: 'italic 17px Georgia, serif', dx: 4, dy: -14 }); if (names[2]) txt.push({ at: pts._u, t: names[2], font: 'italic 17px Georgia, serif', dx: 12, dy: 2 }); }
+  return g10Fig({ pts, noDot: Object.keys(pts), lines: [['_a1', '_b1', 0.04, 0.04], ['_a2', '_b2', 0.04, 0.04], ['_u', '_d', 0.12, 0.12]], angs, txt, margin: 22 });
+}
+const G3TYPES = { corr: 'corresponding', altInt: 'alternate interior', altExt: 'alternate exterior', consInt: 'consecutive interior' };
+// how two angle positions (0–7) are related
+function g3Rel(i, j) {
+  if (i > j) [i, j] = [j, i];
+  const qi = i % 4, qj = j % 4;
+  if (i < 4 && j < 4 || i >= 4 && j >= 4) return qi + qj === 3 ? 'vert' : 'lin';
+  if (qi === qj) return 'corr';
+  const iLow = qi >= 2, jUp = qj <= 1, sameSide = qi % 2 === qj % 2;
+  if (iLow && jUp) return sameSide ? 'consInt' : 'altInt';
+  if (!iLow && !jUp) return sameSide ? 'consExt' : 'altExt';
+  return 'other';
+}
+const G3THM = { corr: 'Corresponding Angles Theorem', altInt: 'Alternate Interior Angles Theorem', altExt: 'Alternate Exterior Angles Theorem', consInt: 'Consecutive Interior Angles Theorem', vert: 'Vertical Angles Congruence Theorem', lin: 'Linear Pair Postulate' };
+const G3CONV = { corr: 'Corresponding Angles Converse', altInt: 'Alternate Interior Angles Converse', altExt: 'Alternate Exterior Angles Converse', consInt: 'Consecutive Interior Angles Converse' };
+const g3Same = (i, j) => [1, 2].includes(i % 4) === [1, 2].includes(j % 4); // congruent (same measure) or supplementary
+const g3Phi = (r) => (r() < 0.5 ? ri(r, 48, 78) : ri(r, 102, 132));
+
+/* ---------- 3.1 Pairs of Lines and Angles ---------- */
+TEMPLATES.g31Box = (r) => {
+  const L = g10Letters(r, 8), nm = Object.fromEntries('ABCDEFGH'.split('').map((k, i) => [k, L[i]])), pr = ([x, y, z]) => [x * 2.2 + y * 0.8, z * 1.3 + y * 0.6];
+  const pts = Object.fromEntries(Object.entries(G1CUBE).map(([k, v]) => [nm[k], pr(v)]));
+  const E = [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A'], ['E', 'F'], ['F', 'G'], ['G', 'H'], ['H', 'E'], ['A', 'E'], ['B', 'F'], ['C', 'G'], ['D', 'H']];
+  const hidden = [['E', 'H'], ['H', 'G'], ['D', 'H']], seen = E.filter((e) => !hidden.some((h) => h[0] === e[0] && h[1] === e[1]));
+  const draw = g10Fig({ pts, segs: seen.map(([a, b]) => [nm[a], nm[b]]), dsegs: hidden.map(([a, b]) => [nm[a], nm[b]]), margin: 34 });
+  const dir = ([a, b]) => G1CUBE[b].map((v, k) => v - G1CUBE[a][k]).map(Math.abs).join(), meets = (e, f) => e.some((v) => f.includes(v)), ln = ([a, b]) => `line ${nm[a]}${nm[b]}`;
+  const kind = pick(r, ['par', 'perp', 'skew', 'skew', 'plane']);
+  if (kind === 'plane') {
+    const F = pick(r, G1FACES), opp = G1FACES.find((g) => g.every((k) => !F.includes(k)) && g.length === 4), V = pick(r, opp), nmF = F.slice(0, 3).map((k) => nm[k]).join(''), ans = `plane ${opp.slice(0, 3).map((k) => nm[k]).join('')}`;
+    const others = G1FACES.filter((g) => g !== F && g !== opp && g.includes(V)).map((g) => `plane ${g.slice(0, 3).map((k) => nm[k]).join('')}`);
+    return g2Q(r, 'Parallel planes', `Consider the planes that contain the faces of the box. All angles are right angles. Which plane contains point ${nm[V]} and is parallel to plane ${nmF}?`, ans, [...others, `plane ${nmF}`], { draw, size: [380, 300], solution: `Plane ${nmF} is one face. The face across from it never meets it, so it is parallel: ${ans}.` });
+  }
+  for (;;) {
+    const e = pick(r, E), V = pick(r, 'ABCDEFGH'.split('').filter((k) => !e.includes(k))), thru = E.filter((f) => f.includes(V));
+    const sort = { par: thru.filter((f) => dir(f) === dir(e)), perp: thru.filter((f) => dir(f) !== dir(e) && meets(f, e)), skew: thru.filter((f) => dir(f) !== dir(e) && !meets(f, e)) };
+    if (!sort[kind].length) continue;
+    const show = (list) => (list.length ? list.map(ln).join(' and ') : 'none');
+    const ans = show(sort[kind]), wrong = ['par', 'perp', 'skew'].filter((k) => k !== kind).map((k) => show(sort[k])).concat(thru.map(ln), show(thru));
+    const word = { par: 'parallel to', perp: 'perpendicular to', skew: 'skew to' }[kind];
+    return g2Q(r, 'Parallel, perpendicular, and skew lines', `Consider the lines that contain the edges of the box. All angles are right angles. Which line(s) contain point ${nm[V]} and appear to be ${word} ${ln(e)}?`, ans, wrong,
+      { draw, size: [380, 300], solution: `The edges through ${nm[V]} are ${thru.map(ln).join(', ')}.\n${{ par: 'Parallel lines are coplanar and never meet', perp: 'Perpendicular lines meet at a right angle', skew: 'Skew lines do not meet and are not coplanar' }[kind]}: ${ans}.` });
+  }
+};
+TEMPLATES.g31Pairs = (r) => {
+  const phi = g3Phi(r), draw = g3TFig({ phi, labs: ['1', '2', '3', '4', '5', '6', '7', '8'] });
+  const all = { corr: '∠1 and ∠5, ∠2 and ∠6, ∠3 and ∠7, ∠4 and ∠8', altInt: '∠3 and ∠6, ∠4 and ∠5', altExt: '∠1 and ∠8, ∠2 and ∠7', consInt: '∠3 and ∠5, ∠4 and ∠6' };
+  const k = pick(r, Object.keys(all));
+  return g2Q(r, 'Angles formed by a transversal', `Identify all pairs of ${G3TYPES[k]} angles.`, all[k], [...Object.values(all), '∠1 and ∠4, ∠2 and ∠3, ∠5 and ∠8, ∠6 and ∠7'],
+    { draw, size: [380, 260], solution: `${g2Cap(G3TYPES[k])} angles ${{ corr: 'are in the same position at each intersection', altInt: 'are between the two lines, on opposite sides of the transversal', altExt: 'are outside the two lines, on opposite sides of the transversal', consInt: 'are between the two lines, on the same side of the transversal' }[k]}: ${all[k]}.` });
+};
+TEMPLATES.g31Classify = (r) => {
+  for (;;) {
+    const i = ri(r, 0, 3), j = ri(r, 4, 7), k = g3Rel(i, j); if (!G3TYPES[k]) continue;
+    const phi = g3Phi(r), [a, b] = r() < 0.5 ? [i, j] : [j, i];
+    return g2Q(r, 'Angles formed by a transversal', `Classify the angle pair as corresponding, alternate interior, alternate exterior, or consecutive interior angles.\n∠${a + 1} and ∠${b + 1}`, `${g2Cap(G3TYPES[k])} angles`, Object.values(G3TYPES).map((t) => `${g2Cap(t)} angles`),
+      { draw: g3TFig({ phi, labs: ['1', '2', '3', '4', '5', '6', '7', '8'] }), size: [380, 260], solution: `∠${a + 1} and ∠${b + 1} are ${G3TYPES[k]} angles: ${{ corr: 'they are in the same position at the two intersections', altInt: 'both are between the lines, on opposite sides of the transversal', altExt: 'both are outside the lines, on opposite sides of the transversal', consInt: 'both are between the lines, on the same side of the transversal' }[k]}.` });
+  }
+};
+TEMPLATES.g31Error = (r) => {
+  const E = pick(r, [
+    ['If two lines do not intersect, then they are parallel.', 'If two coplanar lines do not intersect, then they are parallel. (Lines that do not intersect could be skew.)', ['If two lines intersect, then they are parallel.', 'If two lines do not intersect, then they are perpendicular.', 'If two lines are parallel, then they intersect.']],
+    ['If there is a line and a point not on the line, then there is exactly one line through the point that intersects the given line.', 'If there is a line and a point not on the line, then there is exactly one line through the point parallel to the given line. (Infinitely many lines through the point intersect it.)', ['If there is a line and a point on the line, then there is exactly one line through the point that intersects the given line.', 'If there is a line and a point not on the line, then there are no lines through the point that intersect the given line.', 'If there is a line and a point not on the line, then there are exactly two lines through the point parallel to the given line.']],
+    ['If two lines are perpendicular, then they do not intersect.', 'If two lines are perpendicular, then they intersect to form right angles.', ['If two lines are perpendicular, then they are parallel.', 'If two lines are perpendicular, then they are skew.', 'If two lines intersect, then they are perpendicular.']],
+    ['If two lines are skew, then they are coplanar.', 'If two lines are skew, then they are not coplanar and do not intersect.', ['If two lines are skew, then they are parallel.', 'If two lines are skew, then they intersect.', 'If two lines are coplanar, then they are skew.']],
+  ]);
+  return g2Q(r, 'Error analysis: lines', `Describe and correct the error in the conditional statement.\n“${E[0]}”`, E[1], E[2], { solution: E[1] });
+};
+
+/* ---------- 3.2 Parallel Lines and Transversals ---------- */
+const g3RelWhy = (k, a, b) => ({ vert: `∠${a} and ∠${b} are vertical angles`, lin: `∠${a} and ∠${b} form a linear pair`, corr: `∠${a} and ∠${b} are corresponding angles`, altInt: `∠${a} and ∠${b} are alternate interior angles`, altExt: `∠${a} and ∠${b} are alternate exterior angles`, consInt: `∠${a} and ∠${b} are consecutive interior angles` })[k];
+TEMPLATES.g32Find = (r) => {
+  for (;;) {
+    const g = ri(r, 0, 7), i = ri(r, 0, 7), j = ri(r, 0, 7); if (new Set([g, i, j]).size < 3) continue;
+    const k1 = g3Rel(g, i), k2 = g3Rel(g, j); if (!G3THM[k1] || !G3THM[k2] || k1 === k2 && r() < 0.5) continue;
+    const phi = g3Phi(r), v = g3Meas(g, phi), labs = []; labs[g] = `${v}°`; labs[i] = '1'; labs[j] = '2';
+    const m1 = g3Meas(i, phi), m2 = g3Meas(j, phi), ans = `m∠1 = ${m1}°, m∠2 = ${m2}°`;
+    const step = (k, n, m) => `${g3RelWhy(k, n, `the ${v}° angle`).replace(/∠the/, 'the')}, so ${k === 'lin' || k === 'consInt' ? `they are supplementary: m∠${n} = 180° − ${v}° = ${m}°` : `they are congruent: m∠${n} = ${m}°`} (${G3THM[k]}).`;
+    return { topic: 'Angles formed by parallel lines', stem: 'Find m∠1 and m∠2. Tell which theorem you use in each case.', ...g2MC(r, ans, [`m∠1 = ${180 - m1}°, m∠2 = ${180 - m2}°`, `m∠1 = ${m1}°, m∠2 = ${180 - m2}°`, `m∠1 = ${180 - m1}°, m∠2 = ${m2}°`, `m∠1 = ${v}°, m∠2 = ${v}°`]),
+      fr: { fields: [{ kind: 'number', label: 'm∠1 =', suffix: '°' }, { kind: 'number', label: 'm∠2 =', suffix: '°' }], key: [String(m1), String(m2)], display: ans, check: (x) => numEq(x[0], m1) && numEq(x[1], m2), score: (x) => (numEq(x[0], m1) + numEq(x[1], m2)) / 2 },
+      draw: g3TFig({ phi, labs }), size: [400, 270], solution: `${step(k1, 1, m1)}\n${step(k2, 2, m2)}` };
+  }
+};
+// one angle given (number or expression), another an expression in x
+function g3XQ(r, converse) {
+  for (;;) {
+    const i = ri(r, 0, 7), j = ri(r, 0, 7); if (i === j) continue; const k = g3Rel(i, j); if (!G3THM[k] || (converse && !G3CONV[k])) continue;
+    const phi = g3Phi(r), vi = g3Meas(i, phi), vj = g3Meas(j, phi), x = ri(r, 3, 20), both = r() < 0.3;
+    const e = g26Expr(r, vj, x, 'x'), labs = []; labs[j] = e.t;
+    let other = `${vi}°`, eq;
+    if (both) { const e2 = g26Expr(r, vi, x, 'x', e.m); other = e2.t; eq = k === 'lin' || k === 'consInt' ? `${e2.t.replace(/[()°]/g, '')} + ${e.t.replace(/[()°]/g, '')} = 180` : `${e2.t.replace(/[()°]/g, '')} = ${e.t.replace(/[()°]/g, '')}`; }
+    else eq = k === 'lin' || k === 'consInt' ? `${vi} + ${e.t.replace(/[()°]/g, '')} = 180` : `${e.t.replace(/[()°]/g, '')} = ${vi}`;
+    labs[i] = other;
+    const wrongX = k === 'lin' || k === 'consInt' ? (vi - e.c) / e.m : (180 - vi - e.c) / e.m;
+    const ch = g10NumChoices(r, x, [wrongX, x + 2, x - 1, vj].filter((v) => Number.isInteger(v)));
+    const rel = { vert: 'vertical angles', lin: 'a linear pair', corr: 'corresponding angles', altInt: 'alternate interior angles', altExt: 'alternate exterior angles', consInt: 'consecutive interior angles' }[k];
+    const why = converse ? `The angles are ${rel}. For m ∥ n, they must be ${k === 'consInt' ? 'supplementary' : 'congruent'} (${G3CONV[k]}).` : `The angles are ${rel}, so they are ${k === 'lin' || k === 'consInt' ? 'supplementary' : 'congruent'} (${G3THM[k]}).`;
+    return { topic: converse ? 'Making lines parallel' : 'Parallel lines with algebra', stem: converse ? 'Find the value of x that makes m ∥ n. Explain your reasoning.' : 'Find the value of x. Show your steps.', ...ch, fr: g10Num('x =', x),
+      draw: g3TFig({ phi, labs, arrows: !converse, names: converse ? ['m', 'n'] : null }), size: [420, 280], solution: `${why}\n${eq}\nx = ${x}` };
+  }
+}
+TEMPLATES.g32X = (r) => g3XQ(r, false);
+TEMPLATES.g32Error = (r) => {
+  for (;;) {
+    const i = ri(r, 0, 3), j = ri(r, 4, 7), k = g3Rel(i, j); if (!G3TYPES[k] || k === 'consInt') continue;
+    const phi = g3Phi(r), [a, b] = shuffle(r, [ri(r, 1, 9), ri(r, 10, 16)]), labs = []; labs[i] = String(a); labs[j] = String(b);
+    const kind = pick(r, ['noPar', 'name']);
+    const nums = [];
+    nums[i] = String(a); nums[j] = String(b);
+    const fig = g3TFig({ phi, labs: nums.map((t) => t || ''), arrows: kind === 'name' });
+    if (kind === 'noPar') {
+      const ans = `The lines are not marked parallel, so you cannot conclude that ∠${a} ≅ ∠${b}.`;
+      return g2Q(r, 'Error analysis: parallel lines', `Describe and correct the error in the student’s reasoning.\n“∠${a} ≅ ∠${b} by the ${G3THM[k]}.”`, ans,
+        [`The angles are ${G3TYPES[k === 'corr' ? 'altInt' : 'corr']} angles, not ${G3TYPES[k]} angles.`, 'There is no error.', `∠${a} and ∠${b} are supplementary, not congruent.`], { draw: fig, size: [400, 270], solution: `${ans} The ${G3THM[k]} only applies when the lines are parallel.` });
+    }
+    const wrongK = pick(r, Object.keys(G3TYPES).filter((t) => t !== k && t !== 'consInt')), ans = `∠${a} and ∠${b} are ${G3TYPES[k]} angles, so ∠${a} ≅ ∠${b} by the ${G3THM[k]}.`;
+    return g2Q(r, 'Error analysis: parallel lines', `Describe and correct the error in the student’s reasoning.\n“∠${a} ≅ ∠${b} by the ${G3THM[wrongK]}.”`, ans,
+      ['There is no error.', `∠${a} and ∠${b} are supplementary by the Consecutive Interior Angles Theorem.`, `The lines are not parallel, so the angles are not congruent.`], { draw: fig, size: [400, 270], solution: ans });
+  }
+};
+
+/* ---------- 3.3 Proofs with Parallel Lines ---------- */
+TEMPLATES.g33X = (r) => g3XQ(r, true);
+const G3NOT = 'No, there is not enough information.';
+TEMPLATES.g33Enough = (r) => {
+  for (;;) {
+    const i = ri(r, 0, 7), j = ri(r, 0, 7); if (i === j) continue; const k = g3Rel(i, j); if (k === 'other' || k === 'consExt' || k === 'lin') continue;
+    if (!G3CONV[k] && r() < 0.4) continue;
+    const phi = g3Phi(r), ok = !!G3CONV[k] && k !== 'consInt', ans = ok ? `Yes, by the ${G3CONV[k]}.` : G3NOT;
+    const opts = [...Object.values(G3CONV).map((c) => `Yes, by the ${c}.`), G3NOT];
+    const why = ok ? `The marked angles are ${G3TYPES[k]} angles and they are congruent, so m ∥ n by the ${G3CONV[k]}.` : k === 'vert' ? 'The marked angles are vertical angles. Vertical angles are always congruent, so they tell you nothing about the lines m and n.' : 'The marked angles are consecutive interior angles. The converse needs them to be supplementary; congruent alone is not enough (unless you know they are right angles).';
+    return g2Q(r, 'Proving lines parallel', 'Decide whether there is enough information to prove that m ∥ n. If so, state the theorem you can use.', ans, opts,
+      { draw: g3TFig({ phi, marks: [i, j], arrows: false, names: ['m', 'n', 'r'] }), size: [400, 270], solution: why });
+  }
+};
+TEMPLATES.g33Parallel = (r) => {
+  for (;;) {
+    const i = ri(r, 0, 3), j = ri(r, 4, 7), k = g3Rel(i, j); if (!G3CONV[k]) continue;
+    const phi = g3Phi(r), yes = r() < 0.5, vi = g3Meas(i, phi), sum = k === 'consInt';
+    let vj = sum ? 180 - vi : vi; if (!yes) vj += pick(r, [-6, -4, -2, 2, 4, 6]);
+    const labs = []; labs[i] = `${vi}°`; labs[j] = `${vj}°`;
+    const ans = yes ? `Yes, by the ${G3CONV[k]}.` : `No. The ${G3TYPES[k]} angles are not ${sum ? 'supplementary' : 'congruent'}.`;
+    const wrongs = [yes ? `No. The ${G3TYPES[k]} angles are not ${sum ? 'supplementary' : 'congruent'}.` : `Yes, by the ${G3CONV[k]}.`, `Yes, by the ${G3CONV[pick(r, Object.keys(G3CONV).filter((t) => t !== k))]}.`, `No. ${sum ? 'Consecutive interior angles must be congruent.' : 'The angles must be supplementary.'}`];
+    return g2Q(r, 'Proving lines parallel', 'Are the two horizontal lines parallel? Explain your reasoning.', ans, wrongs,
+      { draw: g3TFig({ phi, labs, arrows: false }), size: [400, 270], solution: `The angles are ${G3TYPES[k]} angles. ${sum ? `${vi}° + ${vj}° = ${vi + vj}°` : `${vi}° ${vi === vj ? '=' : '≠'} ${vj}°`}. ${ans}` });
+  }
+};
+const G3REASONS = ['Given', 'Definition of congruent angles', 'Definition of supplementary angles', 'Definition of complementary angles', 'Definition of linear pair', 'Definition of right angle', 'Definition of perpendicular lines',
+  'Linear Pair Postulate', 'Angle Addition Postulate', 'Addition Property of Equality', 'Subtraction Property of Equality', 'Division Property of Equality', 'Substitution Property of Equality', 'Transitive Property of Equality',
+  'Transitive Property of Angle Congruence', 'Vertical Angles Congruence Theorem', 'Congruent Supplements Theorem', 'Corresponding Angles Theorem', 'Alternate Interior Angles Theorem', 'Consecutive Interior Angles Theorem',
+  'Corresponding Angles Converse', 'Alternate Interior Angles Converse', 'Alternate Exterior Angles Converse', 'Consecutive Interior Angles Converse', 'Linear Pair Perpendicular Theorem', 'Lines Perpendicular to a Transversal Theorem'];
+const G3NEAR = { ...G2NEAR,
+  'Corresponding Angles Theorem': ['Corresponding Angles Converse', 'Alternate Interior Angles Theorem', 'Vertical Angles Congruence Theorem'], 'Corresponding Angles Converse': ['Corresponding Angles Theorem', 'Alternate Interior Angles Converse', 'Alternate Exterior Angles Converse'],
+  'Alternate Interior Angles Theorem': ['Alternate Interior Angles Converse', 'Corresponding Angles Theorem', 'Alternate Exterior Angles Theorem'], 'Consecutive Interior Angles Converse': ['Consecutive Interior Angles Theorem', 'Alternate Interior Angles Converse', 'Corresponding Angles Converse'],
+  'Definition of perpendicular lines': ['Definition of right angle', 'Linear Pair Perpendicular Theorem', 'Definition of congruent angles'], 'Angle Addition Postulate': ['Segment Addition Postulate', 'Addition Property of Equality', 'Definition of complementary angles'] };
+// the 2.x proof engine with chapter 3 reasons
+function g3ProofQ(r, topic, P) {
+  const cand = P.steps.map((s, i) => i).filter((i) => P.steps[i][1] !== 'Given' && P.steps[i][1] !== 'Simplify');
+  const i = pick(r, cand), col = r() < 0.75 ? 1 : 0, [st, why] = P.steps[i];
+  const PP = { ...P, blank: i, col }, L = g2ProofLayout(PP), draw = (cv) => g2ProofDraw(cv, PP), sol = `Step ${i + 1}: ${st}\nReason: ${why}.${P.why && P.why[i] ? ' ' + P.why[i] : ''}`;
+  if (col === 1) {
+    const near = (G3NEAR[why] || []).filter((x) => x !== why), ch = buildChoices(r, why, shuffle(r, G3REASONS.filter((x) => x !== why && !near.includes(x))).slice(0, 4), () => null, shuffle(r, near).slice(0, 2));
+    return { topic, stem: `Complete the proof. Which reason belongs in step ${i + 1}?`, ...ch, fr: g1Sel(`Reason ${i + 1}:`, ch.choices, why), draw, size: [L.W, L.H], solution: sol };
+  }
+  const alts = (P.alts && P.alts[i]) || [], ch = buildChoices(r, st, shuffle(r, P.steps.filter((s, j) => j !== i && s[0] !== st).map((s) => s[0])), () => null, shuffle(r, alts).slice(0, 2));
+  return { topic, stem: `Complete the proof. Which statement belongs in step ${i + 1}?`, ...ch, fr: g1Sel(`Statement ${i + 1}:`, ch.choices, st), draw, size: [L.W, L.H], solution: sol };
+}
+function g3Proofs(r, which) {
+  const phi = g3Phi(r), fig = (labs, opts = {}) => g3TFig({ phi, labs, arrows: false, names: ['m', 'n'], ...opts }), out = [];
+  if (which === 'thm') {
+    out.push({ given: 'm ∥ n', prove: '∠4 ≅ ∠5', fig: fig(['1', '', '', '4', '5'], { arrows: true }), figH: 210, figW: 440,
+      steps: [['m ∥ n', 'Given'], ['∠1 ≅ ∠5', 'Corresponding Angles Theorem'], ['∠1 ≅ ∠4', 'Vertical Angles Congruence Theorem'], ['∠4 ≅ ∠5', 'Transitive Property of Angle Congruence']], alts: { 1: ['∠1 ≅ ∠4', '∠4 ≅ ∠1'], 2: ['∠1 ≅ ∠5', '∠4 ≅ ∠8'] } });
+    out.push({ given: 'm ∥ n', prove: '∠3 and ∠5 are supplementary.', fig: fig(['1', '', '3', '', '5'], { arrows: true }), figH: 210, figW: 440,
+      steps: [['m ∥ n', 'Given'], ['∠1 ≅ ∠5', 'Corresponding Angles Theorem'], ['∠1 and ∠3 form a linear pair.', 'Definition of linear pair'], ['∠1 and ∠3 are supplementary.', 'Linear Pair Postulate'], ['m∠1 + m∠3 = 180°', 'Definition of supplementary angles'],
+        ['m∠1 = m∠5', 'Definition of congruent angles'], ['m∠5 + m∠3 = 180°', 'Substitution Property of Equality'], ['∠3 and ∠5 are supplementary.', 'Definition of supplementary angles']],
+      alts: { 4: ['m∠1 + m∠3 = 90°', 'm∠1 = m∠3'], 6: ['m∠5 = m∠3', 'm∠1 + m∠5 = 180°'] } });
+    return out;
+  }
+  const a = ri(r, 100, 130);
+  out.push({ given: `m∠1 = ${a}°, m∠2 = ${180 - a}°`, prove: 'm ∥ n', fig: fig(['', '', '', '1', '', '2']), figH: 210, figW: 440,
+    steps: [[`m∠1 = ${a}°, m∠2 = ${180 - a}°`, 'Given'], [`m∠1 + m∠2 = ${a}° + ${180 - a}°`, 'Addition Property of Equality'], ['m∠1 + m∠2 = 180°', 'Simplify'], ['∠1 and ∠2 are supplementary.', 'Definition of supplementary angles'], ['m ∥ n', 'Consecutive Interior Angles Converse']],
+    alts: { 3: ['∠1 and ∠2 are complementary.', '∠1 ≅ ∠2'] } });
+  out.push({ given: '∠1 and ∠3 are supplementary.', prove: 'm ∥ n', fig: fig(['1', '2', '', '', '', '3']), figH: 210, figW: 440,
+    steps: [['∠1 and ∠3 are supplementary.', 'Given'], ['∠1 and ∠2 form a linear pair.', 'Definition of linear pair'], ['∠1 and ∠2 are supplementary.', 'Linear Pair Postulate'], ['∠2 ≅ ∠3', 'Congruent Supplements Theorem'], ['m ∥ n', 'Corresponding Angles Converse']],
+    alts: { 3: ['∠1 ≅ ∠3', '∠1 ≅ ∠2'] } });
+  out.push({ given: '∠4 ≅ ∠5', prove: 'm ∥ n', fig: fig(['1', '', '', '4', '5']), figH: 210, figW: 440,
+    steps: [['∠4 ≅ ∠5', 'Given'], ['∠1 ≅ ∠4', 'Vertical Angles Congruence Theorem'], ['∠1 ≅ ∠5', 'Transitive Property of Angle Congruence'], ['m ∥ n', 'Corresponding Angles Converse']], alts: { 1: ['∠1 ≅ ∠5', '∠4 ≅ ∠8'], 2: ['∠1 ≅ ∠4', '∠4 ≅ ∠1'] } });
+  return out;
+}
+TEMPLATES.g32Proof = (r) => g3ProofQ(r, 'Proving the parallel line theorems', pick(r, g3Proofs(r, 'thm')));
+TEMPLATES.g33Proof = (r) => g3ProofQ(r, 'Proofs with parallel lines', pick(r, g3Proofs(r, 'conv')));
+
+/* ---------- 3.4 Proofs with Perpendicular Lines ---------- */
+// a distance √n2 (times num/den): exact form and decimal, with a numeric answer box
+const g3Exact = (num, n2, den = 1) => { const [k, m] = sqrtParts(n2), top = num * k, g = gcd(top, den), t = top / g, d = den / g; return (m === 1 ? String(t) : `${t === 1 ? '' : t}√${m}`) + (d === 1 ? '' : `/${d}`); };
+const g3DistFR = (label, v, exact) => ({ fields: [{ kind: 'expr', keys: 'num', label }], key: [String(Math.round(v * 1000) / 1000)], display: Number.isInteger(Math.round(v * 1e9) / 1e9) ? fmt(Math.round(v)) : `${exact} ≈ ${g9r(v, 2)}`, check: (x) => numOk(x[0], v, 0.006 / Math.max(1, v)) });
+const g3DistShow = (v, exact) => (Number.isInteger(Math.round(v * 1e9) / 1e9) ? fmt(Math.round(v)) : /[√/]/.test(exact) ? `${exact} ≈ ${g9r(v, 2)}` : g9r(v, 2));
+const g3DistChoices = (r, v, exact, wrongs) => g2MC(r, g3DistShow(v, exact), wrongs.map(([w, ex]) => g3DistShow(w, ex)));
+TEMPLATES.g34Dist = (r) => {
+  for (;;) {
+    const [a, b] = pick(r, [[1, 2], [2, 1], [1, 3], [3, 1], [3, 4], [4, 3], [1, 1], [2, 3], [3, 2]]).map((v, i) => v * (i === 1 && r() < 0.5 ? -1 : 1)), X = [ri(r, -4, 1), ri(r, -4, 3)];
+    const t = ri(r, 1, 2), s = t + ri(r, 1, 2), k = pick(r, [1, 2, -1, -2]), F = [X[0] + t * a, X[1] + t * b], Z = [X[0] + s * a, X[1] + s * b], A = [F[0] - k * b, F[1] + k * a];
+    const all = [X, Z, A, F]; if (all.some((p) => Math.abs(p[0]) > 9 || Math.abs(p[1]) > 9)) continue;
+    const [nX, nZ, nA, nY] = g10Letters(r, 4), n2 = k * k * (a * a + b * b), v = Math.sqrt(n2), ex = g3Exact(1, n2);
+    const lo = Math.min(-1, ...all.flat()) - 1, hi = Math.max(1, ...all.flat()) + 1;
+    const draw = plotQ({ xr: [lo, hi], yr: [lo, hi], curves: [{ param: [(u) => [X[0] + u * (Z[0] - X[0]), X[1] + u * (Z[1] - X[1])], -0.15, 1.15] }, { param: [(u) => [A[0] + u * (F[0] - A[0]), A[1] + u * (F[1] - A[1])], 0, 1], dash: true, color: '#b03a2e' }],
+      pts: [{ p: X, label: `${nX}${pt(X)}` }, { p: Z, label: `${nZ}${pt(Z)}` }, { p: A, label: `${nA}${pt(A)}` }] });
+    const d1 = Math.hypot(A[0] - X[0], A[1] - X[1]), d2 = Math.hypot(A[0] - Z[0], A[1] - Z[1]);
+    return { topic: 'Distance from a point to a line', stem: `Find the distance from point ${nA} to line ${nX}${nZ}.`, ...g3DistChoices(r, v, ex, [[d1, g3Exact(1, Math.round(d1 * d1))], [d2, g3Exact(1, Math.round(d2 * d2))], [v * 2, g3Exact(2, n2)], [Math.abs(A[1] - F[1]) + Math.abs(A[0] - F[0]), String(Math.abs(A[1] - F[1]) + Math.abs(A[0] - F[0]))], [Math.sqrt(n2 + 1), g3Exact(1, n2 + 1)], [Math.sqrt(n2 * 2), g3Exact(1, n2 * 2)]]),
+      fr: g3DistFR('Distance =', v, ex), draw, size: [380, 360],
+      solution: `The distance is the length of the perpendicular segment from ${nA} to the line.\nSlope of line ${nX}${nZ}: ${fracT(b / a)}. The perpendicular through ${nA} has slope ${fracT(-a / b)}. They meet at ${pt(F)}.\nDistance = √(${g10paren2(A[0] - F[0])}² + ${g10paren2(A[1] - F[1])}²) = √${n2}${ex === `√${n2}` ? '' : ` = ${ex}`}${Number.isInteger(v) ? '' : ` ≈ ${g9r(v, 2)}`}` };
+  }
+};
+TEMPLATES.g34Parallel = (r) => {
+  const [v1, v2, h1, h2] = shuffle(r, ['a', 'b', 'c', 'd', 'p', 'q', 'r', 's']).slice(0, 4), X = [0, 1.6], Y = [1.3, 0];
+  const pairs = [[0, 0], [0, 1], [1, 0], [1, 1]], marks = shuffle(r, pairs).slice(0, r() < 0.6 ? 2 : 3), has = (i, j) => marks.some(([a, b]) => a === i && b === j);
+  const hPar = [0, 1].some((i) => has(i, 0) && has(i, 1)), vPar = [0, 1].some((j) => has(0, j) && has(1, j));
+  const ans = hPar && vPar ? `${v1} ∥ ${v2} and ${h1} ∥ ${h2}` : hPar ? `${h1} ∥ ${h2} only` : vPar ? `${v1} ∥ ${v2} only` : 'None of the lines must be parallel.';
+  const pts = { _v1t: [X[0], 1.9], _v1b: [X[0], -0.5], _v2t: [Y[0], 1.9], _v2b: [Y[0], -0.5], _h1l: [-0.6, X[1]], _h1r: [1.9, X[1]], _h2l: [-0.6, 0], _h2r: [1.9, 0], _p00: [X[0], X[1]], _p01: [X[0], 0], _p10: [Y[0], X[1]], _p11: [Y[0], 0] };
+  const at = (i, j) => `_p${i}${j}`, right = marks.map(([i, j]) => [i ? '_v2b' : '_v1b', at(i, j), j ? '_h2r' : '_h1r']);
+  const draw = g10Fig({ pts, noDot: Object.keys(pts), lines: [['_v1b', '_v1t', 0.05, 0.05], ['_v2b', '_v2t', 0.05, 0.05], ['_h1l', '_h1r', 0.05, 0.05], ['_h2l', '_h2r', 0.05, 0.05]], right,
+    txt: [{ at: [X[0], 2.1], t: v1, font: 'italic 17px Georgia, serif', dx: 10 }, { at: [Y[0], 2.1], t: v2, font: 'italic 17px Georgia, serif', dx: 10 }, { at: [2.05, X[1]], t: h1, font: 'italic 17px Georgia, serif', dy: -12 }, { at: [2.05, 0], t: h2, font: 'italic 17px Georgia, serif', dy: -12 }], margin: 26 });
+  const why = [];
+  [0, 1].forEach((i) => { if (has(i, 0) && has(i, 1)) why.push(`${h1} and ${h2} are both perpendicular to ${[v1, v2][i]}, so ${h1} ∥ ${h2}.`); });
+  [0, 1].forEach((j) => { if (has(0, j) && has(1, j)) why.push(`${v1} and ${v2} are both perpendicular to ${[h1, h2][j]}, so ${v1} ∥ ${v2}.`); });
+  return g2Q(r, 'Lines perpendicular to a transversal', 'Determine which lines, if any, must be parallel. Explain your reasoning.', ans, [`${v1} ∥ ${v2} and ${h1} ∥ ${h2}`, `${h1} ∥ ${h2} only`, `${v1} ∥ ${v2} only`, 'None of the lines must be parallel.'],
+    { draw, size: [320, 280], solution: why.length ? `In a plane, two lines perpendicular to the same line are parallel (Lines Perpendicular to a Transversal Theorem).\n${why.join('\n')}` : 'No two lines are marked perpendicular to the same line, so no lines must be parallel. Lines that look parallel are not necessarily parallel.' });
+};
+TEMPLATES.g34X = (r) => {
+  const x = ri(r, 2, 12), e = g26Expr(r, 90, x, 'x'), [a, b, c] = shuffle(r, ['a', 'b', 'c', 'j', 'k', 'm']).slice(0, 3);
+  const pts = { _bt: [0, 1.3], _bb: [0, -1.1], _ct: [1.4, 1.3], _cb: [1.4, -1.1], _al: [-0.9, 0], _ar: [2.4, 0], _o: [0, 0], _q: [1.4, 0] };
+  const draw = g10Fig({ pts, noDot: Object.keys(pts), lines: [['_bb', '_bt', 0.05, 0.08], ['_cb', '_ct', 0.05, 0.08], ['_al', '_ar', 0.05, 0.05]], right: [['_bt', '_o', '_ar']], angs: [{ v: '_q', p: '_ar', q: '_cb', lab: e.t, r: 22, far: 34 }],
+    txt: [{ at: [0, 1.5], t: b, font: 'italic 17px Georgia, serif', dx: -10 }, { at: [1.4, 1.5], t: c, font: 'italic 17px Georgia, serif', dx: -10 }, { at: [-1.05, 0], t: a, font: 'italic 17px Georgia, serif', dy: -12 }], margin: 26 });
+  const ch = g10NumChoices(r, x, [(180 - e.c) / e.m, x + 1, x - 2, 90 / e.m].filter((v) => Number.isInteger(v)));
+  return { topic: 'Perpendicular lines with algebra', stem: `In the diagram, ${a} ⊥ ${b}. Find the value of x that makes ${b} ∥ ${c}.`, ...ch, fr: g10Num('x =', x), draw, size: [360, 280],
+    solution: `If ${b} ∥ ${c}, then ${c} is also perpendicular to ${a}, so the marked angle is a right angle.\n${e.t.replace(/[()°]/g, '')} = 90\nx = ${x}` };
+};
+TEMPLATES.g34Error = (r) => {
+  const [A, B, C] = g10Letters(r, 3), [h, d] = pick(r, [[6, 10], [8, 12], [5, 13], [9, 15], [7, 11], [12, 20]]);
+  const pts = { [A]: [0, 0], [B]: [2.4, 0], _f: [1.6, 0], [C]: [1.6, 1.6 * h / Math.sqrt(d * d - h * h)] };
+  const draw = g10Fig({ pts, noDot: ['_f'], lines: [[A, B, 0.35, 0.15]], segs: [[A, C], [C, '_f']], right: [[C, '_f', B]], slab: [{ p: A, q: C, t: `${d} cm`, side: -1 }, { p: '_f', q: C, t: `${h} cm`, side: 1 }], margin: 30 });
+  const ans = `The distance from a point to a line is the length of the perpendicular segment, so the distance from ${C} to line ${A}${B} is ${h} centimeters.`;
+  return g2Q(r, 'Error analysis: distance', `Describe and correct the error in the statement about the diagram.\n“The distance from point ${C} to line ${A}${B} is ${d} centimeters.”`, ans,
+    [`The distance is ${d + h} centimeters, the sum of the two segments.`, 'There is no error.', `The distance is ${d - h} centimeters, the difference of the two segments.`], { draw, size: [380, 240], solution: ans });
+};
+function g34Proofs(r) {
+  const [A, B, C] = pickLetters(r, 3, ['I', 'O']), out = [];
+  out.push({ given: `ray ${B}${A} ⊥ ray ${B}${C}`, prove: '∠1 and ∠2 are complementary.', figH: 170,
+    fig: g10Fig({ pts: { [B]: [0, 0], [A]: [0, 1.4], [C]: [1.5, 0], _m: g10P(50, 1.5) }, noDot: ['_m'], lines: [[B, A, 0, 0.15], [B, C, 0, 0.15], [B, '_m', 0, 0.1]], right: [[A, B, C]],
+      angs: [{ v: B, p: '_m', q: A, lab: '1', red: true, mark: false, r: 30 }, { v: B, p: C, q: '_m', lab: '2', red: true, mark: false, r: 30 }], margin: 20 }),
+    steps: [[`ray ${B}${A} ⊥ ray ${B}${C}`, 'Given'], [`∠${A}${B}${C} is a right angle.`, 'Definition of perpendicular lines'], [`m∠${A}${B}${C} = 90°`, 'Definition of right angle'], [`m∠1 + m∠2 = m∠${A}${B}${C}`, 'Angle Addition Postulate'], ['m∠1 + m∠2 = 90°', 'Transitive Property of Equality'], ['∠1 and ∠2 are complementary.', 'Definition of complementary angles']],
+    alts: { 2: [`m∠${A}${B}${C} = 180°`, 'm∠1 = 90°'], 4: ['m∠1 + m∠2 = 180°', 'm∠1 = m∠2'], 5: ['∠1 and ∠2 are supplementary.', '∠1 ≅ ∠2'] } });
+  out.push({ given: '∠1 ≅ ∠2, and ∠1 and ∠2 form a linear pair.', prove: 'g ⊥ h', figH: 150,
+    fig: g10Fig({ pts: { _o: [0, 0], _l: [-1.5, 0], _r: [1.5, 0], _u: [0, 1.4] }, noDot: ['_o', '_l', '_r', '_u'], lines: [['_l', '_r', 0.05, 0.05], ['_o', '_u', 0, 0.1]], angs: [{ v: '_o', p: '_u', q: '_l', lab: '1', red: true, mark: false, r: 22 }, { v: '_o', p: '_r', q: '_u', lab: '2', red: true, mark: false, r: 22 }],
+      txt: [{ at: [1.6, 0], t: 'h', font: 'italic 17px Georgia, serif', dy: -12 }, { at: [0, 1.55], t: 'g', font: 'italic 17px Georgia, serif', dx: 10 }], margin: 20 }),
+    steps: [['∠1 ≅ ∠2, and ∠1 and ∠2 form a linear pair.', 'Given'], ['∠1 and ∠2 are supplementary.', 'Linear Pair Postulate'], ['m∠1 + m∠2 = 180°', 'Definition of supplementary angles'], ['m∠1 = m∠2', 'Definition of congruent angles'],
+      ['m∠1 + m∠1 = 180°', 'Substitution Property of Equality'], ['2(m∠1) = 180°', 'Simplify'], ['m∠1 = 90°', 'Division Property of Equality'], ['∠1 is a right angle.', 'Definition of right angle'], ['g ⊥ h', 'Definition of perpendicular lines']],
+    alts: { 2: ['m∠1 + m∠2 = 90°', 'm∠1 = 180°'], 6: ['m∠1 = 180°', 'm∠1 = 45°'] } });
+  return out;
+}
+TEMPLATES.g34Proof = (r) => g3ProofQ(r, 'Proofs with perpendicular lines', pick(r, g34Proofs(r)));
+
+/* ---------- 3.5 Equations of Parallel and Perpendicular Lines ---------- */
+TEMPLATES.g35Partition = (r) => {
+  for (;;) {
+    const p = ri(r, 1, 5), q = ri(r, 1, 6), n = p + q; if (gcd(p, q) !== 1) continue;
+    const A = [ri(r, -8, 8), ri(r, -8, 8)], d = [n * pick(r, [-2, -1, 1, 2]) * (r() < 0.5 ? 1 : 0.5), n * pick(r, [-2, -1, 1, 2]) * (r() < 0.5 ? 1 : 0.5)];
+    const B = [A[0] + d[0], A[1] + d[1]]; if (!B.every(Number.isInteger) || B.some((v) => Math.abs(v) > 12) || (d[0] === 0 && d[1] === 0)) continue;
+    const P = [A[0] + (d[0] * p) / n, A[1] + (d[1] * p) / n]; if (!P.every((v) => Number.isInteger(v * 2))) continue;
+    const show = (X) => `(${fmt(X[0])}, ${fmt(X[1])})`, rev = [A[0] + (d[0] * q) / n, A[1] + (d[1] * q) / n], mid = [A[0] + d[0] / 2, A[1] + d[1] / 2], bad = [A[0] + (d[0] * p) / q, A[1] + (d[1] * p) / q];
+    const ch = g2MC(r, show(P), [show(rev), show(mid), show(bad), show([B[0] - (d[0] * p) / n, B[1] - (d[1] * p) / n]), show([A[0] + d[0] / n, A[1] + d[1] / n]), show([P[1], P[0]]), show(B), show([P[0] + 1, P[1]]), show([P[0], P[1] - 1])].filter((s) => !/\.\d\d|\.\d{3}/.test(s)));
+    return { topic: 'Partitioning a segment', stem: `Find the coordinates of point P along the directed line segment AB so that AP to PB is the given ratio.\nA${show(A)}, B${show(B)}; ${p} to ${q}`, ...ch, fr: g13FRpt('P =', P),
+      solution: `AP to PB is ${p} to ${q}, so P is ${p}/${n} of the way from A to B.\nFrom A to B: run = ${fmt(d[0])}, rise = ${fmt(d[1])}\nx = ${fmt(A[0])} + (${p}/${n})(${fmt(d[0])}) = ${fmt(P[0])}\ny = ${fmt(A[1])} + (${p}/${n})(${fmt(d[1])}) = ${fmt(P[1])}\nP${show(P)}` };
+  }
+};
+TEMPLATES.g35Slopes = (r) => {
+  for (;;) {
+    const p = nz(r, -4, 4), q = ri(r, 1, 4); if (gcd(Math.abs(p), q) !== 1 || Math.abs(p) === q) continue;
+    const kind = pick(r, ['par', 'perp', 'neither', 'neither2']), m1 = p / q;
+    const [dx2, dy2] = kind === 'par' ? [q, p] : kind === 'perp' ? [p, -q] : kind === 'neither' ? [q, -p] : [p, q]; // neither: opposite slope, or the reciprocal
+    const P1 = [ri(r, -9, 6), ri(r, -9, 6)], k1 = ri(r, 1, 2), P2 = [P1[0] + k1 * q, P1[1] + k1 * p], Q1 = [ri(r, -9, 6), ri(r, -9, 6)], k2 = pick(r, [1, 2, -1]), Q2 = [Q1[0] + k2 * dx2, Q1[1] + k2 * dy2];
+    if ([P2, Q2].some((X) => Math.abs(X[0]) > 12 || Math.abs(X[1]) > 12)) continue;
+    const m2 = dy2 / dx2, verdict = kind === 'par' ? 'Parallel' : kind === 'perp' ? 'Perpendicular' : 'Neither', sl = `the slopes are ${fracT(m1)} and ${fracT(m2)}`;
+    const opts = { Parallel: `Parallel, because ${sl}.`, Perpendicular: `Perpendicular, because ${sl}.`, Neither: `Neither, because ${sl}.` };
+    const ans = opts[verdict], wrongs = [...Object.values(opts), `${verdict === 'Perpendicular' ? 'Parallel' : 'Perpendicular'}, because the slopes are ${fracT(q / p)} and ${fracT(m2)}.`];
+    return g2Q(r, 'Parallel, perpendicular, or neither', `Tell whether the lines through the given points are parallel, perpendicular, or neither. Justify your answer.\nLine 1: ${pt(P1)}, ${pt(P2)}\nLine 2: ${pt(Q1)}, ${pt(Q2)}`, ans, wrongs,
+      { solution: `m₁ = rise/run = (${fmt(P2[1] - P1[1])})/(${fmt(P2[0] - P1[0])}) = ${fracT(m1)}\nm₂ = rise/run = (${fmt(Q2[1] - Q1[1])})/(${fmt(Q2[0] - Q1[0])}) = ${fracT(m2)}\n${verdict === 'Parallel' ? 'The slopes are equal, so the lines are parallel.' : verdict === 'Perpendicular' ? `The product of the slopes is ${fracT(m1)} · ${fracT(m2)} = −1, so the lines are perpendicular.` : 'The slopes are not equal and their product is not −1, so the lines are neither.'}` });
+  }
+};
+TEMPLATES.g35ParLine = (r) => TEMPLATES.a44ParThrough(r);
+TEMPLATES.g35PerpLine = (r) => TEMPLATES.a44PerpThrough(r);
+TEMPLATES.g35Bisector = (r) => {
+  for (;;) {
+    const P = [ri(r, -8, 6), ri(r, -6, 6)], d = [nz(r, -4, 4), nz(r, -4, 4)], Q = [P[0] + 2 * d[0], P[1] + 2 * d[1]], M = [P[0] + d[0], P[1] + d[1]];
+    if (Q.some((v) => Math.abs(v) > 10)) continue;
+    const m = d[1] / d[0], k = -1 / m, b = M[1] - k * M[0]; if (!a4ok(k) || !a4ok(b)) continue;
+    const ans = lineText(k, b), wrong = [lineText(m, M[1] - m * M[0]), lineText(-m, M[1] + m * M[0]), lineText(k, P[1] - k * P[0]), lineText(1 / m, M[1] - M[0] / m), lineText(k, M[1] + k * M[0]), lineText(-k, M[1] + k * M[0]), lineText(k, b + 2), lineText(k, b - 3)];
+    return { topic: 'Perpendicular bisectors', stem: `Find the midpoint of ${g10seg('PQ')}. Then write an equation of the line that passes through the midpoint and is perpendicular to ${g10seg('PQ')}.\nP${pt(P)}, Q${pt(Q)}`, ...g2MC(r, `Midpoint ${pt(M)}; ${ans}`, wrong.map((w) => `Midpoint ${pt(M)}; ${w}`)),
+      fr: { fields: [{ kind: 'expr', keys: 'lin', label: 'Equation:' }], key: [lineLatex(k, b)], display: `Midpoint ${pt(M)}; ${ans}`, check: (v) => lineOk(v[0], [k, -1, b], true) },
+      solution: `Midpoint: average the coordinates: (${fmt(P[0] + Q[0])}/2, ${fmt(P[1] + Q[1])}/2) = ${pt(M)}\nSlope of ${g10seg('PQ')}: ${fracT(m)}, so the perpendicular slope is ${fracT(k)}.\nUse y = mx + b with m = ${fracT(k)} and the point ${pt(M)}: b = ${fmt(M[1])} − (${fracT(k)})(${fmt(M[0])}) = ${fracT(b)}\n${ans}` };
+  }
+};
+TEMPLATES.g35PtDist = (r) => {
+  for (;;) {
+    const [p, q] = pick(r, [[-3, 1], [-2, 1], [-1, 1], [1, 1], [2, 1], [3, 1], [1, 2], [-1, 2], [3, 2]]), m = p / q, F = [ri(r, -6, 6), 0], b0 = nz(r, -6, 6); F[1] = m * F[0] + b0; if (!Number.isInteger(F[1])) continue;
+    const k = pick(r, [1, 2, 3, -1, -2]), A = [F[0] - k * p, F[1] + k * q];
+    if (A.some((v) => Math.abs(v) > 20)) continue;
+    const n2 = (A[0] - F[0]) ** 2 + (A[1] - F[1]) ** 2, v = Math.sqrt(n2), ex = g3Exact(1, n2), eq = lineText(m, b0);
+    const dy = Math.abs(A[1] - (m * A[0] + b0)), dxl = m ? Math.abs(A[0] - (A[1] - b0) / m) : dy;
+    return { topic: 'Distance from a point to a line', stem: `Find the distance from point A to the given line.\nA${pt(A)}, ${eq}`, ...g3DistChoices(r, v, ex, [[dy, fmt(dy)], [dxl, fmt(dxl)], [v * 2, g3Exact(2, n2)], [v / 2, g3Exact(1, n2, 2)]]), fr: g3DistFR('Distance =', v, ex),
+      solution: `The perpendicular through A has slope ${m === 0 ? 'undefined (a vertical line)' : fracT(-1 / m)}. It meets ${eq} at ${pt(F)}.\nDistance = √(${g10paren2(A[0] - F[0])}² + ${g10paren2(A[1] - F[1])}²) = √${n2}${ex === `√${n2}` ? '' : ` = ${ex}`}${Number.isInteger(v) ? '' : ` ≈ ${g9r(v, 2)}`}` };
+  }
+};
+TEMPLATES.g35ParDist = (r) => {
+  for (;;) {
+    const m = nz(r, -4, 4), b1 = ri(r, -6, 8), b2 = ri(r, -6, 8); if (b1 === b2) continue;
+    const s = m * m + 1, db = Math.abs(b2 - b1), v = db / Math.sqrt(s), ex = g3Exact(db, s, s), lo = Math.min(-6, b1, b2) - 1, hi = Math.max(6, b1, b2) + 1;
+    const draw = plotQ({ xr: [-7, 7], yr: [lo, hi], curves: [{ f: (x) => m * x + b1 }, { f: (x) => m * x + b2, color: '#b03a2e' }] });
+    return { topic: 'Distance between parallel lines', stem: `Find the distance between the parallel lines ${lineText(m, b1)} and ${lineText(m, b2)}.`, ...g3DistChoices(r, v, ex, [[db, String(db)], [db / s, fracT(db / s)], [db * Math.sqrt(s), g3Exact(db, s)], [db / Math.abs(m), fracT(db / Math.abs(m))]]),
+      fr: g3DistFR('Distance =', v, ex), draw, size: [340, 340],
+      solution: `The distance between parallel lines is the length of a perpendicular segment between them. Measuring from the point (0, ${fmt(b1)}) on the first line along a line with slope ${fracT(-1 / m)} gives this shortcut:\nThe y-intercepts differ by ${db}. Distance = ${db} / √(${g10paren2(m)}² + 1) = ${db}/√${s} = ${ex}${Number.isInteger(Math.round(v * 1e9) / 1e9) ? '' : ` ≈ ${g9r(v, 2)}`}` };
+  }
+};
+/* ==== GEOMETRY CH3 END ==== */
 /* ==== GEOMETRY CH11 BEGIN ==== */
 /* ---------- Geometry (Big Ideas Math), Chapter 11: Circumference and Area ---------- */
 const g11h = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('-', MINUS); // nearest hundredth
@@ -24667,6 +25012,12 @@ Object.assign(SETS, {
   'geo-2-4': { subject: 'geometry', title: '2.4 Algebraic Reasoning', items: [['g24StepReason', 3], ['g24Solve', 3], ['g24Formula', 2], ['g24FormulaUse', 1], ['g24Property', 3], ['g24Complete', 2]] },
   'geo-2-5': { subject: 'geometry', title: '2.5 Proving Statements about Segments and Angles', items: [['g25Property', 4], ['g25Proof', 6], ['g25Error', 1]] },
   'geo-2-6': { subject: 'geometry', title: '2.6 Proving Geometric Relationships', items: [['g26Find', 2], ['g26Var', 4], ['g26Error', 1], ['g26Proof', 4]] },
+  // ----- Geometry, Chapter 3: Parallel and Perpendicular Lines -----
+  'geo-3-1': { subject: 'geometry', title: '3.1 Pairs of Lines and Angles', items: [['g31Box', 4], ['g31Pairs', 3], ['g31Classify', 4], ['g31Error', 1]] },
+  'geo-3-2': { subject: 'geometry', title: '3.2 Parallel Lines and Transversals', items: [['g32Find', 4], ['g32X', 5], ['g32Error', 2], ['g32Proof', 2]] },
+  'geo-3-3': { subject: 'geometry', title: '3.3 Proofs with Parallel Lines', items: [['g33X', 4], ['g33Enough', 4], ['g33Parallel', 3], ['g33Proof', 3]] },
+  'geo-3-4': { subject: 'geometry', title: '3.4 Proofs with Perpendicular Lines', items: [['g34Dist', 2], ['g34Parallel', 4], ['g34X', 2], ['g34Error', 1], ['g34Proof', 2]] },
+  'geo-3-5': { subject: 'geometry', title: '3.5 Equations of Parallel and Perpendicular Lines', items: [['g35Partition', 3], ['g35Slopes', 3], ['g35ParLine', 2], ['g35PerpLine', 2], ['g35PtDist', 2], ['g35Bisector', 2], ['g35ParDist', 1]] },
   // ----- Geometry, Chapter 10: Circles -----
   'geo-10-1': { subject: 'geometry', title: '10.1 Lines and Segments That Intersect Circles', items: [['g101Name', 3], ['g101CommonTan', 2], ['g101IsTangent', 2], ['g101Radius', 2], ['g101TwoTan', 3]] },
   'geo-10-2': { subject: 'geometry', title: '10.2 Finding Arc Measures', items: [['g102MinorMajor', 2], ['g102Identify', 2], ['g102Find', 2], ['g102Graph', 1], ['g102Congruent', 2], ['g102Algebra', 2]] },
@@ -25398,6 +25749,30 @@ QUESTION_TYPES.push(
   { id: 'g26Var', subject: 'geometry', section: '2.6 Proving Geometric Relationships', label: 'Find the variables', desc: 'Vertical angles and linear pairs with algebra (#9–12, 16)' },
   { id: 'g26Error', subject: 'geometry', section: '2.6 Proving Geometric Relationships', label: 'Error analysis: vertical angles', desc: '#13' },
   { id: 'g26Proof', subject: 'geometry', section: '2.6 Proving Geometric Relationships', label: 'Complete the proof', desc: 'Vertical angles, congruent complements and supplements (#17–20, 22)' },
+  { id: 'g31Box', subject: 'geometry', section: '3.1 Pairs of Lines and Angles', label: 'Parallel, perpendicular, and skew', desc: 'Lines and planes in a box (#1–4)' },
+  { id: 'g31Pairs', subject: 'geometry', section: '3.1 Pairs of Lines and Angles', label: 'Identify all pairs of a type', desc: 'Corresponding, alternate, consecutive (#9–12)' },
+  { id: 'g31Classify', subject: 'geometry', section: '3.1 Pairs of Lines and Angles', label: 'Classify the angle pair', desc: '#13–16' },
+  { id: 'g31Error', subject: 'geometry', section: '3.1 Pairs of Lines and Angles', label: 'Error analysis: lines', desc: '#17–18' },
+  { id: 'g32Find', subject: 'geometry', section: '3.2 Parallel Lines and Transversals', label: 'Find m∠1 and m∠2', desc: 'Name the theorem (#1–4, 11–14)' },
+  { id: 'g32X', subject: 'geometry', section: '3.2 Parallel Lines and Transversals', label: 'Find x with parallel lines', desc: '#5–10' },
+  { id: 'g32Error', subject: 'geometry', section: '3.2 Parallel Lines and Transversals', label: 'Error analysis: theorems', desc: '#15–16' },
+  { id: 'g32Proof', subject: 'geometry', section: '3.2 Parallel Lines and Transversals', label: 'Complete the proof of a theorem', desc: 'Alternate interior, consecutive interior (#17–18)' },
+  { id: 'g33X', subject: 'geometry', section: '3.3 Proofs with Parallel Lines', label: 'Find x that makes m ∥ n', desc: '#1–6' },
+  { id: 'g33Enough', subject: 'geometry', section: '3.3 Proofs with Parallel Lines', label: 'Enough information to prove m ∥ n?', desc: 'State the converse (#11–16)' },
+  { id: 'g33Parallel', subject: 'geometry', section: '3.3 Proofs with Parallel Lines', label: 'Are the lines parallel?', desc: 'From angle measures (#19–22)' },
+  { id: 'g33Proof', subject: 'geometry', section: '3.3 Proofs with Parallel Lines', label: 'Complete the proof', desc: 'm ∥ n from angles (#29–31)' },
+  { id: 'g34Dist', subject: 'geometry', section: '3.4 Proofs with Perpendicular Lines', label: 'Distance from a point to a line', desc: 'On the coordinate plane (#1–2)' },
+  { id: 'g34Parallel', subject: 'geometry', section: '3.4 Proofs with Perpendicular Lines', label: 'Which lines must be parallel?', desc: 'Right-angle marks (#11–16)' },
+  { id: 'g34X', subject: 'geometry', section: '3.4 Proofs with Perpendicular Lines', label: 'Find x so that the lines are parallel', desc: '#23' },
+  { id: 'g34Error', subject: 'geometry', section: '3.4 Proofs with Perpendicular Lines', label: 'Error analysis: distance', desc: '#17' },
+  { id: 'g34Proof', subject: 'geometry', section: '3.4 Proofs with Perpendicular Lines', label: 'Complete the proof', desc: 'Perpendicular lines (#9, 20)' },
+  { id: 'g35Partition', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Partition a directed segment', desc: '#1–4' },
+  { id: 'g35Slopes', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Parallel, perpendicular, or neither?', desc: 'Lines through two points (#7–10)' },
+  { id: 'g35ParLine', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Parallel line through a point', desc: '#11–14' },
+  { id: 'g35PerpLine', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Perpendicular line through a point', desc: '#15–18' },
+  { id: 'g35PtDist', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Distance from a point to a line', desc: '#19–22' },
+  { id: 'g35Bisector', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Midpoint and perpendicular bisector', desc: '#25–28' },
+  { id: 'g35ParDist', subject: 'geometry', section: '3.5 Equations of Parallel and Perpendicular Lines', label: 'Distance between parallel lines', desc: '#29–30' },
   { id: 'g101Name', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Parts of a circle', desc: 'Name a radius, chord, diameter, secant, tangent (#1–6)' },
   { id: 'g101CommonTan', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Common tangents', desc: 'How many common tangents? (#7–10)' },
   { id: 'g101IsTangent', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Is the segment tangent?', desc: 'Converse of the Pythagorean Theorem (#11–14)' },
@@ -27957,7 +28332,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 2: 'Reasoning and Proofs', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 2: 'Reasoning and Proofs', 3: 'Parallel and Perpendicular Lines', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0), b = secs[sec].ids.reduce((a, id) => a + (bonusCounts[id] || 0), 0);
     return [n ? `${n} chosen` : '', b ? `★ ${b} bonus` : ''].filter(Boolean).join(' · '); };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
