@@ -22766,6 +22766,624 @@ TEMPLATES.g16Word = (r) => {
   }
 };
 /* ==== GEOMETRY CH1 END ==== */
+/* ==== GEOMETRY CH2 BEGIN ==== */
+/* ---------- Geometry (Big Ideas Math), Chapter 2: Reasoning and Proofs ---------- */
+const G2F = '15px Georgia, "Times New Roman", serif', G2FB = 'bold 15px Georgia, "Times New Roman", serif';
+const g2MC = (r, ans, wrong) => buildChoices(r, ans, [...new Set(wrong.filter((w) => w && w !== ans))], () => null);
+const g2Q = (r, topic, stem, ans, wrong, extra = {}) => { const ch = g2MC(r, ans, wrong); return { topic, stem, ...ch, fr: g1Sel('Answer:', ch.choices, ans), ...extra }; };
+const g2Cap = (s) => s[0].toUpperCase() + s.slice(1);
+// a measuring context for laying out canvas tables before they are drawn
+let g2MeasureCtx = null;
+const g2Measure = () => { if (!g2MeasureCtx) { try { g2MeasureCtx = document.createElement('canvas').getContext('2d'); } catch { g2MeasureCtx = null; } } return g2MeasureCtx; };
+const g2Wrap = (ctx, t, w) => (ctx ? wrapLines(ctx, t, w) : (() => { const out = []; let line = ''; String(t).split(' ').forEach((x) => { if ((line + ' ' + x).length * 7.2 > w && line) { out.push(line); line = x; } else line = line ? line + ' ' + x : x; }); if (line) out.push(line); return out; })());
+// draw a g10 figure inside part of a canvas
+const g2Sub = (cv, F, x, y, w, h) => { const ctx = cv._ctx; ctx.save(); ctx.translate(x, y); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip(); const sub = { _ctx: ctx, _w: w, _h: h }; if (typeof F === 'function') F(sub); else g10Draw(sub, F); ctx.restore(); };
+
+/* two-column proof on a canvas: optional figure on top, Given/Prove, then STATEMENTS | REASONS with one blank cell */
+const G2PW = 600;
+function g2ProofLayout(P) {
+  const ctx = g2Measure(), W = G2PW, pad = 10, cw = [W * 0.5, W * 0.5], lh = 20;
+  if (ctx) ctx.font = G2F;
+  let y = (P.fig ? P.figH || 190 : 0) + 8;
+  const gp = [];
+  [['Given', P.given], ['Prove', P.prove]].forEach(([k, t]) => { const ls = g2Wrap(ctx, t, W - 80); gp.push({ k, ls, y }); y += ls.length * lh + 4; });
+  y += 8; const head = y; y += 26;
+  const rows = P.steps.map(([s, why], i) => {
+    const st = P.blank === i && P.col === 0 ? '?' : s, re = P.blank === i && P.col === 1 ? '?' : why;
+    const a = g2Wrap(ctx, `${i + 1}. ${st}`, cw[0] - 2 * pad), b = g2Wrap(ctx, `${i + 1}. ${re}`, cw[1] - 2 * pad), h = Math.max(a.length, b.length) * lh + 10, row = { a, b, y, h, i };
+    y += h; return row; });
+  return { W, H: y + 10, gp, head, rows, cw, pad, lh };
+}
+function g2ProofDraw(cv, P) {
+  const L = g2ProofLayout(P), ctx = cv._ctx;
+  ctx.clearRect(0, 0, cv._w, cv._h);
+  if (P.fig) g2Sub(cv, P.fig, (L.W - (P.figW || 330)) / 2, 0, P.figW || 330, P.figH || 190);
+  ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+  L.gp.forEach(({ k, ls, y }) => { ctx.font = G2FB; ctx.fillStyle = '#1d1d1b'; ctx.fillText(k, 6, y + 2); ctx.font = G2F; ls.forEach((t, j) => ctx.fillText(t, 70, y + 2 + j * L.lh)); });
+  ctx.fillStyle = '#eef2f7'; ctx.fillRect(0, L.head, L.W, 26); ctx.fillStyle = '#1d1d1b'; ctx.font = G2FB;
+  ctx.fillText('STATEMENTS', L.pad, L.head + 6); ctx.fillText('REASONS', L.cw[0] + L.pad, L.head + 6);
+  ctx.strokeStyle = '#9aa3ad'; ctx.lineWidth = 1;
+  const top = L.head, bot = L.rows.length ? L.rows[L.rows.length - 1].y + L.rows[L.rows.length - 1].h : L.head + 26;
+  ctx.beginPath(); ctx.moveTo(0, L.head + 26); ctx.lineTo(L.W, L.head + 26); ctx.moveTo(L.cw[0], top); ctx.lineTo(L.cw[0], bot); ctx.stroke();
+  L.rows.forEach((R) => {
+    ctx.strokeStyle = '#d5d9de'; ctx.beginPath(); ctx.moveTo(0, R.y + R.h); ctx.lineTo(L.W, R.y + R.h); ctx.stroke();
+    [[R.a, 0], [R.b, 1]].forEach(([ls, c]) => {
+      const x = c ? L.cw[0] + L.pad : L.pad, blank = P.blank === R.i && P.col === c;
+      if (blank) { ctx.fillStyle = 'rgba(176,58,46,0.10)'; ctx.fillRect(x - 4, R.y + 3, L.cw[c] - 2 * L.pad + 8, R.h - 6); ctx.strokeStyle = '#b03a2e'; ctx.strokeRect(x - 4, R.y + 3, L.cw[c] - 2 * L.pad + 8, R.h - 6); }
+      ctx.font = blank ? G2FB : G2F; ctx.fillStyle = blank ? '#b03a2e' : '#1d1d1b';
+      ls.forEach((t, j) => ctx.fillText(t, x, R.y + 6 + j * L.lh));
+    });
+  });
+}
+const G2REASONS = ['Given', 'Definition of congruent segments', 'Definition of congruent angles', 'Definition of complementary angles', 'Definition of supplementary angles', 'Definition of right angle',
+  'Definition of segment bisector', 'Definition of linear pair', 'Segment Addition Postulate', 'Angle Addition Postulate', 'Linear Pair Postulate', 'Addition Property of Equality', 'Subtraction Property of Equality',
+  'Division Property of Equality', 'Substitution Property of Equality', 'Transitive Property of Equality', 'Reflexive Property of Equality', 'Symmetric Property of Equality', 'Simplify',
+  'Transitive Property of Segment Congruence', 'Transitive Property of Angle Congruence', 'Symmetric Property of Segment Congruence', 'Vertical Angles Congruence Theorem', 'Congruent Complements Theorem', 'Congruent Supplements Theorem', 'Right Angles Congruence Theorem'];
+// near-misses: the reasons students mix up with each one
+const G2NEAR = {
+  'Definition of congruent segments': ['Definition of congruent angles', 'Reflexive Property of Equality', 'Definition of segment bisector'],
+  'Definition of congruent angles': ['Definition of congruent segments', 'Definition of supplementary angles', 'Vertical Angles Congruence Theorem'],
+  'Definition of complementary angles': ['Definition of supplementary angles', 'Definition of right angle', 'Congruent Complements Theorem'],
+  'Definition of supplementary angles': ['Definition of complementary angles', 'Linear Pair Postulate', 'Congruent Supplements Theorem'],
+  'Segment Addition Postulate': ['Angle Addition Postulate', 'Addition Property of Equality', 'Substitution Property of Equality'],
+  'Addition Property of Equality': ['Segment Addition Postulate', 'Substitution Property of Equality', 'Subtraction Property of Equality'],
+  'Subtraction Property of Equality': ['Addition Property of Equality', 'Division Property of Equality', 'Substitution Property of Equality'],
+  'Substitution Property of Equality': ['Transitive Property of Equality', 'Addition Property of Equality', 'Symmetric Property of Equality'],
+  'Transitive Property of Equality': ['Substitution Property of Equality', 'Symmetric Property of Equality', 'Reflexive Property of Equality'],
+  'Linear Pair Postulate': ['Definition of supplementary angles', 'Vertical Angles Congruence Theorem', 'Angle Addition Postulate'],
+  'Vertical Angles Congruence Theorem': ['Linear Pair Postulate', 'Congruent Supplements Theorem', 'Definition of congruent angles'],
+  'Congruent Complements Theorem': ['Congruent Supplements Theorem', 'Definition of complementary angles', 'Right Angles Congruence Theorem'],
+  'Congruent Supplements Theorem': ['Congruent Complements Theorem', 'Linear Pair Postulate', 'Vertical Angles Congruence Theorem'],
+  'Transitive Property of Angle Congruence': ['Transitive Property of Segment Congruence', 'Vertical Angles Congruence Theorem', 'Symmetric Property of Angle Congruence'],
+  'Transitive Property of Segment Congruence': ['Transitive Property of Angle Congruence', 'Symmetric Property of Segment Congruence', 'Reflexive Property of Segment Congruence'],
+  'Definition of segment bisector': ['Definition of congruent segments', 'Definition of midpoint', 'Segment Addition Postulate'],
+  'Division Property of Equality': ['Subtraction Property of Equality', 'Multiplication Property of Equality', 'Simplify'],
+  'Definition of right angle': ['Definition of complementary angles', 'Right Angles Congruence Theorem', 'Definition of congruent angles'],
+};
+// pick a step and blank its reason (or, sometimes, its statement)
+function g2ProofQ(r, topic, P, { stemLead = 'Complete the proof.' } = {}) {
+  const cand = P.steps.map((s, i) => i).filter((i) => P.steps[i][1] !== 'Given' && P.steps[i][1] !== 'Simplify');
+  const i = pick(r, cand), col = r() < 0.75 ? 1 : 0, [st, why] = P.steps[i];
+  const PP = { ...P, blank: i, col }, L = g2ProofLayout(PP), draw = (cv) => g2ProofDraw(cv, PP);
+  if (col === 1) {
+    const near = (G2NEAR[why] || []).filter((x) => x !== why), others = G2REASONS.filter((x) => x !== why && !near.includes(x));
+    const ch = buildChoices(r, why, shuffle(r, others).slice(0, 4), () => null, shuffle(r, near).slice(0, 2));
+    return { topic, stem: `${stemLead} Which reason belongs in step ${i + 1}?`, ...ch, fr: g1Sel(`Reason ${i + 1}:`, ch.choices, why), draw, size: [L.W, L.H],
+      solution: `Step ${i + 1}: ${st}\nReason: ${why}.${P.why && P.why[i] ? ' ' + P.why[i] : ''}` };
+  }
+  const wrongs = [...P.steps.filter((s, j) => j !== i && s[0] !== st).map((s) => s[0]), ...(P.alts && P.alts[i] ? P.alts[i] : [])];
+  const ch = buildChoices(r, st, shuffle(r, wrongs), () => null, P.alts && P.alts[i] ? shuffle(r, P.alts[i]).slice(0, 2) : []);
+  return { topic, stem: `${stemLead} Which statement belongs in step ${i + 1}?`, ...ch, fr: g1Sel(`Statement ${i + 1}:`, ch.choices, st), draw, size: [L.W, L.H],
+    solution: `Step ${i + 1}: ${st}\nReason: ${why}.${P.why && P.why[i] ? ' ' + P.why[i] : ''}` };
+}
+
+/* ---------- 2.1 Conditional Statements ---------- */
+// p, q, not p, not q, is p → q true, is q → p true
+const G2COND = [
+  ['two angles are supplementary', 'the measures of the angles sum to 180°', 'two angles are not supplementary', 'the measures of the angles do not sum to 180°', true, true],
+  ['you are in math class', 'you are in Geometry', 'you are not in math class', 'you are not in Geometry', false, true],
+  ['an angle measures 30°', 'the angle is acute', 'an angle does not measure 30°', 'the angle is not acute', true, false],
+  ['a polygon is a square', 'the polygon has four sides', 'a polygon is not a square', 'the polygon does not have four sides', true, false],
+  ['a number is divisible by 6', 'the number is divisible by 3', 'a number is not divisible by 6', 'the number is not divisible by 3', true, false],
+  ['two angles are vertical angles', 'the angles are congruent', 'two angles are not vertical angles', 'the angles are not congruent', true, false],
+  ['a figure is a rectangle', 'the figure has four right angles', 'a figure is not a rectangle', 'the figure does not have four right angles', true, true],
+  ['x = 4', 'x² = 16', 'x ≠ 4', 'x² ≠ 16', true, false],
+  ['3x − 7 = 20', 'x = 9', '3x − 7 ≠ 20', 'x ≠ 9', true, true],
+  ['it is Valentine’s Day', 'it is February', 'it is not Valentine’s Day', 'it is not February', true, false],
+  ['a number is even', 'the number is divisible by 4', 'a number is not even', 'the number is not divisible by 4', false, true],
+  ['an angle is a right angle', 'the angle measures 90°', 'an angle is not a right angle', 'the angle does not measure 90°', true, true],
+  ['a triangle is equilateral', 'the triangle is isosceles', 'a triangle is not equilateral', 'the triangle is not isosceles', true, false],
+  ['you are not an only child', 'you have a sibling', 'you are an only child', 'you do not have a sibling', true, true],
+  ['the Sun is out', 'it is daytime', 'the Sun is not out', 'it is not daytime', true, false],
+  ['an animal is a fish', 'the animal lives in water', 'an animal is not a fish', 'the animal does not live in water', true, false],
+  ['a polygon has five sides', 'the polygon is a pentagon', 'a polygon does not have five sides', 'the polygon is not a pentagon', true, true],
+  ['two lines are perpendicular', 'the lines intersect', 'two lines are not perpendicular', 'the lines do not intersect', true, false],
+];
+const g2If = (a, b) => `If ${a}, then ${b}.`;
+TEMPLATES.g21HypConc = (r) => {
+  const [p, q, np, nq] = pick(r, G2COND), hyp = r() < 0.5, ans = hyp ? p : q;
+  return g2Q(r, 'Hypothesis and conclusion', `${g2If(p, q)}\nWhat is the ${hyp ? 'hypothesis' : 'conclusion'}?`, ans, [hyp ? q : p, hyp ? np : nq, hyp ? nq : np],
+    { solution: `In “if p, then q,” the hypothesis p follows “if” and the conclusion q follows “then.”\nHypothesis: ${p}\nConclusion: ${q}` });
+};
+// statement, its if-then form (p, q), not p, not q
+const G2IFTHEN = [
+  ['9x + 5 = 23, because x = 2.', 'x = 2', '9x + 5 = 23', 'x ≠ 2', '9x + 5 ≠ 23'],
+  ['4x − 1 = 11, because x = 3.', 'x = 3', '4x − 1 = 11', 'x ≠ 3', '4x − 1 ≠ 11'],
+  ['Today is Friday, so tomorrow is the weekend.', 'today is Friday', 'tomorrow is the weekend', 'today is not Friday', 'tomorrow is not the weekend'],
+  ['When a glacier melts, the sea level rises.', 'a glacier melts', 'the sea level rises', 'a glacier does not melt', 'the sea level does not rise'],
+  ['Two right angles are supplementary angles.', 'two angles are right angles', 'they are supplementary angles', 'two angles are not right angles', 'they are not supplementary angles'],
+  ['People who are registered are allowed to vote.', 'a person is registered', 'the person is allowed to vote', 'a person is not registered', 'the person is not allowed to vote'],
+  ['The measures of complementary angles sum to 90°.', 'two angles are complementary', 'their measures sum to 90°', 'two angles are not complementary', 'their measures do not sum to 90°'],
+  ['All squares are rectangles.', 'a figure is a square', 'it is a rectangle', 'a figure is not a square', 'it is not a rectangle'],
+  ['Vertical angles are congruent.', 'two angles are vertical angles', 'they are congruent', 'two angles are not vertical angles', 'they are not congruent'],
+  ['When it rains, the game is canceled.', 'it rains', 'the game is canceled', 'it does not rain', 'the game is not canceled'],
+  ['A triangle has three sides.', 'a polygon is a triangle', 'it has three sides', 'a polygon is not a triangle', 'it does not have three sides'],
+  ['Students who finish their work early can read a book.', 'a student finishes their work early', 'the student can read a book', 'a student does not finish their work early', 'the student cannot read a book'],
+];
+TEMPLATES.g21IfThen = (r) => {
+  const [s, p, q, np, nq] = pick(r, G2IFTHEN), ans = g2If(p, q);
+  return g2Q(r, 'If-then form', `Rewrite the conditional statement in if-then form.\n${s}`, ans, [g2If(q, p), g2If(np, nq), g2If(p, nq)],
+    { solution: `Find the condition (the hypothesis) and what follows from it (the conclusion).\nHypothesis: ${p}\nConclusion: ${q}\n${ans}` });
+};
+// subject, adjective, an opposite (a common mistake: the opposite is not the negation)
+const G2NEG = [['The sky', 'blue', 'gray'], ['The lake', 'cold', 'hot'], ['The ball', 'pink', 'blue'], ['The dog', 'a Labrador retriever', 'a poodle'], ['The angle', 'acute', 'obtuse'],
+  ['The number', 'positive', 'negative'], ['The door', 'open', 'closed'], ['The test', 'easy', 'hard'], ['The line', 'horizontal', 'vertical'], ['The triangle', 'isosceles', 'scalene'], ['The room', 'dark', 'bright'], ['The road', 'wet', 'dry']];
+TEMPLATES.g21Negate = (r) => {
+  const [s, a, o] = pick(r, G2NEG), not = r() < 0.4, st = `${s} is ${not ? 'not ' : ''}${a}.`, ans = `${s} is ${not ? '' : 'not '}${a}.`;
+  return g2Q(r, 'Negation', `Write the negation of the statement.\n${st}`, ans, [st, `${s} is ${o}.`, `${s} is not ${o}.`],
+    { solution: `The negation of a statement has the opposite truth value. ${not ? 'Remove' : 'Add'} “not”: ${ans}\n(“${s} is ${o}” is not the negation: ${s.toLowerCase()} could be neither ${a} nor ${o}.)` });
+};
+TEMPLATES.g21Related = (r) => {
+  const [p, q, np, nq, tc, tv] = pick(r, G2COND), forms = { conditional: g2If(p, q), converse: g2If(q, p), inverse: g2If(np, nq), contrapositive: g2If(nq, np) };
+  if (r() < 0.6) {
+    const want = pick(r, ['converse', 'inverse', 'contrapositive']), ans = forms[want];
+    return g2Q(r, 'Converse, inverse, and contrapositive', `Let p be “${p}” and let q be “${q}.” Which statement is the ${want}?`, ans, Object.values(forms).filter((x) => x !== ans),
+      { solution: `Conditional p → q: ${forms.conditional}\nConverse q → p: ${forms.converse}\nInverse ∼p → ∼q: ${forms.inverse}\nContrapositive ∼q → ∼p: ${forms.contrapositive}` });
+  }
+  const opts = { tt: 'All four are true.', tf: 'Only the conditional and the contrapositive are true.', ft: 'Only the converse and the inverse are true.', ff: 'None of them are true.' };
+  const ans = opts[(tc ? 't' : 'f') + (tv ? 't' : 'f')];
+  return g2Q(r, 'Truth values of related conditionals', `Let p be “${p}” and let q be “${q}.” Think about the conditional p → q, its converse, its inverse, and its contrapositive. Which are true?`, ans, Object.values(opts),
+    { solution: `Conditional: ${forms.conditional} (${tc ? 'true' : 'false'})\nConverse: ${forms.converse} (${tv ? 'true' : 'false'})\nA conditional and its contrapositive always have the same truth value, and so do the converse and the inverse.` });
+};
+TEMPLATES.g21Diagram = (r) => {
+  const kind = pick(r, ['right', 'cong', 'lin', 'mid']);
+  const T = (why) => `True. ${why}`, F = (why) => `False. ${why}`;
+  if (kind === 'right') {
+    const [A, B, C] = g10Letters(r, 3), marked = r() < 0.5, t = 90 + (marked ? 0 : pick(r, [-3, 3]));
+    const draw = g10Fig({ pts: { [B]: [0, 0], [A]: g10P(t, 1.3), [C]: [1.6, 0] }, lines: [[B, A, 0, 0.25], [B, C, 0, 0.25]], right: marked ? [[A, B, C]] : [], margin: 30 });
+    const ok = T(`The right angle mark shows that ∠${A}${B}${C} is a right angle, so m∠${A}${B}${C} = 90°.`), no = F(`There is no right angle mark, so you cannot assume that ∠${A}${B}${C} is a right angle.`);
+    return g2Q(r, 'Statements about a diagram', `Decide whether the statement about the diagram is true. Explain using definitions.\nm∠${A}${B}${C} = 90°`, marked ? ok : no,
+      [marked ? no : ok, T(`∠${A}${B}${C} looks like it measures 90°.`), F(`∠${A}${B}${C} is an acute angle.`)], { draw, size: [300, 220], solution: marked ? ok : no });
+  }
+  if (kind === 'cong') {
+    const [S, Tn] = shuffle(r, ['S', 'T', 'R', 'U', 'V']).slice(0, 2), a = ri(r, 30, 70), same = r() < 0.5, b = same ? a : a + pick(r, [-6, -4, 4, 6]);
+    const draw = g10Fig({ pts: { [S]: [0, 0], _s1: g10P(110, 1.4), _s2: g10P(110 + a, 1.4), [Tn]: [2.2, 0], _t1: g10P(70, 1.4, [2.2, 0]), _t2: g10P(70 - b, 1.4, [2.2, 0]) }, noDot: ['_s1', '_s2', '_t1', '_t2'],
+      lines: [[S, '_s1', 0, 0.12], [S, '_s2', 0, 0.12], [Tn, '_t1', 0, 0.12], [Tn, '_t2', 0, 0.12]], angs: [{ v: S, p: '_s1', q: '_s2', lab: `${a}°`, r: 26, far: 16 }, { v: Tn, p: '_t2', q: '_t1', lab: `${b}°`, r: 26, far: 16 }], margin: 26 });
+    const ok = T(`m∠${S} = m∠${Tn} = ${a}°, and angles with equal measures are congruent.`), no = F(`m∠${S} = ${a}° and m∠${Tn} = ${b}°. Congruent angles must have the same measure.`);
+    return g2Q(r, 'Statements about a diagram', `Decide whether the statement about the diagram is true. Explain using definitions.\n∠${S} ≅ ∠${Tn}`, same ? ok : no,
+      [same ? no : ok, T(`Both angles are acute, so they are congruent.`), F(`The angles do not share a vertex, so they cannot be congruent.`)], { draw, size: [340, 220], solution: same ? ok : no });
+  }
+  if (kind === 'lin') {
+    const [M, N, P, Q] = g10Letters(r, 4), straight = r() < 0.55, t = ri(r, 50, 130), bend = straight ? 0 : pick(r, [-14, 14]);
+    const draw = g10Fig({ pts: { [M]: g10P(180 + bend, 1.4), [N]: [0, 0], [P]: [1.4, 0], [Q]: g10P(t, 1.3) }, lines: straight ? [[M, P, 0.2, 0.2], [N, Q, 0, 0.25]] : [[N, M, 0, 0.2], [N, P, 0, 0.2], [N, Q, 0, 0.25]],
+      angs: [{ v: N, p: Q, q: M, lab: '2', red: true, mark: false, r: 14 }, { v: N, p: P, q: Q, lab: '3', red: true, mark: false, r: 14 }], margin: 26 });
+    const ok = T(`${M}, ${N}, and ${P} are on one line, so ∠2 and ∠3 form a linear pair, and the angles of a linear pair are supplementary.`), no = F(`${N}${M} and ${N}${P} are not opposite rays (${M}, ${N}, and ${P} are not on one line), so ∠2 and ∠3 do not form a linear pair.`);
+    return g2Q(r, 'Statements about a diagram', `Decide whether the statement about the diagram is true. Explain using definitions.\nm∠2 + m∠3 = 180°`, straight ? ok : no,
+      [straight ? no : ok, T(`∠2 and ∠3 are adjacent angles, so their measures add to 180°.`), F(`∠2 and ∠3 are vertical angles, so they are congruent.`)], { draw, size: [340, 220], solution: straight ? ok : no });
+  }
+  const [A, B, M] = shuffle(r, ['A', 'B', 'M', 'K', 'J', 'P']).slice(0, 3), ticked = r() < 0.5, k = ticked ? 0.5 : pick(r, [0.42, 0.58]), a0 = ri(r, 15, 40);
+  const pA = g10P(180 + a0, 1.2), pB = g10P(a0, 1.2), pM = [pA[0] + (pB[0] - pA[0]) * k, pA[1] + (pB[1] - pA[1]) * k];
+  const draw = g10Fig({ pts: { [A]: pA, [M]: pM, [B]: pB }, segs: [[A, B]], ticks: ticked ? [[A, M, 1], [M, B, 1]] : [], margin: 30 });
+  const ok = T(`The tick marks show ${g10seg(A + M)} ≅ ${g10seg(M + B)}, and a midpoint divides a segment into two congruent segments.`), no = F(`Nothing shows that ${g10seg(A + M)} ≅ ${g10seg(M + B)}, so you cannot assume that ${M} is the midpoint.`);
+  return g2Q(r, 'Statements about a diagram', `Decide whether the statement about the diagram is true. Explain using definitions.\n${M} is the midpoint of ${g10seg(A + B)}.`, ticked ? ok : no,
+    [ticked ? no : ok, T(`${M} is on ${g10seg(A + B)}, so it is the midpoint.`), F(`A midpoint has to be marked with a dot.`)], { draw, size: [320, 200], solution: ticked ? ok : no });
+};
+// definition as clause A and clause B
+const G2DEF = [
+  ['a point is the midpoint of a segment', 'it divides the segment into two congruent segments'], ['two angles are vertical angles', 'their sides form two pairs of opposite rays'],
+  ['two angles are adjacent angles', 'they share a common vertex and side but have no common interior points'], ['two angles are supplementary angles', 'the sum of their measures is 180°'],
+  ['two angles are complementary angles', 'the sum of their measures is 90°'], ['an angle is a right angle', 'it measures 90°'], ['an angle is obtuse', 'its measure is between 90° and 180°'],
+  ['a polygon is a triangle', 'it has three sides'], ['two lines are perpendicular', 'they intersect to form a right angle'], ['a polygon is a quadrilateral', 'it has four sides'], ['an angle is acute', 'its measure is between 0° and 90°'],
+];
+// a conditional and its converse, both true
+const G2PAIRS = [
+  ['If a polygon has three sides, then it is a triangle.', 'If a polygon is a triangle, then it has three sides.', 'A polygon is a triangle if and only if it has three sides.', 'A polygon has three sides if it is a triangle.'],
+  ['If a polygon has four sides, then it is a quadrilateral.', 'If a polygon is a quadrilateral, then it has four sides.', 'A polygon is a quadrilateral if and only if it has four sides.', 'A polygon has four sides if it is a quadrilateral.'],
+  ['If an angle is a right angle, then it measures 90°.', 'If an angle measures 90°, then it is a right angle.', 'An angle is a right angle if and only if it measures 90°.', 'An angle measures 90° if it is a right angle.'],
+  ['If an angle is obtuse, then it has a measure between 90° and 180°.', 'If an angle has a measure between 90° and 180°, then it is obtuse.', 'An angle is obtuse if and only if it has a measure between 90° and 180°.', 'An angle has a measure between 90° and 180° if it is obtuse.'],
+  ['If two angles are complementary, then the sum of their measures is 90°.', 'If the sum of the measures of two angles is 90°, then the angles are complementary.', 'Two angles are complementary if and only if the sum of their measures is 90°.', 'The sum of the measures of two angles is 90° if they are complementary.'],
+];
+TEMPLATES.g21Bicond = (r) => {
+  if (r() < 0.6) {
+    const i = ri(r, 0, G2DEF.length - 1), [a, b] = G2DEF[i], other = G2DEF[(i + ri(r, 1, G2DEF.length - 1)) % G2DEF.length][1], ans = `${g2Cap(a)} if and only if ${b}.`;
+    return g2Q(r, 'Biconditional statements', `Rewrite the definition as a biconditional statement.\n${g2Cap(a)} when ${b}.`, ans, [`If ${a}, then ${b}.`, `${g2Cap(a)} if and only if ${other}.`, `${g2Cap(a)} if ${b}.`],
+      { solution: `A definition can be written as a biconditional: it joins the conditional and its converse with “if and only if.”\n${ans}` });
+  }
+  const [c1, c2, ans, half] = pick(r, G2PAIRS);
+  return g2Q(r, 'Biconditional statements', `Rewrite the statements as a biconditional statement.\n${c1}\n${c2}`, ans, [c1, c2, half],
+    { solution: `Both the conditional and its converse are true, so they combine into one biconditional with “if and only if”:\n${ans}` });
+};
+// truth tables: expression and its value as a function of p, q
+const G2TT = [['∼p → q', (p, q) => p || q], ['∼q → p', (p, q) => q || p], ['∼(∼p → ∼q)', (p, q) => !p && q], ['∼(p → ∼q)', (p, q) => p && q], ['q → ∼p', (p, q) => !q || !p], ['∼(q → p)', (p, q) => q && !p],
+  ['p → q', (p, q) => !p || q], ['q → p', (p, q) => !q || p], ['∼p → ∼q', (p, q) => p || !q], ['∼q → ∼p', (p, q) => q || !p], ['∼(p → q)', (p, q) => p && !q]];
+const G2ROWS = [[true, true], [true, false], [false, true], [false, false]];
+TEMPLATES.g21Truth = (r) => {
+  const [e, f] = pick(r, G2TT), col = G2ROWS.map(([p, q]) => (f(p, q) ? 'T' : 'F')), ans = col.join(', ');
+  const wrong = [col.map((x) => (x === 'T' ? 'F' : 'T')).join(', '), ...G2TT.map(([, g]) => G2ROWS.map(([p, q]) => (g(p, q) ? 'T' : 'F')).join(', '))];
+  const draw = (cv) => { const ctx = cv._ctx, W = cv._w, cols = ['p', 'q', e], w = [70, 70, 160], x0 = (W - 300) / 2; ctx.clearRect(0, 0, W, cv._h); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#eef2f7'; ctx.fillRect(x0, 6, 300, 30); ctx.strokeStyle = '#9aa3ad'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 5; i++) { ctx.beginPath(); ctx.moveTo(x0, 6 + (i ? 30 + (i - 1) * 30 : 0)); ctx.lineTo(x0 + 300, 6 + (i ? 30 + (i - 1) * 30 : 0)); ctx.stroke(); }
+    let x = x0; [0, ...w].forEach((ww, i) => { x += ww; ctx.beginPath(); ctx.moveTo(x, 6); ctx.lineTo(x, 156); ctx.stroke(); });
+    ctx.fillStyle = '#1d1d1b'; ctx.font = 'italic bold 17px Georgia, serif'; let cx = x0; cols.forEach((c, i) => { ctx.fillText(c, cx + w[i] / 2, 21); cx += w[i]; });
+    G2ROWS.forEach(([p, q], j) => { ctx.font = '17px Georgia, serif'; ctx.fillStyle = '#1d1d1b'; ctx.fillText(p ? 'T' : 'F', x0 + 35, 51 + j * 30); ctx.fillText(q ? 'T' : 'F', x0 + 105, 51 + j * 30); ctx.fillStyle = '#b03a2e'; ctx.font = 'bold 17px Georgia, serif'; ctx.fillText('?', x0 + 220, 51 + j * 30); }); };
+  const steps = G2ROWS.map(([p, q], j) => `p = ${p ? 'T' : 'F'}, q = ${q ? 'T' : 'F'}: ${col[j]}`).join('\n');
+  return g2Q(r, 'Truth tables', `Complete the truth table for ${e}. Which list gives the last column, from top to bottom?`, ans, wrong,
+    { draw, size: [320, 165], solution: `A conditional is false only when the hypothesis is true and the conclusion is false. ∼ switches T and F.\n${steps}` });
+};
+
+/* ---------- 2.2 Inductive and Deductive Reasoning ---------- */
+TEMPLATES.g22Pattern = (r) => {
+  const kind = pick(r, ['arith', 'alt', 'diffs', 'geo', 'letters', 'letters', 'shapes']);
+  if (kind === 'shapes') {
+    const n0 = ri(r, 3, 5), names = { 3: 'triangle', 4: 'square', 5: 'pentagon', 6: 'hexagon', 7: 'heptagon', 8: 'octagon', 9: 'nonagon', 10: 'decagon' };
+    const polys = [0, 1, 2].map((k) => { const n = n0 + k, c = [k * 2.6, 0]; return { pts: [...Array(n)].map((_, j) => g10P(90 + (360 * j) / n + (n === 4 ? 45 : 0), 1, c)), fill: 'rgba(110,160,210,0.45)' }; });
+    const ans = `${g2Cap(names[n0 + 3])}, then ${names[n0 + 4]}`;
+    return g2Q(r, 'Describing patterns', 'Describe the pattern. Then name the next two figures.', ans, [`${g2Cap(names[n0 + 4])}, then ${names[n0 + 5]}`, `${g2Cap(names[n0 + 2])}, then ${names[n0 + 3]}`, `${g2Cap(names[n0])}, then ${names[n0 + 1]}`],
+      { draw: g10Fig({ polys, margin: 20 }), size: [420, 160], solution: `Each figure is a regular polygon with one more side than the one before (${n0}, ${n0 + 1}, ${n0 + 2} sides). The next two have ${n0 + 3} and ${n0 + 4} sides: a ${names[n0 + 3]} and a ${names[n0 + 4]}.` });
+  }
+  let seq, next, wrong, rule;
+  if (kind === 'arith') { const a = ri(r, -10, 12), d = pick(r, [-7, -5, -4, -3, 3, 4, 5, 6, 8]); seq = [0, 1, 2, 3, 4].map((k) => a + k * d); next = [a + 5 * d, a + 6 * d]; wrong = [[a + 5 * d, a + 7 * d], [a + 6 * d, a + 7 * d], [a + 4 * d + d + 1, a + 4 * d + 2 * d + 2]]; rule = `Add ${fmt(d)} each time.`; }
+  else if (kind === 'alt') { const a = ri(r, 1, 6), s = pick(r, [1, -1]); seq = [0, 1, 2, 3, 4].map((k) => s * (k % 2 ? -1 : 1) * (a + k)); next = [5, 6].map((k) => s * (k % 2 ? -1 : 1) * (a + k)); wrong = [next.map((v) => -v), [next[0], -next[1]], [-next[0], next[1]]]; rule = 'The numbers count up by 1, and the signs alternate.'; }
+  else if (kind === 'diffs') { const a = ri(r, 0, 5), d0 = ri(r, 1, 4), dd = ri(r, 1, 3); seq = [a]; for (let k = 0; k < 4; k++) seq.push(seq[k] + d0 + k * dd); const n1 = seq[4] + d0 + 4 * dd, n2 = n1 + d0 + 5 * dd; next = [n1, n2]; wrong = [[seq[4] + d0 + 3 * dd, seq[4] + 2 * (d0 + 3 * dd)], [n1, n1 + d0 + 4 * dd], [n1 + dd, n2 + 2 * dd]]; rule = `The differences are ${[1, 2, 3, 4].map((k) => seq[k] - seq[k - 1]).join(', ')}, …: each is ${dd} more than the one before.`; }
+  else if (kind === 'geo') { const a = pick(r, [1, 2, 3, 5]), m = pick(r, [2, 3, -2]); seq = [0, 1, 2, 3, 4].map((k) => a * m ** k); next = [a * m ** 5, a * m ** 6]; wrong = [[a * m ** 5, a * m ** 5 * 2], [seq[4] + (seq[4] - seq[3]), seq[4] + 2 * (seq[4] - seq[3])], next.map((v) => -v)]; rule = `Multiply by ${fmt(m)} each time.`; }
+  else { const AL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', back = r() < 0.4, d = back ? -pick(r, [1, 2]) : pick(r, [2, 3, 4]), st = back ? ri(r, 15, 25) : ri(r, 0, 25 - 6 * d);
+    seq = [0, 1, 2, 3, 4].map((k) => AL[st + k * d]); next = [AL[st + 5 * d], AL[st + 6 * d]]; wrong = [[AL[st + 5 * d + Math.sign(d)], AL[st + 6 * d + 2 * Math.sign(d)]], [AL[st + 4 * d], AL[st + 3 * d]], [AL[st + 6 * d], AL[st + 7 * d]], [AL[st + 5 * d - Math.sign(d)], AL[st + 6 * d - Math.sign(d)]]].filter((x) => x.every(Boolean)); rule = `Go ${back ? 'backward' : 'forward'} ${Math.abs(d)} letter${Math.abs(d) > 1 ? 's' : ''} in the alphabet each time.`; }
+  wrong.push(next.slice().reverse(), typeof next[0] === 'number' ? [next[0], next[1] + 1] : next.map((c) => c.toLowerCase()), typeof next[0] === 'number' ? [next[0] - 1, next[1] - 1] : [next[0], next[0]]);
+  const show = (a) => a.map((v) => (typeof v === 'number' ? fmt(v) : v)).join(', ');
+  return g2Q(r, 'Describing patterns', `Describe the pattern. Then write the next two terms.\n${show(seq)}, …`, show(next), wrong.map(show), { solution: `${rule}\nNext two terms: ${show(next)}` });
+};
+// conjecture, a counterexample, examples that fit the conjecture
+const G2COUNTER = [
+  ['The product of two positive numbers is always greater than either number.', ['1/2 and 4', '1/3 and 6', '1 and 9'], ['2 and 3', '5 and 10', '3 and 7', '4 and 6'], 'the product is not greater than both numbers'],
+  ['If n is a nonzero integer, then (n + 1)/n is always greater than 1.', ['n = −2', 'n = −5', 'n = −3'], ['n = 1', 'n = 2', 'n = 5', 'n = 10'], '(n + 1)/n is less than 1'],
+  ['If two angles are supplements of each other, then one of the angles must be acute.', ['90° and 90°'], ['30° and 150°', '100° and 80°', '45° and 135°', '120° and 60°'], 'neither angle is acute'],
+  ['The sum of two numbers is always greater than either number.', ['−3 and 5', '−4 and 2', '0 and 7'], ['2 and 7', '4 and 9', '10 and 1', '6 and 6'], 'the sum is not greater than both numbers'],
+  ['The square of a number is always greater than the number.', ['1/2', '1', '0'], ['3', '−2', '5', '10'], 'the square is not greater than the number'],
+  ['The difference of two positive numbers is always positive.', ['3 − 8', '2 − 5', '1 − 4'], ['9 − 4', '7 − 2', '10 − 3', '6 − 1'], 'the difference is not positive'],
+  ['If a number is divisible by 2, then it is divisible by 4.', ['6', '10', '14'], ['8', '12', '16', '20'], 'the number is divisible by 2 but not by 4'],
+  ['All prime numbers are odd.', ['2'], ['3', '5', '7', '11'], '2 is prime but even'],
+  ['The quotient of two negative integers is always an integer.', ['−3 ÷ (−2)', '−5 ÷ (−2)', '−7 ÷ (−4)'], ['−6 ÷ (−2)', '−8 ÷ (−4)', '−9 ÷ (−3)', '−10 ÷ (−5)'], 'the quotient is not an integer'],
+  ['If an angle is not acute, then it is obtuse.', ['an angle of 90°', 'an angle of 180°'], ['an angle of 120°', 'an angle of 100°', 'an angle of 150°', 'an angle of 95°'], 'the angle is neither acute nor obtuse'],
+];
+TEMPLATES.g22Counter = (r) => {
+  const [c, cx, ok, why] = pick(r, G2COUNTER), ans = pick(r, cx);
+  return g2Q(r, 'Counterexamples', `Which is a counterexample that shows the conjecture is false?\n${c}`, ans, shuffle(r, ok).slice(0, 3),
+    { solution: `A counterexample fits the hypothesis but makes the conjecture false. For ${ans}, ${why}. The other choices agree with the conjecture, so they don’t disprove it.` });
+};
+// rule p → q, a fact that is p, the conclusion q, a fact that is q (the converse error), not q
+const G2DETACH = [
+  ['If you download a GIF, then your device crashes.', 'You download a GIF.', 'Your device crashes.', 'Your device crashes.', 'You download a GIF.', 'Your device does not crash.'],
+  ['If your cousin lets you borrow a car, then you will go to the mountains with your friend.', 'Your cousin lets you borrow a car.', 'You will go to the mountains with your friend.', 'You will go to the mountains with your friend.', 'Your cousin lets you borrow a car.', 'You will not go to the mountains with your friend.'],
+  ['If a quadrilateral is a square, then it has four right angles.', 'Quadrilateral QRST is a square.', 'Quadrilateral QRST has four right angles.', 'Quadrilateral QRST has four right angles.', 'Quadrilateral QRST is a square.', 'Quadrilateral QRST does not have four right angles.'],
+  ['If a point divides a line segment into two congruent line segments, then the point is a midpoint.', 'Point P divides L̅H̅ into two congruent line segments.', 'P is the midpoint of L̅H̅.', 'P is the midpoint of L̅H̅.', 'Point P divides L̅H̅ into two congruent line segments.', 'P is not the midpoint of L̅H̅.'],
+  ['If two angles are vertical angles, then they are congruent.', '∠1 and ∠2 are vertical angles.', '∠1 ≅ ∠2.', '∠1 ≅ ∠2.', '∠1 and ∠2 are vertical angles.', '∠1 and ∠2 are not congruent.'],
+  ['If it snows more than 6 inches, then school is canceled.', 'It snows 8 inches.', 'School is canceled.', 'School is canceled.', 'It snows 8 inches.', 'School is not canceled.'],
+  ['If an angle is a right angle, then its measure is 90°.', '∠K is a right angle.', 'm∠K = 90°.', 'm∠K = 90°.', '∠K is a right angle.', 'm∠K ≠ 90°.'],
+  ['If you score 90% or higher on the test, then you earn an A.', 'You score 94% on the test.', 'You earn an A.', 'You earn an A.', 'You score 94% on the test.', 'You do not earn an A.'],
+  ['If two angles form a linear pair, then they are supplementary.', '∠3 and ∠4 form a linear pair.', '∠3 and ∠4 are supplementary.', '∠3 and ∠4 are supplementary.', '∠3 and ∠4 form a linear pair.', '∠3 and ∠4 are not supplementary.'],
+];
+const G2NONE = 'No conclusion is possible.';
+TEMPLATES.g22Detach = (r) => {
+  const [rule, pf, q, qf, pAgain, nq] = pick(r, G2DETACH), good = r() < 0.6, fact = good ? pf : qf, ans = good ? q : G2NONE;
+  const [h, c] = rule.replace(/^If /, '').replace(/\.$/, '').split(', then '), conv = `If ${c}, then ${h}.`;
+  return g2Q(r, 'Law of Detachment', `Use the Law of Detachment to determine what you can conclude from the given information, if possible.\n${rule}\n${fact}`, ans, good ? [G2NONE, nq, conv] : [pAgain, nq, conv],
+    { solution: good ? `The fact matches the hypothesis, so by the Law of Detachment the conclusion is true: ${q}` : `The fact matches the conclusion, not the hypothesis. The Law of Detachment only works when the hypothesis is true, so no conclusion is possible.` });
+};
+// p → q, q → r chains (and pairs that cannot be chained)
+const G2SYLL = [
+  { s1: 'If a = 3, then 5a = 15.', s2: 'If ½a = 1½, then a = 3.', ans: 'If ½a = 1½, then 5a = 15.', bad: ['If 5a = 15, then ½a = 1½.', 'If a = 3, then ½a = 1½.'] },
+  { s1: 'If a figure is a rhombus, then the figure is a parallelogram.', s2: 'If a figure is a parallelogram, then the figure has two pairs of opposite sides that are parallel.', ans: 'If a figure is a rhombus, then the figure has two pairs of opposite sides that are parallel.', bad: ['If a figure has two pairs of opposite sides that are parallel, then the figure is a rhombus.', 'If a figure is a parallelogram, then the figure is a rhombus.'] },
+  { s1: 'If x < −2, then |x| > 2.', s2: 'If x > 2, then |x| > 2.', ans: null, bad: ['If x < −2, then x > 2.', 'If x > 2, then x < −2.'] },
+  { s1: 'If a figure is a square, then the figure has four congruent sides.', s2: 'If a figure is a square, then the figure has four right angles.', ans: null, bad: ['If a figure has four congruent sides, then the figure has four right angles.', 'If a figure has four right angles, then the figure has four congruent sides.'] },
+  { s1: 'If you do your homework, then you can watch TV.', s2: 'If you watch TV, then you can watch your favorite show.', ans: 'If you do your homework, then you can watch your favorite show.', bad: ['If you watch your favorite show, then you did your homework.', 'If you can watch TV, then you do your homework.'] },
+  { s1: 'If it rains, then the field is muddy.', s2: 'If the field is muddy, then practice is moved inside.', ans: 'If it rains, then practice is moved inside.', bad: ['If practice is moved inside, then it rains.', 'If the field is muddy, then it rains.'] },
+  { s1: 'If x = 4, then 3x = 12.', s2: 'If 3x = 12, then 3x + 2 = 14.', ans: 'If x = 4, then 3x + 2 = 14.', bad: ['If 3x + 2 = 14, then 3x = 12.', 'If 3x = 12, then x = 4.'] },
+  { s1: 'If an angle measures 120°, then it is obtuse.', s2: 'If an angle is obtuse, then it is not acute.', ans: 'If an angle measures 120°, then it is not acute.', bad: ['If an angle is not acute, then it measures 120°.', 'If an angle is obtuse, then it measures 120°.'] },
+  { s1: 'If you study, then you pass the test.', s2: 'If you pass the test, then you make the honor roll.', ans: 'If you study, then you make the honor roll.', bad: ['If you make the honor roll, then you study.', 'If you pass the test, then you study.'] },
+  { s1: 'If two angles are vertical angles, then they are congruent.', s2: 'If two angles are congruent, then they have the same measure.', ans: 'If two angles are vertical angles, then they have the same measure.', bad: ['If two angles have the same measure, then they are vertical angles.', 'If two angles are congruent, then they are vertical angles.'] },
+];
+const G2NOSYL = 'Not possible: no new statement follows.';
+TEMPLATES.g22Syllogism = (r) => {
+  const S = pick(r, G2SYLL), swap = r() < 0.5, [a, b] = swap ? [S.s2, S.s1] : [S.s1, S.s2], ans = S.ans || G2NOSYL;
+  return g2Q(r, 'Law of Syllogism', `Use the Law of Syllogism to write a new conditional statement that follows from the pair of true statements, if possible.\n${a}\n${b}`, ans, [S.ans ? G2NOSYL : null, ...S.bad, S.s1],
+    { solution: S.ans ? `The conclusion of one statement is the hypothesis of the other, so the two statements link together: ${S.ans}` : 'The statements share a hypothesis or a conclusion, but the conclusion of one is not the hypothesis of the other. So the Law of Syllogism does not apply.' });
+};
+TEMPLATES.g22WhichLaw = (r) => {
+  const kind = pick(r, ['det', 'syl', 'ind', 'none']);
+  let text, ans, why;
+  if (kind === 'det') { const D = pick(r, G2DETACH); text = `${D[0]}\n${D[1]}\n${D[2]}`; ans = 'Law of Detachment'; why = 'A conditional and its true hypothesis give the conclusion.'; }
+  else if (kind === 'syl') { const S = pick(r, G2SYLL.filter((x) => x.ans)); text = `${S.s1}\n${S.s2}\n${S.ans}`; ans = 'Law of Syllogism'; why = 'Two conditionals that link (the conclusion of one is the hypothesis of the other) give a new conditional.'; }
+  else if (kind === 'ind') { const I = pick(r, ['The last five days, the bus arrived at 7:42. So the bus will arrive at 7:42 tomorrow.', 'Each time you water the plant, it grows. So the plant will grow the next time you water it.', '2 + 4 = 6, 6 + 8 = 14, and 10 + 12 = 22. So the sum of any two even numbers is even.', 'The first four times the coach wore a red tie, the team won. So the team will win when the coach wears a red tie.']); text = I; ans = 'Inductive reasoning (not a law of logic)'; why = 'The conclusion comes from a pattern of examples, not from a law of logic.'; }
+  else { const D = pick(r, G2DETACH); text = `${D[0]}\n${D[3]}\n${D[4]}`; ans = 'Neither law: the conclusion does not follow'; why = 'The fact matches the conclusion, not the hypothesis, so the Law of Detachment does not apply.'; }
+  return g2Q(r, 'Laws of logic', `Which law of logic is illustrated?\n${text}`, ans, ['Law of Detachment', 'Law of Syllogism', 'Inductive reasoning (not a law of logic)', 'Neither law: the conclusion does not follow'], { solution: `${ans}. ${why}` });
+};
+const G2INDDED = [
+  ['Each time you go to bed, you charge your electronic devices. So, the next time you go to bed, you will charge your electronic devices.', true],
+  ['Even numbers are divisible by 2. Odd numbers are not divisible by 2. So, 4 is an even number.', false],
+  ['All photosynthetic organisms produce oxygen. Phytoplankton are photosynthetic organisms. So, phytoplankton produce oxygen.', false],
+  ['Each time you clean your room, you are allowed to go out with your friends. So, the next time you clean your room, you will be allowed to go out with your friends.', true],
+  ['The sum of the angle measures of every triangle is 180°. △ABC is a triangle. So, the angle measures of △ABC sum to 180°.', false],
+  ['The last three Mondays, the cafeteria served pizza. So, the cafeteria will serve pizza next Monday.', true],
+  ['Vertical angles are congruent. ∠1 and ∠2 are vertical angles. So, ∠1 ≅ ∠2.', false],
+  ['You measured the angles of 20 triangles, and they always added to 180°. So, the angles of every triangle add to 180°.', true],
+  ['If a number ends in 0, it is divisible by 10. The number 730 ends in 0. So, 730 is divisible by 10.', false],
+];
+TEMPLATES.g22IndDed = (r) => {
+  const [t, ind] = pick(r, G2INDDED), I = 'Inductive: the conclusion is based on a pattern of observations.', D = 'Deductive: the conclusion uses facts, definitions, and laws of logic.';
+  return g2Q(r, 'Inductive or deductive', `Decide whether inductive reasoning or deductive reasoning is used to reach the conclusion.\n${t}`, ind ? I : D,
+    [ind ? D : I, 'Inductive: the conclusion uses facts, definitions, and laws of logic.', 'Deductive: the conclusion is based on a pattern of observations.'], { solution: ind ? I : D });
+};
+TEMPLATES.g22Table = (r) => {
+  const m = pick(r, [-3, -2, 2, 3, 4, 5]), b = pick(r, [-6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8]), xs = [0, 1, 2, 3, 4], ys = xs.map((x) => m * x + b), ask = ri(r, 7, 15);
+  const eq = `y = ${g10lin(m, b)}`, ans = `${eq}; when x = ${ask}, y = ${fmt(m * ask + b)}`;
+  const draw = (cv) => { const ctx = cv._ctx, W = cv._w, cw = 54, x0 = (W - cw * 6) / 2; ctx.clearRect(0, 0, W, cv._h); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.strokeStyle = '#9aa3ad';
+    ctx.fillStyle = '#eef2f7'; ctx.fillRect(x0, 8, cw, 64); ctx.strokeRect(x0, 8, cw * 6, 64); ctx.beginPath(); ctx.moveTo(x0, 40); ctx.lineTo(x0 + cw * 6, 40); for (let i = 1; i < 6; i++) { ctx.moveTo(x0 + i * cw, 8); ctx.lineTo(x0 + i * cw, 72); } ctx.stroke();
+    ctx.fillStyle = '#1d1d1b'; ctx.font = 'italic bold 17px Georgia, serif'; ctx.fillText('x', x0 + cw / 2, 24); ctx.fillText('y', x0 + cw / 2, 56); ctx.font = '17px Georgia, serif';
+    xs.forEach((x, i) => { ctx.fillText(fmt(x), x0 + (i + 1.5) * cw, 24); ctx.fillText(fmt(ys[i]), x0 + (i + 1.5) * cw, 56); }); };
+  return g2Q(r, 'Conjectures from a table', `Use the table to make a conjecture about the relationship between x and y. Write an equation for y in terms of x. Then find y when x = ${ask}.`, ans,
+    [`y = ${g10lin(b === 0 ? m + 1 : b, m)}; when x = ${ask}, y = ${fmt((b === 0 ? m + 1 : b) * ask + m)}`, `y = ${g10lin(m, 0)}; when x = ${ask}, y = ${fmt(m * ask)}`, `${eq}; when x = ${ask}, y = ${fmt(m * ask + b + m)}`, `y = ${g10lin(m, b + m)}; when x = ${ask}, y = ${fmt(m * ask + b + m)}`],
+    { draw, size: [360, 80], solution: `Each time x goes up by 1, y changes by ${fmt(m)}, and y = ${fmt(b)} when x = 0. So ${eq}.\nWhen x = ${ask}: y = ${fmt(m)}(${ask}) ${b < 0 ? MINUS : '+'} ${fmt(Math.abs(b))} = ${fmt(m * ask + b)}` });
+};
+
+/* ---------- 2.3 Postulates and Diagrams ---------- */
+const G2POST = { tp: 'Two Point Postulate', lp: 'Line-Point Postulate', li: 'Line Intersection Postulate', thp: 'Three Point Postulate', pp: 'Plane-Point Postulate', pl: 'Plane-Line Postulate', pi: 'Plane Intersection Postulate' };
+TEMPLATES.g23Postulate = (r) => {
+  const [A, B, C] = g10Letters(r, 3, ['M', 'P']), [l, m] = shuffle(r, ['ℓ', 'm', 'n', 'k']).slice(0, 2), Pn = pick(r, ['M', 'P', 'X', 'R']), Qn = Pn === 'X' ? 'W' : 'X';
+  const ex = [
+    ['tp', `Through points ${A} and ${B}, there is exactly one line.`], ['tp', `Exactly one line, line ${A}${B}, passes through points ${A} and ${B}.`],
+    ['lp', `Line ${l} contains at least two points, such as ${A} and ${B}.`], ['li', `Lines ${l} and ${m} intersect at exactly one point, point ${A}.`],
+    ['thp', `Through the noncollinear points ${A}, ${B}, and ${C}, there is exactly one plane, plane ${Pn}.`], ['pp', `Plane ${Pn} contains at least three noncollinear points, such as ${A}, ${B}, and ${C}.`],
+    ['pl', `Points ${A} and ${B} lie in plane ${Pn}, so line ${A}${B} lies in plane ${Pn}.`], ['pi', `Planes ${Pn} and ${Qn} intersect in line ${l}.`]];
+  const [k, s] = pick(r, ex), ans = G2POST[k], near = { tp: ['lp', 'thp'], lp: ['tp', 'pp'], li: ['pi', 'tp'], thp: ['pp', 'tp'], pp: ['thp', 'lp'], pl: ['pp', 'pi'], pi: ['li', 'pl'] }[k];
+  const statement = { tp: 'Through any two points, there exists exactly one line.', lp: 'A line contains at least two points.', li: 'If two lines intersect, then their intersection is exactly one point.', thp: 'Through any three noncollinear points, there exists exactly one plane.', pp: 'A plane contains at least three noncollinear points.', pl: 'If two points lie in a plane, then the line containing them lies in the plane.', pi: 'If two planes intersect, then their intersection is a line.' }[k];
+  const ch = buildChoices(r, ans, Object.values(G2POST).filter((x) => x !== ans), () => null, near.map((x) => G2POST[x]));
+  return { topic: 'Postulates', stem: `Which postulate does the statement illustrate?\n${s}`, ...ch, fr: g1Sel('Postulate:', ch.choices, ans), solution: `${ans}: ${statement}` };
+};
+// two lines crossing at M with optional right-angle mark and tick marks; which statements can you conclude?
+TEMPLATES.g23Assume = (r) => {
+  const [A, B, C, D, M] = g10Letters(r, 5), right = r() < 0.5, tickH = r() < 0.5, tickV = r() < 0.3, tilt = right ? 90 : pick(r, [80, 100]);
+  const pts = { [M]: [0, 0], [A]: g10P(tilt, 1.1), [C]: g10P(tilt + 180, tickV ? 1.1 : 1.0), [D]: [-1.25, 0], [B]: [tickH ? 1.25 : 1.6, 0] };
+  const draw = g10Fig({ pts, segs: [[A, C], [D, B]], right: right ? [[A, M, B]] : [], ticks: [...(tickH ? [[D, M, 1], [M, B, 1]] : []), ...(tickV ? [[A, M, 2], [M, C, 2]] : [])], margin: 30 });
+  const S = (a, b) => g10seg(a + b), yes = [`${A}, ${M}, and ${C} are collinear.`, `${S(A, C)} and ${S(D, B)} intersect at point ${M}.`, `∠${A}${M}${D} and ∠${C}${M}${B} are vertical angles.`, `∠${D}${M}${A} and ∠${A}${M}${B} form a linear pair.`, `m∠${D}${M}${A} + m∠${A}${M}${B} = 180°`];
+  const no = [`${A}, ${M}, and ${B} are collinear.`, `${M}${A} = ${M}${D}`, `${S(A, M)} ≅ ${S(D, M)}`];
+  (right ? yes : no).push(`${S(A, C)} ⊥ ${S(D, B)}`, `∠${A}${M}${B} is a right angle.`);
+  (tickH ? yes : no).push(`${M} is the midpoint of ${S(D, B)}.`);
+  (tickV ? yes : no).push(`${M} is the midpoint of ${S(A, C)}.`);
+  if (tickH && tickV) yes.push(`${M} is the midpoint of ${S(A, C)} and ${S(D, B)}.`); else no.push(`${M} is the midpoint of ${S(A, C)} and ${S(D, B)}.`);
+  const want = r() < 0.5, ans = pick(r, want ? yes : no), ch = g2MC(r, ans, shuffle(r, want ? no : yes).slice(0, 3));
+  const why = { [`${S(A, C)} ⊥ ${S(D, B)}`]: right ? 'the right angle mark shows the segments are perpendicular' : 'there is no right angle mark', [`∠${A}${M}${B} is a right angle.`]: right ? 'the right angle mark shows it' : 'there is no right angle mark' };
+  return { topic: 'What you can assume from a diagram', stem: `Which statement can you ${want ? '' : 'NOT '}conclude from the diagram?`, ...ch, fr: g1Sel('Statement:', ch.choices, ans), draw, size: [320, 260],
+    solution: `You can assume points that look collinear are collinear, lines that look like they intersect do intersect, and angles that look like vertical angles or linear pairs are. You cannot assume lengths, congruence, midpoints, or right angles unless the diagram marks them${right ? ' (here the right angle is marked)' : ''}${tickH || tickV ? ' (the tick marks show congruent segments)' : ''}.\nAnswer: ${ans}${why[ans] ? ` (${why[ans]})` : ''}` };
+};
+TEMPLATES.g23Error = (r) => {
+  const [A, B, C, D, M] = g10Letters(r, 5), err = pick(r, ['mid', 'perp']);
+  const pts = { [M]: [0, 0], [A]: [0, 1.1], [C]: [0, -1.1], [D]: [-1.25, 0], [B]: [1.25, 0] };
+  const draw = g10Fig({ pts, segs: [[A, C], [D, B]], ticks: [[D, M, 1], [M, B, 1]], margin: 30 });
+  const S = (a, b) => g10seg(a + b);
+  if (err === 'mid') {
+    const claim = `${M} is the midpoint of ${S(A, C)} and ${S(D, B)}.`, ans = `Only ${S(D, M)} ≅ ${S(M, B)} is marked, so ${M} is the midpoint of ${S(D, B)}. Nothing shows ${S(A, M)} ≅ ${S(M, C)}.`;
+    return g2Q(r, 'Error analysis: diagrams', `Describe and correct the error in the statement made about the diagram.\n“${claim}”`, ans,
+      [`${M} is the midpoint of ${S(A, C)} only, because ${S(A, C)} is vertical.`, 'There is no error: segments that look congruent are congruent.', `${M} is not the midpoint of either segment, because there are no points marked as midpoints.`], { draw, size: [300, 260], solution: ans });
+  }
+  const claim = `${S(A, C)} intersects ${S(D, B)} at a 90° angle, so ${S(A, C)} ⊥ ${S(D, B)}.`, ans = 'The diagram has no right angle mark, so you cannot assume the segments are perpendicular. You only know they intersect at ' + M + '.';
+  return g2Q(r, 'Error analysis: diagrams', `Describe and correct the error in the statement made about the diagram.\n“${claim}”`, ans,
+    ['There is no error: the angle looks like 90°, so it is 90°.', `The segments are perpendicular because ${M} is the midpoint of ${S(D, B)}.`, `The segments do not intersect because ${M} is not labeled on ${S(A, C)}.`], { draw, size: [300, 260], solution: ans });
+};
+
+/* ---------- 2.4 Algebraic Reasoning ---------- */
+const G2PROPS = ['Addition Property of Equality', 'Subtraction Property of Equality', 'Multiplication Property of Equality', 'Division Property of Equality', 'Substitution Property of Equality', 'Distributive Property', 'Reflexive Property of Equality', 'Symmetric Property of Equality', 'Transitive Property of Equality'];
+const g2Lin = (a, b, v = 'x') => g10lin(a, b, v);
+TEMPLATES.g24StepReason = (r) => {
+  for (;;) {
+    const x = ri(r, -9, 12), dist = r() < 0.4, k = ri(r, 2, 5), a = ri(r, 2, 9), c = ri(r, -6, 8), b0 = ri(r, -12, 12); if (a === c || !b0) continue;
+    const lhsA = dist ? k * a : a, lhsB = dist ? k * b0 : b0, d = (lhsA - c) * x + lhsB; if (!d || Math.abs(d) > 120) continue;
+    const steps = [[dist ? `${k}(${g2Lin(a, b0)}) = ${g2Lin(c, d)}` : `${g2Lin(a, b0)} = ${g2Lin(c, d)}`, 'Given']];
+    if (dist) steps.push([`${g2Lin(lhsA, lhsB)} = ${g2Lin(c, d)}`, 'Distributive Property']);
+    if (c) steps.push([`${g2Lin(lhsA - c, lhsB)} = ${fmt(d)}`, c > 0 ? 'Subtraction Property of Equality' : 'Addition Property of Equality']);
+    steps.push([`${g2Lin(lhsA - c, 0)} = ${fmt(d - lhsB)}`, lhsB > 0 ? 'Subtraction Property of Equality' : 'Addition Property of Equality']);
+    if (lhsA - c !== 1) steps.push([`x = ${fmt(x)}`, 'Division Property of Equality']);
+    const i = ri(r, 1, steps.length - 1), ans = steps[i][1];
+    const W = 520, lh = 30, draw = (cv) => { const ctx = cv._ctx; ctx.clearRect(0, 0, cv._w, cv._h); ctx.textBaseline = 'middle'; steps.forEach(([s, why], j) => { const y = 18 + j * lh;
+      ctx.font = '17px Georgia, serif'; ctx.fillStyle = '#1d1d1b'; ctx.textAlign = 'right'; ctx.fillText(s, 250, y); ctx.textAlign = 'left';
+      if (j === i) { ctx.fillStyle = 'rgba(176,58,46,0.10)'; ctx.fillRect(282, y - 12, 220, 24); ctx.strokeStyle = '#b03a2e'; ctx.strokeRect(282, y - 12, 220, 24); ctx.fillStyle = '#b03a2e'; ctx.font = 'bold 16px Georgia, serif'; ctx.fillText('?', 288, y); }
+      else { ctx.fillStyle = '#4a5160'; ctx.font = 'italic 15px Georgia, serif'; ctx.fillText(why, 288, y); } }); };
+    const ch = buildChoices(r, ans, G2PROPS.filter((p) => p !== ans), () => null, ans.startsWith('Sub') ? ['Addition Property of Equality'] : ans.startsWith('Add') ? ['Subtraction Property of Equality'] : ans.startsWith('Div') ? ['Multiplication Property of Equality'] : ['Substitution Property of Equality']);
+    return { topic: 'Justifying steps', stem: `Write the property that justifies the marked step.`, ...ch, fr: g1Sel('Property:', ch.choices, ans), draw, size: [W, 12 + steps.length * lh],
+      solution: steps.map(([s, why], j) => `${s}    ${why}`).join('\n') };
+  }
+};
+TEMPLATES.g24Solve = (r) => {
+  for (;;) {
+    const x = ri(r, -9, 12), kind = pick(r, ['two', 'both', 'dist', 'distBoth']); let lhs, rhs, a, b, c, d, k, m;
+    if (kind === 'two') { a = ri(r, 2, 9) * pick(r, [1, -1]); b = ri(r, -20, 20); if (!b) continue; lhs = g2Lin(a, b); rhs = fmt(a * x + b); }
+    else if (kind === 'both') { a = ri(r, 2, 9); c = ri(r, -6, 9); if (a === c) continue; b = ri(r, -20, 20); d = (a - c) * x + b; if (!b || !d) continue; lhs = g2Lin(a, b); rhs = c ? g2Lin(c, d) : fmt(d); }
+    else if (kind === 'dist') { k = ri(r, 2, 5) * pick(r, [1, -1]); a = ri(r, 1, 5); b = ri(r, -9, 9); if (!b) continue; lhs = `${k}(${g2Lin(a, b)})`; rhs = fmt(k * (a * x + b)); }
+    else { k = ri(r, 2, 5); a = ri(r, 1, 4); b = ri(r, -8, 8); m = ri(r, 2, 5); c = ri(r, 1, 4); if (k * a === m * c || !b) continue; const dd = k * a * x + k * b - m * c * x; if (dd % m) continue; d = dd / m; if (!d) continue; lhs = `${k}(${g2Lin(a, b)})`; rhs = `${m}(${g2Lin(c, d)})`; }
+    if (Math.abs(x) > 15) continue;
+    const ch = g10NumChoices(r, x, [-x, x + 1, x - 2, x * 2, x + 3]);
+    return { topic: 'Solving equations with justification', stem: `Solve the equation. Justify each step.\n${lhs} = ${rhs}`, ...ch, fr: g10Num('x =', x),
+      solution: `${lhs} = ${rhs}    Given\n${kind.startsWith('dist') ? 'Use the Distributive Property, then ' : ''}${kind === 'two' || kind === 'dist' ? 'use the Addition or Subtraction Property of Equality, then the Division Property of Equality.' : 'collect the x-terms on one side with the Addition or Subtraction Property of Equality, then use the Division Property of Equality.'}\nx = ${fmt(x)}` };
+  }
+};
+// formula, variable, solved form, wrong forms
+const G2FORM = [
+  ['C = 2πr', 'r', 'r = C/(2π)', ['r = 2πC', 'r = C − 2π', 'r = 2C/π']], ['I = Prt', 'P', 'P = I/(rt)', ['P = Irt', 'P = I/r − t', 'P = I − rt']],
+  ['S = 180(n − 2)', 'n', 'n = S/180 + 2', ['n = S/180 − 2', 'n = (S − 2)/180', 'n = 180S + 2']], ['S = 2πr² + 2πrh', 'h', 'h = (S − 2πr²)/(2πr)', ['h = S/(2πr) − 2πr²', 'h = (S − 2πr)/(2πr²)', 'h = S − 2πr² − 2πr']],
+  ['P = 2ℓ + 2w', 'ℓ', 'ℓ = (P − 2w)/2', ['ℓ = P − 2w', 'ℓ = (P − w)/2', 'ℓ = P/2 − 2w']], ['A = ½bh', 'h', 'h = 2A/b', ['h = A/(2b)', 'h = 2Ab', 'h = A − ½b']],
+  ['V = ℓwh', 'w', 'w = V/(ℓh)', ['w = Vℓh', 'w = ℓh/V', 'w = V − ℓh']], ['d = rt', 't', 't = d/r', ['t = dr', 't = r/d', 't = d − r']],
+  ['y = mx + b', 'x', 'x = (y − b)/m', ['x = y/m − b', 'x = (y + b)/m', 'x = m(y − b)']], ['A = ½h(b₁ + b₂)', 'b₁', 'b₁ = 2A/h − b₂', ['b₁ = A/(2h) − b₂', 'b₁ = 2A − hb₂', 'b₁ = 2A/h + b₂']],
+  ['P = a + b + c', 'b', 'b = P − a − c', ['b = P + a + c', 'b = P − a + c', 'b = (P − a)/c']],
+];
+TEMPLATES.g24Formula = (r) => {
+  const [f, v, ans, wr] = pick(r, G2FORM);
+  return g2Q(r, 'Solving formulas', `Solve the formula for ${v}.\n${f}`, ans, wr, { solution: `Use inverse operations (the properties of equality) to get ${v} alone.\n${f}  →  ${ans}` });
+};
+TEMPLATES.g24FormulaUse = (r) => {
+  const kind = pick(r, ['rect', 'trap', 'circle', 'poly']);
+  if (kind === 'rect') { const w = ri(r, 3, 15), l = ri(r, w + 1, 30), P = 2 * l + 2 * w; return { topic: 'Using formulas', stem: `The formula for the perimeter P of a rectangle is P = 2ℓ + 2w. Solve the formula for ℓ. Then find the length of a rectangular lawn with a perimeter of ${P} meters and a width of ${w} meters.`, ...g10NumChoices(r, l, [P - 2 * w, (P - w) / 2, P / 2 - 2 * w, l + w]), fr: g10Num('ℓ =', l, ' m'), solution: `ℓ = (P − 2w)/2 = (${P} − ${2 * w})/2 = ${l} meters` }; }
+  if (kind === 'trap') { const h = ri(r, 3, 12), b2 = ri(r, 4, 25), b1 = ri(r, 4, 25), A = (h * (b1 + b2)) / 2; if (!Number.isInteger(A)) return TEMPLATES.g24FormulaUse(r);
+    return { topic: 'Using formulas', stem: `The formula for the area of a trapezoid is A = ½h(b₁ + b₂). Solve the formula for b₁. Then find b₁ when the area is ${A} square meters, the height is ${h} meters, and the other base is ${b2} meters.`, ...g10NumChoices(r, b1, [(2 * A) / h + b2, A / h - b2, A / (2 * h) - b2, 2 * A - h * b2].filter((x) => Number.isInteger(x) && x > 0)), fr: g10Num('b₁ =', b1, ' m'), solution: `b₁ = 2A/h − b₂ = ${2 * A}/${h} − ${b2} = ${b1} meters` }; }
+  if (kind === 'circle') { const rr = ri(r, 2, 20), C = 2 * rr; return { topic: 'Using formulas', stem: `The circumference of a circle is C = 2πr. Solve the formula for r. Then find the radius of a circle with a circumference of ${C}π inches.`, ...g10NumChoices(r, rr, [C, 2 * C, rr / 2, rr + 2]), fr: g10Num('r =', rr, ' in.'), solution: `r = C/(2π) = ${C}π/(2π) = ${rr} inches` }; }
+  const n = ri(r, 5, 14), S = 180 * (n - 2); return { topic: 'Using formulas', stem: `The sum S of the interior angle measures of a polygon with n sides is S = 180(n − 2). Solve the formula for n. Then find the number of sides of a polygon whose interior angle measures add to ${S}°.`, ...g10NumChoices(r, n, [n - 2, n - 4, n + 2, n + 1]), fr: g10Num('n =', n), solution: `n = S/180 + 2 = ${S}/180 + 2 = ${n - 2} + 2 = ${n}` };
+};
+TEMPLATES.g24Property = (r) => {
+  const [A, B, C, D] = g10Letters(r, 4), a = ri(r, 2, 9), n = ri(r, 12, 75), x = pick(r, ['x', 'a', 'z']), y = { x: 'y', a: 'b', z: 'w' }[x];
+  const ex = pick(r, [
+    [`If ${x} = ${y}, then ${a}${x} = ${a}${y}.`, 'Multiplication Property of Equality'], [`If ${A}${B} = ${B}${C}, then ${A}${B} + ${a} = ${B}${C} + ${a}.`, 'Addition Property of Equality'],
+    [`If ${x} = ${y}, then ${x} − ${a} = ${y} − ${a}.`, 'Subtraction Property of Equality'], [`If ${a}${x} = ${a}${y}, then ${x} = ${y}.`, 'Division Property of Equality'],
+    [`${x} = ${x}`, 'Reflexive Property of Equality'], [`m∠${A} = m∠${A}`, 'Reflexive Property of Equality'], [`${A}${B} = ${A}${B}`, 'Reflexive Property of Equality'],
+    [`If ${x} = ${y}, then ${y} = ${x}.`, 'Symmetric Property of Equality'], [`If ${A}${B} = ${C}${D}, then ${C}${D} = ${A}${B}.`, 'Symmetric Property of Equality'],
+    [`If m∠${A} = m∠${B} and m∠${B} = m∠${C}, then m∠${A} = m∠${C}.`, 'Transitive Property of Equality'], [`If ${A}${B} = ${C}${D} and ${C}${D} = ${n}, then ${A}${B} = ${n}.`, 'Transitive Property of Equality'],
+    [`If ${A}${B} = ${n} and ${A}${B} + ${B}${C} = ${n + a + 10}, then ${n} + ${B}${C} = ${n + a + 10}.`, 'Substitution Property of Equality'], [`If ${a}(${x} + ${a + 1}) = ${n}, then ${a}${x} + ${a * (a + 1)} = ${n}.`, 'Distributive Property'],
+  ]);
+  const ch = buildChoices(r, ex[1], G2PROPS.filter((p) => p !== ex[1]), () => null);
+  return { topic: 'Properties of equality', stem: `Name the property of equality that the statement illustrates.\n${ex[0]}`, ...ch, fr: g1Sel('Property:', ch.choices, ex[1]), solution: ex[1] };
+};
+TEMPLATES.g24Complete = (r) => {
+  const [A, B, C, D] = g10Letters(r, 4), n = ri(r, 8, 60), [i, j, k] = shuffle(r, [1, 2, 3, 4, 5]).slice(0, 3), kind = pick(r, ['sub', 'sym', 'tra', 'ref']);
+  if (kind === 'sub') return g2Q(r, 'Using the properties of equality', `Use the Substitution Property of Equality to complete the statement.\nIf ${A}${B} = ${n}, then ${A}${B} + ${C}${D} = ___`, `${n} + ${C}${D}`, [`${n}`, `${A}${B} + ${n}`, `${n}${C}${D}`], { solution: `Replace ${A}${B} with ${n}: ${A}${B} + ${C}${D} = ${n} + ${C}${D}` });
+  if (kind === 'sym') return g2Q(r, 'Using the properties of equality', `Use the Symmetric Property of Equality to complete the statement.\nIf m∠${i} = m∠${j}, then ___`, `m∠${j} = m∠${i}`, [`m∠${i} = m∠${i}`, `∠${i} ≅ ∠${j}`, `m∠${i} + m∠${j} = 180°`], { solution: `The Symmetric Property switches the two sides: m∠${j} = m∠${i}` });
+  if (kind === 'tra') return g2Q(r, 'Using the properties of equality', `Use the Transitive Property of Equality to complete the statement.\nIf m∠${i} = m∠${j} and m∠${j} = m∠${k}, then ___`, `m∠${i} = m∠${k}`, [`m∠${k} = m∠${j}`, `m∠${i} = m∠${j}`, `m∠${j} = m∠${i}`], { solution: `If a = b and b = c, then a = c: m∠${i} = m∠${k}` });
+  return g2Q(r, 'Using the properties of equality', `Use the Reflexive Property of Equality to complete the statement.\nm∠${A}${B}${C} = ___`, `m∠${A}${B}${C}`, [`m∠${C}${B}${A} + m∠${A}${B}${C}`, `180° − m∠${A}${B}${C}`, `m∠${B}${A}${C}`], { solution: `Any quantity equals itself: m∠${A}${B}${C} = m∠${A}${B}${C}` });
+};
+
+/* ---------- 2.5 Proving Statements about Segments and Angles ---------- */
+TEMPLATES.g25Property = (r) => {
+  const [P, Q, S, T, U, V] = g10Letters(r, 6), seg = r() < 0.5, kind = pick(r, ['ref', 'sym', 'tra']), X = (a, b) => g10seg(a + b);
+  const st = seg ? { ref: `${X(P, Q)} ≅ ${X(P, Q)}`, sym: `If ${X(P, Q)} ≅ ${X(S, T)}, then ${X(S, T)} ≅ ${X(P, Q)}.`, tra: `If ${X(P, Q)} ≅ ${X(S, T)} and ${X(S, T)} ≅ ${X(U, V)}, then ${X(P, Q)} ≅ ${X(U, V)}.` }[kind]
+    : { ref: `∠${P} ≅ ∠${P}`, sym: `If ∠${P} ≅ ∠${Q}, then ∠${Q} ≅ ∠${P}.`, tra: `If ∠${P} ≅ ∠${Q} and ∠${Q} ≅ ∠${S}, then ∠${P} ≅ ∠${S}.` }[kind];
+  const nm = (k, s) => `${{ ref: 'Reflexive', sym: 'Symmetric', tra: 'Transitive' }[k]} Property of ${s ? 'Segment' : 'Angle'} Congruence`, ans = nm(kind, seg);
+  const ch = buildChoices(r, ans, ['ref', 'sym', 'tra'].flatMap((k) => [nm(k, true), nm(k, false)]).filter((x) => x !== ans), () => null, [nm(kind, !seg)]);
+  return { topic: 'Properties of congruence', stem: `Name the property that the statement illustrates.\n${st}`, ...ch, fr: g1Sel('Property:', ch.choices, ans), solution: ans };
+};
+// the proof bank: given, prove, steps [statement, reason], optional figure
+function g25Proofs(r) {
+  const [P, Q, R, S] = pickLetters(r, 4, ['I', 'O']), X = (a, b) => g10seg(a + b);
+  const out = [];
+  out.push({ given: `${P}${Q} = ${R}${S}`, prove: `${P}${R} = ${Q}${S}`, fig: g10Fig({ pts: { [P]: [0, 0], [Q]: [1, 0], [R]: [2.3, 0], [S]: [3.3, 0] }, segs: [[P, S]], ticks: [[P, Q, 1], [R, S, 1]], margin: 26 }), figH: 90,
+    steps: [[`${P}${Q} = ${R}${S}`, 'Given'], [`${P}${Q} + ${Q}${R} = ${R}${S} + ${Q}${R}`, 'Addition Property of Equality'], [`${P}${Q} + ${Q}${R} = ${P}${R}`, 'Segment Addition Postulate'], [`${R}${S} + ${Q}${R} = ${Q}${S}`, 'Segment Addition Postulate'], [`${P}${R} = ${Q}${S}`, 'Substitution Property of Equality']],
+    alts: { 1: [`${P}${Q} + ${Q}${R} = ${R}${S}`, `${P}${Q} − ${Q}${R} = ${R}${S} − ${Q}${R}`], 4: [`${P}${Q} = ${Q}${S}`, `${P}${R} = ${R}${S}`] } });
+  const V1 = [0, 0], V2 = [2.2, 0];
+  out.push({ given: '∠1 is a complement of ∠2. ∠2 ≅ ∠3', prove: '∠1 is a complement of ∠3.', figH: 150,
+    fig: g10Fig({ pts: { _v: V1, _a: g10P(0, 1.4), _b: g10P(48, 1.4), _c: g10P(90, 1.4), _w: V2, _d: g10P(0, 1.4, V2), _e: g10P(48, 1.4, V2) }, noDot: ['_v', '_a', '_b', '_c', '_w', '_d', '_e'],
+      lines: [['_v', '_a', 0, 0.1], ['_v', '_b', 0, 0.1], ['_v', '_c', 0, 0.1], ['_w', '_d', 0, 0.1], ['_w', '_e', 0, 0.1]], angs: [{ v: '_v', p: '_b', q: '_c', lab: '1', red: true, mark: false, r: 22 }, { v: '_v', p: '_a', q: '_b', lab: '2', red: true, mark: false, r: 26 }, { v: '_w', p: '_d', q: '_e', lab: '3', red: true, mark: false, r: 26 }], margin: 18 }),
+    steps: [['∠1 is a complement of ∠2.', 'Given'], ['∠2 ≅ ∠3', 'Given'], ['m∠1 + m∠2 = 90°', 'Definition of complementary angles'], ['m∠2 = m∠3', 'Definition of congruent angles'], ['m∠1 + m∠3 = 90°', 'Substitution Property of Equality'], ['∠1 is a complement of ∠3.', 'Definition of complementary angles']],
+    alts: { 2: ['m∠1 + m∠2 = 180°', 'm∠1 = m∠2'], 3: ['m∠2 + m∠3 = 90°', 'm∠1 = m∠3'], 4: ['m∠1 + m∠3 = 180°', 'm∠2 + m∠3 = 90°'] } });
+  const [E, F, G, H] = pickLetters(r, 4, ['I', 'O']);
+  out.push({ given: `∠${G}${F}${H} ≅ ∠${G}${H}${F}`, prove: `∠${E}${F}${G} and ∠${G}${H}${F} are supplementary.`, figH: 150,
+    fig: g10Fig({ pts: { [E]: [-1.2, 0], [F]: [0, 0], [H]: [2, 0], [G]: [1, 1.1] }, lines: [[E, H, 0.15, 0.15], [F, G, 0.1, 0.35], [H, G, 0.1, 0.35]], margin: 22 }),
+    steps: [[`∠${G}${F}${H} ≅ ∠${G}${H}${F}`, 'Given'], [`∠${E}${F}${G} and ∠${G}${F}${H} form a linear pair.`, 'Definition of linear pair'], [`∠${E}${F}${G} and ∠${G}${F}${H} are supplementary.`, 'Linear Pair Postulate'],
+      [`m∠${E}${F}${G} + m∠${G}${F}${H} = 180°`, 'Definition of supplementary angles'], [`m∠${G}${F}${H} = m∠${G}${H}${F}`, 'Definition of congruent angles'], [`m∠${E}${F}${G} + m∠${G}${H}${F} = 180°`, 'Substitution Property of Equality'], [`∠${E}${F}${G} and ∠${G}${H}${F} are supplementary.`, 'Definition of supplementary angles']],
+    alts: { 3: [`m∠${E}${F}${G} + m∠${G}${F}${H} = 90°`, `m∠${E}${F}${G} = m∠${G}${F}${H}`], 5: [`m∠${E}${F}${G} = m∠${G}${H}${F}`, `m∠${G}${F}${H} + m∠${G}${H}${F} = 180°`] } });
+  const [A, B, C, D, F2, G2] = pickLetters(r, 6, ['I', 'O']);
+  out.push({ given: `${X(A, B)} ≅ ${X(F2, G2)}, line ${B}${F2} bisects ${X(A, C)} and ${X(D, G2)}.`, prove: `${X(B, C)} ≅ ${X(D, F2)}`, figH: 190, figW: 280,
+    fig: g10Fig({ pts: { [A]: [1, 2.2], [B]: [1, 1], [C]: [1, -0.2], [D]: [-0.3, 1.9], [F2]: [-0.3, 0.6], [G2]: [-0.3, -0.7] }, segs: [[A, C], [D, G2]], lines: [[F2, B, 0.45, 0.45]], ticks: [[A, B, 1], [B, C, 1], [D, F2, 2], [F2, G2, 2]], margin: 22 }),
+    steps: [[`${X(A, B)} ≅ ${X(F2, G2)}`, 'Given'], [`Line ${B}${F2} bisects ${X(A, C)} and ${X(D, G2)}.`, 'Given'], [`${X(A, B)} ≅ ${X(B, C)}`, 'Definition of segment bisector'], [`${X(D, F2)} ≅ ${X(F2, G2)}`, 'Definition of segment bisector'],
+      [`${X(B, C)} ≅ ${X(F2, G2)}`, 'Transitive Property of Segment Congruence'], [`${X(B, C)} ≅ ${X(D, F2)}`, 'Transitive Property of Segment Congruence']],
+    why: { 4: `(${X(B, C)} ≅ ${X(A, B)} and ${X(A, B)} ≅ ${X(F2, G2)})`, 5: `(${X(B, C)} ≅ ${X(F2, G2)} and ${X(F2, G2)} ≅ ${X(D, F2)})` },
+    alts: { 2: [`${X(A, B)} ≅ ${X(D, F2)}`, `${X(A, C)} ≅ ${X(D, G2)}`], 3: [`${X(D, F2)} ≅ ${X(B, C)}`, `${X(D, G2)} ≅ ${X(A, C)}`] } });
+  out.push({ given: `∠${A} ≅ ∠${B} and ∠${B} ≅ ∠${C}`, prove: `∠${A} ≅ ∠${C}`, steps: [[`∠${A} ≅ ∠${B} and ∠${B} ≅ ∠${C}`, 'Given'], [`m∠${A} = m∠${B}`, 'Definition of congruent angles'], [`m∠${B} = m∠${C}`, 'Definition of congruent angles'], [`m∠${A} = m∠${C}`, 'Transitive Property of Equality'], [`∠${A} ≅ ∠${C}`, 'Definition of congruent angles']],
+    alts: { 3: [`m∠${A} = m∠${B}`, `m∠${C} = m∠${B}`] } });
+  out.push({ given: `${X(A, B)} ≅ ${X(C, D)} and ${X(C, D)} ≅ ${X(F2, G2)}`, prove: `${X(A, B)} ≅ ${X(F2, G2)}`, steps: [[`${X(A, B)} ≅ ${X(C, D)} and ${X(C, D)} ≅ ${X(F2, G2)}`, 'Given'], [`${A}${B} = ${C}${D}`, 'Definition of congruent segments'], [`${C}${D} = ${F2}${G2}`, 'Definition of congruent segments'], [`${A}${B} = ${F2}${G2}`, 'Transitive Property of Equality'], [`${X(A, B)} ≅ ${X(F2, G2)}`, 'Definition of congruent segments']],
+    alts: { 3: [`${A}${B} = ${C}${D}`, `${F2}${G2} = ${C}${D}`] } });
+  out.push({ given: `${X(A, B)}`, prove: `${X(A, B)} ≅ ${X(A, B)}`, steps: [[`${A}${B} = ${A}${B}`, 'Reflexive Property of Equality'], [`${X(A, B)} ≅ ${X(A, B)}`, 'Definition of congruent segments']], alts: { 0: [`${A}${B} = 2${A}${B}`, `${A}${B} ≅ ${A}${B}`], 1: [`${A}${B} ≅ ${A}${B}`, `${A}${B} = 2${A}${B}`, `${X(A, B)} = ${A}${B}`] } });
+  return out;
+}
+TEMPLATES.g25Proof = (r) => g2ProofQ(r, 'Two-column proofs', pick(r, g25Proofs(r)));
+TEMPLATES.g25Error = (r) => {
+  const [L, M, N, P, Q] = g10Letters(r, 5), X = (a, b) => g10seg(a + b), kind = pick(r, ['ref', 'trans']);
+  if (kind === 'ref') { const ans = `It should say the Transitive Property of Segment Congruence: ${X(M, N)} ≅ ${X(L, Q)} and ${X(L, Q)} ≅ ${X(P, N)}, so ${X(M, N)} ≅ ${X(P, N)}.`;
+    return g2Q(r, 'Error analysis: properties', `${X(M, N)} ≅ ${X(L, Q)} and ${X(L, Q)} ≅ ${X(P, N)}. Describe and correct the error in the reasoning.\n“Because ${X(M, N)} ≅ ${X(L, Q)} and ${X(L, Q)} ≅ ${X(P, N)}, then ${X(M, N)} ≅ ${X(P, N)} by the Reflexive Property of Segment Congruence.”`, ans,
+      [`It should say the Symmetric Property of Segment Congruence.`, `There is no error.`, `The conclusion should be ${X(M, N)} ≅ ${X(L, Q)}.`], { solution: ans }); }
+  const [A, B, C, R2, S, T] = pickLetters(r, 6, ['I', 'O']), ans = `No. ${X(S, R2)} ≅ ${X(C, B)} and ${X(A, C)} ≅ ${X(T, R2)} do not share a segment, so the Transitive Property does not apply. You cannot conclude ${X(C, B)} ≅ ${X(A, C)}.`;
+  return g2Q(r, 'Error analysis: properties', `${X(S, R2)} ≅ ${X(C, B)} and ${X(A, C)} ≅ ${X(T, R2)}. Your friend claims that because of this, ${X(C, B)} ≅ ${X(A, C)} by the Transitive Property of Segment Congruence. Is your friend correct?`, ans,
+    [`Yes. Congruence is transitive, so ${X(C, B)} ≅ ${X(A, C)}.`, `Yes, by the Symmetric Property of Segment Congruence.`, `No, because the segments are not in the same triangle.`], { solution: ans });
+};
+
+/* ---------- 2.6 Proving Geometric Relationships ---------- */
+// two lines crossing: ∠1 between rays d0 and d1, then ∠2, ∠3, ∠4 counterclockwise
+const g26X = (a, rot, labs) => { const dirs = [rot, rot + a, rot + 180, rot + 180 + a], pts = { _o: [0, 0], ...Object.fromEntries(dirs.map((d, i) => [`_${i}`, g10P(d, 1.25)])) };
+  return g10Fig({ pts, noDot: ['_o', '_0', '_1', '_2', '_3'], lines: [['_0', '_2', 0.08, 0.08], ['_1', '_3', 0.08, 0.08]],
+    angs: [0, 1, 2, 3].map((i) => ({ v: '_o', p: `_${i}`, q: `_${(i + 1) % 4}`, lab: labs[i], red: labs[i].length < 3, mark: false, r: labs[i].length < 3 ? 18 : 34, far: labs[i].length < 3 ? 15 : 40 })), margin: 24 }); };
+TEMPLATES.g26Find = (r) => {
+  let a = ri(r, 25, 85) + (r() < 0.5 ? 0 : 60); if (a === 90) a = 96;
+  const g = ri(r, 1, 4), m = [a, 180 - a, a, 180 - a], given = m[g - 1], others = [1, 2, 3, 4].filter((k) => k !== g);
+  const draw = g26X(a, ri(r, -20, 20), ['1', '2', '3', '4']);
+  const ans = others.map((k) => `m∠${k} = ${m[k - 1]}°`).join(', ');
+  const alt = (f) => others.map((k) => `m∠${k} = ${f(k)}°`).join(', '), v = (k) => Math.abs(k - g) === 2;
+  const ch = g2MC(r, ans, [alt((k) => (v(k) ? 180 - given : given)), alt((k) => (v(k) ? given : Math.abs(90 - given))), alt(() => given), alt(() => 180 - given), alt((k) => (v(k) ? given : 360 - given))]);
+  return { topic: 'Vertical angles and linear pairs', stem: `Use the diagram and the given angle measure to find the other three measures.\nm∠${g} = ${given}°`, ...ch,
+    fr: { fields: others.map((k) => ({ kind: 'number', label: `m∠${k} =`, suffix: '°' })), key: others.map((k) => String(m[k - 1])), display: ans, check: (v) => others.every((k, i) => numEq(v[i], m[k - 1])), score: (v) => others.filter((k, i) => numEq(v[i], m[k - 1])).length / 3 },
+    draw, size: [340, 260], solution: others.map((k) => (Math.abs(k - g) === 2 ? `∠${k} and ∠${g} are vertical angles, so m∠${k} = ${given}°.` : `∠${k} and ∠${g} form a linear pair, so m∠${k} = 180° − ${given}° = ${m[k - 1]}°.`)).join('\n') };
+};
+// a linear expression mv + c that equals target at v = val, with |c| in range
+function g26Expr(r, target, val, v, avoid) {
+  const ms = []; for (let m = 2; m <= 45; m++) if (m !== avoid && Math.abs(target - m * val) <= 40) ms.push(m);
+  const small = ms.filter((k) => k <= 12), pool = small.length ? small : ms.slice(0, 3);
+  let m = pool.length ? pick(r, pool) : Math.max(2, Math.round(target / val)); if (m === avoid) m++;
+  const c = target - m * val; return { m, c, t: c ? `(${g10lin(m, c, v)})°` : `${m}${v}°` };
+}
+TEMPLATES.g26Var = (r) => {
+  const kind = pick(r, ['vert', 'vert', 'both', 'lin']), a = ri(r, 30, 80), b = 180 - a, rot = ri(r, -15, 15);
+  if (kind === 'vert') {
+    const big = r() < 0.5, val = big ? b : a, x = ri(r, 3, 20), e1 = g26Expr(r, val, x, 'x'), e2 = g26Expr(r, val, x, 'x', e1.m), at = big ? [1, 3] : [0, 2];
+    const labs = ['', '', '', '']; labs[at[0]] = e1.t; labs[at[1]] = e2.t;
+    const ch = g10NumChoices(r, x, [(180 - e1.c - e2.c) / (e1.m + e2.m), -x, x + 2, val, x - 1].filter((v) => Number.isInteger(v)));
+    return { topic: 'Vertical angles with algebra', stem: 'Find the value of the variable.', ...ch, fr: g10Num('x =', x), draw: g26X(a, rot, labs), size: [380, 280],
+      solution: `The two angles are vertical angles, so they are congruent:\n${e1.t.replace(/[()°]/g, '')} = ${e2.t.replace(/[()°]/g, '')}\nx = ${x}  (each angle is ${val}°)` };
+  }
+  if (kind === 'lin') {
+    for (;;) { const x = ri(r, 3, 20), e1 = g26Expr(r, a, x, 'x'), e2 = g26Expr(r, b, x, 'x', e1.m); const labs = ['', '', '', '']; const k = ri(r, 0, 3); labs[k] = k % 2 ? e2.t : e1.t; labs[(k + 1) % 4] = k % 2 ? e1.t : e2.t;
+      const wrong = (e2.c - e1.c) / (e1.m - e2.m);
+      const ch = g10NumChoices(r, x, [Number.isInteger(wrong) ? wrong : null, x + 3, 180 / (e1.m + e2.m), x - 2].filter((v) => v != null && Number.isInteger(v)));
+      return { topic: 'Linear pairs with algebra', stem: 'Find the value of the variable.', ...ch, fr: g10Num('x =', x), draw: g26X(a, rot, labs), size: [380, 280],
+        solution: `The two angles form a linear pair, so they are supplementary:\n${e1.t.replace(/[()°]/g, '')} + ${e2.t.replace(/[()°]/g, '')} = 180\n${g10lin(e1.m + e2.m, e1.c + e2.c)} = 180\nx = ${x}  (the angles are ${a}° and ${b}°)` }; }
+  }
+  const x = ri(r, 3, 20), y = ri(r, 3, 20), ex1 = g26Expr(r, a, x, 'x'), ex2 = g26Expr(r, a, x, 'x', ex1.m), ey1 = g26Expr(r, b, y, 'y'), ey2 = g26Expr(r, b, y, 'y', ey1.m);
+  const labs = [ex1.t, ey1.t, ex2.t, ey2.t];
+  const ans = `x = ${x}, y = ${y}`, ch = g2MC(r, ans, [`x = ${y}, y = ${x}`, `x = ${x + 1}, y = ${y - 1}`, `x = ${x}, y = ${y + 2}`, `x = ${x - 2}, y = ${y}`]);
+  return { topic: 'Vertical angles with algebra', stem: 'Find the values of x and y.', ...ch,
+    fr: { fields: [{ kind: 'number', label: 'x =' }, { kind: 'number', label: 'y =' }], key: [String(x), String(y)], display: ans, check: (v) => numEq(v[0], x) && numEq(v[1], y), score: (v) => (numEq(v[0], x) + numEq(v[1], y)) / 2 },
+    draw: g26X(a, rot, labs), size: [400, 290],
+    solution: `Vertical angles are congruent.\n${ex1.t.replace(/[()°]/g, '')} = ${ex2.t.replace(/[()°]/g, '')}  →  x = ${x}  (${a}°)\n${ey1.t.replace(/[()°]/g, '')} = ${ey2.t.replace(/[()°]/g, '')}  →  y = ${y}  (${b}°)\nCheck: ${a}° + ${b}° = 180°, a linear pair.` };
+};
+function g26Proofs(r) {
+  const out = [];
+  // two lines cut by a transversal: ∠1 and ∠2 vertical at the top, ∠3 and ∠4 vertical at the bottom
+  const t = ri(r, 55, 70), T1 = [0, 1], T2 = [1 / Math.tan((t * Math.PI) / 180), 0];
+  out.push({ given: '∠1 ≅ ∠3', prove: '∠2 ≅ ∠4', figH: 170,
+    fig: g10Fig({ pts: { _t1: T1, _t2: T2, _l1: [-1.4, 1], _r1: [2, 1], _l2: [-1.4, 0], _r2: [2, 0], _u: g10P(180 - t, 0.9, T1), _d: g10P(-t, 0.9, T2) }, noDot: ['_t1', '_t2', '_l1', '_r1', '_l2', '_r2', '_u', '_d'],
+      lines: [['_l1', '_r1', 0, 0.08], ['_l2', '_r2', 0, 0.08], ['_u', '_d', 0.1, 0.1]],
+      angs: [{ v: '_t1', p: '_u', q: '_l1', lab: '1', red: true, mark: false, r: 16 }, { v: '_t1', p: '_r1', q: '_t2', lab: '2', red: true, mark: false, r: 16 }, { v: '_t2', p: '_t1', q: '_l2', lab: '3', red: true, mark: false, r: 16 }, { v: '_t2', p: '_r2', q: '_d', lab: '4', red: true, mark: false, r: 16 }], margin: 16 }),
+    steps: [['∠1 ≅ ∠3', 'Given'], ['∠1 ≅ ∠2, ∠3 ≅ ∠4', 'Vertical Angles Congruence Theorem'], ['∠2 ≅ ∠3', 'Transitive Property of Angle Congruence'], ['∠2 ≅ ∠4', 'Transitive Property of Angle Congruence']],
+    alts: { 1: ['∠1 ≅ ∠4, ∠2 ≅ ∠3', '∠1 ≅ ∠3, ∠2 ≅ ∠4'], 2: ['∠1 ≅ ∠4', '∠2 ≅ ∠1'] } });
+  const [A, B, C, D, E] = pickLetters(r, 5, ['I', 'O']);
+  out.push({ given: `∠${A}${B}${D} is a right angle. ∠${C}${B}${E} is a right angle.`, prove: `∠${A}${B}${C} ≅ ∠${D}${B}${E}`, figH: 170,
+    fig: g10Fig({ pts: { [B]: [0, 0], [A]: g10P(90, 1.3), [C]: g10P(128, 1.1), [D]: g10P(180, 1.3), [E]: g10P(218, 1.1) }, lines: [[B, A, 0, 0.12], [B, C, 0, 0.3], [B, D, 0, 0.15], [B, E, 0, 0.3]], margin: 24, labDir: { [B]: [1, -0.4] } }),
+    steps: [[`∠${A}${B}${D} and ∠${C}${B}${E} are right angles.`, 'Given'], [`∠${A}${B}${C} and ∠${C}${B}${D} are complementary.`, 'Definition of complementary angles'], [`∠${D}${B}${E} and ∠${C}${B}${D} are complementary.`, 'Definition of complementary angles'], [`∠${A}${B}${C} ≅ ∠${D}${B}${E}`, 'Congruent Complements Theorem']],
+    why: { 1: `(m∠${A}${B}${C} + m∠${C}${B}${D} = m∠${A}${B}${D} = 90°)`, 2: `(m∠${D}${B}${E} + m∠${C}${B}${D} = m∠${C}${B}${E} = 90°)`, 3: 'Both angles are complements of ∠' + C + B + D + '.' },
+    alts: { 1: [`∠${A}${B}${C} and ∠${C}${B}${D} are supplementary.`, `∠${A}${B}${C} ≅ ∠${C}${B}${D}`], 2: [`∠${D}${B}${E} and ∠${C}${B}${D} are supplementary.`, `∠${D}${B}${E} ≅ ∠${C}${B}${D}`] } });
+  const W1 = [0, 0], W2 = [2.9, 0], u = ri(r, 58, 72);
+  out.push({ given: '∠1 and ∠2 are supplementary. ∠3 and ∠4 are supplementary. ∠1 ≅ ∠4', prove: '∠2 ≅ ∠3', figH: 130,
+    fig: g10Fig({ pts: { _v: W1, _l: [-1, 0], _r: [1, 0], _p: g10P(180 - u, 1.2), _w: W2, _l2: [1.9, 0], _r2: [3.9, 0], _q: g10P(u, 1.2, W2) }, noDot: ['_v', '_l', '_r', '_p', '_w', '_l2', '_r2', '_q'],
+      lines: [['_l', '_r', 0.1, 0.1], ['_v', '_p', 0, 0.15], ['_l2', '_r2', 0.1, 0.1], ['_w', '_q', 0, 0.15]],
+      angs: [{ v: '_v', p: '_p', q: '_l', lab: '1', red: true, mark: false, r: 16 }, { v: '_v', p: '_r', q: '_p', lab: '2', red: true, mark: false, r: 16 }, { v: '_w', p: '_q', q: '_l2', lab: '3', red: true, mark: false, r: 16 }, { v: '_w', p: '_r2', q: '_q', lab: '4', red: true, mark: false, r: 16 }], margin: 16 }),
+    steps: [['∠1 and ∠2 are supplementary. ∠3 and ∠4 are supplementary. ∠1 ≅ ∠4', 'Given'], ['m∠1 + m∠2 = 180°, m∠3 + m∠4 = 180°', 'Definition of supplementary angles'], ['m∠1 + m∠2 = m∠3 + m∠4', 'Transitive Property of Equality'],
+      ['m∠1 = m∠4', 'Definition of congruent angles'], ['m∠1 + m∠2 = m∠3 + m∠1', 'Substitution Property of Equality'], ['m∠2 = m∠3', 'Subtraction Property of Equality'], ['∠2 ≅ ∠3', 'Definition of congruent angles']],
+    alts: { 1: ['m∠1 + m∠2 = 90°, m∠3 + m∠4 = 90°', 'm∠1 = m∠2, m∠3 = m∠4'], 4: ['m∠1 + m∠2 = m∠1 + m∠4', 'm∠4 + m∠2 = m∠3 + m∠4'], 5: ['m∠1 = m∠3', 'm∠2 = m∠4'] } });
+  out.push({ given: '∠1 ≅ ∠2. ∠1 and ∠2 are supplementary.', prove: '∠1 and ∠2 are right angles.',
+    steps: [['∠1 ≅ ∠2. ∠1 and ∠2 are supplementary.', 'Given'], ['m∠1 = m∠2', 'Definition of congruent angles'], ['m∠1 + m∠2 = 180°', 'Definition of supplementary angles'], ['m∠1 + m∠1 = 180°', 'Substitution Property of Equality'],
+      ['2(m∠1) = 180°', 'Simplify'], ['m∠1 = 90°', 'Division Property of Equality'], ['m∠2 = 90°', 'Transitive Property of Equality'], ['∠1 and ∠2 are right angles.', 'Definition of right angle']],
+    alts: { 3: ['m∠1 + m∠2 = 90°', 'm∠1 = 180°'], 5: ['m∠1 = 180°', 'm∠1 = 45°'], 7: ['∠1 and ∠2 are complementary.', '∠1 and ∠2 are vertical angles.'] } });
+  const s = ri(r, 35, 65);
+  out.push({ given: '∠5 and ∠7 are vertical angles.', prove: '∠5 ≅ ∠7', figH: 170,
+    fig: g26X(s, ri(r, -10, 10), ['5', '6', '7', '8']),
+    steps: [['∠5 and ∠7 are vertical angles.', 'Given'], ['∠5 and ∠6 are a linear pair. ∠6 and ∠7 are a linear pair.', 'Definition of linear pair'], ['∠5 and ∠6 are supplementary. ∠6 and ∠7 are supplementary.', 'Linear Pair Postulate'], ['∠5 ≅ ∠7', 'Congruent Supplements Theorem']],
+    alts: { 2: ['∠5 and ∠6 are complementary. ∠6 and ∠7 are complementary.', '∠5 ≅ ∠6 and ∠6 ≅ ∠7'] } });
+  return out;
+}
+TEMPLATES.g26Proof = (r) => g2ProofQ(r, 'Proofs with angle theorems', pick(r, g26Proofs(r)));
+TEMPLATES.g26Error = (r) => {
+  for (;;) {
+    const a = ri(r, 30, 80), b = 180 - a, x = ri(r, 3, 12), e1 = g26Expr(r, b, x, 'x'), e2 = g26Expr(r, b, x, 'x', e1.m), d1 = g26Expr(r, a, x, 'x', e1.m);
+    const wrongX = (180 - e1.c - e2.c) / (e1.m + e2.m); if (Math.abs(wrongX - x) < 0.01) continue;
+    const labs = [d1.t, e1.t, '', e2.t];
+    const ans = `The angles ${e1.t} and ${e2.t} are vertical angles, so they are congruent, not supplementary. Set them equal: x = ${x}.`;
+    return g2Q(r, 'Error analysis: vertical angles', `Describe and correct the error in using the diagram to find the value of x.\n“${e1.t} + ${e2.t} = 180°, so x = ${fmt(Math.round(wrongX * 1000) / 1000)}.”`, ans,
+      [`The angles form a linear pair, so their sum should be 90°, not 180°.`, `There is no error: x = ${fmt(Math.round(wrongX * 1000) / 1000)}.`, `The sum should be 360° because the angles go all the way around.`], { draw: g26X(a, ri(r, -10, 10), labs), size: [400, 290], solution: ans });
+  }
+};
+/* ==== GEOMETRY CH2 END ==== */
 /* ==== GEOMETRY CH11 BEGIN ==== */
 /* ---------- Geometry (Big Ideas Math), Chapter 11: Circumference and Area ---------- */
 const g11h = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('-', MINUS); // nearest hundredth
@@ -24042,6 +24660,13 @@ Object.assign(SETS, {
   'geo-1-4': { subject: 'geometry', title: '1.4 Perimeter and Area in the Coordinate Plane', items: [['g14Classify', 3], ['g14Perimeter', 4], ['g14Area', 4]] },
   'geo-1-5': { subject: 'geometry', title: '1.5 Measuring and Constructing Angles', items: [['g15Names', 2], ['g15Protractor', 3], ['g15Add', 3], ['g15AddAlg', 3], ['g15Bisect', 3]] },
   'geo-1-6': { subject: 'geometry', title: '1.6 Describing Pairs of Angles', items: [['g16Vertical', 3], ['g16Comp', 3], ['g16Alg', 3], ['g16Word', 3]] },
+  // ----- Geometry, Chapter 2: Reasoning and Proofs -----
+  'geo-2-1': { subject: 'geometry', title: '2.1 Conditional Statements', items: [['g21HypConc', 2], ['g21IfThen', 2], ['g21Negate', 1], ['g21Related', 3], ['g21Diagram', 2], ['g21Bicond', 2], ['g21Truth', 2]] },
+  'geo-2-2': { subject: 'geometry', title: '2.2 Inductive and Deductive Reasoning', items: [['g22Pattern', 3], ['g22Counter', 2], ['g22Detach', 2], ['g22Syllogism', 2], ['g22WhichLaw', 2], ['g22IndDed', 2], ['g22Table', 1]] },
+  'geo-2-3': { subject: 'geometry', title: '2.3 Postulates and Diagrams', items: [['g23Postulate', 4], ['g23Assume', 5], ['g23Error', 2]] },
+  'geo-2-4': { subject: 'geometry', title: '2.4 Algebraic Reasoning', items: [['g24StepReason', 3], ['g24Solve', 3], ['g24Formula', 2], ['g24FormulaUse', 1], ['g24Property', 3], ['g24Complete', 2]] },
+  'geo-2-5': { subject: 'geometry', title: '2.5 Proving Statements about Segments and Angles', items: [['g25Property', 4], ['g25Proof', 6], ['g25Error', 1]] },
+  'geo-2-6': { subject: 'geometry', title: '2.6 Proving Geometric Relationships', items: [['g26Find', 2], ['g26Var', 4], ['g26Error', 1], ['g26Proof', 4]] },
   // ----- Geometry, Chapter 10: Circles -----
   'geo-10-1': { subject: 'geometry', title: '10.1 Lines and Segments That Intersect Circles', items: [['g101Name', 3], ['g101CommonTan', 2], ['g101IsTangent', 2], ['g101Radius', 2], ['g101TwoTan', 3]] },
   'geo-10-2': { subject: 'geometry', title: '10.2 Finding Arc Measures', items: [['g102MinorMajor', 2], ['g102Identify', 2], ['g102Find', 2], ['g102Graph', 1], ['g102Congruent', 2], ['g102Algebra', 2]] },
@@ -24743,6 +25368,36 @@ QUESTION_TYPES.push(
   { id: 'g16Comp', subject: 'geometry', section: '1.6 Describing Pairs of Angles', label: 'Complements and supplements', desc: 'Find the other angle (#5–8)' },
   { id: 'g16Alg', subject: 'geometry', section: '1.6 Describing Pairs of Angles', label: 'Pairs of angles with algebra', desc: 'Find each angle (#9–12)' },
   { id: 'g16Word', subject: 'geometry', section: '1.6 Describing Pairs of Angles', label: 'Pairs of angles in words', desc: 'Linear pairs, ratios (#19–24)' },
+  { id: 'g21HypConc', subject: 'geometry', section: '2.1 Conditional Statements', label: 'Hypothesis and conclusion', desc: '#1–4' },
+  { id: 'g21IfThen', subject: 'geometry', section: '2.1 Conditional Statements', label: 'Rewrite in if-then form', desc: '#5–10' },
+  { id: 'g21Negate', subject: 'geometry', section: '2.1 Conditional Statements', label: 'Negation', desc: '#11–14' },
+  { id: 'g21Related', subject: 'geometry', section: '2.1 Conditional Statements', label: 'Converse, inverse, contrapositive', desc: 'Write them and decide which are true (#15–22)' },
+  { id: 'g21Diagram', subject: 'geometry', section: '2.1 Conditional Statements', label: 'Is the statement about the diagram true?', desc: 'Using definitions (#23–26)' },
+  { id: 'g21Bicond', subject: 'geometry', section: '2.1 Conditional Statements', label: 'Biconditional statements', desc: '#27–34' },
+  { id: 'g21Truth', subject: 'geometry', section: '2.1 Conditional Statements', label: 'Truth tables', desc: '#35–40' },
+  { id: 'g22Pattern', subject: 'geometry', section: '2.2 Inductive and Deductive Reasoning', label: 'Describe the pattern', desc: 'Next two numbers, letters, or figures (#1–6)' },
+  { id: 'g22Counter', subject: 'geometry', section: '2.2 Inductive and Deductive Reasoning', label: 'Counterexamples', desc: '#11–14' },
+  { id: 'g22Detach', subject: 'geometry', section: '2.2 Inductive and Deductive Reasoning', label: 'Law of Detachment', desc: '#15–18' },
+  { id: 'g22Syllogism', subject: 'geometry', section: '2.2 Inductive and Deductive Reasoning', label: 'Law of Syllogism', desc: '#19–22' },
+  { id: 'g22WhichLaw', subject: 'geometry', section: '2.2 Inductive and Deductive Reasoning', label: 'Which law of logic?', desc: '#23–26' },
+  { id: 'g22IndDed', subject: 'geometry', section: '2.2 Inductive and Deductive Reasoning', label: 'Inductive or deductive?', desc: '#29–32' },
+  { id: 'g22Table', subject: 'geometry', section: '2.2 Inductive and Deductive Reasoning', label: 'Conjecture from a table', desc: 'Write y in terms of x (#37)' },
+  { id: 'g23Postulate', subject: 'geometry', section: '2.3 Postulates and Diagrams', label: 'Name the postulate', desc: 'Point, line, and plane postulates (#1–6)' },
+  { id: 'g23Assume', subject: 'geometry', section: '2.3 Postulates and Diagrams', label: 'What can you assume from a diagram?', desc: '#11–18' },
+  { id: 'g23Error', subject: 'geometry', section: '2.3 Postulates and Diagrams', label: 'Error analysis: diagrams', desc: '#19–20' },
+  { id: 'g24StepReason', subject: 'geometry', section: '2.4 Algebraic Reasoning', label: 'Property that justifies a step', desc: '#1–2' },
+  { id: 'g24Solve', subject: 'geometry', section: '2.4 Algebraic Reasoning', label: 'Solve and justify', desc: '#3–12' },
+  { id: 'g24Formula', subject: 'geometry', section: '2.4 Algebraic Reasoning', label: 'Solve a formula for a variable', desc: '#21–24' },
+  { id: 'g24FormulaUse', subject: 'geometry', section: '2.4 Algebraic Reasoning', label: 'Rewrite a formula, then use it', desc: '#25–26' },
+  { id: 'g24Property', subject: 'geometry', section: '2.4 Algebraic Reasoning', label: 'Name the property of equality', desc: '#27–34' },
+  { id: 'g24Complete', subject: 'geometry', section: '2.4 Algebraic Reasoning', label: 'Use a property to complete a statement', desc: '#35–38' },
+  { id: 'g25Property', subject: 'geometry', section: '2.5 Proving Statements about Segments and Angles', label: 'Properties of congruence', desc: 'Reflexive, symmetric, transitive (#3–6)' },
+  { id: 'g25Proof', subject: 'geometry', section: '2.5 Proving Statements about Segments and Angles', label: 'Complete the two-column proof', desc: 'Missing reason or statement (#1–2, 7–12)' },
+  { id: 'g25Error', subject: 'geometry', section: '2.5 Proving Statements about Segments and Angles', label: 'Error analysis: properties', desc: '#10, 13' },
+  { id: 'g26Find', subject: 'geometry', section: '2.6 Proving Geometric Relationships', label: 'Find the other three angles', desc: 'Vertical angles and linear pairs (#5–8)' },
+  { id: 'g26Var', subject: 'geometry', section: '2.6 Proving Geometric Relationships', label: 'Find the variables', desc: 'Vertical angles and linear pairs with algebra (#9–12, 16)' },
+  { id: 'g26Error', subject: 'geometry', section: '2.6 Proving Geometric Relationships', label: 'Error analysis: vertical angles', desc: '#13' },
+  { id: 'g26Proof', subject: 'geometry', section: '2.6 Proving Geometric Relationships', label: 'Complete the proof', desc: 'Vertical angles, congruent complements and supplements (#17–20, 22)' },
   { id: 'g101Name', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Parts of a circle', desc: 'Name a radius, chord, diameter, secant, tangent (#1–6)' },
   { id: 'g101CommonTan', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Common tangents', desc: 'How many common tangents? (#7–10)' },
   { id: 'g101IsTangent', subject: 'geometry', section: '10.1 Lines and Segments That Intersect Circles', label: 'Is the segment tangent?', desc: 'Converse of the Pythagorean Theorem (#11–14)' },
@@ -27302,7 +27957,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 2: 'Reasoning and Proofs', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0), b = secs[sec].ids.reduce((a, id) => a + (bonusCounts[id] || 0), 0);
     return [n ? `${n} chosen` : '', b ? `★ ${b} bonus` : ''].filter(Boolean).join(' · '); };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
