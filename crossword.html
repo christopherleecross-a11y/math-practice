@@ -430,6 +430,8 @@ osmosis: Movement of water across a membrane"></textarea>
    One entry per teacher. Students pick their teacher on the sign-in screen.
      name:    what students see
      sheet:   that teacher's Google Apps Script web app URL (ends in /exec), or '' if not set up yet
+     results: that teacher's Practice Results web app URL (CONFIG.SCRIPT_URL in practice.html), so assigned
+              crossword scores also show on the practice site's Results dashboard (a "Crosswords" tab), or ''
      courses: the class lists that belong to this teacher: the part of a list's name before the
               colon, e.g. "Geometry 2" for "Geometry 2: Circles"
    Each teacher's lists are locked with that teacher's own password.
@@ -437,9 +439,11 @@ osmosis: Movement of water across a membrane"></textarea>
 const TEACHERS = [
   { name: 'Mr. Cross (Geometry & Pre-Calculus)',
     sheet: 'https://script.google.com/macros/s/AKfycbyxLSWqfM1mZ0OcZz4JfzmaYGwLKmz_gL3sHBJg4IMmuK4l3UDzT7d_YG2Mtj4ox9smNg/exec',
+    results: 'https://script.google.com/macros/s/AKfycbycKSv_XXuM9HI9evVQ6dapHk0hGWBgqPVEh8CneUqkoOKx8CzKUUGa14x3lHrQl-Ih/exec',
     courses: ['Geometry 1', 'Geometry 2', 'Pre-Cal 1', 'Pre-Cal 2'] },
   { name: 'Mr. Spencer (Algebra I & II)',
     sheet: 'https://script.google.com/macros/s/AKfycby7_Vq0F1elfsaH7Hca7UtnTFKjzX5RCFpik0-f-u-fcYAYyNg3ZEffrRiP6cxmSrFMbw/exec',
+    results: 'https://script.google.com/macros/s/AKfycbxjKMy-XuQt8LR0Cd5ILEGk_lverjHGze1ob4_k-HAro1tV7wGVznySDxaQrToUfwoH/exec',
     courses: ['Algebra I 1', 'Algebra I 2', 'Algebra II 1', 'Algebra II 2'] }
 ];
 const courseOf = n => (String(n).split(':')[0] || n).trim();
@@ -1641,7 +1645,7 @@ function finish(early) {
     : revealed ? 'Finished with a little help from Reveal.' : 'Solved with no reveals — nice work!';
   const rid = P.assign && P.assign.sheet ? Date.now().toString(36) + Math.random().toString(36).slice(2, 8) : '';
   $('#doneReport').innerHTML = isTest() || P.assign ? reportHTML(rid) : '';
-  if (rid) queueResult(resultPayload(rid));
+  if (rid) { queueResult(resultPayload(rid)); queueDash(rid); }
   setTimeout(() => openModal('#doneModal'), 450);
 }
 const pct = sc => Math.round(sc.correct / sc.total * 100) + '%';
@@ -2706,6 +2710,40 @@ function showSendStatus() {
   } else { el.textContent = 'Couldn’t send. Show this screen to your teacher.'; el.className = 'flag'; }
 }
 window.addEventListener('online', flushOutbox);
+
+// the same score, also sent to the teacher's Practice Results sheet so it shows on the practice site's Results dashboard
+const DASH_OUTBOX = 'crossword-dash-outbox';
+let dashBox = store.get(DASH_OUTBOX) || [], dashBusy = false;
+const ordinal = p => /^\d+$/.test(String(p)) ? p + ({ 1: 'st', 2: 'nd', 3: 'rd' }[+p % 10 === 0 || (+p % 100 >= 11 && +p % 100 <= 13) ? 0 : +p % 10] || 'th') : String(p);
+function queueDash(rid) {
+  const tch = TEACHERS.find(t => t.sheet === P.assign.sheet);
+  if (!tch || !/^https:\/\//.test(tch.results || '') || integ.teacher || P.assign.label === 'Teacher view' || !student || !integ.score) return;
+  const sc = integ.score, words = integ.words || [];
+  const detail = words.map((w, i) => (i + 1) + (w[2] ? '✓' : (/^_*$/.test(w[1]) ? '✗–' : '✗')) + '(' + w[0] + (w[2] ? '' : ' ' + String(w[1]).replace(/_/g, '·')) + ')').join(' ')
+    + (sc.timeout ? ' · time ran out' : sc.early ? ' · turned in early' : '') + (integ.away ? ' · left the page ' + integ.away + '×' : '');
+  dashBox.push({ to: tch.results, body: {
+    subject: 'Crosswords', setTitle: 'Crossword: ' + (P.assign.label && P.assign.label !== 'Shared link' ? P.assign.label : P.title),
+    period: ordinal(P.assign.period), name: student, score: sc.correct, total: sc.total || 1, percent: Math.round(100 * sc.correct / (sc.total || 1)),
+    detail, minutes: Math.round(timer.elapsed / 6) / 10, tabAways: integ.away || 0,
+    version: [DIFFS[P.diff].label, P.entries.length + ' words', showBank() ? 'word bank' : '', verText(P), 'id ' + rid].filter(Boolean).join(' · '),
+    set: 'crossword:' + (P.code || P.title) } });
+  store.set(DASH_OUTBOX, dashBox); flushDash();
+}
+async function flushDash() {
+  if (dashBusy || !dashBox.length) return;
+  dashBusy = true;
+  while (dashBox.length) {
+    const item = dashBox[0];
+    // no-cors, like the practice page: the collector saves the row whether or not the page can read the answer
+    try { await fetch(item.to, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(item.body) }); }
+    catch { break; } // offline: try again later
+    dashBox.shift(); store.set(DASH_OUTBOX, dashBox);
+  }
+  dashBusy = false;
+  if (dashBox.length) setTimeout(flushDash, 30000);
+}
+window.addEventListener('online', flushDash);
+flushDash();
 
 /* ================= KEYBOARD ================= */
 function focusKbd() { try { kbd.focus({ preventScroll: true }); } catch { kbd.focus(); } resetKbd(); }
