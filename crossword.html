@@ -3045,7 +3045,7 @@ $('#tCopy').addEventListener('click', () => {
 /* ================= CLASS SHEET: sign-in, assignments, results ================= */
 const sheetOn = () => TEACHERS.some(hasSheet);
 async function fetchJSON(url, opts) {
-  const ac = new AbortController(), t = setTimeout(() => ac.abort(), 15000);
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), 25000); // a Sheet that hasn't run in a while can take a while to wake up
   try {
     const r = await fetch(url, Object.assign({ redirect: 'follow', signal: ac.signal }, opts || {}));
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -3153,6 +3153,7 @@ function loadTeacherPeriods() {
     return Promise.resolve();
   }
   return loadPeriods($('#siPeriod'), t.sheet)
+    .catch(() => new Promise(r => setTimeout(r, 1500)).then(() => loadPeriods($('#siPeriod'), t.sheet))) // one more try before giving up
     .then(() => setTimeout(() => ($('#siPeriod').value ? $('#siName') : $('#siPeriod')).focus(), 50))
     .catch(() => siMsg('Couldn’t reach your teacher’s class sheet. Check your internet connection, or practice instead.'));
 }
