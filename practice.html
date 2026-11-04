@@ -28143,6 +28143,11 @@ function classroomAssignBox(getLink, getTitle, onPosted) {
   box.addEventListener('toggle', () => { if (box.open && !loaded) load(); else if (box.open) { const t = body.querySelector('input[type=text]'); if (t && !t.dataset.typed) t.value = getTitle(); } });
   return box;
 }
+// the teacher PIN, once entered, is remembered in this browser tab only (closing the tab forgets it)
+function teacherSession(set) {
+  const k = 'teacher-ok:' + (TEACHER_ID || 'main');
+  try { if (set) { sessionStorage.setItem(k, String(Date.now())); return true; } const t = +sessionStorage.getItem(k) || 0; return t > 0 && Date.now() - t < 8 * 3600e3; } catch { return false; }
+}
 /* ---------- teacher tools: menu + assignment builder ---------- */
 // tabs across the top of every teacher screen (only appears after the teacher PIN)
 function teacherNav(active) {
@@ -29354,6 +29359,7 @@ function copyIntoBuilder(link) {
     return;
   }
   if (viewOk()) return viewScreen();
+  if (params.has('teacher') && teacherSession()) return teacherMenu(); // already unlocked in this tab (coming back from the crossword, for example)
   if (params.has('teacher')) {
     document.getElementById('title').textContent = 'Teacher tools';
     const pin = el('input', { type: 'password', placeholder: CONFIG.SCRIPT_URL ? 'PIN or dashboard password' : 'Teacher PIN', autocomplete: 'off' });
@@ -29364,13 +29370,13 @@ function copyIntoBuilder(link) {
     const go = async () => {
       if (busy) return;
       const v = pin.value; err.textContent = '';
-      if (CONFIG.TEACHER_PIN_HASH && String(cyrb53(v)) === CONFIG.TEACHER_PIN_HASH) return teacherMenu();
+      if (CONFIG.TEACHER_PIN_HASH && String(cyrb53(v)) === CONFIG.TEACHER_PIN_HASH) { teacherSession(true); return teacherMenu(); }
       if (!CONFIG.SCRIPT_URL || !v) { err.textContent = CONFIG.TEACHER_PIN_HASH ? 'Wrong PIN.' : 'No teacher PIN is set up yet. Open this page with &makehash=YOUR-PIN added to the address to make one.'; return; }
       busy = true; btn.textContent = 'Checking…';
       try {
         const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'assignments', password: v }) });
         const j = await res.json().catch(() => ({}));
-        if (j && j.ok) { dashPw.set(v); return teacherMenu(); }
+        if (j && j.ok) { dashPw.set(v); teacherSession(true); return teacherMenu(); }
         err.textContent = j && j.locked ? 'Too many wrong tries. Wait 15 minutes, or use your PIN.' : 'That isn’t your PIN or your dashboard password.';
       } catch { err.textContent = 'Couldn’t reach your Sheet to check the password (no internet?). Your PIN still works.'; }
       finally { busy = false; btn.textContent = 'Continue'; pin.value = ''; pin.focus(); }
