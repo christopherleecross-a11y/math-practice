@@ -127,6 +127,8 @@ body.covered main{visibility:hidden}
 body.covered #coverHint{display:block}
 .ct.hiddenclue{color:var(--muted);font-style:italic;font-size:.88rem}
 .foot{text-align:center;margin:28px 0 8px}
+.foot a.practice-link{color:var(--muted);font-size:.8rem;margin:0 8px}
+a.btn.practice-link{text-decoration:none;display:inline-flex;align-items:center}
 .foot button{background:none;border:0;color:var(--muted);font-size:.8rem;cursor:pointer;text-decoration:underline}
 .dialog h4{margin:14px 0 6px}
 .dialog code{font-size:.85em;background:var(--bg);padding:1px 4px;border-radius:4px}
@@ -338,7 +340,7 @@ body.tp-open{overflow:hidden}
       <section><h2>Down</h2><ol id="downList"></ol></section>
     </aside>
   </main>
-  <footer class="foot"><button id="signinBtn" type="button" hidden>Class sign-in</button><button id="teacherBtn" type="button">Teacher</button></footer>
+  <footer class="foot"><a class="practice-link" href="practice.html">← Math practice</a><button id="signinBtn" type="button" hidden>Class sign-in</button><button id="teacherBtn" type="button">Teacher</button></footer>
 </div>
 
 <div class="modal" id="customModal">
@@ -414,7 +416,7 @@ osmosis: Movement of water across a membrane"></textarea>
   <div class="tp-wrap">
     <header class="tp-head">
       <div><h1>Crossword · Teacher</h1><p id="tpWho" class="muted"></p></div>
-      <div class="tp-acts"><button class="btn" id="tpPlay" type="button">See the puzzle</button><button class="btn" id="tpLock" type="button">Lock</button></div>
+      <div class="tp-acts"><a class="btn practice-link" id="tpBack" href="practice.html">← Math practice</a><button class="btn" id="tpPlay" type="button">See the puzzle</button><button class="btn" id="tpLock" type="button">Lock</button></div>
     </header>
     <nav class="tp-tabs" role="tablist">
       <button type="button" role="tab" data-tab="make">Make a puzzle</button>
@@ -508,6 +510,14 @@ osmosis: Movement of water across a membrane"></textarea>
 <script>
 (() => {
 'use strict';
+
+// links back to the math practice page keep the teacher it came from (practice.html?t=spencer, for example)
+(() => {
+  let t = new URLSearchParams(location.search).get('t');
+  try { if (t !== null) localStorage.setItem('crossword-practice-t', t); else t = localStorage.getItem('crossword-practice-t'); } catch (e) {}
+  const href = 'practice.html' + (t && /^[a-z0-9_-]+$/i.test(t) ? '?t=' + encodeURIComponent(t) : '');
+  document.querySelectorAll('a.practice-link').forEach((a) => { a.href = href; });
+})();
 
 /* ================= TEACHERS =================
    One entry per teacher. Students pick their teacher on the sign-in screen.
