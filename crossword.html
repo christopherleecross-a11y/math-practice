@@ -511,13 +511,22 @@ osmosis: Movement of water across a membrane"></textarea>
 (() => {
 'use strict';
 
-// links back to the math practice page keep the teacher it came from (practice.html?t=spencer, for example)
-(() => {
-  let t = new URLSearchParams(location.search).get('t');
-  try { if (t !== null) localStorage.setItem('crossword-practice-t', t); else t = localStorage.getItem('crossword-practice-t'); } catch (e) {}
-  const href = 'practice.html' + (t && /^[a-z0-9_-]+$/i.test(t) ? '?t=' + encodeURIComponent(t) : '');
-  document.querySelectorAll('a.practice-link').forEach((a) => { a.href = a.id === 'tpBack' ? href + (href.includes('?') ? '&' : '?') + 'teacher=1' : href; }); // the teacher page goes back to the teacher tools
-})();
+// links back to the math practice page keep the teacher it came from (practice.html?t=spencer, for example);
+// once a teacher has unlocked the crossword, they go to that teacher's own teacher tools (…&teacher=1)
+let practiceT = new URLSearchParams(location.search).get('t');
+try { if (practiceT !== null) localStorage.setItem('crossword-practice-t', practiceT); else practiceT = localStorage.getItem('crossword-practice-t'); } catch (e) {}
+function practiceHref() {
+  let t = practiceT, tm = false;
+  try { if (teacher.on) { tm = true; if (teacher.owner && typeof teacher.owner.practice === 'string') t = teacher.owner.practice; } } catch (e) {}
+  const q = [];
+  if (t && /^[a-z0-9_-]+$/i.test(t)) q.push('t=' + encodeURIComponent(t));
+  if (tm) q.push('teacher=1');
+  return 'practice.html' + (q.length ? '?' + q.join('&') : '');
+}
+document.querySelectorAll('a.practice-link').forEach((a) => {
+  a.href = practiceHref();
+  ['mouseenter', 'focus', 'mousedown', 'touchstart'].forEach((ev) => a.addEventListener(ev, () => { a.href = practiceHref(); }, { passive: true }));
+});
 
 /* ================= TEACHERS =================
    One entry per teacher. Students pick their teacher on the sign-in screen.
@@ -533,10 +542,12 @@ const TEACHERS = [
   { name: 'Mr. Cross (Geometry & Pre-Calculus)',
     sheet: 'https://script.google.com/macros/s/AKfycbyxLSWqfM1mZ0OcZz4JfzmaYGwLKmz_gL3sHBJg4IMmuK4l3UDzT7d_YG2Mtj4ox9smNg/exec',
     results: 'https://script.google.com/macros/s/AKfycbycKSv_XXuM9HI9evVQ6dapHk0hGWBgqPVEh8CneUqkoOKx8CzKUUGa14x3lHrQl-Ih/exec',
+    practice: '', // this teacher's practice page: practice.html?t=<this>
     courses: ['Geometry 1', 'Geometry 2', 'Pre-Cal 1', 'Pre-Cal 2'] },
   { name: 'Mr. Spencer (Algebra I & II)',
     sheet: 'https://script.google.com/macros/s/AKfycby7_Vq0F1elfsaH7Hca7UtnTFKjzX5RCFpik0-f-u-fcYAYyNg3ZEffrRiP6cxmSrFMbw/exec',
     results: 'https://script.google.com/macros/s/AKfycbxjKMy-XuQt8LR0Cd5ILEGk_lverjHGze1ob4_k-HAro1tV7wGVznySDxaQrToUfwoH/exec',
+    practice: 'spencer',
     courses: ['Algebra I 1', 'Algebra I 2', 'Algebra II 1', 'Algebra II 2'] }
 ];
 const courseOf = n => (String(n).split(':')[0] || n).trim();
