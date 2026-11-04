@@ -3165,7 +3165,8 @@ function openSignin() {
   siMsg('');
   $('#siName').value = store.get('crossword-student') || '';
   const lastT = TEACHERS.findIndex(t => t.name === store.get('crossword-teacher'));
-  tSel.value = String(lastT >= 0 ? lastT : Math.max(0, TEACHERS.findIndex(hasSheet)));
+  const fromT = new URLSearchParams(location.search).get('t'), fromI = fromT === null ? -1 : TEACHERS.findIndex(t => (t.practice || '') === fromT); // opened from that teacher's practice page
+  tSel.value = String(fromI >= 0 ? fromI : lastT >= 0 ? lastT : Math.max(0, TEACHERS.findIndex(hasSheet)));
   document.body.classList.add('signing');
   openModal('#signinModal');
   loadTeacherPeriods();
