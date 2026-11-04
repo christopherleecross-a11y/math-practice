@@ -26635,7 +26635,6 @@ function startScreen(teacher = false) {
         return g;
       }).filter((g) => g.children.length));
     card.append(el('label', { for: 'set' }, 'Assignment'), setSel);
-    if (!teacher) card.append(el('p', { class: 'small', style: 'margin:6px 0 0' }, 'Looking for the vocabulary crossword? ', el('a', { href: 'crossword.html', style: 'color:var(--accent);font-weight:600' }, 'Open it here')));
     const none = el('p', { class: 'small' }, teacher ? 'Loading the assignments you built…' : 'No assignments here yet.');
     if (!setSel.querySelector('option[value]:not([value=""])')) card.append(none);
     if (teacher) builderLibrary().then((lib) => { // answer key: the assignments you built come first
@@ -28046,6 +28045,85 @@ function dashStudent(s) {
     prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered${p.correct != null ? `, ${p.correct} correct` : ''}, ${dashDate(p.t)})`).join('; ')) : ''));
 }
 /* ==== RESULTS DASHBOARD END ==== */
+/* ---------- Assign in Google Classroom, straight from the builder (needs PracticeResults.gs version 10) ---------- */
+function classroomAssignBox(getLink, getTitle, onPosted) {
+  const box = el('details', { style: 'margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:8px 12px' });
+  const body = el('div', {});
+  box.append(el('summary', { style: 'cursor:pointer;font-weight:700;color:var(--accent)' }, '📤 Assign in Google Classroom'), body);
+  let loaded = false;
+  const post = async (obj) => (await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...obj, password: dashPw.get() }) })).json();
+  async function load() {
+    body.innerHTML = '';
+    if (!CONFIG.SCRIPT_URL) { body.append(el('p', { class: 'small' }, 'This needs your Practice Results sheet (CONFIG.SCRIPT_URL).')); return; }
+    if (!dashPw.get()) {
+      const pw = el('input', { type: 'password', placeholder: 'Dashboard password', style: 'max-width:220px;margin:0 6px' });
+      const go = () => { if (pw.value) { dashPw.set(pw.value); load(); } };
+      pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      body.append(el('p', { class: 'small' }, 'Connect with your dashboard password:', pw, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: go }, 'Connect')));
+      return;
+    }
+    body.append(el('p', { class: 'small' }, 'Loading your periods…'));
+    let g;
+    try { g = await post({ action: 'classPeriods' }); } catch (e) { body.innerHTML = ''; body.append(el('p', { class: 'small' }, 'Couldn’t reach your Practice Results sheet. ', el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); load(); } }, 'Try again'))); return; }
+    body.innerHTML = '';
+    if (g.wrong) { dashPw.set(''); return load(); }
+    if (!g.ok) { body.append(el('p', { class: 'small' }, g.error === 'unknown action' ? 'To assign from here, update the Apps Script in your Practice Results sheet to the new PracticeResults.gs (version 10), then Deploy > Manage deployments > Edit > New version > Deploy.' : g.setup ? 'Set DASHBOARD_PASSWORD in the Apps Script’s Script properties first.' : 'Problem: ' + (g.error || 'unknown'))); return; }
+    if (!g.periods.length) { body.append(el('p', { class: 'small' }, 'No periods yet. In your Practice Results sheet, run Practice > Set up Classroom and fill in the Period column on the Classroom tab.')); return; }
+    loaded = true;
+    const title = el('input', { type: 'text', value: getTitle(), style: 'font-size:15px' });
+    title.addEventListener('input', () => (title.dataset.typed = '1'));
+    const pds = g.periods.map((x) => { const c = el('input', { type: 'checkbox', value: x.p }); return { x, c, row: el('label', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0;font-weight:400;cursor:pointer' }, c, el('b', {}, `${x.p} period`), el('span', { class: 'small', style: 'margin:0' }, x.classes)) }; });
+    const modeSel = el('select', { style: 'width:auto' }, el('option', { value: 'all' }, 'Everyone in the checked periods'), el('option', { value: 'only' }, 'Only the students I check'), el('option', { value: 'except' }, 'Everyone except the students I check'));
+    const picked = new Set(), studs = el('div', { style: 'max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px 10px;margin-top:6px' });
+    const drawStuds = () => {
+      studs.innerHTML = ''; studs.style.display = modeSel.value === 'all' ? 'none' : '';
+      const ps = pds.filter((p) => p.c.checked).map((p) => p.x.p), list = g.roster.filter((r) => ps.includes(r.p));
+      if (!ps.length) { studs.append(el('div', { class: 'small' }, 'Check a period to see its students.')); return; }
+      if (!g.roster.length) { studs.append(el('div', { class: 'small' }, 'No roster yet: in your Sheet, run Practice > Refresh roster from Classroom.')); return; }
+      let last = null;
+      list.forEach((r) => {
+        if (r.p !== last) { studs.append(el('div', { style: 'font-weight:700;margin-top:6px' }, `${r.p} period`)); last = r.p; }
+        const c = el('input', { type: 'checkbox' }); c.checked = picked.has(r.id); c.addEventListener('change', () => (c.checked ? picked.add(r.id) : picked.delete(r.id)));
+        studs.append(el('label', { style: 'display:block;font-weight:400;margin:2px 0;cursor:pointer' }, c, ' ', r.n, r.g ? el('span', { class: 'small' }, ` (${r.g})`) : ''));
+      });
+    };
+    pds.forEach((p) => p.c.addEventListener('change', drawStuds)); modeSel.addEventListener('change', drawStuds);
+    const pts = el('input', { type: 'number', value: '100', min: '1', style: 'width:100px' }), due = el('input', { type: 'date', style: 'width:auto' }), tm = el('input', { type: 'time', value: '23:59', style: 'width:auto' });
+    const msg = el('p', { class: 'small', style: 'white-space:pre-line;margin:8px 0 0' });
+    const go = el('button', { class: 'btn', type: 'button' }, 'Assign');
+    const allLink = el('a', { href: '#', class: 'small', style: 'margin-left:8px;font-weight:400', onclick: (e) => { e.preventDefault(); const on = !pds.every((p) => p.c.checked); pds.forEach((p) => (p.c.checked = on)); drawStuds(); } }, 'select all');
+    go.addEventListener('click', async () => {
+      const link = getLink(), ps = pds.filter((p) => p.c.checked).map((p) => p.x.p);
+      const ids = [...picked].filter((id) => g.roster.some((r) => r.id === id && ps.includes(r.p)));
+      msg.style.color = '#b03a2e';
+      if (!link) { msg.textContent = 'Pick some questions first, so there is a link to assign.'; return; }
+      if (!title.value.trim()) { msg.textContent = 'Give the assignment a title.'; return; }
+      if (!ps.length) { msg.textContent = 'Check at least one period.'; return; }
+      if (modeSel.value !== 'all' && !ids.length) { msg.textContent = 'Check at least one student.'; return; }
+      go.disabled = true; go.textContent = 'Assigning…'; msg.style.color = ''; msg.textContent = '';
+      try {
+        const r = await post({ action: 'postAssignment', link, title: title.value.trim(), periods: ps, mode: modeSel.value, students: ids, points: +pts.value || 100, due: due.value, time: tm.value });
+        if (!r.ok) throw new Error(r.wrong ? 'That dashboard password didn’t match.' : r.error === 'unknown action' ? 'Update your PracticeResults.gs to version 10 to assign from here.' : r.error || 'failed');
+        if (r.posted.length && onPosted) onPosted();
+        msg.style.color = r.failed.length ? '#b03a2e' : '#2e7d32';
+        msg.textContent = (r.posted.length ? '✓ Assigned to ' + r.posted.join(', ') + '.' : '') + (r.failed.length ? '\nProblems:\n' + r.failed.join('\n') : '');
+        go.textContent = 'Assign again';
+      } catch (e) { msg.style.color = '#b03a2e'; msg.textContent = String(e.message || e); go.textContent = 'Assign'; }
+      go.disabled = false;
+    });
+    body.append(
+      el('label', {}, 'Title in Classroom'), title,
+      el('label', {}, 'Periods', allLink), ...pds.map((p) => p.row),
+      el('label', {}, 'Who gets it?'), modeSel, studs,
+      el('div', { style: 'display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end' },
+        el('div', {}, el('label', {}, 'Points'), pts), el('div', {}, el('label', {}, 'Due date (optional)'), due), el('div', {}, el('label', {}, 'Due time'), tm)),
+      go, msg,
+      el('p', { class: 'small' }, 'This posts the student link above as an assignment in each checked period’s Google Classroom class. Scores go to Classroom automatically when students submit (Classroom keeps each student’s best). To give some students a different version, change the settings above, then assign again with only those students checked.'));
+    drawStuds();
+  }
+  box.addEventListener('toggle', () => { if (box.open && !loaded) load(); else if (box.open) { const t = body.querySelector('input[type=text]'); if (t && !t.dataset.typed) t.value = getTitle(); } });
+  return box;
+}
 /* ---------- teacher tools: menu + assignment builder ---------- */
 // tabs across the top of every teacher screen (only appears after the teacher PIN)
 function teacherNav(active) {
@@ -28061,7 +28139,6 @@ function teacherNav(active) {
     ['key', 'Look up an answer key', go(() => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); })],
     ['print', 'Print', go(() => printScreen())],
     ['lesson', 'Lesson plans', go(() => lessonScreen())],
-    ['crossword', 'Crossword', () => { location.href = 'crossword.html'; }],
   ];
   nav.innerHTML = '';
   tabs.forEach(([id, label, fn]) => nav.append(el('button', { type: 'button', onclick: fn, 'aria-current': id === active ? 'page' : 'false',
@@ -28583,8 +28660,7 @@ function teacherMenu() {
     el('button', { class: 'btn', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard'), ' ',
     el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key'), ' ',
     el('button', { class: 'btn secondary', onclick: () => printScreen() }, 'Print an assignment'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => lessonScreen() }, 'Lesson plans'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => { location.href = 'crossword.html'; } }, 'Vocabulary crossword')));
+    el('button', { class: 'btn secondary', onclick: () => lessonScreen() }, 'Lesson plans')));
 }
 
 /* ---------- printing (teacher only): paper copies in one or more versions, with an answer key ---------- */
@@ -29079,6 +29155,7 @@ function builder() {
   const out = el('div', { class: 'card' },
     el('div', {}, 'Total questions: ', totalEl), msg,
     el('label', {}, 'Student link (post this in Google Classroom)'), linkIn, copyBtn,
+    classroomAssignBox(() => linkIn.value, () => titleIn.value.trim() || 'Custom Practice', remember),
     el('p', { class: 'small', style: 'margin-top:14px' }, tryLink, ' · ', keyLink, ' · ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); const k = linkIn.value && registerCustomUrl(linkIn.value); if (k) { printScreen(k); window.scrollTo(0, 0); } } }, 'Print it')),
     el('details', { style: 'margin-top:10px' }, el('summary', { class: 'small' }, 'Make it a permanent menu item (optional)'),
       el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut), shareBox);
