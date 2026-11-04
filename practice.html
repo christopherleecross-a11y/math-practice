@@ -28045,7 +28045,7 @@ function dashStudent(s) {
     prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered${p.correct != null ? `, ${p.correct} correct` : ''}, ${dashDate(p.t)})`).join('; ')) : ''));
 }
 /* ==== RESULTS DASHBOARD END ==== */
-/* ---------- Assign in Google Classroom, straight from the builder (needs PracticeResults.gs version 10) ---------- */
+/* ---------- Assign in Google Classroom, straight from the builder (needs PracticeResults.gs version 10; per-period post times need 11) ---------- */
 function classroomAssignBox(getLink, getTitle, onPosted) {
   const box = el('details', { style: 'margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:8px 12px' });
   const body = el('div', {});
@@ -28067,12 +28067,20 @@ function classroomAssignBox(getLink, getTitle, onPosted) {
     try { g = await post({ action: 'classPeriods' }); } catch (e) { body.innerHTML = ''; body.append(el('p', { class: 'small' }, 'Couldn’t reach your Practice Results sheet. ', el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); load(); } }, 'Try again'))); return; }
     body.innerHTML = '';
     if (g.wrong) { dashPw.set(''); return load(); }
-    if (!g.ok) { body.append(el('p', { class: 'small' }, g.error === 'unknown action' ? 'To assign from here, update the Apps Script in your Practice Results sheet to the new PracticeResults.gs (version 10), then Deploy > Manage deployments > Edit > New version > Deploy.' : g.setup ? 'Set DASHBOARD_PASSWORD in the Apps Script’s Script properties first.' : 'Problem: ' + (g.error || 'unknown'))); return; }
+    if (!g.ok) { body.append(el('p', { class: 'small' }, g.error === 'unknown action' ? 'To assign from here, update the Apps Script in your Practice Results sheet to the new PracticeResults.gs (version 11), then Deploy > Manage deployments > Edit > New version > Deploy.' : g.setup ? 'Set DASHBOARD_PASSWORD in the Apps Script’s Script properties first.' : 'Problem: ' + (g.error || 'unknown'))); return; }
     if (!g.periods.length) { body.append(el('p', { class: 'small' }, 'No periods yet. In your Practice Results sheet, run Practice > Set up Classroom and fill in the Period column on the Classroom tab.')); return; }
     loaded = true;
     const title = el('input', { type: 'text', value: getTitle(), style: 'font-size:15px' });
     title.addEventListener('input', () => (title.dataset.typed = '1'));
-    const pds = g.periods.map((x) => { const c = el('input', { type: 'checkbox', value: x.p }); return { x, c, row: el('label', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0;font-weight:400;cursor:pointer' }, c, el('b', {}, `${x.p} period`), el('span', { class: 'small', style: 'margin:0' }, x.classes)) }; });
+    // each period: its own post time (blank = right away) and due date (blank = the default below)
+    const tIn = (type, v) => el('input', { type, value: v || '', style: 'width:auto;padding:4px 6px;font-size:14px' });
+    const pds = g.periods.map((x) => {
+      const c = el('input', { type: 'checkbox', value: x.p }), postD = tIn('date'), postT = tIn('time', '07:30'), dueD = tIn('date'), dueT = tIn('time', '23:59');
+      const when = el('div', { style: 'display:none;gap:10px;flex-wrap:wrap;align-items:center;padding:2px 0 8px 28px', class: 'small' },
+        el('span', {}, 'Post on ', postD, ' at ', postT), el('span', {}, 'Due ', dueD, ' at ', dueT));
+      c.addEventListener('change', () => (when.style.display = c.checked ? 'flex' : 'none'));
+      return { x, c, postD, postT, dueD, dueT, row: el('div', {}, el('label', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0 0;font-weight:400;cursor:pointer' }, c, el('b', {}, `${x.p} period`), el('span', { class: 'small', style: 'margin:0' }, x.classes)), when) };
+    });
     const modeSel = el('select', { style: 'width:auto' }, el('option', { value: 'all' }, 'Everyone in the checked periods'), el('option', { value: 'only' }, 'Only the students I check'), el('option', { value: 'except' }, 'Everyone except the students I check'));
     const picked = new Set(), studs = el('div', { style: 'max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px 10px;margin-top:6px' });
     const drawStuds = () => {
@@ -28091,7 +28099,7 @@ function classroomAssignBox(getLink, getTitle, onPosted) {
     const pts = el('input', { type: 'number', value: '100', min: '1', style: 'width:100px' }), due = el('input', { type: 'date', style: 'width:auto' }), tm = el('input', { type: 'time', value: '23:59', style: 'width:auto' });
     const msg = el('p', { class: 'small', style: 'white-space:pre-line;margin:8px 0 0' });
     const go = el('button', { class: 'btn', type: 'button' }, 'Assign');
-    const allLink = el('a', { href: '#', class: 'small', style: 'margin-left:8px;font-weight:400', onclick: (e) => { e.preventDefault(); const on = !pds.every((p) => p.c.checked); pds.forEach((p) => (p.c.checked = on)); drawStuds(); } }, 'select all');
+    const allLink = el('a', { href: '#', class: 'small', style: 'margin-left:8px;font-weight:400', onclick: (e) => { e.preventDefault(); const on = !pds.every((p) => p.c.checked); pds.forEach((p) => { p.c.checked = on; p.c.dispatchEvent(new Event('change')); }); drawStuds(); } }, 'select all');
     go.addEventListener('click', async () => {
       const link = getLink(), ps = pds.filter((p) => p.c.checked).map((p) => p.x.p);
       const ids = [...picked].filter((id) => g.roster.some((r) => r.id === id && ps.includes(r.p)));
@@ -28102,8 +28110,18 @@ function classroomAssignBox(getLink, getTitle, onPosted) {
       if (modeSel.value !== 'all' && !ids.length) { msg.textContent = 'Check at least one student.'; return; }
       go.disabled = true; go.textContent = 'Assigning…'; msg.style.color = ''; msg.textContent = '';
       try {
-        const r = await post({ action: 'postAssignment', link, title: title.value.trim(), periods: ps, mode: modeSel.value, students: ids, points: +pts.value || 100, due: due.value, time: tm.value });
-        if (!r.ok) throw new Error(r.wrong ? 'That dashboard password didn’t match.' : r.error === 'unknown action' ? 'Update your PracticeResults.gs to version 10 to assign from here.' : r.error || 'failed');
+        const perPeriod = {}, now = Date.now();
+        for (const p of pds.filter((q) => q.c.checked)) {
+          const o = {};
+          if (p.postD.value) { if (new Date(`${p.postD.value}T${p.postT.value || '07:30'}`).getTime() < now - 60000) throw new Error(`${p.x.p} period: that post time has already passed. Clear the date to post it right away.`); o.post = p.postD.value; o.postTime = p.postT.value || '07:30'; }
+          if (p.dueD.value) { o.due = p.dueD.value; o.time = p.dueT.value || '23:59'; }
+          const dueAt = o.due ? `${o.due}T${o.time}` : due.value ? `${due.value}T${tm.value || '23:59'}` : '';
+          if (o.post && dueAt && dueAt <= `${o.post}T${o.postTime}`) throw new Error(`${p.x.p} period: the due date has to be after the post time.`);
+          if (Object.keys(o).length) perPeriod[p.x.p] = o;
+        }
+        if (Object.keys(perPeriod).length) { LESSON_EDITS.version = null; const v = await lpVersion(); if (v >= 0 && v < 11) throw new Error('A different post time or due date for each period needs PracticeResults.gs version 11 (yours is version ' + v + '). Update the script, or clear those dates.'); }
+        const r = await post({ action: 'postAssignment', link, title: title.value.trim(), periods: ps, mode: modeSel.value, students: ids, points: +pts.value || 100, due: due.value, time: tm.value, perPeriod });
+        if (!r.ok) throw new Error(r.wrong ? 'That dashboard password didn’t match.' : r.error === 'unknown action' ? 'Update your PracticeResults.gs to version 11 to assign from here.' : r.error || 'failed');
         if (r.posted.length && onPosted) onPosted();
         msg.style.color = r.failed.length ? '#b03a2e' : '#2e7d32';
         msg.textContent = (r.posted.length ? '✓ Assigned to ' + r.posted.join(', ') + '.' : '') + (r.failed.length ? '\nProblems:\n' + r.failed.join('\n') : '');
@@ -28116,9 +28134,9 @@ function classroomAssignBox(getLink, getTitle, onPosted) {
       el('label', {}, 'Periods', allLink), ...pds.map((p) => p.row),
       el('label', {}, 'Who gets it?'), modeSel, studs,
       el('div', { style: 'display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end' },
-        el('div', {}, el('label', {}, 'Points'), pts), el('div', {}, el('label', {}, 'Due date (optional)'), due), el('div', {}, el('label', {}, 'Due time'), tm)),
+        el('div', {}, el('label', {}, 'Points'), pts), el('div', {}, el('label', {}, 'Due date (optional, for periods without their own)'), due), el('div', {}, el('label', {}, 'Due time'), tm)),
       go, msg,
-      el('p', { class: 'small' }, 'This posts the student link above as an assignment in each checked period’s Google Classroom class. Scores go to Classroom automatically when students submit (Classroom keeps each student’s best). To give some students a different version, change the settings above, then assign again with only those students checked.'));
+      el('p', { class: 'small' }, 'This posts the student link above as an assignment in each checked period’s Google Classroom class. Leave a period’s “Post on” date blank to post it right away, or pick a date and time and Classroom posts it then (it waits in Classroom as a scheduled assignment). Scores go to Classroom automatically when students submit (Classroom keeps each student’s best). To give some students a different version, change the settings above, then assign again with only those students checked.'));
     drawStuds();
   }
   box.addEventListener('toggle', () => { if (box.open && !loaded) load(); else if (box.open) { const t = body.querySelector('input[type=text]'); if (t && !t.dataset.typed) t.value = getTitle(); } });
