@@ -180,6 +180,13 @@ body.tp-open{overflow:hidden}
 .tp-head h1{margin:0;font-size:1.5rem}
 .tp-head p{margin:2px 0 0}
 .tp-acts{display:flex;gap:8px;flex-wrap:wrap}
+#cpClass{margin-top:12px}#cpClass summary{font-weight:700;color:var(--accent,#1f5fa8)}
+#cpClassBody label.blk{display:block;font-weight:600;margin:10px 0 4px}
+#cpClassBody .pd{display:flex;gap:8px;align-items:center;margin:4px 0 0;cursor:pointer}
+#cpClassBody .when{display:none;gap:10px;flex-wrap:wrap;align-items:center;padding:2px 0 8px 28px;font-size:.85rem}
+#cpClassBody .studs{max-height:220px;overflow:auto;border:1px solid #ddd;border-radius:8px;padding:4px 10px;margin-top:6px}
+#cpClassBody .msg{white-space:pre-line;font-size:.9rem}
+#cpClassBody input[type=text]{width:100%;box-sizing:border-box}
 .tp-tabs{display:flex;gap:6px;flex-wrap:wrap;background:var(--panel);border-radius:12px;padding:6px;margin-bottom:14px;box-shadow:var(--shadow)}
 .tp-tabs button{flex:1;min-width:140px;padding:9px 12px;font:600 .95rem system-ui,sans-serif;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--accent);cursor:pointer}
 .tp-tabs button[aria-selected=true]{background:var(--accent);color:var(--accent-ink)}
@@ -464,6 +471,7 @@ osmosis: Movement of water across a membrane"></textarea>
           <button class="btn" id="cpCopySite" type="button" hidden>Copy link for Google Classroom</button>
         </div>
         <input type="text" id="cpLink" readonly hidden>
+        <details id="cpClass" class="tp-more"><summary>📤 Assign in Google Classroom</summary><div id="cpClassBody"></div></details>
         <p id="cpSheetHint" class="muted">Assigning puts it on your Sheet's Assignments tab and turns off the period's previous crossword. In Google Classroom, post the <b>link for Google Classroom</b>. Students sign in there and get this puzzle.</p>
       </div>
     </section>
@@ -2592,6 +2600,103 @@ $('#cpAssign').addEventListener('click', async () => {
     if (r.ok) toast('Assigned to ' + pers.map(perLabel).join(', ') + '. Students get it the next time they sign in.', 5000);
   } finally { btn.disabled = false; btn.textContent = 'Assign to these periods'; }
 });
+/* ---- Assign in Google Classroom (through the teacher's Practice Results sheet, like the practice site) ----
+   Posts the student link for this puzzle to each checked period's Classroom class, now or at a set time, with its own due date.
+   Scores go to Classroom by themselves: the finished puzzle's score goes to the Practice Results sheet, which matches it to this posting. */
+const mk = (tag, attrs, ...kids) => { const e = document.createElement(tag); Object.entries(attrs || {}).forEach(([k, v]) => { if (k === 'style') e.style.cssText = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v); }); kids.flat().forEach((k) => k != null && k !== false && e.append(k)); return e; };
+const dashPwKey = () => ((teacher.owner && teacher.owner.practice) ? teacher.owner.practice + ':' : '') + 'dash:pw'; // the same remembered password as the practice site
+const dashPwGet = () => { try { return localStorage.getItem(dashPwKey()) || ''; } catch { return ''; } };
+const dashPwSet = (v) => { try { v ? localStorage.setItem(dashPwKey(), v) : localStorage.removeItem(dashPwKey()); } catch {} };
+let classLoaded = false;
+async function classPost(obj) {
+  const url = teacher.owner && teacher.owner.results;
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({}, obj, { password: dashPwGet() })) });
+  return r.json();
+}
+async function classLoad() {
+  const body = $('#cpClassBody'); body.innerHTML = '';
+  if (!teacher.owner || !/^https:\/\//.test(teacher.owner.results || '')) { body.append(mk('p', { class: 'muted' }, 'This needs your Practice Results sheet (results: in TEACHERS at the top of crossword.html).')); return; }
+  if (!dashPwGet()) {
+    const pw = mk('input', { type: 'password', placeholder: 'Results dashboard password', style: 'max-width:240px;margin:0 6px' });
+    const go = () => { if (pw.value) { dashPwSet(pw.value); classLoad(); } };
+    pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    body.append(mk('p', { class: 'muted' }, 'Connect with your Results dashboard password (the one from the practice site):', pw, mk('button', { class: 'btn', type: 'button', onclick: go }, 'Connect')));
+    return;
+  }
+  body.append(mk('p', { class: 'muted' }, 'Loading your periods…'));
+  let g;
+  try { g = await classPost({ action: 'classPeriods' }); } catch { body.innerHTML = ''; body.append(mk('p', { class: 'muted' }, 'Couldn’t reach your Practice Results sheet. ', mk('a', { href: '#', onclick: (e) => { e.preventDefault(); classLoad(); } }, 'Try again'))); return; }
+  body.innerHTML = '';
+  if (g.wrong) { dashPwSet(''); return classLoad(); }
+  if (!g.ok) { body.append(mk('p', { class: 'muted' }, g.error === 'unknown action' ? 'Update the Apps Script in your Practice Results sheet to the newest PracticeResults.gs (version 12), then Deploy > Manage deployments > Edit > New version > Deploy.' : 'Problem: ' + (g.error || 'unknown'))); return; }
+  if (!g.periods.length) { body.append(mk('p', { class: 'muted' }, 'No periods yet: in your Practice Results sheet, run Practice > Set up Classroom and fill in the Period column on the Classroom tab.')); return; }
+  classLoaded = true;
+  const title = mk('input', { type: 'text', value: 'Crossword: ' + ($('#cpLabel').value.trim() || (TP.built && TP.built.list) || '') });
+  title.addEventListener('input', () => (title.dataset.typed = '1'));
+  $('#cpLabel').addEventListener('input', () => { if (!title.dataset.typed) title.value = 'Crossword: ' + ($('#cpLabel').value.trim() || (TP.built && TP.built.list) || ''); });
+  const tIn = (type, v) => mk('input', { type, value: v || '', style: 'width:auto;padding:3px 6px' });
+  const pds = g.periods.map((x) => {
+    const c = mk('input', { type: 'checkbox', value: x.p }), postD = tIn('date'), postT = tIn('time', '07:30'), dueD = tIn('date'), dueT = tIn('time', '23:59');
+    const when = mk('div', { class: 'when' }, mk('span', {}, 'Post on ', postD, ' at ', postT), mk('span', {}, 'Due ', dueD, ' at ', dueT));
+    c.addEventListener('change', () => { when.style.display = c.checked ? 'flex' : 'none'; drawStuds(); });
+    return { x, c, postD, postT, dueD, dueT, row: mk('div', {}, mk('label', { class: 'pd' }, c, mk('b', {}, x.p + ' period'), mk('span', { class: 'muted' }, x.classes)), when) };
+  });
+  const modeSel = mk('select', {}, mk('option', { value: 'all' }, 'Everyone in the checked periods'), mk('option', { value: 'only' }, 'Only the students I check'), mk('option', { value: 'except' }, 'Everyone except the students I check'));
+  const picked = new Set(), studs = mk('div', { class: 'studs' });
+  function drawStuds() {
+    studs.innerHTML = ''; studs.style.display = modeSel.value === 'all' ? 'none' : '';
+    const ps = pds.filter((p) => p.c.checked).map((p) => p.x.p), list = g.roster.filter((r) => ps.includes(r.p));
+    if (!ps.length) { studs.append(mk('div', { class: 'muted' }, 'Check a period to see its students.')); return; }
+    let last = null;
+    list.forEach((r) => {
+      if (r.p !== last) { studs.append(mk('div', { style: 'font-weight:700;margin-top:6px' }, r.p + ' period')); last = r.p; }
+      const c = mk('input', { type: 'checkbox' }); c.checked = picked.has(r.id); c.addEventListener('change', () => (c.checked ? picked.add(r.id) : picked.delete(r.id)));
+      studs.append(mk('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' ', r.n));
+    });
+  }
+  modeSel.addEventListener('change', drawStuds);
+  const pts = mk('input', { type: 'number', value: '100', min: '1', style: 'width:90px' }), due = tIn('date'), tm = tIn('time', '23:59');
+  const msg = mk('p', { class: 'msg' }), go = mk('button', { class: 'btn primary', type: 'button' }, 'Assign in Classroom');
+  const all = mk('a', { href: '#', class: 'muted', style: 'margin-left:8px;font-weight:400', onclick: (e) => { e.preventDefault(); const on = !pds.every((p) => p.c.checked); pds.forEach((p) => { p.c.checked = on; p.c.dispatchEvent(new Event('change')); }); } }, 'select all');
+  go.addEventListener('click', async () => {
+    const e = builtEntry(), link = $('#cpLink').value, ps = pds.filter((p) => p.c.checked).map((p) => p.x.p);
+    const ids = [...picked].filter((id) => g.roster.some((r) => r.id === id && ps.includes(r.p)));
+    msg.style.color = '#b03a2e';
+    if (!e || !link || !e.pcode) { msg.textContent = 'Build a puzzle first.'; return; }
+    if (!title.value.trim()) { msg.textContent = 'Give the assignment a title.'; return; }
+    if (!ps.length) { msg.textContent = 'Check at least one period.'; return; }
+    if (modeSel.value !== 'all' && !ids.length) { msg.textContent = 'Check at least one student.'; return; }
+    const perPeriod = {}, now = Date.now();
+    for (const p of pds.filter((q) => q.c.checked)) {
+      const o = {};
+      if (p.postD.value) { if (new Date(p.postD.value + 'T' + (p.postT.value || '07:30')).getTime() < now - 60000) { msg.textContent = p.x.p + ' period: that post time has already passed. Clear the date to post it right away.'; return; } o.post = p.postD.value; o.postTime = p.postT.value || '07:30'; }
+      if (p.dueD.value) { o.due = p.dueD.value; o.time = p.dueT.value || '23:59'; }
+      const dueAt = o.due ? o.due + 'T' + o.time : due.value ? due.value + 'T' + (tm.value || '23:59') : '';
+      if (o.post && dueAt && dueAt <= o.post + 'T' + o.postTime) { msg.textContent = p.x.p + ' period: the due date has to be after the post time.'; return; }
+      if (Object.keys(o).length) perPeriod[p.x.p] = o;
+    }
+    go.disabled = true; go.textContent = 'Assigning…'; msg.style.color = ''; msg.textContent = '';
+    try {
+      try { await saveEntry(e); } catch {} // keep it in My assignments too
+      const r = await classPost({ action: 'postAssignment', key: 'crossword:' + e.pcode, link, title: title.value.trim(), periods: ps, mode: modeSel.value, students: ids, points: +pts.value || 100, due: due.value, time: tm.value, perPeriod });
+      if (!r.ok) throw new Error(r.wrong ? 'That dashboard password didn’t match.' : r.error === 'unknown action' || /practice link/.test(r.error || '') ? 'Update your PracticeResults.gs to version 12 to assign crosswords in Classroom.' : r.error || 'failed');
+      msg.style.color = r.failed.length ? '#b03a2e' : '#2e7d32';
+      msg.textContent = (r.posted.length ? '✓ Assigned to ' + r.posted.join(', ') + '.' : '') + (r.failed.length ? '\nProblems:\n' + r.failed.join('\n') : '');
+      go.textContent = 'Assign again';
+    } catch (err) { msg.style.color = '#b03a2e'; msg.textContent = String(err.message || err); go.textContent = 'Assign in Classroom'; }
+    go.disabled = false;
+  });
+  body.append(
+    mk('label', { class: 'blk' }, 'Title in Classroom'), title,
+    mk('label', { class: 'blk' }, 'Periods', all), ...pds.map((p) => p.row),
+    mk('label', { class: 'blk' }, 'Who gets it?'), modeSel, studs,
+    mk('div', { class: 'cp-row', style: 'display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end' },
+      mk('div', {}, mk('label', { class: 'blk' }, 'Points'), pts), mk('div', {}, mk('label', { class: 'blk' }, 'Due date (for periods without their own)'), due), mk('div', {}, mk('label', { class: 'blk' }, 'Due time'), tm)),
+    mk('div', { class: 'row left' }, go), msg,
+    mk('p', { class: 'muted' }, 'This posts this puzzle’s student link in each checked period’s Google Classroom class. Leave “Post on” blank to post it right away, or pick a date and time and Classroom posts it then. Students open the link, pick their period and name, and their score goes to Classroom when they finish (Classroom keeps each student’s best) and to your Results dashboard.'));
+  drawStuds();
+}
+$('#cpClass').addEventListener('toggle', () => { if ($('#cpClass').open && !classLoaded) classLoad(); });
 $('#cpPreview').addEventListener('click', () => showPuzzleView('Preview: ' + viewText() + '. This is what students see, with Check and Reveal turned on for you.'));
 function copyText(text, msg) {
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(() => toast(msg), () => prompt('Copy this:', text));
@@ -3176,8 +3281,10 @@ window.addEventListener('online', flushOutbox);
 // the same score, also sent to the teacher's Practice Results sheet so it shows on the practice site's Results dashboard
 const DASH_OUTBOX = 'crossword-dash-outbox';
 let dashBox = store.get(DASH_OUTBOX) || [], dashBusy = false;
-const ordinal = p => /^\d+$/.test(String(p)) ? p + ({ 1: 'st', 2: 'nd', 3: 'rd' }[+p % 10 === 0 || (+p % 100 >= 11 && +p % 100 <= 13) ? 0 : +p % 10] || 'th') : String(p);
-function queueDash(rid) {
+const ordinal = p => { const m = String(p).match(/^\D*(\d{1,2})(?:st|nd|rd|th)?\b/i); return m ? ordinal0(m[1]) : String(p); };
+const ordinal0 = p => /^\d+$/.test(String(p)) ? p + ({ 1: 'st', 2: 'nd', 3: 'rd' }[+p % 10 === 0 || (+p % 100 >= 11 && +p % 100 <= 13) ? 0 : +p % 10] || 'th') : String(p);
+async function queueDash(rid) {
+  if (P && !P.code) { try { P.code = await puzzleCode(P); } catch {} } // the code ties the score to its Classroom posting
   const tch = TEACHERS.find(t => t.sheet === P.assign.sheet);
   if (!tch || !/^https:\/\//.test(tch.results || '') || integ.teacher || P.assign.label === 'Teacher view' || !student || !integ.score) return;
   const sc = integ.score, words = integ.words || [];
