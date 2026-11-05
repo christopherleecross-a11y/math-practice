@@ -28910,6 +28910,8 @@ function builder() {
   const formats = Object.assign({}, saved.formats || {});
   const frCounts = Object.assign({}, saved.frCounts || {}); // "Some of each": how many of a type are free response
   const bonusCounts = Object.assign({}, saved.bonusCounts || {}), bonusFormats = Object.assign({}, saved.bonusFormats || {}); // bonus questions (always at the end)
+  let seq = Array.isArray(saved.seq) ? saved.seq.slice() : []; // the order of the question groups (the teacher can move them)
+  const seqBox = el('div', { style: 'margin-top:6px' });
   const titleIn = el('input', { type: 'text', value: saved.title || '', placeholder: 'e.g. 5.6 Quiz Review' });
   const subjSel = el('select', {}, ...Object.entries(SUBJECTS).map(([k, v]) => el('option', { value: k }, v)));
   subjSel.value = saved.subject && SUBJECTS[saved.subject] ? saved.subject : Object.keys(SUBJECTS)[0];
@@ -28959,7 +28961,7 @@ function builder() {
       const prev = f[id]; c[id] = (c[id] || 0) + n;
       if (m === 'fr') { frc[id] = (frc[id] || 0) + n; f[id] = prev && prev !== 'fr' ? 'both' : 'fr'; } else f[id] = prev && prev !== 'mc' ? 'both' : 'mc'; });
     Object.keys(f).forEach((id) => { if (f[id] !== 'both') delete frc[id]; });
-    return { counts: c, formats: f, frCounts: frc, bonusCounts: bc, bonusFormats: bf };
+    return { counts: c, formats: f, frCounts: frc, bonusCounts: bc, bonusFormats: bf, seq: builderSeq(items) };
   };
   const loadFromUrl = (text, note = '') => {
     let u; try { u = new URL(String(text).trim()); } catch { editMsg.textContent = 'That doesn’t look like a link. Copy the whole student link (it starts with https://).'; return; }
@@ -29061,7 +29063,7 @@ function builder() {
   app.append(el('div', { class: 'card' },
     el('label', {}, 'Assignment title'), titleIn,
     el('label', {}, 'Subject (which gradebook tab scores go to)'), subjSel,
-    el('label', {}, 'Question order'), orderSel,
+    el('label', {}, 'Question order'), orderSel, seqBox,
     el('label', {}, 'Retries on a missed question'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, retriesIn,
       el('span', { class: 'small' }, '0 = graded only at Submit. 1 or more adds a Check button; each retry is a new version of the question.')),
     checksLab, checksBox,
@@ -29185,7 +29187,7 @@ function builder() {
   // once the link is copied or assigned in Classroom, the next new assignment starts with every count at 0 (the other settings stay)
   const built = () => {
     remember();
-    const d = { ...(store.get(TK('builder:last')) || {}), counts: {}, formats: {}, frCounts: {}, bonusCounts: {}, bonusFormats: {}, title: '', t: Date.now() };
+    const d = { ...(store.get(TK('builder:last')) || {}), counts: {}, formats: {}, frCounts: {}, bonusCounts: {}, bonusFormats: {}, seq: [], title: '', t: Date.now() };
     delete d.editId;
     setTimeout(() => { store.set(TK('builder:last'), d); store.set(TK('builder:sentSig'), draftSig(d)); queueDraft(d); }, 0); // after this page's own save
   };
@@ -29221,6 +29223,30 @@ function builder() {
   shareIn.addEventListener('change', update);
   redoSel.addEventListener('change', update);
 
+  // the chosen question groups, in order, with arrows (and drag) to move them
+  function drawSeq(items) {
+    seqBox.innerHTML = '';
+    if (items.length < 2) return;
+    if (orderSel.value === 'mixed') { seqBox.append(el('p', { class: 'small', style: 'margin:4px 0 0' }, 'Each student gets the questions in a different order. Pick “Grouped by type” to set the order yourself.')); return; }
+    const move = (k, d) => { const j = k + d; if (j < 0 || j >= seq.length) return; [seq[k], seq[j]] = [seq[j], seq[k]]; update(); };
+    let dragK = -1, num = 1;
+    const rows = items.map((it, k) => {
+      const t = QUESTION_TYPES.find((x) => x.id === it[0]), from = num; num += it[1];
+      const up = el('button', { class: 'btn secondary', type: 'button', title: 'Move up', 'aria-label': 'Move up', style: 'margin:0;padding:2px 9px;font-size:14px', onclick: () => move(k, -1) }, '▲');
+      const dn = el('button', { class: 'btn secondary', type: 'button', title: 'Move down', 'aria-label': 'Move down', style: 'margin:0;padding:2px 9px;font-size:14px', onclick: () => move(k, 1) }, '▼');
+      up.disabled = k === 0; dn.disabled = k === items.length - 1;
+      const row = el('div', { draggable: 'true', style: 'display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--line);border-top:' + (k ? 'none' : '1px solid var(--line)') + ';background:#fff;cursor:grab' },
+        el('span', { class: 'small', style: 'margin:0;min-width:58px;color:var(--muted)' }, it[1] > 1 ? `#${from}–${from + it[1] - 1}` : `#${from}`),
+        el('span', { style: 'flex:1' }, (t ? t.label : it[0]) + (it[2] === 'fr' ? ' (free response)' : ''), el('span', { class: 'small', style: 'margin:0 0 0 6px' }, `× ${it[1]}`)), up, dn);
+      row.addEventListener('dragstart', (e) => { dragK = k; e.dataTransfer.effectAllowed = 'move'; row.style.opacity = '.5'; });
+      row.addEventListener('dragend', () => { row.style.opacity = ''; });
+      row.addEventListener('dragover', (e) => { e.preventDefault(); row.style.boxShadow = 'inset 0 3px 0 var(--accent)'; });
+      row.addEventListener('dragleave', () => { row.style.boxShadow = ''; });
+      row.addEventListener('drop', (e) => { e.preventDefault(); row.style.boxShadow = ''; if (dragK < 0 || dragK === k) return; const [m] = seq.splice(dragK, 1); seq.splice(k, 0, m); dragK = -1; update(); });
+      return row;
+    });
+    seqBox.append(el('p', { class: 'small', style: 'margin:6px 0 4px' }, 'Order of the questions (bonus questions always come last). Use the arrows or drag a row:'), ...rows);
+  }
   function update() {
     leaveGray();
     const items = [];
@@ -29232,6 +29258,12 @@ function builder() {
         if (fr > 0) items.push([t.id, fr, 'fr']);
       } else items.push([t.id, n, f === 'fr' ? 'fr' : 'mc']);
     });
+    // the teacher's order: groups already placed keep their places; a newly added group goes at the end
+    const keyOf = (it) => `${it[0]}:${it[2]}`;
+    seq = seq.filter((k) => items.some((it) => keyOf(it) === k));
+    items.forEach((it) => { if (!seq.includes(keyOf(it))) seq.push(keyOf(it)); });
+    items.sort((a, b) => seq.indexOf(keyOf(a)) - seq.indexOf(keyOf(b)));
+    drawSeq(items);
     const total = items.reduce((a, [, n]) => a + n, 0);
     const bItems = QUESTION_TYPES.filter((t) => bonusCounts[t.id] > 0).map((t) => [t.id, bonusCounts[t.id], t.writtenOnly || t.sketch ? 'mc' : bonusFormats[t.id] === 'fr' ? 'fr' : 'mc', 'b']);
     const nBonus = bItems.reduce((a, [, n]) => a + n, 0), bp = Math.max(0.5, Math.min(50, Math.round(2 * (+bonusPctIn.value || 5)) / 2));
@@ -29240,7 +29272,7 @@ function builder() {
     const title = titleIn.value.trim() || 'Custom Practice';
     changedNow = false;
     const prevLast = store.get(TK('builder:last')) || {};
-    const nextLast = { counts, formats, frCounts, bonusCounts, bonusFormats, bonusPct: +bonusPctIn.value || 5, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, shareWork: shareIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
+    const nextLast = { counts, formats, frCounts, bonusCounts, bonusFormats, seq, bonusPct: +bonusPctIn.value || 5, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, shareWork: shareIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
     const sig = draftSig(nextLast);
     if (sig === store.get(TK('builder:sentSig'))) nextLast.t = prevLast.t || 0;
     else if (opening) { // first look at what was already here: copy it only if it came from loading an assignment just now
@@ -29355,6 +29387,8 @@ function viewScreen() {
         el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: () => { const u = new URL(location.origin + location.pathname); if (who.value) u.searchParams.set('t', who.value); u.searchParams.set('teacher', '1'); u.searchParams.set('copy', studentUrl); location.href = u.toString(); } }, 'Make my own copy'))));
   draw();
 }
+// the order of a built assignment's question groups ("type:mc" / "type:fr"), from its question list
+const builderSeq = (items) => { const out = []; items.forEach(([id, n, m, b]) => { if (b === 'b' || !TEMPLATES[id] || !(+n > 0)) return; const k = `${id}:${m === 'fr' ? 'fr' : 'mc'}`; if (!out.includes(k)) out.push(k); }); return out; };
 // opened from a shared assignment's "Make my own copy": load it into this teacher's builder as a NEW assignment
 function copyIntoBuilder(link) {
   let q; try { q = new URL(link).searchParams; } catch { return false; }
@@ -29368,7 +29402,7 @@ function copyIntoBuilder(link) {
     if (m === 'fr') { frc[id] = (frc[id] || 0) + n; f[id] = prev && prev !== 'fr' ? 'both' : 'fr'; } else f[id] = prev && prev !== 'mc' ? 'both' : 'mc'; });
   Object.keys(f).forEach((id) => { if (f[id] !== 'both') delete frc[id]; });
   const g = (k, d) => (q.has(k) ? q.get(k) : d);
-  store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, bonusCounts: bc, bonusFormats: bf, bonusPct: (mix ? bonusPctOf(q) : set && set.bonusPct) || 5, title: g('title', set ? set.title : ''), subject: SUBJECTS[g('subject', set ? set.subject : '')] ? g('subject', set ? set.subject : '') : Object.keys(SUBJECTS)[0],
+  store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, bonusCounts: bc, bonusFormats: bf, seq: builderSeq(items), bonusPct: (mix ? bonusPctOf(q) : set && set.bonusPct) || 5, title: g('title', set ? set.title : ''), subject: SUBJECTS[g('subject', set ? set.subject : '')] ? g('subject', set ? set.subject : '') : Object.keys(SUBJECTS)[0],
     order: g('order', set && set.shuffle ? 'mixed' : '') === 'mixed' ? 'mixed' : 'grouped', retries: +g('retries', set ? set.retries || 0 : 0) || 0, checks: +g('checks', set ? set.checks || 1 : 1) || 1, attempts: +g('attempts', set ? set.attempts || 1 : 1) || 1,
     lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', desmos: g('desmos', '') === '1', shareWork: g('sw', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
     note: 'This is a copy of a shared assignment. Check the title and settings, then copy your own student link below.', t: Date.now() });
