@@ -26332,7 +26332,7 @@ const scoreOf = (q, a) => (q.mode === 'fr'
 const isCorrect = (q, a) => scoreOf(q, a) === 1;
 const norm = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
 // who a student is: their Classroom ID when they picked their name from the list, otherwise the letters of the typed name
-const PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); // each preview tab starts fresh
+let PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); // each preview tab starts fresh (New questions picks another)
 const sidOf = (name, rid) => (PREVIEW ? PREVIEW_ID : rid ? 'id' + rid : norm(name));
 function generate(setKey, period, sid, attempt = 1) {
   // same: true → one version for the whole class (retries and new attempts are also the same for everyone)
@@ -26744,6 +26744,8 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
   if (!mathReady) { app.innerHTML = '<div class="card">Loading…</div>'; await mathLoading; }
   document.getElementById('title').textContent = SETS[setKey].title;
   document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period` + (PREVIEW ? ' · preview, not saved' : '');
+  if (PREVIEW && !teacher) document.getElementById('subtitle').append(' ', el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:4px 12px;font-size:14px', title: 'Start over with a different set of numbers',
+    onclick: () => { if (((store.get(`practice:${CONFIG.SALT}:${setKey}:${period}:${PREVIEW_ID}`) || {}).answers || []).some((a) => a != null && a !== '' && !(Array.isArray(a) && !a.some((x) => x != null && x !== ''))) && !confirm('Start over with new questions? Your answers on this page will be cleared.')) return; PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); window.scrollTo(0, 0); begin(setKey, period, name, false, 1, null, true); } }, '🔄 New questions'));
   const sid = sidOf(name, rid);
   const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${sid}`;
   if (!teacher && CONFIG.SCRIPT_URL && !noCloud) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
