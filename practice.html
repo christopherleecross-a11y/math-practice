@@ -10887,12 +10887,15 @@ TEMPLATES.g65AlgSides = (r) => {
     const s = ang.map((d) => Math.sin(d * D2R)); const pts = g65Tri(r, s[0] * 6, s[1] * 6, s[2] * 6);
     const fmt = (o) => o.map((i) => SEG(sideOpp(i))).join(', ');
     const wrongs = [[...order].reverse(), naive, [order[1], order[0], order[2]], [order[0], order[2], order[1]], [0, 1, 2]].map(fmt);
-    const check = (v) => { const g = String(v[0] || '').toUpperCase().match(/[A-Z]{2}/g) || []; return g.length === 3 && order.every((i, k) => g[k].split('').sort().join('') === sideOpp(i).split('').sort().join('')); };
+    const sidesOk = (t) => { const g = String(t || '').toUpperCase().match(/[A-Z]{2}/g) || []; return g.length === 3 && order.every((i, k) => g[k].split('').sort().join('') === sideOpp(i).split('').sort().join('')); };
+    const dg = (t) => String(t || '').replace(/°|degrees?/gi, ''), parts = (v) => [numOk(v[0], x), numOk(dg(v[1]), a1), numOk(dg(v[2]), a2), numOk(dg(v[3]), a3), sidesOk(v[4])];
     const M = m[0] + m[1] + m[2], B = b[0] + b[1] + b[2];
-    return { topic: 'Solve, then order the sides', stem: `In △${N.join('')}, m∠${N[0]} = (${ex[0]})°, m∠${N[1]} = (${ex[1]})°, and m∠${N[2]} = (${ex[2]})°. List the sides of the triangle in order from shortest to longest.`,
+    return { topic: 'Solve, then order the sides', stem: `In △${N.join('')}, m∠${N[0]} = (${ex[0]})°, m∠${N[1]} = (${ex[1]})°, and m∠${N[2]} = (${ex[2]})°. Solve for x, find the measure of each angle, then list the sides of the triangle in order from shortest to longest.`,
       draw: (cv) => drawFigure(cv, { polys: [{ pts, names: N, alab: ex.map((e) => `(${e})°`), arcs: [1, 1, 1] }] }), size: [420, 290],
       ...buildChoices(r, disp, wrongs, () => null),
-      fr: { fields: [{ kind: 'text', label: 'Sides (shortest to longest):', prefix: '' }], key: [order.map((i) => sideOpp(i)).join(', ')], display: disp, check },
+      fr: { fields: [{ kind: 'number', label: 'x =' }, { kind: 'number', label: `m∠${N[0]} =`, suffix: '°' }, { kind: 'number', label: `m∠${N[1]} =`, suffix: '°' }, { kind: 'number', label: `m∠${N[2]} =`, suffix: '°' }, { kind: 'text', label: 'Sides (shortest to longest):', prefix: '' }],
+        key: [String(x), String(a1), String(a2), String(a3), order.map((i) => sideOpp(i)).join(', ')], display: `x = ${x};  m∠${N[0]} = ${a1}°, m∠${N[1]} = ${a2}°, m∠${N[2]} = ${a3}°;  ${disp}`,
+        check: (v) => parts(v).every(Boolean), score: (v) => parts(v).filter(Boolean).length / 5 },
       solution: `The angles add to 180°: ${ex.map((e) => (/ [+−] /.test(e) ? `(${e})` : e)).join(' + ')} = 180, so ${g65Expr(M, B)} = 180 and x = ${x}.\nThe angles are m∠${N[0]} = ${a1}°, m∠${N[1]} = ${a2}°, and m∠${N[2]} = ${a3}°.\nThe shortest side is opposite the smallest angle: ${order.map((i) => `${SEG(sideOpp(i))} (opposite ${ang[i]}°)`).join(', ')}.` };
   }
 };
