@@ -28910,7 +28910,7 @@ function builder() {
   const formats = Object.assign({}, saved.formats || {});
   const frCounts = Object.assign({}, saved.frCounts || {}); // "Some of each": how many of a type are free response
   const bonusCounts = Object.assign({}, saved.bonusCounts || {}), bonusFormats = Object.assign({}, saved.bonusFormats || {}); // bonus questions (always at the end)
-  let seq = Array.isArray(saved.seq) ? saved.seq.slice() : []; // the order of the question groups (the teacher can move them)
+  let seq = Array.isArray(saved.seq) ? saved.seq.slice() : []; // the order of the questions, one entry per question (the teacher can move them)
   const seqBox = el('div', { style: 'margin-top:6px' });
   const titleIn = el('input', { type: 'text', value: saved.title || '', placeholder: 'e.g. 5.6 Quiz Review' });
   const subjSel = el('select', {}, ...Object.entries(SUBJECTS).map(([k, v]) => el('option', { value: k }, v)));
@@ -29223,29 +29223,32 @@ function builder() {
   shareIn.addEventListener('change', update);
   redoSel.addEventListener('change', update);
 
-  // the chosen question groups, in order, with arrows (and drag) to move them
-  function drawSeq(items) {
+  // every question, in order, with arrows (and drag) to move it; a type can be split up and come back later
+  function drawSeq() {
     seqBox.innerHTML = '';
-    if (items.length < 2) return;
+    if (seq.length < 2) return;
     if (orderSel.value === 'mixed') { seqBox.append(el('p', { class: 'small', style: 'margin:4px 0 0' }, 'Each student gets the questions in a different order. Pick “Grouped by type” to set the order yourself.')); return; }
-    const move = (k, d) => { const j = k + d; if (j < 0 || j >= seq.length) return; [seq[k], seq[j]] = [seq[j], seq[k]]; update(); };
-    let dragK = -1, num = 1;
-    const rows = items.map((it, k) => {
-      const t = QUESTION_TYPES.find((x) => x.id === it[0]), from = num; num += it[1];
-      const up = el('button', { class: 'btn secondary', type: 'button', title: 'Move up', 'aria-label': 'Move up', style: 'margin:0;padding:2px 9px;font-size:14px', onclick: () => move(k, -1) }, '▲');
-      const dn = el('button', { class: 'btn secondary', type: 'button', title: 'Move down', 'aria-label': 'Move down', style: 'margin:0;padding:2px 9px;font-size:14px', onclick: () => move(k, 1) }, '▼');
-      up.disabled = k === 0; dn.disabled = k === items.length - 1;
-      const row = el('div', { draggable: 'true', style: 'display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--line);border-top:' + (k ? 'none' : '1px solid var(--line)') + ';background:#fff;cursor:grab' },
-        el('span', { class: 'small', style: 'margin:0;min-width:58px;color:var(--muted)' }, it[1] > 1 ? `#${from}–${from + it[1] - 1}` : `#${from}`),
-        el('span', { style: 'flex:1' }, (t ? t.label : it[0]) + (it[2] === 'fr' ? ' (free response)' : ''), el('span', { class: 'small', style: 'margin:0 0 0 6px' }, `× ${it[1]}`)), up, dn);
+    const move = (k, j) => { if (j < 0 || j >= seq.length || j === k) return; const [m] = seq.splice(k, 1); seq.splice(j, 0, m); update(); };
+    const label = (key) => { const [id, f] = key.split(':'), t = QUESTION_TYPES.find((x) => x.id === id); return (t ? t.label : id) + (f === 'fr' ? ' (free response)' : ''); };
+    let dragK = -1;
+    const rows = seq.map((key, k) => {
+      const same = k > 0 && seq[k - 1] === key; // the same type as the question above: shown lighter
+      const up = el('button', { class: 'btn secondary', type: 'button', title: 'Move up', 'aria-label': `Move question ${k + 1} up`, style: 'margin:0;padding:1px 8px;font-size:13px', onclick: () => move(k, k - 1) }, '▲');
+      const dn = el('button', { class: 'btn secondary', type: 'button', title: 'Move down', 'aria-label': `Move question ${k + 1} down`, style: 'margin:0;padding:1px 8px;font-size:13px', onclick: () => move(k, k + 1) }, '▼');
+      up.disabled = k === 0; dn.disabled = k === seq.length - 1;
+      const row = el('div', { draggable: 'true', style: 'display:flex;align-items:center;gap:8px;padding:3px 8px;border:1px solid var(--line);border-top:' + (k ? 'none' : '1px solid var(--line)') + ';background:#fff;cursor:grab;font-size:15px' },
+        el('span', { class: 'small', style: 'margin:0;min-width:34px;color:var(--muted)' }, `#${k + 1}`),
+        el('span', { style: 'flex:1' + (same ? ';color:var(--muted)' : '') }, label(key)), up, dn);
       row.addEventListener('dragstart', (e) => { dragK = k; e.dataTransfer.effectAllowed = 'move'; row.style.opacity = '.5'; });
       row.addEventListener('dragend', () => { row.style.opacity = ''; });
       row.addEventListener('dragover', (e) => { e.preventDefault(); row.style.boxShadow = 'inset 0 3px 0 var(--accent)'; });
       row.addEventListener('dragleave', () => { row.style.boxShadow = ''; });
-      row.addEventListener('drop', (e) => { e.preventDefault(); row.style.boxShadow = ''; if (dragK < 0 || dragK === k) return; const [m] = seq.splice(dragK, 1); seq.splice(k, 0, m); dragK = -1; update(); });
+      row.addEventListener('drop', (e) => { e.preventDefault(); row.style.boxShadow = ''; if (dragK >= 0) move(dragK, k); dragK = -1; });
       return row;
     });
-    seqBox.append(el('p', { class: 'small', style: 'margin:6px 0 4px' }, 'Order of the questions (bonus questions always come last). Use the arrows or drag a row:'), ...rows);
+    const regroup = el('a', { href: '#', class: 'small', style: 'margin-left:8px', onclick: (e) => { e.preventDefault(); seq = []; update(); } }, 'put each type back together');
+    seqBox.append(el('p', { class: 'small', style: 'margin:6px 0 4px' }, 'Order of the questions (bonus questions always come last). Use the arrows or drag a question anywhere, even apart from the rest of its type.', regroup),
+      el('div', { style: 'max-height:420px;overflow:auto' }, ...rows));
   }
   function update() {
     leaveGray();
@@ -29258,12 +29261,15 @@ function builder() {
         if (fr > 0) items.push([t.id, fr, 'fr']);
       } else items.push([t.id, n, f === 'fr' ? 'fr' : 'mc']);
     });
-    // the teacher's order: groups already placed keep their places; a newly added group goes at the end
-    const keyOf = (it) => `${it[0]}:${it[2]}`;
-    seq = seq.filter((k) => items.some((it) => keyOf(it) === k));
-    items.forEach((it) => { if (!seq.includes(keyOf(it))) seq.push(keyOf(it)); });
-    items.sort((a, b) => seq.indexOf(keyOf(a)) - seq.indexOf(keyOf(b)));
-    drawSeq(items);
+    // the teacher's order, one entry per question: questions already placed keep their places; extra ones go at the end
+    const keyOf = (it) => `${it[0]}:${it[2]}`, need = {}, used = {};
+    items.forEach((it) => (need[keyOf(it)] = it[1]));
+    const old = seq.length && !seq.some((k, j) => seq.indexOf(k) !== j) && seq.length < items.reduce((a, it) => a + it[1], 0) ? seq.flatMap((k) => Array(need[k] || 0).fill(k)) : seq; // a list saved before questions could be split up
+    seq = old.filter((k) => need[k] && (used[k] = (used[k] || 0) + 1) <= need[k]);
+    items.forEach((it) => { const k = keyOf(it); while ((used[k] || 0) < need[k]) { seq.push(k); used[k] = (used[k] || 0) + 1; } });
+    items.length = 0; // the question list in that order; a type that comes back later is listed again
+    seq.forEach((k) => { const [id, f] = k.split(':'), last = items[items.length - 1]; if (last && last[0] === id && last[2] === f) last[1]++; else items.push([id, 1, f]); });
+    drawSeq();
     const total = items.reduce((a, [, n]) => a + n, 0);
     const bItems = QUESTION_TYPES.filter((t) => bonusCounts[t.id] > 0).map((t) => [t.id, bonusCounts[t.id], t.writtenOnly || t.sketch ? 'mc' : bonusFormats[t.id] === 'fr' ? 'fr' : 'mc', 'b']);
     const nBonus = bItems.reduce((a, [, n]) => a + n, 0), bp = Math.max(0.5, Math.min(50, Math.round(2 * (+bonusPctIn.value || 5)) / 2));
@@ -29388,7 +29394,8 @@ function viewScreen() {
   draw();
 }
 // the order of a built assignment's question groups ("type:mc" / "type:fr"), from its question list
-const builderSeq = (items) => { const out = []; items.forEach(([id, n, m, b]) => { if (b === 'b' || !TEMPLATES[id] || !(+n > 0)) return; const k = `${id}:${m === 'fr' ? 'fr' : 'mc'}`; if (!out.includes(k)) out.push(k); }); return out; };
+// one entry per question, so a type can come back later in the assignment (bonus questions aren't in it: they always come last)
+const builderSeq = (items) => { const out = []; items.forEach(([id, n, m, b]) => { if (b === 'b' || !TEMPLATES[id] || !(+n > 0)) return; for (let i = 0; i < Math.floor(+n); i++) out.push(`${id}:${m === 'fr' ? 'fr' : 'mc'}`); }); return out; };
 // opened from a shared assignment's "Make my own copy": load it into this teacher's builder as a NEW assignment
 function copyIntoBuilder(link) {
   let q; try { q = new URL(link).searchParams; } catch { return false; }
