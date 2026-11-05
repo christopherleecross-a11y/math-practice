@@ -26745,7 +26745,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
   document.getElementById('title').textContent = SETS[setKey].title;
   document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period` + (PREVIEW ? ' · preview, not saved' : '');
   if (PREVIEW && !teacher) document.getElementById('subtitle').append(' ', el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:4px 12px;font-size:14px', title: 'Start over with a different set of numbers',
-    onclick: () => { if (((store.get(`practice:${CONFIG.SALT}:${setKey}:${period}:${PREVIEW_ID}`) || {}).answers || []).some((a) => a != null && a !== '' && !(Array.isArray(a) && !a.some((x) => x != null && x !== ''))) && !confirm('Start over with new questions? Your answers on this page will be cleared.')) return; PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); window.scrollTo(0, 0); begin(setKey, period, name, false, 1, null, true); } }, '🔄 New questions'));
+    onclick: () => { if (((store.get(`practice:${CONFIG.SALT}:${setKey}:${period}:${PREVIEW_ID}`) || {}).answers || []).some((a) => a != null && a !== '' && !(Array.isArray(a) && !a.some((x) => x != null && x !== ''))) && !confirm('Start over with new questions? Your answers on this page will be cleared.')) return; PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); window.scrollTo(0, 0); begin(setKey, period, name, false, 1, null, true); } }, '🔄 New questions'), el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:4px 12px;font-size:14px', title: 'Show the questions one at a time, large, for the TV', onclick: () => previewTV(0) }, '📺 Show on the TV'));
   const sid = sidOf(name, rid);
   const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${sid}`;
   if (!teacher && CONFIG.SCRIPT_URL && !noCloud) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
@@ -26842,7 +26842,8 @@ function render() {
         el('p', { style: 'margin:6px 0 0' }, `${nb === 1 ? 'This one is' : 'These are'} extra credit. A wrong or blank answer costs you nothing. Each one you get right adds `, el('strong', {}, `+${fmt(bp)}%`), ' to your percent.'))); }
     const box = el('div', { class: 'q' + (wm ? ' wm' : '') + (q.bonus ? ' bonus' : ''), id: 'q' + i });
     box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, q.bonus ? el('span', { class: 'bonustag' }, '★ BONUS') : '', `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic,
-      PREVIEW && !teacher && !submitted ? el('button', { class: 'btn secondary', type: 'button', title: 'Show another version of this question', style: 'margin:0 0 0 10px;padding:2px 10px;font-size:13px;vertical-align:middle', onclick: () => previewNewQ(i) }, '🔄 New version') : '')));
+      PREVIEW && !teacher && !submitted ? el('button', { class: 'btn secondary', type: 'button', title: 'Show another version of this question', style: 'margin:0 0 0 10px;padding:2px 10px;font-size:13px;vertical-align:middle', onclick: () => previewNewQ(i) }, '🔄 New version') : '',
+      PREVIEW && !teacher ? el('button', { class: 'btn secondary', type: 'button', title: 'Show this question large, for the TV', style: 'margin:0 0 0 6px;padding:2px 10px;font-size:13px;vertical-align:middle', onclick: () => previewTV(i) }, '📺 TV') : '')));
     if (q.bonus) { const bp = setting(state.setKey, 'bonusPct'); box.append(el('div', { class: 'bonusnote' }, `Extra credit: +${fmt(bp)}% added to your score if correct. Nothing is taken off if it’s wrong.`)); }
     const prev = !teacher && prevTry(i, W); if (prev) box.append(prev, el('div', { class: 'newver' }, `🔄 New numbers — version ${(state.tries[i] || 0) + 1} of this question. Try this one:`));
     if (!teacher && state.fresh && state.fresh[i]) { box.classList.add('regen'); delete state.fresh[i]; }
@@ -27365,6 +27366,10 @@ async function checkQ(i) {
   } else { state.status[i] = 'locked'; delete state.misses[i]; }
   saveState();
   rerenderAt(i);
+}
+// "Try it as a student" on the TV: the questions on this page, one at a time and large (Back/Next, Show answer, New numbers, timer)
+function previewTV(i) {
+  tvShow(state.qs.map((q, k) => ({ label: `Question ${k + 1}`, q, tpl: q.tpl, mode: q.fmt })), i);
 }
 // "Try it as a student": another version of one question (nothing here is graded or saved)
 function previewNewQ(i) {
@@ -28600,7 +28605,8 @@ function tvShow(list, at) {
   let fresh = false; // false = the plan's own question; true = New numbers made one from a question type
   const make = () => {
     const x = list[i]; shown = false;
-    if (x.fixed && !fresh) { const f = x.fixed; q = { topic: f.topic, stem: f.stem, choices: f.choices, answer: f.answer, mode: f.choices ? 'mc' : 'fr', fr: { display: f.display }, solution: f.solution };
+    if (x.q && !fresh) q = x.q; // a question from the student preview, exactly as it is on the page
+    else if (x.fixed && !fresh) { const f = x.fixed; q = { topic: f.topic, stem: f.stem, choices: f.choices, answer: f.answer, mode: f.choices ? 'mc' : 'fr', fr: { display: f.display }, solution: f.solution };
       if (f.fig) q.draw = (cv) => drawFigure(cv, { polys: [
         { group: 'g', pts: [[3, 5], [1.5, 2.5], [5, 2.5]], names: ['A', 'D', 'E'], ticks: [1, 0, 2], slab: ['', f.fig[0], ''] },
         { group: 'g', pts: [[1.5, 2.5], [0, 0], [7, 0], [5, 2.5]], names: ['D', 'B', 'C', 'E'], ticks: [1, 0, 2, 0], slab: ['', f.fig[1], '', ''] }] }), q.size = [400, 280];
