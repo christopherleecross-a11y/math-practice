@@ -29182,11 +29182,18 @@ function builder() {
   const codeOut = el('code', { style: 'display:block;white-space:pre-wrap;word-break:break-all;padding:8px;margin-top:6px;font-size:12px' });
   const msg = el('div', { class: 'err' });
   const remember = () => { if (!linkIn.value) return; try { const q = new URL(linkIn.value).searchParams; rememberAssignment(linkIn.value, q.get('title') || 'Custom Practice', q.get('subject') || '', customKeyFor(q)); } catch {} };
+  // once the link is copied or assigned in Classroom, the next new assignment starts with every count at 0 (the other settings stay)
+  const built = () => {
+    remember();
+    const d = { ...(store.get(TK('builder:last')) || {}), counts: {}, formats: {}, frCounts: {}, bonusCounts: {}, bonusFormats: {}, title: '', t: Date.now() };
+    delete d.editId;
+    setTimeout(() => { store.set(TK('builder:last'), d); store.set(TK('builder:sentSig'), draftSig(d)); queueDraft(d); }, 0); // after this page's own save
+  };
   [tryLink, keyLink].forEach((a) => a.addEventListener('click', remember));
-  linkIn.addEventListener('copy', remember); // copied by hand (Ctrl+C) instead of with the button
+  linkIn.addEventListener('copy', built); // copied by hand (Ctrl+C) instead of with the button
   const copyBtn = el('button', { class: 'btn', type: 'button', onclick: async () => {
     if (!linkIn.value) return;
-    remember();
+    built();
     try { await navigator.clipboard.writeText(linkIn.value); copyBtn.textContent = 'Copied!'; }
     catch { linkIn.select(); copyBtn.textContent = 'Press Ctrl+C to copy'; }
     setTimeout(() => (copyBtn.textContent = 'Copy link'), 1800);
@@ -29201,7 +29208,7 @@ function builder() {
   const out = el('div', { class: 'card' },
     el('div', {}, 'Total questions: ', totalEl), msg,
     el('label', {}, 'Student link (post this in Google Classroom)'), linkIn, copyBtn,
-    classroomAssignBox(() => linkIn.value, () => titleIn.value.trim() || 'Custom Practice', remember),
+    classroomAssignBox(() => linkIn.value, () => titleIn.value.trim() || 'Custom Practice', () => built()),
     el('p', { class: 'small', style: 'margin-top:14px' }, tryLink, ' · ', keyLink, ' · ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); const k = linkIn.value && registerCustomUrl(linkIn.value); if (k) { printScreen(k); window.scrollTo(0, 0); } } }, 'Print it')),
     el('details', { style: 'margin-top:10px' }, el('summary', { class: 'small' }, 'Make it a permanent menu item (optional)'),
       el('p', { class: 'small' }, 'Paste this line inside SETS near the top of practice.html to add it to the assignment menu:'), codeOut), shareBox);
