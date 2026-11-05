@@ -26841,7 +26841,8 @@ function render() {
       app.append(el('div', { class: 'card bonusintro' }, el('div', { style: 'font-size:20px;font-weight:800;color:#8a6d0f' }, `★ Bonus question${nb === 1 ? '' : 's'}`),
         el('p', { style: 'margin:6px 0 0' }, `${nb === 1 ? 'This one is' : 'These are'} extra credit. A wrong or blank answer costs you nothing. Each one you get right adds `, el('strong', {}, `+${fmt(bp)}%`), ' to your percent.'))); }
     const box = el('div', { class: 'q' + (wm ? ' wm' : '') + (q.bonus ? ' bonus' : ''), id: 'q' + i });
-    box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, q.bonus ? el('span', { class: 'bonustag' }, '★ BONUS') : '', `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic)));
+    box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, q.bonus ? el('span', { class: 'bonustag' }, '★ BONUS') : '', `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic,
+      PREVIEW && !teacher && !submitted ? el('button', { class: 'btn secondary', type: 'button', title: 'Show another version of this question', style: 'margin:0 0 0 10px;padding:2px 10px;font-size:13px;vertical-align:middle', onclick: () => previewNewQ(i) }, '🔄 New version') : '')));
     if (q.bonus) { const bp = setting(state.setKey, 'bonusPct'); box.append(el('div', { class: 'bonusnote' }, `Extra credit: +${fmt(bp)}% added to your score if correct. Nothing is taken off if it’s wrong.`)); }
     const prev = !teacher && prevTry(i, W); if (prev) box.append(prev, el('div', { class: 'newver' }, `🔄 New numbers — version ${(state.tries[i] || 0) + 1} of this question. Try this one:`));
     if (!teacher && state.fresh && state.fresh[i]) { box.classList.add('regen'); delete state.fresh[i]; }
@@ -27364,6 +27365,16 @@ async function checkQ(i) {
   } else { state.status[i] = 'locked'; delete state.misses[i]; }
   saveState();
   rerenderAt(i);
+}
+// "Try it as a student": another version of one question (nothing here is graded or saved)
+function previewNewQ(i) {
+  state.pvVer = state.pvVer || {};
+  state.pvVer[i] = (state.pvVer[i] || 0) + 1;
+  try { state.qs[i] = regenQuestion(state.seedStr, state.origQs[i], i, 'p' + state.pvVer[i]); } catch { return; }
+  state.answers[i] = null; delete state.status[i]; if (state.misses) delete state.misses[i]; if (state.flash) delete state.flash[i];
+  if (state.history) delete state.history[i]; state.tries[i] = 0;
+  delete state.drawings[String(i)]; delete state.drawings['L' + i];
+  saveState(); rerenderAt(i);
 }
 // the version a student just missed, with its worked-out solution (shown above the new version)
 function prevTry(i, W) {
