@@ -9492,7 +9492,7 @@ function mathTextCanvas(text, width, font, lh) {
 }
 const solNode = (t0) => { const t = autoMath(t0); return el('div', { class: 'sol' }, hasM(t) ? mathTextCanvas(t, Math.max(280, contentWidth() - 30), '16px Georgia, "Times New Roman", serif', 24) : t); };
 // ∥ is drawn as two upright bars: some Chromebook fonts have a slanted ∥ that looks like //
-function tcParW(ctx) { const px = +((ctx.font.match(/(\d+(?:\.\d+)?)px/) || [0, 17])[1]); return px * 0.55; }
+function tcParW(ctx) { if (typeof ctx.font !== 'string') return ctx.measureText('∥').width; const px = +((ctx.font.match(/(\d+(?:\.\d+)?)px/) || [0, 17])[1]); return px * 0.55; }
 function tcDraw(ctx, txt, x, y) { // draws txt at (x, y) (textBaseline top) and returns its width
   const segs = txt.split('∥'); let w = 0;
   segs.forEach((seg, i) => {
@@ -28491,7 +28491,10 @@ function lessonScreen(preKey) {
     const L = lessonOf(LESSON.key), S = SETS[LESSON.key]; if (!L || !S) return;
     const h = (t) => el('h3', { class: 'lp-h' }, t);
     const list = (arr) => el('ul', { class: 'lp-ul' }, ...arr.map((x) => el('li', {}, x)));
-    const all = L.steps.flatMap((s) => s.show || []);
+    // the I can statements go on the TV right after the bell ringer (built from the plan, so an edited plan keeps them up to date)
+    const steps = L.steps.map((s) => ({ ...s })), bi = Math.max(0, steps.findIndex((s) => /bell ringer/i.test(s.name)));
+    if (L.iCan && L.iCan.length && steps.length) steps[bi] = { ...steps[bi], afterIcan: true, show: [...(steps[bi].show || []), { label: 'I can statements', fixed: { topic: 'Today’s lesson', stem: L.iCan.map((x) => '•  ' + x).join('\n \n') } }] };
+    const all = steps.flatMap((s) => s.show || []);
     out.append(el('div', { class: 'card lp' },
       el('div', { class: 'lp-top' }, el('div', {}, el('h2', { style: 'margin:0' }, S.title), el('div', { class: 'small' }, `${SUBJECTS[S.subject] || ''} · ${L.minutes} minutes · ${CONFIG.TEACHER_NAME}`),
           L.note ? el('div', { class: 'small', style: 'font-weight:600;margin-top:4px' }, L.note) : ''),
@@ -28501,7 +28504,7 @@ function lessonScreen(preKey) {
           LESSON_EDITS.status === 'ok' ? el('button', { class: 'btn secondary', type: 'button', onclick: () => lessonEdit(LESSON.key) }, '✏️ Edit this plan') : '',
           LESSON_EDITS.data[LESSON.key] ? el('span', { class: 'small', style: 'align-self:center' }, '(your edited version)') : '')),
       h('Objective'), el('p', {}, L.objective),
-      h('Students will say'), list(L.iCan),
+      h('I can statements'), list(L.iCan),
       h('Vocabulary'), el('ul', { class: 'lp-ul' }, ...L.vocab.map(([w, d]) => el('li', {}, el('b', {}, w), ' — ', lpMath(d, 16)))),
       L.printables ? h('Print for this lesson') : '',
       L.printables ? el('div', { class: 'lp-print' }, ...L.printables.map((x) => el('div', { class: 'lp-printrow' },
@@ -28510,11 +28513,11 @@ function lessonScreen(preKey) {
       el('div', { class: 'lp-two' }, el('div', {}, h('Materials'), el('p', {}, L.materials)), el('div', {}, h('Builds on'), el('p', {}, L.prior))),
       L.before ? h('Before class') : '', L.before ? el('ul', { class: 'lp-ul lp-check-list' }, ...L.before.map((x) => el('li', {}, x))) : '',
       h('Lesson flow'),
-      ...L.steps.map((s) => el('div', { class: 'lp-step' },
+      ...steps.map((s) => el('div', { class: 'lp-step' },
         el('div', { class: 'lp-time' }, s.time, el('div', { class: 'small' }, 'min')),
         el('div', { style: 'flex:1;min-width:0' },
           el('div', { class: 'lp-name' }, s.name, s.tag ? el('span', { class: 'lp-tag' }, s.tag) : ''),
-          el('p', {}, el('b', {}, 'Teacher: '), s.teacher),
+          el('p', {}, el('b', {}, 'Teacher: '), s.teacher, s.afterIcan ? ' Then put the I can statements on the TV and read them together.' : ''),
           el('p', {}, el('b', {}, 'Students: '), s.students),
           s.say ? el('p', {}, el('b', {}, 'Ask: '), el('i', {}, s.say)) : '',
           el('p', { class: 'lp-check' }, el('b', {}, 'Check for understanding: '), s.check),
