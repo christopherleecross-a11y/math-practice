@@ -209,7 +209,7 @@
   .frfield { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; font-family: Georgia, "Times New Roman", serif; font-size: 18px; }
   .frlabel { font-size: 17px; }
   .frprefix { font-size: 18px; }
-  .fr input.num { width: 92px; } .fr input.let { width: 110px; text-transform: uppercase; letter-spacing: 1px; }
+  .fr input.num { width: 92px; } .fr input.plain { width: 175px; } .fr input.let { width: 110px; text-transform: uppercase; letter-spacing: 1px; }
   .fr input, .fr select { padding: 8px 10px; font-size: 17px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); width: auto; }
   .fr input:disabled, .fr select:disabled { background: #f3f1ec; }
   code { background: #eee; padding: 1px 5px; border-radius: 4px; }
@@ -10962,10 +10962,10 @@ TEMPLATES.g65AlgThird = (r) => {
       const res = A > 0 ? `x > ${nice(C / A)}` : A < 0 ? `x < ${nice(C / A)}` : (C < 0 ? 'always true' : 'never true');
       return `${exprStr(i)} + ${exprStr(j)} > ${ex[k]}  →  ${res}${A === 0 ? '' : ''}`;
     });
-    const ok = (v) => { const a = numOk(v[0], lo); const t = String(v[1] || '').trim().toLowerCase(); const b = hi === Infinity ? (t === '' || /^(∞|inf|infinity|none|no|n\/a|no limit|no upper limit)$/.test(t)) : numOk(v[1], hi); return [a, b]; };
+    const ok = (v) => { const a = numOk(v[0], lo); const t = String(v[1] || '').trim().toLowerCase(); const b = hi === Infinity ? /^(∞|inf|infinity|none|no|n\/a|no limit|no upper limit|nothing|-)$/.test(t) : numOk(v[1], hi); return [a, b]; };
     return { topic: 'Triangle Inequality with a variable', stem: `A triangle has sides of length ${ex[0]}, ${ex[1]}, and ${ex[2]}. Describe the possible values of x.`,
       ...buildChoices(r, correct, cands.filter((w) => w !== correct), (i) => `x > ${nice(lo + i + 1)}`),
-      fr: { fields: [{ kind: 'number', label: 'x is greater than' }, { kind: 'text', label: 'and less than (leave blank if there is no upper limit)', prefix: '' }], key: [nice(lo), hi === Infinity ? '' : nice(hi)], display: correct,
+      fr: { fields: [{ kind: 'number', label: 'x is greater than' }, { kind: 'text', label: 'and x is less than (type none if there is no upper limit)', placeholder: 'a number, or none' }], key: [nice(lo), hi === Infinity ? 'none' : nice(hi)], display: correct,
         check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
       solution: `Write all three Triangle Inequalities (each pair of sides must add to more than the third):\n${lines.join('\n')}\nEvery side must also be positive.\nThe values that make all of these true: ${correct}.` };
   }
@@ -27307,8 +27307,10 @@ function frArea(q, i) {
     if (f.kind === 'select') {
       input = el('select', {}, el('option', { value: '' }, 'Choose…'), ...f.options.map((o) => el('option', { value: o }, o)));
     } else {
-      input = el('input', { type: 'text', autocomplete: 'off', autocapitalize: f.kind === 'text' ? 'characters' : 'off', spellcheck: 'false',
-        inputmode: f.kind === 'number' ? 'decimal' : 'text', class: f.kind === 'number' ? 'num' : f.kind === 'expr' ? 'expr' : 'let', placeholder: f.kind === 'number' ? '' : f.kind === 'expr' ? 'e.g. sin^2 x / cos x' : 'letters' });
+      // a text field with its own placeholder (e.g. "a number, or none") is plain text: not the uppercase letters box
+      const plain = f.kind === 'text' && f.placeholder !== undefined;
+      input = el('input', { type: 'text', autocomplete: 'off', autocapitalize: f.kind === 'text' && !plain ? 'characters' : 'off', spellcheck: 'false',
+        inputmode: f.kind === 'number' ? 'decimal' : 'text', class: f.kind === 'number' ? 'num' : f.kind === 'expr' ? 'expr' : plain ? 'plain' : 'let', placeholder: plain ? f.placeholder : f.kind === 'number' ? '' : f.kind === 'expr' ? 'e.g. sin^2 x / cos x' : 'letters' });
       if (f.kind === 'expr') input.autocapitalize = 'off';
     }
     input.value = vals[k] || '';
