@@ -28555,20 +28555,19 @@ function ediaPanel(f) {
   const flash = (b, ok) => { const t = b.textContent; b.textContent = ok ? '✓ Copied' : 'Copy failed'; setTimeout(() => { b.textContent = t; }, 1300); };
   const copyText = async (txt, b) => { try { await navigator.clipboard.writeText(txt); flash(b, true); } catch { try { const ta = el('textarea', { style: 'position:fixed;left:-9999px' }); ta.value = txt; document.body.append(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); flash(b, ok); } catch { flash(b, false); } } };
   const copyImg = async (b) => { try { const sz = f.figure.size || [440, 300], cv = makeCanvas(sz[0], sz[1]); cv._stack = false; const ctx = cv._ctx; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.restore(); lpFigDraw(f.figure)(cv);
-    const blob = await new Promise((res) => cv.toBlob(res, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash(b, true); } catch { flash(b, false); } };
+    const a = el('a', { href: cv.toDataURL('image/png'), download: 'bell-ringer.png' }); document.body.append(a); a.click(); a.remove(); flash(b, true); } catch { flash(b, false); } }; // saved as a file for edia’s “Add image”
   const L = 'ABCD', why = plain(f.solution).split('\n').filter((l) => !/^[B-D] = |^[A-D] = .*\.\s+[B-D] = /.test(l)).join('\n') || plain(f.solution);
   const row = (label, txt, extra) => el('div', { style: 'display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid #ece9e1' },
     el('div', { style: 'flex:0 0 92px;font-weight:600;font-size:14px;padding-top:6px' }, label),
     el('div', { style: 'flex:1;min-width:0;white-space:pre-wrap;font-size:15px;padding-top:6px' }, txt),
     extra || el('button', { class: 'btn secondary', type: 'button', style: 'flex:0 0 auto;margin:0;padding:4px 12px;font-size:13px', onclick: (e) => copyText(txt, e.currentTarget) }, '📋 Copy'));
   const body = el('div', { style: 'display:none;margin-top:8px;padding:10px 12px;border:1px solid #d9d5cb;border-radius:10px;background:#fbfaf6' },
-    el('p', { class: 'small', style: 'margin:0 0 6px' }, 'Click 📋 Copy beside each part, then paste it into the matching box in edia. Or copy everything at once at the bottom.'),
-    row('Question', plain(f.stem)),
-    f.figure ? row('Picture', '(the diagram)', el('button', { class: 'btn secondary', type: 'button', style: 'flex:0 0 auto;margin:0;padding:4px 12px;font-size:13px', onclick: (e) => copyImg(e.currentTarget) }, '📋 Copy picture')) : '',
-    ...f.choices.map((c, i) => row(`Choice ${L[i]}${i === f.answer ? ' ✓' : ''}`, plain(c))),
-    row('Correct', L[f.answer]),
-    row('Explanation', why),
-    el('div', { style: 'padding-top:8px;border-top:1px solid #ece9e1' }, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: (e) => copyText(`${plain(f.stem)}\n\n${f.choices.map((c, i) => `${L[i]}. ${plain(c)}`).join('\n')}\n\nAnswer: ${L[f.answer]}\n${why}`, e.currentTarget) }, '📋 Copy everything as one block')));
+    el('p', { class: 'small', style: 'margin:0 0 6px' }, 'In edia: Add → New custom question. Click 📋 Copy beside each part below and paste it into the box with the same name. Then check the box beside the correct choice.'),
+    row('Question', plain(f.stem)), // edia: “Type text or math”
+    f.figure ? row('Picture', 'Save it, then use “Add image” in edia.', el('button', { class: 'btn secondary', type: 'button', style: 'flex:0 0 auto;margin:0;padding:4px 12px;font-size:13px', onclick: (e) => copyImg(e.currentTarget) }, '⬇ Save picture')) : '',
+    ...f.choices.map((c, i) => row(`Choice ${i + 1}${i === f.answer ? ' ✓' : ''}`, plain(c))),
+    el('div', { style: 'padding:8px 0;border-top:1px solid #ece9e1;font-size:15px' }, el('b', {}, 'Correct answer: '), `check the box beside Choice ${f.answer + 1} (it is ${L[f.answer]} on the TV).`),
+    row('Explanation', why));
   const btn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { const open = body.style.display === 'none'; body.style.display = open ? 'block' : 'none'; btn.textContent = open ? '✕ Hide the edia copy' : '📋 Copy the bell ringer for edia'; } }, '📋 Copy the bell ringer for edia');
   return el('div', { class: 'noprint', style: 'margin-top:6px' }, btn, body);
 }
