@@ -207,6 +207,19 @@
   .fr input, .fr select { padding: 8px 10px; font-size: 17px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); width: auto; }
   .fr input:disabled, .fr select:disabled { background: #f3f1ec; }
   code { background: #eee; padding: 1px 5px; border-radius: 4px; }
+.lp-pick { position: relative; flex: 1 1 320px; min-width: 240px; max-width: 520px; }
+.lp-pickbtn { width: 100%; display: flex; gap: 8px; align-items: center; padding: 10px 14px; border: 1px solid #d9d5cb; border-radius: 10px; background: #fff; font: inherit; font-size: 16px; cursor: pointer; color: inherit; }
+.lp-pickbtn:hover { border-color: #b9b4a8; }
+.lp-pickpanel { position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 4px); max-height: 60vh; overflow: auto; background: #fff; border: 1px solid #d9d5cb; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px 8px 10px; }
+.lp-picktools { font-size: 13px; text-align: right; padding: 2px 4px 4px; color: #888; }
+.lp-picktools .linkbtn { background: none; border: 0; padding: 0; color: #1f5fa8; cursor: pointer; font: inherit; }
+.lp-picksubj { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6b675e; padding: 10px 6px 4px; }
+.lp-pickchap > summary { cursor: pointer; padding: 7px 8px; border-radius: 8px; font-weight: 600; list-style-position: inside; }
+.lp-pickchap > summary:hover { background: #f4f2ec; }
+.lp-picksec { display: block; width: 100%; text-align: left; padding: 7px 10px 7px 30px; border: 0; background: none; border-radius: 8px; font: inherit; font-size: 15px; cursor: pointer; color: inherit; }
+.lp-picksec:hover { background: #eef3fa; }
+.lp-picksec.on { background: #e3ecf8; font-weight: 600; }
+@media print { .lp-pick { display: none; } }
 </style>
 </head>
 <body>
@@ -28505,14 +28518,40 @@ function lessonScreen(preKey) {
   if (!LESSON.key || !LESSONS[LESSON.key]) LESSON.key = keys[0] || null;
   const note = el('div', {});
   const showNote = () => { note.innerHTML = ''; note.append(lessonEditNote(() => { showNote(); draw(); })); };
-  const pick = el('select', {}, ...subjOrder.filter((sb) => keys.some((k) => SETS[k].subject === sb)).map((sb) => el('optgroup', { label: SUBJECTS[sb] }, ...keys.filter((k) => SETS[k].subject === sb).map((k) => el('option', { value: k }, SETS[k].title)))));
-  if (LESSON.key) pick.value = LESSON.key;
+  // section picker: subject → chapter (collapsible) → section. The chapter you're in starts open.
+  const chapOf = (k) => Math.floor(secNum(k) / 1000);
+  const pickLabel = el('span', { style: 'flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' });
+  const pickBtn = el('button', { type: 'button', class: 'lp-pickbtn', 'aria-haspopup': 'true', 'aria-expanded': 'false' }, pickLabel, el('span', { 'aria-hidden': 'true' }, '▾'));
+  const pickPanel = el('div', { class: 'lp-pickpanel', style: 'display:none' });
+  const setLabel = () => { pickLabel.textContent = LESSON.key && SETS[LESSON.key] ? `${SUBJECTS[SETS[LESSON.key].subject] || ''} · ${SETS[LESSON.key].title}` : 'Choose a section'; };
+  const buildPanel = () => {
+    pickPanel.innerHTML = '';
+    const tools = el('div', { class: 'lp-picktools' },
+      el('button', { type: 'button', class: 'linkbtn', onclick: () => pickPanel.querySelectorAll('details').forEach((d) => { d.open = true; }) }, 'Open all chapters'), ' · ',
+      el('button', { type: 'button', class: 'linkbtn', onclick: () => pickPanel.querySelectorAll('details').forEach((d) => { d.open = false; }) }, 'Close all'));
+    pickPanel.append(tools);
+    subjOrder.filter((sb) => keys.some((k) => SETS[k].subject === sb)).forEach((sb) => {
+      const ks = keys.filter((k) => SETS[k].subject === sb), chaps = [...new Set(ks.map(chapOf))];
+      pickPanel.append(el('div', { class: 'lp-picksubj' }, SUBJECTS[sb]));
+      chaps.forEach((c) => {
+        const cks = ks.filter((k) => chapOf(k) === c), open = cks.includes(LESSON.key);
+        const d = el('details', { class: 'lp-pickchap' }, el('summary', {}, c < 1e6 ? `Chapter ${c}` : 'Other', el('span', { class: 'small', style: 'margin-left:8px' }, `${cks.length} section${cks.length === 1 ? '' : 's'}`)),
+          ...cks.map((k) => el('button', { type: 'button', class: 'lp-picksec' + (k === LESSON.key ? ' on' : ''), onclick: () => { LESSON.key = k; closePick(); setLabel(); draw(); } }, SETS[k].title)));
+        d.open = open; pickPanel.append(d);
+      });
+    });
+  };
+  const closePick = () => { pickPanel.style.display = 'none'; pickBtn.setAttribute('aria-expanded', 'false'); };
+  pickBtn.addEventListener('click', () => { const show = pickPanel.style.display === 'none'; if (show) { buildPanel(); pickPanel.style.display = 'block'; pickBtn.setAttribute('aria-expanded', 'true'); const on = pickPanel.querySelector('.lp-picksec.on'); if (on) on.scrollIntoView({ block: 'nearest' }); } else closePick(); });
+  document.addEventListener('click', (e) => { if (!pickWrap.contains(e.target)) closePick(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePick(); });
+  const pickWrap = el('div', { class: 'lp-pick' }, pickBtn, pickPanel);
+  const pick = pickWrap; setLabel();
   const out = el('div', {});
   app.append(el('div', { class: 'card noprint' },
     el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, el('label', { style: 'margin:0' }, 'Section'), pick,
       el('button', { class: 'btn secondary', type: 'button', onclick: () => window.print() }, '🖨 Print the plan')),
     el('p', { class: 'small', style: 'margin:8px 0 0' }, '🖨 buttons open a handout as a PDF; print it from there. Buttons marked 📺 put the plan’s questions on the TV. Press “Show answer” when you’re ready, or “New numbers” for another one like it.'), note), out);
-  pick.addEventListener('change', () => { LESSON.key = pick.value; draw(); });
   function draw() {
     out.innerHTML = '';
     const L = lessonOf(LESSON.key), S = SETS[LESSON.key]; if (!L || !S) return;
