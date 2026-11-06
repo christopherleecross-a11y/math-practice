@@ -9285,7 +9285,7 @@ function wrapLines(ctx, text, maxW) {
   const words = text.split(' '); const lines = []; let line = '';
   for (const w of words) {
     const test = line ? line + ' ' + w : w;
-    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+    if (tcLineW(ctx, test) > maxW && line) { lines.push(line); line = w; } else line = test;
   }
   if (line) lines.push(line);
   return lines;
@@ -9491,12 +9491,31 @@ function mathTextCanvas(text, width, font, lh) {
   return cv;
 }
 const solNode = (t0) => { const t = autoMath(t0); return el('div', { class: 'sol' }, hasM(t) ? mathTextCanvas(t, Math.max(280, contentWidth() - 30), '16px Georgia, "Times New Roman", serif', 24) : t); };
+// ∥ is drawn as two upright bars: some Chromebook fonts have a slanted ∥ that looks like //
+function tcParW(ctx) { const px = +((ctx.font.match(/(\d+(?:\.\d+)?)px/) || [0, 17])[1]); return px * 0.55; }
+function tcDraw(ctx, txt, x, y) { // draws txt at (x, y) (textBaseline top) and returns its width
+  const segs = txt.split('∥'); let w = 0;
+  segs.forEach((seg, i) => {
+    if (i) { const px = +((ctx.font.match(/(\d+(?:\.\d+)?)px/) || [0, 17])[1]), pw = tcParW(ctx), lw = ctx.lineWidth;
+      ctx.save(); ctx.lineWidth = Math.max(1.2, px / 14); ctx.beginPath();
+      for (const f of [0.33, 0.67]) { ctx.moveTo(x + w + pw * f, y + px * 0.08); ctx.lineTo(x + w + pw * f, y + px * 0.9); }
+      ctx.stroke(); ctx.restore(); ctx.lineWidth = lw; w += pw; }
+    if (seg) { ctx.fillText(seg, x + w, y); w += ctx.measureText(seg).width; }
+  });
+  return w;
+}
+function tcLineW(ctx, l) { // width of a line exactly as textCanvas draws it
+  if (l.startsWith(NOWRAP)) l = l.slice(1);
+  return l.split(/((?:.\u0305)+)/).reduce((t, part) => { if (!part) return t; const txt = part.replace(/\u0305/g, ''); return t + txt.split('∥').reduce((u, seg, i) => u + (i ? tcParW(ctx) : 0) + (seg ? ctx.measureText(seg).width : 0), 0); }, 0);
+}
 function textCanvas(text, width, font = TEXT_FONT, lh = 26) {
   text = autoMath(text);
   if (hasM(text)) return mathTextCanvas(text, width, font, lh);
   const probe = document.createElement('canvas').getContext('2d');
   probe.font = font;
-  const lines = wrapLines(probe, text, width - 4);
+  let lines = wrapLines(probe, text, width - 4);
+  // some Chromebook fonts measure a whole line narrower than the pieces it is drawn in; re-wrap if a drawn line would run off the edge
+  for (let k = 1; k <= 6 && lines.some((l) => !l.startsWith(NOWRAP) && tcLineW(probe, l) > width - 4); k++) lines = wrapLines(probe, text, width - 4 - 12 * k);
   const cv = makeCanvas(width, lines.length * lh + 6);
   cv.style.maxWidth = '100%'; cv.style.width = width + 'px';
   const ctx = cv._ctx;
@@ -9505,7 +9524,7 @@ function textCanvas(text, width, font = TEXT_FONT, lh = 26) {
     ctx.font = font;
     if (l.startsWith(NOWRAP)) { // one-line expression: shrink the font if it's wider than the space
       l = l.slice(1);
-      const w0 = ctx.measureText(l.replace(/\u0305/g, '')).width;
+      const w0 = tcLineW(ctx, l);
       if (w0 > width - 4) ctx.font = font.replace(/(\d+(?:\.\d+)?)px/, (m, px) => (Math.floor(px * (width - 4) / w0 * 10) / 10) + 'px');
     }
     // draw letters followed by U+0305 with a real bar over the whole run
@@ -9514,8 +9533,7 @@ function textCanvas(text, width, font = TEXT_FONT, lh = 26) {
     for (const part of parts) {
       if (!part) continue;
       const over = /\u0305/.test(part), txt = part.replace(/\u0305/g, '');
-      ctx.fillText(txt, x, y);
-      const w = ctx.measureText(txt).width;
+      const w = tcDraw(ctx, txt, x, y);
       if (over) { ctx.beginPath(); ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + w - 1, y + 1); ctx.stroke(); }
       x += w;
     }
