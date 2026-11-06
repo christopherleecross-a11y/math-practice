@@ -27162,6 +27162,10 @@ QUESTION_TYPES.push(
   { id: 'b57Challenge', subject: 'algebra2', section: '5.7 Inverse of a Function', label: '★ Challenge: Values of an inverse', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
 );
 ['g64Backward', 'g65AlgSides', 'trigProveHard'].forEach((id) => { const t = QUESTION_TYPES.find((x) => x.id === id); if (t) { t.challenge = true; if (!t.label.startsWith('★')) t.label = '★ Challenge: ' + t.label; } });
+// keep each section's types together (types added later, like the challenges, join their section instead of starting a second copy of it)
+{ const order = new Map(); QUESTION_TYPES.forEach((t) => { const k = t.subject + '|' + t.section; if (!order.has(k)) order.set(k, order.size); });
+  const sorted = QUESTION_TYPES.map((t, i) => [t, i]).sort((x, y) => order.get(x[0].subject + '|' + x[0].section) - order.get(y[0].subject + '|' + y[0].section) || x[1] - y[1]).map((x) => x[0]);
+  QUESTION_TYPES.length = 0; QUESTION_TYPES.push(...sorted); }
 { // keep each subject's question types together (stable)
   const first = {}; QUESTION_TYPES.forEach((t, i) => { if (!(t.subject in first)) first[t.subject] = i; });
   const chOf = (t) => (t.subject === 'geometry' ? parseInt(t.section.replace(/^Pre-/, ''), 10) || 0 : 0); // geometry chapters in order (Chapter 1 was added last)
