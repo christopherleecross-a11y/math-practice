@@ -24974,6 +24974,8 @@ const chPair = (a, b, la, lb) => `${la} = ${fracT(a)}, ${lb} = ${fracT(b)}`;
 const chPairChoices = (r, a, b, la, lb, wrongs) => buildChoices(r, chPair(a, b, la, lb), [...new Set(wrongs.map(([x, y]) => chPair(x, y, la, lb)))].filter((w) => w !== chPair(a, b, la, lb)), (i) => chPair(a + i + 1, b, la, lb));
 const CH_TRIPLES = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [6, 8, 10], [9, 12, 15], [12, 16, 20], [20, 21, 29]];
 const chFrac = (n, d) => n / d;
+const chK = (v) => (fracT(v).includes('/') ? `(${fracT(v)})` : fracT(v)); // a coefficient: fractions in parentheses
+const chCo = (v) => (v === 1 ? '' : v === -1 ? MINUS : chK(v)); // a coefficient in front of a variable
 const chP = (v) => (v < 0 ? `(${fmt(v)})` : fmt(v)); // a negative number in parentheses after an operation // exact enough for fracT/fracParts with the small denominators used here
 
 /* Geometry 6.1: a point on an axis equidistant from two points (perpendicular bisector, then intersect) */
@@ -24989,7 +24991,7 @@ TEMPLATES.g61Challenge = (r) => {
     return { topic: 'Challenge: equidistant point', stem: `Point P lies on the ${onY ? 'y-axis' : 'x-axis'} and is the same distance from A${ptT(A)} and B${ptT(B)}. Find the coordinates of P.`,
       ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => (onY ? ptT([0, P[1] + i + 2]) : ptT([P[0] + i + 2, 0]))),
       fr: chPtFR([{ label: 'P =', P }], correct),
-      solution: `A point the same distance from A and B lies on the perpendicular bisector of A̅B̅.\nMidpoint of A̅B̅: ${ptT(M)}.   Slope of A̅B̅: ${fracT(m)}, so the perpendicular slope is ${fracT(pm)}.\nPerpendicular bisector: ${M[1] ? `y ${M[1] < 0 ? '+' : MINUS} ${Math.abs(M[1])}` : 'y'} = ${fracT(pm)}(${M[0] ? `x ${M[0] < 0 ? '+' : MINUS} ${Math.abs(M[0])}` : 'x'})\nP is on the ${onY ? 'y-axis, so x = 0' : 'x-axis, so y = 0'}: P = ${correct}.\nCheck: PA = PB = ${exactT(Math.hypot(P[0] - A[0], P[1] - A[1]))}.` };
+      solution: `A point the same distance from A and B lies on the perpendicular bisector of A̅B̅.\nMidpoint of A̅B̅: ${ptT(M)}.   Slope of A̅B̅: ${fracT(m)}, so the perpendicular slope is ${fracT(pm)}.\nPerpendicular bisector: ${M[1] ? `y ${M[1] < 0 ? '+' : MINUS} ${Math.abs(M[1])}` : 'y'} = ${chK(pm)}(${M[0] ? `x ${M[0] < 0 ? '+' : MINUS} ${Math.abs(M[0])}` : 'x'})\nP is on the ${onY ? 'y-axis, so x = 0' : 'x-axis, so y = 0'}: P = ${correct}.\nCheck: PA = PB = ${exactT(Math.hypot(P[0] - A[0], P[1] - A[1]))}.` };
   }
 };
 /* Geometry 6.2: incenter algebra, then the Pythagorean Theorem */
@@ -25402,7 +25404,7 @@ TEMPLATES.b47Challenge = (r) => {
     return { topic: 'Challenge: transformations, then evaluate', stem: `The graph of g is the graph of f(x) = ${chPoly(f)} ${desc}. Find g(${fmt(x0)}) and g(${fmt(x1)}).`,
       ...chPairChoices(r, G0, G1, `g(${fmt(x0)})`, `g(${fmt(x1)})`, [[wg(x0, -h, refl), wg(x1, -h, refl)], [wg(x0, h, !refl), wg(x1, h, !refl)], [G0 - 2 * v, G1 - 2 * v]]),
       fr: chNums([{ label: `g(${fmt(x0)}) =`, val: G0 }, { label: `g(${fmt(x1)}) =`, val: G1 }], chPair(G0, G1, `g(${fmt(x0)})`, `g(${fmt(x1)})`)),
-      solution: `Build the rule in order: ${rule}\ng(${fmt(x0)}) = ${refl ? MINUS : ''}${fracT(k)} · f(${fmt(x0 - h)}) ${v < 0 ? MINUS : '+'} ${Math.abs(v)} = ${refl ? MINUS : ''}${fracT(k)}(${fmt(chEval(f, x0 - h))}) ${v < 0 ? MINUS : '+'} ${Math.abs(v)} = ${fracT(G0)}\ng(${fmt(x1)}) = ${refl ? MINUS : ''}${fracT(k)}(${fmt(chEval(f, x1 - h))}) ${v < 0 ? MINUS : '+'} ${Math.abs(v)} = ${fracT(G1)}` };
+      solution: `Build the rule in order: ${rule.replace(fracT(k) + 'f', chK(k) + 'f')}\ng(${fmt(x0)}) = ${refl ? MINUS : ''}${chK(k)} · f(${fmt(x0 - h)}) ${v < 0 ? MINUS : '+'} ${Math.abs(v)} = ${refl ? MINUS : ''}${chK(k)}(${fmt(chEval(f, x0 - h))}) ${v < 0 ? MINUS : '+'} ${Math.abs(v)} = ${fracT(G0)}\ng(${fmt(x1)}) = ${refl ? MINUS : ''}${chK(k)}(${fmt(chEval(f, x1 - h))}) ${v < 0 ? MINUS : '+'} ${Math.abs(v)} = ${fracT(G1)}` };
   }
 };
 /* 4.8: a cubic from its zeros and y-intercept */
@@ -25414,7 +25416,7 @@ TEMPLATES.b48Challenge = (r) => {
     return { topic: 'Challenge: cubic from zeros and a point', stem: `The graph of a cubic function f has x-intercepts ${Z.map(fmt).join(', ')} and y-intercept ${fmt(y0)}. Find the leading coefficient a and f(${fmt(x1)}).`,
       ...chPairChoices(r, a, y1, 'a', `f(${fmt(x1)})`, [[-a, -y1], [y0, y0 * (x1 - Z[0]) * (x1 - Z[1]) * (x1 - Z[2])], [1, y1 / a]]),
       fr: chNums([{ label: 'a =', val: a }, { label: `f(${fmt(x1)}) =`, val: y1 }], chPair(a, y1, 'a', `f(${fmt(x1)})`)),
-      solution: `Factored form from the zeros: f(x) = a${fac}\nUse the y-intercept: f(0) = a(${fmt(-Z[0])})(${fmt(-Z[1])})(${fmt(-Z[2])}) = ${fmt(-Z[0] * -Z[1] * -Z[2])}a = ${fmt(y0)}  →  a = ${fracT(a)}\nf(${fmt(x1)}) = ${fracT(a)}(${fmt(x1 - Z[0])})(${fmt(x1 - Z[1])})(${fmt(x1 - Z[2])}) = ${fmt(y1)}` };
+      solution: `Factored form from the zeros: f(x) = a${fac}\nUse the y-intercept: f(0) = a(${fmt(-Z[0])})(${fmt(-Z[1])})(${fmt(-Z[2])}) = ${fmt(-Z[0] * -Z[1] * -Z[2])}a = ${fmt(y0)}  →  a = ${fracT(a)}\nf(${fmt(x1)}) = ${chK(a)}(${fmt(x1 - Z[0])})(${fmt(x1 - Z[1])})(${fmt(x1 - Z[2])}) = ${fmt(y1)}` };
   }
 };
 /* 4.9: extend finite differences to predict a later value */
@@ -25559,7 +25561,7 @@ TEMPLATES.a62Challenge = (r) => {
     return { topic: 'Challenge: negative rational exponents', stem: `Evaluate without a calculator.   (${base[0]}/${base[1]})^(${exT})`,
       ...buildChoices(r, disp, [...new Set([fracT((p / q) ** m), fracT(-ans), fracT(q / p), fracT((q ** n / p ** n) * m / n)])].filter((w) => w !== disp), (i) => fracT(ans + i + 1)),
       fr: chNums([{ label: 'Value:', val: ans }], disp),
-      solution: `A negative exponent flips the fraction: (${base[0]}/${base[1]})^(${exT}) = (${base[1]}/${base[0]})^(${m}/${n})\nTake the ${['', '', 'square', 'cube', 'fourth'][n]} root first: ${n === 2 ? '√' : n === 3 ? '∛' : '∜'}(${base[1]}/${base[0]}) = ${q}/${p}${m > 1 ? `\nThen raise it to the power ${m}: (${q}/${p})${a6sup(m)} = ${disp}` : ''}` };
+      solution: `A negative exponent flips the fraction: (${base[0]}/${base[1]})^(${exT}) = (${fracT(base[1] / base[0])})^(${m}/${n})\nTake the ${['', '', 'square', 'cube', 'fourth'][n]} root first: ${n === 2 ? '√' : n === 3 ? '∛' : '∜'}(${base[1]}/${base[0]}) = ${q}/${p}${m > 1 ? `\nThen raise it to the power ${m}: (${q}/${p})${a6sup(m)} = ${disp}` : ''}` };
   }
 };
 /* 6.3: rationalize two conjugate fractions and add (the radicals cancel) */
@@ -25571,7 +25573,7 @@ TEMPLATES.a63Challenge = (r) => {
     return { topic: 'Challenge: rationalize, then add', stem: `Simplify. Your answer should have no radicals.   (${A})/(${B}) + (${B})/(${A})`,
       ...buildChoices(r, fracT(val), [...new Set([fracT((a + b) / (a - b)), fracT(-val), fracT(2 * (a + b)), fracT(2 * (a - b) / (a + b))])].filter((w) => w !== fracT(val)), (i) => fracT(val + i + 1)),
       fr: chNums([{ label: 'Value:', val }], fracT(val)),
-      solution: `Use the common denominator (${B})(${A}) = ${a} − ${b} = ${fmt(a - b)}.\nNumerators: (${A})² + (${B})² = (${a + b} + 2√${a * b}) + (${a + b} − 2√${a * b}) = ${2 * (a + b)}\nThe radicals cancel: ${2 * (a + b)}/${chP(a - b)} = ${fracT(val)}` };
+      solution: `Use the common denominator (${B})(${A}) = ${a} − ${b} = ${fmt(a - b)}.\nNumerators: (${A})² + (${B})² = (${a + b} + 2√${a * b}) + (${a + b} − 2√${a * b}) = ${2 * (a + b)}\nThe radicals cancel: ${a - b === 1 ? '' : `${2 * (a + b)}/${chP(a - b)} = `}${fracT(val)}` };
   }
 };
 /* 6.4: an exponential function through two points */
@@ -25693,6 +25695,330 @@ TEMPLATES.b57Challenge = (r) => {
       ...chPairChoices(r, v1, v2, `f⁻¹(${fmt(c1)})`, `f⁻¹(${fmt(c2)})`, [[u + h, w + h], [u ** 3 - h, w ** 3 - h], [a * Math.cbrt(c1 - h) + k, a * Math.cbrt(c2 - h) + k]].filter(([x, y]) => fracParts(x) && fracParts(y))),
       fr: chNums([{ label: `f⁻¹(${fmt(c1)}) =`, val: v1 }, { label: `f⁻¹(${fmt(c2)}) =`, val: v2 }], chPair(v1, v2, `f⁻¹(${fmt(c1)})`, `f⁻¹(${fmt(c2)})`)),
       solution: `f⁻¹(c) is the x-value where f(x) = c.\n${f} = ${fmt(c1)}  →  ∛(x ${h < 0 ? '+' : MINUS} ${Math.abs(h)}) = ${fmt(u)}  →  x ${h < 0 ? '+' : MINUS} ${Math.abs(h)} = ${fmt(u ** 3)}  →  x = ${fmt(v1)}\n${f} = ${fmt(c2)}  →  ∛(x ${h < 0 ? '+' : MINUS} ${Math.abs(h)}) = ${fmt(w)}  →  x = ${fmt(v2)}` };
+  }
+};
+
+/* ---------- ★ Challenge questions, batch 3: Geometry 5, Pre-Calc 1, Algebra I 4, Algebra II 3 ---------- */
+const chPiT = (n, d) => { const g = gcd(Math.abs(n), d) || 1; n /= g; d /= g; if (!n) return '0'; const s = n < 0 ? MINUS : '', a = Math.abs(n); return `${s}${a === 1 ? '' : a}π${d === 1 ? '' : '/' + d}`; };
+const chPiL = (n, d) => { const g = gcd(Math.abs(n), d) || 1; n /= g; d /= g; if (!n) return '0'; const s = n < 0 ? '-' : '', a = Math.abs(n); return d === 1 ? `${s}${a === 1 ? '' : a}\\pi` : `${s}\\frac{${a === 1 ? '' : a}\\pi}{${d}}`; };
+const chR1 = (v) => Math.round(v * 10) / 10;
+const chMinus = (v, s = 'x') => (v < 0 ? `${s} + ${fmt(-v)}` : v ? `${s} − ${fmt(v)}` : s); // x − v, written nicely
+const chPtsFR = (P, label) => ({ fields: [{ kind: 'expr', keys: 'point', label }], key: [P.map((p) => `\\left(${fracL(p[0])},${fracL(p[1])}\\right)`).join(',')], display: P.map(ptT).join(', '),
+  check: (v) => { const L = parsePoints(v[0]); return !!L && L.length === P.length && P.every((p) => L.some((q) => Math.abs(q[0] - p[0]) < 1e-7 && Math.abs(q[1] - p[1]) < 1e-7)); } });
+
+/* Geometry 5.1: Exterior Angle Theorem with algebra, then the interior angle */
+TEMPLATES.g51Challenge = (r) => {
+  for (;;) {
+    const x = ri(r, 4, 25), c = ri(r, 1, 4), e = ri(r, 1, 4), a = c + e + pick(r, [-1, 1, 2]); if (a === c + e || a <= 0) continue;
+    const d = ri(r, -10, 30), f = ri(r, -10, 30), ext = (c + e) * x + d + f, b = ext - a * x;
+    if (ext >= 170 || ext <= 20 || c * x + d <= 5 || e * x + f <= 5 || Math.abs(b) > 60) continue;
+    const [A, B, C] = pickLetters(r, 3);
+    return { topic: 'Challenge: exterior angle with algebra', stem: `In △${A}${B}${C}, m∠${A} = (${g4Lin(c, d)})° and m∠${B} = (${g4Lin(e, f)})°. The exterior angle at ${C} measures (${g4Lin(a, b)})°. Find x and m∠${A}${C}${B}.`,
+      ...chPairChoices(r, x, 180 - ext, 'x', `m∠${A}${C}${B}`, [[x, ext], [x, 180 - (c * x + d)], [x + 1, 180 - ext - c - e]]),
+      fr: chNums([{ label: 'x =', val: x }, { label: `m∠${A}${C}${B} =`, val: 180 - ext }], chPair(x, 180 - ext, 'x', `m∠${A}${C}${B}`)),
+      solution: `Exterior Angle Theorem: the exterior angle equals the sum of the two remote interior angles.\n${g4Lin(a, b)} = (${g4Lin(c, d)}) + (${g4Lin(e, f)})  →  ${g4Lin(a, b)} = ${g4Lin(c + e, d + f)}  →  x = ${x}\nThe exterior angle is ${ext}°, and it forms a linear pair with ∠${A}${C}${B}: m∠${A}${C}${B} = 180° − ${ext}° = ${180 - ext}°` };
+  }
+};
+/* Geometry 5.2: corresponding parts give a system in x and y */
+TEMPLATES.g52Challenge = (r) => {
+  for (;;) {
+    const x = ri(r, 2, 12), y = ri(r, 2, 12), p = ri(r, 1, 4), q = pick(r, [1, 2, -1]), s = ri(r, 1, 5), t = pick(r, [-1, -2, 1]);
+    if (p * t - q * s === 0) continue;
+    const side = p * x + q * y, ang = s * x + t * y; if (side <= 2 || ang <= 15 || ang >= 150) continue;
+    const [A, B, C] = pickLetters(r, 3), [D, E, F] = pickLetters(r, 3, [A, B, C]), lin = (k, v) => (k === 1 ? v : k === -1 ? MINUS + v : `${k}${v}`);
+    const ex = (k1, k2) => `${lin(k1, 'x')} ${k2 < 0 ? MINUS : '+'} ${Math.abs(k2) === 1 ? '' : Math.abs(k2)}y`;
+    return { topic: 'Challenge: corresponding parts with two variables', stem: `△${A}${B}${C} ≅ △${D}${E}${F}. ${A}${B} = ${ex(p, q)}, ${D}${E} = ${side}, m∠${B} = (${ex(s, t)})°, and m∠${E} = ${ang}°. Find x and y.`,
+      ...chPairChoices(r, x, y, 'x', 'y', [[y, x], [x + 1, y], [x, y + 2]]),
+      fr: chNums([{ label: 'x =', val: x }, { label: 'y =', val: y }], chPair(x, y, 'x', 'y')),
+      solution: `Corresponding parts of congruent triangles are congruent:\n${A}${B} = ${D}${E}:  ${ex(p, q)} = ${side}\nm∠${B} = m∠${E}:  ${ex(s, t)} = ${ang}\nSolve the system (elimination or substitution): x = ${x}, y = ${y}` };
+  }
+};
+/* Geometry 5.3–5.6: HL with algebra, then the Pythagorean Theorem */
+TEMPLATES.g53Challenge = (r) => {
+  for (;;) {
+    const T = pick(r, CH_TRIPLES), x = ri(r, 2, 10), a = ri(r, 2, 6), c = ri(r, 1, 5); if (a === c) continue;
+    const b = T[2] - a * x, d = T[2] - c * x; if (Math.abs(b) > 40 || Math.abs(d) > 40) continue;
+    const sw = r() < 0.5, leg = sw ? T[0] : T[1], other = sw ? T[1] : T[0], [A, B, C] = pickLetters(r, 3), [D, E, F] = pickLetters(r, 3, [A, B, C]);
+    return { topic: 'Challenge: HL with algebra', stem: `△${A}${B}${C} and △${D}${E}${F} are right triangles with right angles at ${B} and ${E}. ${A}${C} = ${g4Lin(a, b)}, ${D}${F} = ${g4Lin(c, d)}, and ${A}${B} = ${D}${E} = ${leg}. Find the value of x that makes the triangles congruent by the HL Congruence Theorem, and then find ${E}${F}.`,
+      ...chPairChoices(r, x, other, 'x', E + F, [[x, T[2]], [x, Math.round(Math.sqrt(T[2] ** 2 + leg ** 2))], [x + 1, other], [x, leg]]),
+      fr: chNums([{ label: 'x =', val: x }, { label: `${E}${F} =`, val: other }], chPair(x, other, 'x', E + F)),
+      solution: `HL needs the hypotenuses to be congruent (one pair of legs already is): ${A}${C} = ${D}${F}\n${g4Lin(a, b)} = ${g4Lin(c, d)}  →  x = ${x}, so each hypotenuse is ${T[2]}.\nPythagorean Theorem: ${E}${F} = √(${T[2]}² − ${leg}²) = √${T[2] ** 2 - leg ** 2} = ${other}` };
+  }
+};
+/* Geometry 5.4: isosceles triangle — legs give x, then the perimeter */
+TEMPLATES.g54Challenge = (r) => {
+  for (;;) {
+    const x = ri(r, 2, 12), a = ri(r, 2, 6), c = ri(r, 1, 5), e = ri(r, 1, 4); if (a === c) continue;
+    const L = ri(r, 6, 40), b = L - a * x, d = L - c * x, base = e * x + ri(r, -5, 8), f = base - e * x;
+    if (base <= 1 || base >= 2 * L || Math.abs(b) > 40 || Math.abs(d) > 40) continue;
+    const [A, B, C] = pickLetters(r, 3), P = 2 * L + base;
+    return { topic: 'Challenge: isosceles triangle algebra', stem: `△${A}${B}${C} is isosceles with legs ${SEG(A + B)} and ${SEG(A + C)}. ${A}${B} = ${g4Lin(a, b)}, ${A}${C} = ${g4Lin(c, d)}, and ${B}${C} = ${g4Lin(e, f)}. Find x and the perimeter of △${A}${B}${C}.`,
+      ...chPairChoices(r, x, P, 'x', 'perimeter', [[x, L + base], [x, 2 * base + L], [x, 3 * L], [x + 1, P + 2 * a + e]]),
+      fr: chNums([{ label: 'x =', val: x }, { label: 'Perimeter:', val: P }], chPair(x, P, 'x', 'perimeter')),
+      solution: `The legs of an isosceles triangle are congruent: ${g4Lin(a, b)} = ${g4Lin(c, d)}  →  x = ${x}\nEach leg is ${L}, and the base is ${e === 1 ? x : `${e}(${x})`} ${f < 0 ? MINUS : '+'} ${Math.abs(f)} = ${base}.\nPerimeter = ${L} + ${L} + ${base} = ${P}` };
+  }
+};
+
+/* ---------- Pre-Calc 1 ---------- */
+/* 1.1: two pulleys connected by a belt */
+TEMPLATES.p11Challenge = (r) => {
+  const r1 = ri(r, 2, 8), r2 = ri(r, 3, 12), w1 = 10 * ri(r, 5, 40); if (r1 === r2) return TEMPLATES.p11Challenge(r);
+  const w2 = w1 * r1 / r2, v = 2 * Math.PI * r1 * w1 / 60; // inches per second
+  const disp = `${fmt(chR1(w2))} rpm; ${fmt(chR1(v))} in./sec`;
+  return { topic: 'Challenge: pulleys and a belt', stem: `A belt connects two pulleys. The first pulley has a radius of ${r1} inches and turns at ${w1} revolutions per minute. The other pulley has a radius of ${r2} inches. Find the angular speed of the second pulley (in revolutions per minute) and the linear speed of the belt (in inches per second). Round to the nearest tenth.`,
+    ...buildChoices(r, disp, [`${fmt(chR1(w1 * r2 / r1))} rpm; ${fmt(chR1(v))} in./sec`, `${fmt(chR1(w2))} rpm; ${fmt(chR1(r1 * w1 / 60))} in./sec`, `${fmt(chR1(w2))} rpm; ${fmt(chR1(2 * Math.PI * r1 * w1))} in./sec`, `${w1} rpm; ${fmt(chR1(v))} in./sec`].filter((w) => w !== disp), (i) => `${fmt(chR1(w2 + i + 1))} rpm; ${fmt(chR1(v))} in./sec`),
+    fr: chNums([{ label: 'Second pulley (rpm):', val: w2, tol: 0.06 / w2, key: String(chR1(w2)) }, { label: 'Belt speed (in./sec):', val: v, tol: 0.06 / v, key: String(chR1(v)) }], disp),
+    solution: `The belt moves at the same linear speed around both pulleys.\nBelt speed = r · ω = ${r1} in. · (${w1} · 2π rad/min) = ${fmt(Math.round(2 * Math.PI * r1 * w1 * 10) / 10)} in./min ÷ 60 ≈ ${fmt(chR1(v))} in./sec\nSecond pulley: ${r2} · ω₂ = ${r1} · ${w1}  →  ω₂ = ${fmt(chR1(w2))} rpm` };
+};
+/* 1.2: values at related points on the unit circle (symmetry and periodicity) */
+TEMPLATES.p12Challenge = (r) => {
+  const T = pick(r, CH_TRIPLES.slice(0, 4)), sw = r() < 0.5, Q = pick(r, [1, 2]), sv = (sw ? T[1] : T[0]) / T[2], cv = (Q === 1 ? 1 : -1) * (sw ? T[0] : T[1]) / T[2];
+  const items = [{ t: 'sin(π − t)', v: sv }, { t: 'cos(t + π)', v: -cv }, { t: 'sin(−t)', v: -sv }, { t: 'cos(2π − t)', v: cv }, { t: 'tan(t + π)', v: sv / cv }, { t: 'sin(t + 2π)', v: sv }];
+  const pickd = shuffle(r, items).slice(0, 3), disp = pickd.map((x) => `${x.t} = ${fracT(x.v)}`).join(', ');
+  const wr = [pickd.map((x, i) => `${x.t} = ${fracT(i === 0 ? -x.v : x.v)}`).join(', '), pickd.map((x, i) => `${x.t} = ${fracT(i === 1 ? -x.v : x.v)}`).join(', '), pickd.map((x) => `${x.t} = ${fracT(-x.v)}`).join(', '), pickd.map((x, i) => `${x.t} = ${fracT(i === 2 ? 1 / x.v : x.v)}`).join(', ')];
+  return { topic: 'Challenge: symmetry on the unit circle', stem: `t is a real number with sin t = ${fracT(sv)} and ${Q === 1 ? '0 < t < π/2' : 'π/2 < t < π'}. Find ${pickd.map((x) => x.t).join(', ')}.`,
+    ...buildChoices(r, disp, [...new Set(wr)].filter((w) => w !== disp), (i) => pickd.map((x, j) => `${x.t} = ${fracT(j === 0 ? x.v + i + 1 : x.v)}`).join(', ')),
+    fr: chNums(pickd.map((x) => ({ label: `${x.t} =`, val: x.v })), disp),
+    solution: `First find cos t: cos² t = 1 − sin² t = ${fracT(1 - sv * sv)}, and t is in Quadrant ${Q === 1 ? 'I' : 'II'}, so cos t = ${fracT(cv)}.\nUse symmetry and the period 2π:\nsin(π − t) = sin t,  cos(t + π) = −cos t,  sin(−t) = −sin t,  cos(2π − t) = cos t,  tan(t + π) = tan t,  sin(t + 2π) = sin t\n${disp}` };
+};
+/* 1.3: the height of an object from two angles of elevation (right triangles) */
+TEMPLATES.p13Challenge = (r) => {
+  for (;;) {
+    const d = 10 * ri(r, 5, 40), al = pick(r, [20, 25, 30, 35, 40]), be = al + pick(r, [10, 15, 20, 25, 30]); if (be > 70) continue;
+    const ta = Math.tan(al * D2R), tb = Math.tan(be * D2R), h = d * ta * tb / (tb - ta), x = h / tb;
+    const disp = `height ≈ ${fmt(chR1(h))} ft; ${fmt(chR1(x))} ft from the closer point`;
+    const wr = [[d * tb, x], [h, h / ta], [d * ta, x], [h, d]].map(([u, w]) => `height ≈ ${fmt(chR1(u))} ft; ${fmt(chR1(w))} ft from the closer point`);
+    return { topic: 'Challenge: two right triangles', stem: `From a point on level ground, the angle of elevation to the top of a tower is ${al}°. After walking ${d} feet straight toward the tower, the angle of elevation is ${be}°. How tall is the tower, and how far is the second point from its base? Round to the nearest tenth.`,
+      ...buildChoices(r, disp, [...new Set(wr)].filter((w) => w !== disp), (i) => `height ≈ ${fmt(chR1(h + 5 * (i + 1)))} ft; ${fmt(chR1(x))} ft from the closer point`),
+      fr: chNums([{ label: 'Height (ft):', val: h, tol: 0.06 / h, key: String(chR1(h)) }, { label: 'Distance from the closer point (ft):', val: x, tol: 0.06 / x, key: String(chR1(x)) }], disp),
+      solution: `Let h = the height and x = the distance from the closer point to the base.\ntan ${be}° = h/x  and  tan ${al}° = h/(x + ${d})\nSo h = x tan ${be}° = (x + ${d}) tan ${al}°  →  x(tan ${be}° − tan ${al}°) = ${d} tan ${al}°\nx ≈ ${fmt(chR1(x))} ft, and h = x tan ${be}° ≈ ${fmt(chR1(h))} ft` };
+  }
+};
+/* 1.4: reference angles in many quadrants, combined into one exact value */
+TEMPLATES.p14Challenge = (r) => {
+  const angs = [30, 45, 60, 120, 135, 150, 210, 225, 240, 300, 315, 330, 390, 405, -30, -45, -60, -120, -135, -150];
+  const sq = { sin: (t) => Math.sin(t * D2R) ** 2, cos: (t) => Math.cos(t * D2R) ** 2, tan: (t) => Math.tan(t * D2R) ** 2 };
+  for (;;) {
+    const fns = shuffle(r, ['sin', 'cos', 'tan']), A = shuffle(r, angs).slice(0, 3), k = [ri(r, 1, 4), ri(r, 1, 4), ri(r, 1, 3)], sg = [1, pick(r, [1, -1]), pick(r, [1, -1])];
+    const val = fns.reduce((s, f, i) => s + sg[i] * k[i] * sq[f](A[i]), 0); if (!fracParts(Math.round(val * 1e9) / 1e9)) continue;
+    const v = fracParts(Math.round(val * 1e9) / 1e9), V = v[0] / v[1], angT = (t) => (t < 0 ? `(${fmt(t)}°)` : ` ${t}°`), term = (i) => `${k[i] === 1 ? '' : k[i]}${fns[i]}²${angT(A[i])}`;
+    const expr = `${term(0)} ${sg[1] < 0 ? MINUS : '+'} ${term(1)} ${sg[2] < 0 ? MINUS : '+'} ${term(2)}`;
+    const per = fns.map((f, i) => `${f}${angT(A[i])}: reference angle ${(() => { let t = ((A[i] % 360) + 360) % 360; return t <= 90 ? t : t <= 180 ? 180 - t : t <= 270 ? t - 180 : 360 - t; })()}°, so ${f}²${angT(A[i])} = ${fracT(Math.round(sq[f](A[i]) * 1e9) / 1e9)}`);
+    const wrongs = [fracT(fns.reduce((s, f, i) => s + k[i] * sq[f](A[i]), 0)), fracT(-V), fracT(V + 1), fracT(fns.reduce((s, f, i) => s + sg[i] * k[i] * Math.sqrt(sq[f](A[i])), 0))].filter((w) => w !== fracT(V) && !/\./.test(w));
+    return { topic: 'Challenge: reference angles', stem: `Find the exact value (no calculator).   ${expr}\n(sin² θ means (sin θ)².)`,
+      ...buildChoices(r, fracT(V), [...new Set(wrongs)], (i) => fracT(V + (i + 2) / 4)),
+      fr: chNums([{ label: 'Value:', val: V }], fracT(V)),
+      solution: `Use reference angles (squaring removes the sign):\n${per.join('\n')}\n${expr} = ${fracT(V)}` };
+  }
+};
+/* 1.5: a Ferris wheel modeled by a cosine function */
+TEMPLATES.p15Challenge = (r) => {
+  const D = 10 * ri(r, 5, 25), c = D / 2 + ri(r, 2, 8), P = pick(r, [20, 24, 30, 36, 40, 45, 60]), t = ri(r, 3, P - 2);
+  const h = c - (D / 2) * Math.cos(2 * Math.PI * t / P), B = chPiT(2, P), disp = `h(t) = ${fmt(c)} − ${fmt(D / 2)} cos(${B} · t); h(${t}) ≈ ${fmt(chR1(h))} ft`;
+  const hw = (f) => `h(t) = ${fmt(c)} − ${fmt(D / 2)} cos(${B} · t); h(${t}) ≈ ${fmt(chR1(f))} ft`;
+  return { topic: 'Challenge: Ferris wheel model', stem: `A Ferris wheel has a diameter of ${D} feet, and its center is ${fmt(c)} feet above the ground. It makes one revolution every ${P} seconds, and you board at the lowest point at t = 0. Write a model h(t) for your height, and find your height after ${t} seconds (nearest tenth).`,
+    ...buildChoices(r, disp, [hw(c + (D / 2) * Math.cos(2 * Math.PI * t / P)), hw(c - (D / 2) * Math.cos(2 * Math.PI * t * P)), hw(c - D * Math.cos(2 * Math.PI * t / P)), `h(t) = ${fmt(c)} − ${fmt(D / 2)} cos(${P}π · t); h(${t}) ≈ ${fmt(chR1(h))} ft`].filter((w) => w !== disp), (i) => hw(h + i + 2)),
+    fr: chNums([{ label: 'Amplitude a =', val: D / 2 }, { label: 'Period (seconds):', val: P }, { label: 'Midline d =', val: c }, { label: `h(${t}) ≈`, val: h, tol: 0.06 / Math.max(1, h), key: String(chR1(h)) }], `a = ${fmt(D / 2)}, period ${P}, d = ${fmt(c)}; h(${t}) ≈ ${fmt(chR1(h))} ft`),
+    solution: `Amplitude = radius = ${fmt(D / 2)}.  Midline = height of the center = ${fmt(c)}.  Period ${P} s, so b = 2π/${P} = ${B}.\nYou start at the lowest point, so use −cos: h(t) = ${fmt(c)} − ${fmt(D / 2)} cos(${B} · t)\nh(${t}) = ${fmt(c)} − ${fmt(D / 2)} cos(${chPiT(2 * t, P)}) ≈ ${fmt(chR1(h))} ft` };
+};
+/* 1.6: period and the first two vertical asymptotes of a shifted tan, sec, or csc */
+TEMPLATES.p16Challenge = (r) => {
+  const f = pick(r, ['sec', 'csc', 'tan']), b = pick(r, [1, 2, 3, 4]), cn = pick(r, [0, 1, 1, 2, 3]), cd = pick(r, [2, 3, 4, 6]); // shift c = (cn/cd)π
+  const per = f === 'tan' ? [1, b] : [2, b];
+  // asymptotes (as multiples of π): sec, tan → b·x − c = π/2 + kπ;  csc → b·x − c = kπ
+  const asy = (cOff) => { const L = []; for (let k = -4; k <= 6; k++) { const N = f === 'csc' ? 2 * cOff[0] + 2 * k * cOff[1] : 2 * cOff[0] + cOff[1] + 2 * k * cOff[1], D = 2 * cOff[1] * b; if (N > 0) L.push([N, D]); } return L.sort((u, v) => u[0] / u[1] - v[0] / v[1]).slice(0, 2); };
+  const [x1, x2] = asy([cn, cd]), wrongShift = asy([-cn, cd]);
+  const arg = cn ? `${b === 1 ? '' : b}x ${MINUS} ${chPiT(cn, cd)}` : `${b === 1 ? '' : b}x`;
+  const D = (P, A1, A2) => `period ${chPiT(...P)}; asymptotes x = ${chPiT(...A1)} and x = ${chPiT(...A2)}`, disp = D(per, x1, x2);
+  const noDiv = [[x1[0] * b, x1[1]], [x2[0] * b, x2[1]]];
+  return { topic: 'Challenge: asymptotes of a shifted graph', stem: `For y = ${f}(${arg}), find the period and the first two vertical asymptotes with x > 0.`,
+    ...buildChoices(r, disp, [D([3 - per[0], b], x1, x2), D(per, ...wrongShift), D(per, ...noDiv), D(per, x1, [x1[0] * 2, x1[1]])].filter((w, i, A) => A.indexOf(w) === i && w !== disp), (i) => D(per, x1, [x2[0] + (i + 1) * x2[1], x2[1]])),
+    fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Period:' }, { kind: 'expr', keys: 'num', label: 'First asymptote: x =' }, { kind: 'expr', keys: 'num', label: 'Second asymptote: x =' }],
+      key: [chPiL(...per), chPiL(...x1), chPiL(...x2)], display: disp,
+      check: (v) => numOk(v[0], Math.PI * per[0] / per[1]) && numOk(v[1], Math.PI * x1[0] / x1[1]) && numOk(v[2], Math.PI * x2[0] / x2[1]),
+      score: (v) => [numOk(v[0], Math.PI * per[0] / per[1]), numOk(v[1], Math.PI * x1[0] / x1[1]), numOk(v[2], Math.PI * x2[0] / x2[1])].filter(Boolean).length / 3 },
+    solution: `Period: ${f === 'tan' ? 'π' : '2π'}${b === 1 ? '' : ` ÷ ${b}`} = ${chPiT(...per)}.\n${f} has vertical asymptotes where ${f === 'csc' ? 'sin' : 'cos'} is 0, so set ${arg} = ${f === 'csc' ? 'kπ' : 'π/2 + kπ'} and solve for x:\nx = ${b === 1 ? '' : '('}${cn ? chPiT(cn, cd) + ' + ' : ''}${f === 'csc' ? 'kπ' : 'π/2 + kπ'}${b === 1 ? '' : `)/${b}`}\nThe first two positive values are x = ${chPiT(...x1)} and x = ${chPiT(...x2)} (they repeat every ${chPiT(1, b)}).` };
+};
+/* 1.7: two compositions with inverse functions, added */
+TEMPLATES.p17Challenge = (r) => {
+  const T1 = pick(r, CH_TRIPLES.slice(0, 3)), T2 = pick(r, CH_TRIPLES.slice(0, 3)), s1 = pick(r, [1, -1]), s2 = pick(r, [1, -1]);
+  const P1 = pick(r, [{ t: `sin(arccos(${fracT(s1 * T1[0] / T1[2])}))`, v: T1[1] / T1[2], w: `θ = arccos(${fracT(s1 * T1[0] / T1[2])}) is in [0, π], so sin θ ≥ 0: sin θ = ${fracT(T1[1] / T1[2])}` },
+    { t: `tan(arcsin(${fracT(s1 * T1[0] / T1[2])}))`, v: s1 * T1[0] / T1[1], w: `θ = arcsin(${fracT(s1 * T1[0] / T1[2])}) is in [−π/2, π/2], so cos θ > 0: tan θ = ${fracT(s1 * T1[0] / T1[1])}` }]);
+  const P2 = pick(r, [{ t: `cos(arctan(${fracT(s2 * T2[0] / T2[1])}))`, v: T2[1] / T2[2], w: `θ = arctan(${fracT(s2 * T2[0] / T2[1])}) is in (−π/2, π/2), so cos θ > 0: cos θ = ${fracT(T2[1] / T2[2])}` },
+    { t: `sec(arcsin(${fracT(s2 * T2[0] / T2[2])}))`, v: T2[2] / T2[1], w: `θ = arcsin(${fracT(s2 * T2[0] / T2[2])}) is in [−π/2, π/2], so cos θ > 0: sec θ = ${fracT(T2[2] / T2[1])}` }]);
+  const V = P1.v + P2.v, ans = fracT(V);
+  return { topic: 'Challenge: compositions with inverse functions', stem: `Find the exact value.   ${P1.t} + ${P2.t}`,
+    ...buildChoices(r, ans, [...new Set([fracT(-P1.v + P2.v), fracT(P1.v - P2.v), fracT(1 / P1.v + P2.v), fracT(P1.v + 1 / P2.v)])].filter((w) => w !== ans), (i) => fracT(V + i + 1)),
+    fr: chNums([{ label: 'Value:', val: V }], ans),
+    solution: `Draw a right triangle for each angle (watch the range of each inverse function):\n${P1.w}\n${P2.w}\nSum: ${fracT(P1.v)} + ${fracT(P2.v)} = ${ans}` };
+};
+/* 1.8: two legs of a trip with perpendicular bearings */
+TEMPLATES.p18Challenge = (r) => {
+  for (;;) {
+    const d1 = ri(r, 8, 40), d2 = ri(r, 8, 40), th = 5 * ri(r, 2, 16), dist = Math.hypot(d1, d2), brg = th + Math.atan2(d2, d1) / D2R; if (brg >= 90) continue;
+    const disp = `${fmt(chR1(dist))} mi at N ${fmt(chR1(brg))}° E`;
+    return { topic: 'Challenge: bearings', stem: `A ship leaves port and sails ${d1} miles on a bearing of N ${th}° E. It then turns 90° clockwise and sails ${d2} miles (bearing S ${90 - th}° E). How far is the ship from port, and what is its bearing from port? Round to the nearest tenth.`,
+      ...buildChoices(r, disp, [`${fmt(chR1(dist))} mi at N ${fmt(chR1(Math.atan2(d2, d1) / D2R))}° E`, `${fmt(d1 + d2)} mi at N ${fmt(chR1(brg))}° E`, `${fmt(chR1(dist))} mi at N ${fmt(chR1(th + Math.atan2(d1, d2) / D2R))}° E`, `${fmt(chR1(dist))} mi at S ${fmt(chR1(brg))}° E`].filter((w) => w !== disp), (i) => `${fmt(chR1(dist + i + 1))} mi at N ${fmt(chR1(brg))}° E`),
+      fr: chNums([{ label: 'Distance (mi):', val: dist, tol: 0.06 / dist, key: String(chR1(dist)) }, { label: 'Bearing: N ___° E', val: brg, tol: 0.06 / brg, key: String(chR1(brg)) }], disp),
+      solution: `The two legs meet at a right angle, so they form a right triangle with the path back to port.\nDistance = √(${d1}² + ${d2}²) ≈ ${fmt(chR1(dist))} mi\nAngle at port between the first leg and the line to the ship: arctan(${d2}/${d1}) ≈ ${fmt(chR1(Math.atan2(d2, d1) / D2R))}°\nBearing: N (${th}° + ${fmt(chR1(Math.atan2(d2, d1) / D2R))}°) E ≈ N ${fmt(chR1(brg))}° E` };
+  }
+};
+
+/* ---------- Algebra I chapter 4 ---------- */
+/* 4.1: a linear model from two data points, then the starting value and a prediction */
+TEMPLATES.a41Challenge = (r) => {
+  for (;;) {
+    const m = pick(r, [15, 20, 25, 30, 35, 40, 45]), b = 5 * ri(r, 4, 30), t1 = ri(r, 2, 5), t2 = t1 + ri(r, 3, 6), t3 = t2 + ri(r, 2, 8), item = pick(r, [['gym membership', 'months'], ['phone plan', 'months'], ['music lesson package', 'lessons'], ['bowling league', 'weeks']]);
+    const c1 = m * t1 + b, c2 = m * t2 + b, c3 = m * t3 + b;
+    return { topic: 'Challenge: linear model from two data points', stem: `The total cost of a ${item[0]} is a linear function of the number of ${item[1]}. After ${t1} ${item[1]}, you have paid $${c1}. After ${t2} ${item[1]}, you have paid $${c2}. What is the one-time starting fee, and what is the total cost after ${t3} ${item[1]}?`,
+      ...chPairChoices(r, b, c3, 'fee', 'total', [[0, m * t3], [b, c2 + m * (t3 - t2) * 2], [c1 - m, c3], [b, (c2 / t2) * t3]].filter(([u, v]) => Number.isInteger(u) && Number.isInteger(v))),
+      fr: chNums([{ label: 'Starting fee ($):', val: b }, { label: `Total after ${t3} ${item[1]} ($):`, val: c3 }], `fee $${b}, total $${c3}`),
+      solution: `Slope (cost per ${item[1].replace(/s$/, '')}): (${c2} − ${c1})/(${t2} − ${t1}) = ${m}\nSubstitute a point: ${c1} = ${m}(${t1}) + b  →  b = ${b} (the starting fee)\ny = ${m}x + ${b};  after ${t3}: ${m}(${t3}) + ${b} = $${c3}` };
+  }
+};
+/* 4.2: both intercepts of the line through two points */
+TEMPLATES.a42Challenge = (r) => {
+  for (;;) {
+    const P = [nz(r, -6, 6), nz(r, -6, 6)], Q = [nz(r, -6, 6), nz(r, -6, 6)]; if (P[0] === Q[0] || P[1] === Q[1]) continue;
+    const m = (Q[1] - P[1]) / (Q[0] - P[0]), b = P[1] - m * P[0], xi = -b / m; if (!fracParts(b) || !fracParts(xi) || !b || Number.isInteger(m) && Number.isInteger(xi) && r() < 0.6) continue;
+    const disp = `x-intercept ${fracT(xi)}, y-intercept ${fracT(b)}`;
+    return { topic: 'Challenge: both intercepts', stem: `A line passes through ${ptT(P)} and ${ptT(Q)}. Find its x-intercept and its y-intercept.`,
+      ...buildChoices(r, disp, [`x-intercept ${fracT(b)}, y-intercept ${fracT(xi)}`, `x-intercept ${fracT(-xi)}, y-intercept ${fracT(b)}`, `x-intercept ${fracT(xi)}, y-intercept ${fracT(P[1] + m * P[0])}`, `x-intercept ${fracT(b / m)}, y-intercept ${fracT(-b)}`].filter((w) => w !== disp), (i) => `x-intercept ${fracT(xi + i + 1)}, y-intercept ${fracT(b)}`),
+      fr: chNums([{ label: 'x-intercept:', val: xi }, { label: 'y-intercept:', val: b }], disp),
+      solution: `Slope: m = (${fmt(Q[1])} − ${chP(P[1])})/(${fmt(Q[0])} − ${chP(P[0])}) = ${fracT(m)}\nPoint-slope form: ${chMinus(P[1], 'y')} = ${chK(m)}(${chMinus(P[0])})\ny-intercept (x = 0): y = ${fracT(b)}\nx-intercept (y = 0): 0 = ${chCo(m)}x ${b < 0 ? MINUS : '+'} ${fracT(Math.abs(b))}  →  x = ${fracT(xi)}` };
+  }
+};
+/* 4.3: count the whole-number solutions of Ax + By = C */
+TEMPLATES.a43Challenge = (r) => {
+  for (;;) {
+    const A = pick(r, [2, 3, 4, 5, 6, 8]), B = pick(r, [3, 4, 5, 6, 7, 9, 10]); if (A === B) continue;
+    const C = A * B * ri(r, 1, 3) + pick(r, [0, A, B, 2 * A]); const sols = []; for (let x = 0; x * A <= C; x++) if ((C - A * x) % B === 0) sols.push([x, (C - A * x) / B]);
+    if (sols.length < 2 || sols.length > 9) continue;
+    const it = pick(r, [['adult tickets', 'student tickets'], ['large bags', 'small bags'], ['pizzas', 'salads'], ['shirts', 'hats']]);
+    return { topic: 'Challenge: whole-number combinations', stem: `${it[0][0].toUpperCase() + it[0].slice(1)} cost $${A} each and ${it[1]} cost $${B} each. You spend exactly $${C}. Write an equation in standard form, and find how many different combinations of whole numbers of ${it[0]} (x) and ${it[1]} (y) are possible.`,
+      ...buildChoices(r, `${A}x + ${B}y = ${C}; ${sols.length} combinations`, [`${A}x + ${B}y = ${C}; ${sols.length - 1} combinations`, `${A}x + ${B}y = ${C}; ${sols.length + 1} combinations`, `${B}x + ${A}y = ${C}; ${sols.length} combinations`, `${A}x + ${B}y = ${C}; ${Math.floor(C / A) + 1} combinations`].filter((w, i, X) => X.indexOf(w) === i), (i) => `${A}x + ${B}y = ${C}; ${sols.length + i + 2} combinations`),
+      fr: chNums([{ label: 'Number of combinations:', val: sols.length }], `${A}x + ${B}y = ${C}; ${sols.length} combinations`),
+      solution: `Equation: ${A}x + ${B}y = ${C}\nTry each whole number x from 0 up; y = (${C} − ${A}x)/${B} must be a whole number:\n${sols.map(([x, y]) => `x = ${x}, y = ${y}`).join(';  ')}\nThat is ${sols.length} combinations. (Graphing the line and counting lattice points gives the same list.)` };
+  }
+};
+/* 4.4: a missing coordinate that makes two lines perpendicular (or parallel) */
+TEMPLATES.a44Challenge = (r) => {
+  for (;;) {
+    const A = nz(r, -5, 5), B = nz(r, -5, 5), C = ri(r, -12, 12), perp = r() < 0.6, m = -A / B, need = perp ? B / A : m;
+    const P = [ri(r, -6, 6), ri(r, -6, 6)], y2 = ri(r, -8, 8), dy = y2 - P[1]; if (!dy) continue;
+    const a = P[0] + dy / need; if (!fracParts(a) || a === P[0]) continue;
+    const eq = `${fmt(A)}x ${B < 0 ? MINUS : '+'} ${Math.abs(B) === 1 ? '' : Math.abs(B)}y = ${fmt(C)}`.replace(/^1x/, 'x').replace(/^−1x/, MINUS + 'x');
+    return { topic: `Challenge: make the lines ${perp ? 'perpendicular' : 'parallel'}`, stem: `Find the value of a so that the line through ${ptT(P)} and (a, ${fmt(y2)}) is ${perp ? 'perpendicular' : 'parallel'} to the line ${eq}.`,
+      ...buildChoices(r, fracT(a), [...new Set([fracT(P[0] + dy / m), fracT(P[0] - dy / need), fracT(P[0] + dy * need), fracT(-a)])].filter((w) => w !== fracT(a)), (i) => fracT(a + i + 1)),
+      fr: chNums([{ label: 'a =', val: a }], fracT(a)),
+      solution: `Slope of ${eq}: solve for y → m = ${fracT(m)}.\nA ${perp ? 'perpendicular line has the negative reciprocal slope' : 'parallel line has the same slope'}: ${fracT(need)}\nSlope through the two points: (${fmt(y2)} − ${chP(P[1])})/(${chMinus(P[0], 'a')}) = ${fracT(need)}\n${fmt(dy)} = ${chCo(need)}(${chMinus(P[0], 'a')})  →  a = ${fracT(a)}` };
+  }
+};
+/* 4.5: use a line of fit backwards (solve for x) */
+TEMPLATES.a45Challenge = (r) => {
+  for (;;) {
+    const m = pick(r, [1.5, 2, 2.5, 3, 3.5, 4, 0.5]), b = ri(r, 5, 40), x1 = ri(r, 1, 4), x2 = x1 + ri(r, 3, 6), Y = Math.round(b + m * (x2 + ri(r, 3, 15))) + 0.5 * (r() < 0.3 ? 1 : 0);
+    const X = (Y - b) / m; if (!fracParts(X) && Math.abs(X * 10 - Math.round(X * 10)) > 1e-9) continue;
+    const y1 = b + m * x1, y2 = b + m * x2, ctx = pick(r, [['weeks', 'height of a plant (cm)'], ['hours of practice', 'points scored'], ['months', 'subscribers (thousands)']]);
+    const Xr = Math.round(X * 10) / 10;
+    return { topic: 'Challenge: a line of fit, backwards', stem: `A line of fit for some data passes through (${x1}, ${fmt(y1)}) and (${x2}, ${fmt(y2)}), where x is ${ctx[0]} and y is ${ctx[1]}. Write the equation of the line, and use it to predict x when y = ${fmt(Y)}. Round to the nearest tenth if needed.`,
+      ...buildChoices(r, `y = ${fmt(m)}x + ${fmt(b)};  x ≈ ${fmt(Xr)}`, [`y = ${fmt(m)}x + ${fmt(b)};  x ≈ ${fmt(Math.round((m * Y + b) * 10) / 10)}`, `y = ${fmt(m)}x + ${fmt(b)};  x ≈ ${fmt(Math.round(Y / m * 10) / 10)}`, `y = ${fmt(1 / m)}x + ${fmt(b)};  x ≈ ${fmt(Xr)}`, `y = ${fmt(m)}x + ${fmt(y1)};  x ≈ ${fmt(Math.round((Y - y1) / m * 10) / 10)}`].filter((w, i, A) => A.indexOf(w) === i), (i) => `y = ${fmt(m)}x + ${fmt(b)};  x ≈ ${fmt(Xr + i + 1)}`),
+      fr: chNums([{ label: 'Slope:', val: m }, { label: 'y-intercept:', val: b }, { label: 'x ≈', val: X, tol: 0.06 / Math.max(1, X), key: String(Xr) }], `y = ${fmt(m)}x + ${fmt(b)};  x ≈ ${fmt(Xr)}`),
+      solution: `Slope: (${fmt(y2)} − ${fmt(y1)})/(${x2} − ${x1}) = ${fmt(m)}\ny-intercept: ${fmt(y1)} = ${fmt(m)}(${x1}) + b  →  b = ${fmt(b)}\nSet y = ${fmt(Y)}: ${fmt(Y)} = ${fmt(m)}x + ${fmt(b)}  →  x = ${fmt(Y - b)}/${fmt(m)} ≈ ${fmt(Xr)}` };
+  }
+};
+/* 4.6: residuals for a whole data set — the sum and the largest one */
+TEMPLATES.a46Challenge = (r) => {
+  for (;;) {
+    const m = pick(r, [1.5, 2, 2.5, 3, 0.5]), b = ri(r, 1, 10), xs = [1, 2, 3, 4, 5], noise = xs.map(() => pick(r, [-1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, -2]));
+    const ys = xs.map((x, i) => b + m * x + noise[i]), res = noise, sum = res.reduce((s, v) => s + v, 0), big = Math.max(...res.map(Math.abs)); if (res.filter((v) => Math.abs(v) === big).length > 1) continue;
+    const bi = res.findIndex((v) => Math.abs(v) === big), disp = `sum ${fmt(sum)}; largest at x = ${xs[bi]} (residual ${fmt(res[bi])})`;
+    return { topic: 'Challenge: residuals for a data set', stem: `A line of fit for the data is y = ${fmt(m)}x + ${b}.   x: ${xs.join(', ')}     y: ${ys.map(fmt).join(', ')}\nFind the sum of the residuals, and find the x-value of the point with the residual farthest from 0 (and that residual).`,
+      ...buildChoices(r, disp, [`sum ${fmt(-sum)}; largest at x = ${xs[bi]} (residual ${fmt(-res[bi])})`, `sum ${fmt(sum)}; largest at x = ${xs[(bi + 1) % 5]} (residual ${fmt(res[(bi + 1) % 5])})`, `sum ${fmt(res.reduce((s, v) => s + Math.abs(v), 0))}; largest at x = ${xs[bi]} (residual ${fmt(res[bi])})`].filter((w) => w !== disp), (i) => `sum ${fmt(sum + 0.5 * (i + 1))}; largest at x = ${xs[bi]} (residual ${fmt(res[bi])})`),
+      fr: chNums([{ label: 'Sum of the residuals:', val: sum }, { label: 'x-value of the farthest point:', val: xs[bi] }, { label: 'Its residual:', val: res[bi] }], disp),
+      solution: `Residual = actual y − predicted y.\nPredicted: ${xs.map((x) => fmt(b + m * x)).join(', ')}\nResiduals: ${res.map(fmt).join(', ')}\nSum: ${fmt(sum)}.   Farthest from 0: ${fmt(res[bi])} at x = ${xs[bi]}.` };
+  }
+};
+
+/* ---------- Algebra II chapter 3 ---------- */
+/* 3.1: rectangle dimensions from its area (factor ax² + bx + c) */
+TEMPLATES.b31Challenge = (r) => {
+  for (;;) {
+    const k = pick(r, [2, 3]), c = ri(r, -4, 7), w = ri(r, 3, 15), L = k * w + c, A = w * L; if (L <= 0 || c === 0) continue;
+    const obj = pick(r, ['garden', 'patio', 'poster', 'rug']);
+    return { topic: 'Challenge: dimensions from the area', stem: `The length of a rectangular ${obj} is ${Math.abs(c)} feet ${c > 0 ? 'more' : 'less'} than ${k === 2 ? 'twice' : 'three times'} its width. Its area is ${A} square feet. Find the width and the length.`,
+      ...chPairChoices(r, w, L, 'width', 'length', [[L, w], [w, k * w - c], [w + 1, L - k]]),
+      fr: chNums([{ label: 'Width (ft):', val: w }, { label: 'Length (ft):', val: L }], `width ${w} ft, length ${L} ft`),
+      solution: `Let w = width. Then length = ${g4Lin(k, c, 'w')}.\nw(${g4Lin(k, c, 'w')}) = ${A}  →  ${k}w² ${c < 0 ? MINUS : '+'} ${Math.abs(c)}w − ${A} = 0\nFactor: (w − ${w})(${k}w ${A / w < 0 ? MINUS : '+'} ${A / w}) = 0  →  w = ${w} or w = ${fracT(-A / w / k)}\nA width can’t be negative, so w = ${w} ft and the length is ${L} ft.` };
+  }
+};
+/* 3.2: (ax + b)² = (cx + d)² — difference of two squares */
+TEMPLATES.b32Challenge = (r) => {
+  for (;;) {
+    const a = pick(r, [1, 2, 3]), c = pick(r, [1, 2, 3, 4]), b = ri(r, -8, 8), d = ri(r, -8, 8); if (a === c || (!b && !d)) continue;
+    const z1 = (d - b) / (a - c), z2 = -(b + d) / (a + c); if (z1 === z2) continue;
+    const zs = [z1, z2].sort((p, q) => p - q), S = b3Sol(r, { zeros: zs.map((t) => ({ v: [t, 0] })), text: zs.map(fracT).join(', '), latex: zs.map(fracL).join(','), wrongs: [`x = ${fracT(z1)}`, `x = ${fracT(-z1)}, ${fracT(-z2)}`, `x = ${fracT(z1)}, ${fracT((b + d) / (a + c))}`] });
+    const L = g4Lin(a, b), R = g4Lin(c, d);
+    return { topic: 'Challenge: difference of two squares', stem: `Solve.   (${L})² = (${R})²`, ...S,
+      solution: `Move everything to one side: (${L})² − (${R})² = 0\nDifference of two squares: [(${L}) − (${R})][(${L}) + (${R})] = 0\n(${g4Lin(a - c, b - d)})(${g4Lin(a + c, b + d)}) = 0\nx = ${zs.map(fracT).join(' or x = ')}` };
+  }
+};
+/* 3.3: a uniform border around a rectangle */
+TEMPLATES.b33Challenge = (r) => {
+  for (;;) {
+    const w = 2 * ri(r, 3, 10), l = w + 2 * ri(r, 1, 6), x = pick(r, [1, 1.5, 2, 2.5, 3, 4]), T = (w + 2 * x) * (l + 2 * x); if (!Number.isInteger(T)) continue;
+    const obj = pick(r, [['photo', 'frame'], ['pool', 'deck'], ['painting', 'mat'], ['garden', 'path']]);
+    return { topic: 'Challenge: a uniform border', stem: `A ${w}-inch by ${l}-inch ${obj[0]} has a ${obj[1]} of the same width x all the way around it. The total area of the ${obj[0]} and ${obj[1]} is ${T} square inches. Find x.`,
+      ...buildChoices(r, fmt(x), [fmt(2 * x), fmt((T - w * l) / (2 * (w + l))), fmt(x + 1), fmt(-(w + l) / 2 - x)].filter((v, i, A) => A.indexOf(v) === i && v !== fmt(x)), (i) => fmt(x + 0.5 * (i + 3))),
+      fr: chNums([{ label: 'x =', val: x }], `${fmt(x)} in.`),
+      solution: `With the border, the dimensions are (${w} + 2x) and (${l} + 2x):\n(${w} + 2x)(${l} + 2x) = ${T}  →  4x² + ${2 * (w + l)}x + ${w * l} = ${T}  →  4x² + ${2 * (w + l)}x − ${T - w * l} = 0\nSolve (factor or Quadratic Formula): x = ${fmt(x)} or x = ${fmt(-(w + l) / 2 - x)}\nA width can’t be negative, so x = ${fmt(x)} in.` };
+  }
+};
+/* 3.4: cube a complex number */
+TEMPLATES.b34Challenge = (r) => {
+  const p = nz(r, -3, 3), q = nz(r, -3, 3), sq = [p * p - q * q, 2 * p * q], cu = [sq[0] * p - sq[1] * q, sq[0] * q + sq[1] * p];
+  const zT = chCx(p, q), S = chCxSol(r, 'z³', [cu], [`z³ = ${chCx(p ** 3, q ** 3)}`, `z³ = ${chCx(p ** 3 - q ** 3, 3 * p * q)}`, `z³ = ${chCx(cu[0], -cu[1])}`, `z³ = ${chCx(sq[0], sq[1])}`], 'z³ =');
+  return { topic: 'Challenge: powers of a complex number', stem: `Let z = ${zT}. Find z³ in standard form.`, ...S,
+    solution: `First square: z² = (${zT})² = ${fmt(p * p)} ${2 * p * q < 0 ? MINUS : '+'} ${Math.abs(2 * p * q)}i + ${q * q === 1 ? '' : q * q}i² = ${chCx(sq[0], sq[1])}  (i² = −1)\nThen multiply by z: (${chCx(sq[0], sq[1])})(${zT}) = ${chCx(cu[0], cu[1])}` };
+};
+/* 3.5: complete the square with a leading coefficient, then solve (irrational answers) */
+TEMPLATES.b35Challenge = (r) => {
+  for (;;) {
+    const a = pick(r, [2, 3, 4]), h = ri(r, -4, 4), s = pick(r, [2, 3, 5, 6, 7, 10, 11]), k = pick(r, [1, 2, 3]); // a(x − h)² = k·s... roots h ± √(ks/a)
+    const rad = k * s; if (!h) continue; // a x² − 2ah x + (a h² − rad) = 0  →  (x − h)² = rad/a
+    const B = -2 * a * h, C = a * h * h - rad; if (Number.isInteger(Math.sqrt(rad / a))) continue;
+    const S = b4SolQ(r, [[a, B, C]], 'x');
+    return { topic: 'Challenge: complete the square', stem: `Solve by completing the square.   ${b4T([a, B, C])} = 0`, ...S,
+      solution: `Move the constant: ${b4T([a, B, 0])} = ${fmt(-C)}\nDivide by ${a}: x² ${B / a < 0 ? MINUS : '+'} ${Math.abs(B / a)}x = ${fracT(-C / a)}\nAdd (${fmt(B / a)}/2)² = ${h * h} to both sides: (x ${h < 0 ? '+' : MINUS} ${Math.abs(h)})² = ${fracT(rad / a)}\nTake square roots: x = ${fmt(h)} ± √(${fracT(rad / a)})\nx = ${S.Z.text}` };
+  }
+};
+/* 3.6: values of k that give exactly one real solution */
+TEMPLATES.b36Challenge = (r) => {
+  for (;;) {
+    const kind = pick(r, ['b', 'a']);
+    if (kind === 'b') { // x² + kx + c = 0 with c = n² → k = ±2n (times √a when a ≠ 1)
+      const a = pick(r, [1, 1, 4, 9]), n = ri(r, 1, 7), c = n * n, kv = 2 * Math.sqrt(a) * n, zs = [-kv, kv];
+      const S = b3Sol(r, { v: 'k', zeros: zs.map((t) => ({ v: [t, 0] })), text: zs.map(fmt).join(', '), latex: zs.join(','), wrongs: [`k = ${fmt(kv)}`, `k = ${fmt(-n)}, ${n}`, `k = ${fmt(-c)}, ${c}`, `k = ${fmt(-2 * c)}, ${2 * c}`] });
+      return { topic: 'Challenge: the discriminant with a parameter', stem: `Find every value of k for which ${a === 1 ? '' : a}x² + kx + ${c} = 0 has exactly one real solution.`, ...S,
+        solution: `Exactly one real solution means the discriminant is 0: b² − 4ac = 0\nk² − 4(${a})(${c}) = 0  →  k² = ${4 * a * c}  →  k = ±${fmt(kv)}` };
+    }
+    const b = pick(r, [2, 4, 6, 8, 10, 12]), c = pick(r, [1, 2, 3, 4]), kv = b * b / (4 * c); if (!Number.isInteger(kv * 4)) continue;
+    const S = b3Sol(r, { v: 'k', zeros: [{ v: [kv, 0] }], text: fracT(kv), latex: fracL(kv), wrongs: [`k = ${fracT(-kv)}`, `k = ${fracT(b * b / c)}`, `k = ${fracT(b / (2 * c))}`, `k = ${fracT(-kv)}, ${fracT(kv)}`] });
+    return { topic: 'Challenge: the discriminant with a parameter', stem: `Find the value of k for which kx² − ${b}x + ${c} = 0 has exactly one real solution.`, ...S,
+      solution: `Exactly one real solution means the discriminant is 0: b² − 4ac = 0\n(−${b})² − 4(k)(${c}) = 0  →  ${b * b} = ${4 * c}k  →  k = ${fracT(kv)}` };
+  }
+};
+/* 3.7: a line and a circle */
+TEMPLATES.b37Challenge = (r) => {
+  const R = pick(r, [5, 10, 13, 25]), pairs = { 5: [[3, 4], [4, 3], [5, 0], [0, 5]], 10: [[6, 8], [8, 6], [10, 0], [0, 10]], 13: [[5, 12], [12, 5], [13, 0], [0, 13]], 25: [[7, 24], [24, 7], [15, 20], [20, 15]] }[R];
+  for (;;) {
+    const pts = shuffle(r, pairs.flatMap(([a, b]) => [[a, b], [-a, b], [a, -b], [-a, -b]])).slice(0, 2); const [P, Q] = pts; if (P[0] === Q[0]) continue;
+    const m = (Q[1] - P[1]) / (Q[0] - P[0]), b = P[1] - m * P[0]; if (!Number.isInteger(m) || !Number.isInteger(b) || (P[0] === -Q[0] && P[1] === -Q[1])) continue;
+    const S = [P, Q].sort((u, v) => u[0] - v[0]), line = chLineT(m, b), correct = S.map(ptT).join(', ');
+    return { topic: 'Challenge: a line and a circle', stem: `Solve the system.\nx² + y² = ${R * R}\n${line}`,
+      ...buildChoices(r, correct, [S.map((p) => ptT([p[1], p[0]])).join(', '), ptT(S[0]), S.map((p) => ptT([-p[0], -p[1]])).join(', '), S.map((p, i) => ptT(i ? p : [p[0], -p[1]])).join(', ')].filter((w, i, A) => A.indexOf(w) === i && w !== correct), (i) => S.map((p, j) => ptT(j ? p : [p[0] + i + 1, p[1]])).join(', ')),
+      fr: chPtsFR(S, 'Solutions:'),
+      solution: `Substitute ${line.replace('y = ', 'y = ')} into the circle: x² + (${line.slice(4)})² = ${R * R}\nExpand and simplify: ${b4T([1 + m * m, 2 * m * b, b * b - R * R])} = 0\nSolve: x = ${S.map((p) => fmt(p[0])).join(' or x = ')}, then find y from the line.\nSolutions: ${correct}` };
   }
 };
 
@@ -27160,6 +27486,33 @@ QUESTION_TYPES.push(
   { id: 'b55Challenge', subject: 'algebra2', section: '5.5 Performing Function Operations', label: '★ Challenge: Product of two square-root functions: value and domain', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
   { id: 'b56Challenge', subject: 'algebra2', section: '5.6 Composition of Functions', label: '★ Challenge: Solve f(g(x)) = a value', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
   { id: 'b57Challenge', subject: 'algebra2', section: '5.7 Inverse of a Function', label: '★ Challenge: Values of an inverse', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+);
+QUESTION_TYPES.push(
+  { id: 'g51Challenge', subject: 'geometry', section: '5.1 Angles of Triangles', label: '★ Challenge: Exterior Angle Theorem with algebra', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g52Challenge', subject: 'geometry', section: '5.2 Congruent Polygons', label: '★ Challenge: Corresponding parts give a system in x and y', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g53Challenge', subject: 'geometry', section: '5.3–5.6 Triangle Congruence', label: '★ Challenge: HL with algebra, then the Pythagorean Theorem', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g54Challenge', subject: 'geometry', section: '5.4 Equilateral and Isosceles Triangles', label: '★ Challenge: Isosceles legs give x; find the perimeter', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'p11Challenge', subject: 'precalc', section: '1.1 Radian and Degree Measure', label: '★ Challenge: Two pulleys and a belt', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'p12Challenge', subject: 'precalc', section: '1.2 Trigonometric Functions: The Unit Circle', label: '★ Challenge: Symmetry and periodicity on the unit circle', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'p13Challenge', subject: 'precalc', section: '1.3 Right Triangle Trigonometry', label: '★ Challenge: A tower from two angles of elevation', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'p14Challenge', subject: 'precalc', section: '1.4 Trigonometric Functions of Any Angle', label: '★ Challenge: Reference angles in many quadrants', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'p15Challenge', subject: 'precalc', section: '1.5 Graphs of Sine and Cosine Functions', label: '★ Challenge: Ferris wheel model', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'p16Challenge', subject: 'precalc', section: '1.6 Graphs of Other Trigonometric Functions', label: '★ Challenge: Period and asymptotes of a shifted graph', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'p17Challenge', subject: 'precalc', section: '1.7 Inverse Trigonometric Functions', label: '★ Challenge: Two compositions with inverse functions', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'p18Challenge', subject: 'precalc', section: '1.8 Applications and Models', label: '★ Challenge: Bearings: distance and direction from port', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'a41Challenge', subject: 'algebra1', section: '4.1 Writing Equations in Slope-Intercept Form', label: '★ Challenge: Linear model from two data points', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'a42Challenge', subject: 'algebra1', section: '4.2 Writing Equations in Point-Slope Form', label: '★ Challenge: Both intercepts of a line through two points', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'a43Challenge', subject: 'algebra1', section: '4.3 Writing Equations in Standard Form', label: '★ Challenge: Count the whole-number combinations', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'a44Challenge', subject: 'algebra1', section: '4.4 Writing Equations of Parallel and Perpendicular Lines', label: '★ Challenge: Find a so the lines are parallel or perpendicular', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'a45Challenge', subject: 'algebra1', section: '4.5 Scatter Plots and Lines of Fit', label: '★ Challenge: Use a line of fit backwards', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'a46Challenge', subject: 'algebra1', section: '4.6 Analyzing Lines of Fit', label: '★ Challenge: Residuals for a whole data set', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b31Challenge', subject: 'algebra2', section: '3.1 Factoring ax² + bx + c', label: '★ Challenge: Rectangle dimensions from its area', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b32Challenge', subject: 'algebra2', section: '3.2 Factoring Special Products', label: '★ Challenge: (ax + b)² = (cx + d)²', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b33Challenge', subject: 'algebra2', section: '3.3 Solving Quadratic Equations', label: '★ Challenge: A uniform border', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b34Challenge', subject: 'algebra2', section: '3.4 Complex Numbers', label: '★ Challenge: Cube a complex number', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b35Challenge', subject: 'algebra2', section: '3.5 Completing the Square', label: '★ Challenge: Complete the square with a leading coefficient', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b36Challenge', subject: 'algebra2', section: '3.6 Using the Quadratic Formula', label: '★ Challenge: Values of k for exactly one solution', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b37Challenge', subject: 'algebra2', section: '3.7 Solving Nonlinear Systems of Equations', label: '★ Challenge: A line and a circle', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
 );
 ['g64Backward', 'g65AlgSides', 'trigProveHard'].forEach((id) => { const t = QUESTION_TYPES.find((x) => x.id === id); if (t) { t.challenge = true; if (!t.label.startsWith('★')) t.label = '★ Challenge: ' + t.label; } });
 // keep each section's types together (types added later, like the challenges, join their section instead of starting a second copy of it)
