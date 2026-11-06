@@ -97,6 +97,12 @@
   .status.ok { background: var(--good-soft); color: var(--good); }
   .status.fail { background: var(--bad-soft); color: var(--bad); }
   .status.wait { background: var(--accent-soft); color: var(--accent); }
+  .helpbox { background: #f2f6fb; border: 1px solid #c6d6ea; border-radius: 10px; padding: 10px 14px 12px; margin: 8px 0 6px; }
+  .helpbox.notes { background: #f6f8f1; border-color: #cfdcb8; }
+  .helphead { font-weight: 700; color: #1f5fa8; margin-bottom: 4px; }
+  .helpbox.notes .helphead { color: #4d6b1f; }
+  .helpex { border-top: 1px dashed #cfdcb8; padding-top: 8px; margin-top: 8px; }
+  .btn.secondary.on { background: #e8f0fb; }
   .prevtry { background: #fbf3f2; border: 1px solid #e6c4bf; border-radius: 10px; padding: 10px 14px 12px; margin: 8px 0 6px; }
   .prevtry canvas { max-width: 100%; height: auto; display: block; margin: 6px 0; opacity: 0.92; }
   .prevhead { font-weight: 700; color: #a33a2c; font-size: 15px; margin-bottom: 6px; }
@@ -274,7 +280,8 @@ const CONFIG = {
   // Usually set per assignment instead: same: true in SETS, or the builder's "Same questions for everyone" box.
   SAME_FOR_EVERYONE: false,
   // HINTS = true puts a Hint button on every question in every assignment. Usually set per assignment instead:
-  // hints: true in SETS, or the builder's "Hints" box. Using a hint never changes the score; the gradebook detail shows (hint).
+  // hints: true in SETS, or the builder's "Homework help" box. Help = Hint, Worked example (a twin problem solved step by step),
+  // and Notes (the section's lesson-plan notes and class examples). Help never changes the score; the gradebook detail shows (hint) / (example).
   HINTS: false,
   // DESMOS = true puts a Desmos graphing calculator button on every assignment. Usually set per assignment instead:
   // desmos: true in SETS, or the builder's "Desmos calculator" box. Students open it beside the questions; it is never graded.
@@ -26499,10 +26506,10 @@ function pMergeSaved(A, B, strict = false) { // strict: never refill an answer t
     // a retry clears the answer and makes a new version of the question: an answer saved for an older version doesn't belong
     const sameVersion = ((A.tries || {})[i] || 0) === ((B.tries || {})[i] || 0) && !(A.status || {})[i] && !(strict && ((A.tries || {})[i] || 0) > 0);
     // only fill a question this device never touched (null); an answer the student erased here stays erased
-    if ((a === null || a === undefined || a === '') && !pBlank(b) && sameVersion) { out.answers[i] = b; added++; ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (B[f] && B[f][i] !== undefined) { out[f] = out[f] || {}; out[f][i] = B[f][i]; } }); }
+    if ((a === null || a === undefined || a === '') && !pBlank(b) && sameVersion) { out.answers[i] = b; added++; ['tries', 'status', 'history', 'ai', 'hintUsed', 'exUsed'].forEach((f) => { if (B[f] && B[f][i] !== undefined) { out[f] = out[f] || {}; out[f][i] = B[f][i]; } }); }
     else out.answers[i] = a === undefined ? null : a;
   }
-  ['tries', 'status', 'history', 'hintUsed'].forEach((f) => { if (B[f]) Object.keys(B[f]).forEach((i) => { out[f] = out[f] || {}; if (out[f][i] === undefined) out[f][i] = B[f][i]; }); });
+  ['tries', 'status', 'history', 'hintUsed', 'exUsed'].forEach((f) => { if (B[f]) Object.keys(B[f]).forEach((i) => { out[f] = out[f] || {}; if (out[f][i] === undefined) out[f][i] = B[f][i]; }); });
   if (B.started && (!out.started || B.started < out.started)) out.started = B.started;
   out.tabAways = Math.max(A.tabAways || 0, B.tabAways || 0);
   out._added = added;
@@ -26871,7 +26878,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
     } catch {}
   });
   const ps = !teacher && rid ? signinPass() : null;
-  state = { origQs, setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, checks: Math.max(1, Math.floor(+setting(setKey, 'checks') || 1)), misses: (!teacher && saved.misses) || {}, fresh: {}, teacher, hints: !!setting(setKey, 'hints'), desmos: !!setting(setKey, 'desmos') && !!CONFIG.DESMOS_KEY, hintUsed: saved.hintUsed || {},
+  state = { origQs, setKey, period, name, rid, token: ps && ps.rid === rid ? ps.token : null, qs, sig, version, seedStr, key, base, meta, attempt, attempts, retries, checks: Math.max(1, Math.floor(+setting(setKey, 'checks') || 1)), misses: (!teacher && saved.misses) || {}, fresh: {}, teacher, hints: !!setting(setKey, 'hints'), desmos: !!setting(setKey, 'desmos') && !!CONFIG.DESMOS_KEY, hintUsed: saved.hintUsed || {}, exUsed: saved.exUsed || {},
     answers: Array.from({ length: qs.length }, (_, i) => (carried[i] ? carried[i].a : saved.answers && saved.answers[i] !== undefined ? saved.answers[i] : null)),
     submitted: !teacher && saved.submitted ? saved.submitted : null,
     started: saved.started || Date.now(), tabAways: saved.tabAways || 0,
@@ -26886,7 +26893,7 @@ function saveState() {
   if (state.teacher) return;
   const saved = store.get(state.key) || {};
   store.set(state.key, { ...saved, answers: state.answers, started: state.started, tabAways: state.tabAways,
-    tries: state.tries, status: state.status, history: state.history, submitted: state.submitted, ai: state.ai, hintUsed: state.hintUsed, sig: state.sig,
+    tries: state.tries, status: state.status, history: state.history, submitted: state.submitted, ai: state.ai, hintUsed: state.hintUsed, exUsed: state.exUsed, sig: state.sig,
     frozen: state.frozen, leaveBase: state.leaveBase, unlocks: state.unlocks, misses: state.misses });
 }
 // fingerprint of a question (before any retries), so saved work follows its question if the assignment is edited
@@ -26900,10 +26907,10 @@ function remapSaved(key, saved, sig) {
   const byIdx = (obj) => { if (!obj) return obj; const out = {}; map.forEach((j, i) => { if (j >= 0 && obj[j] !== undefined) out[i] = obj[j]; }); return out; };
   // work on questions that no longer exist is kept aside (not deleted), so it comes back if those questions return
   const orph = { ...(saved.orphans || {}) };
-  old.forEach((g, j) => { if (!used.has(j) && saved.answers && saved.answers[j] != null) orph[g] = { a: saved.answers[j], ...Object.fromEntries(['tries', 'status', 'history', 'ai', 'hintUsed'].filter((f) => saved[f] && saved[f][j] !== undefined).map((f) => [f, saved[f][j]])) }; });
+  old.forEach((g, j) => { if (!used.has(j) && saved.answers && saved.answers[j] != null) orph[g] = { a: saved.answers[j], ...Object.fromEntries(['tries', 'status', 'history', 'ai', 'hintUsed', 'exUsed'].filter((f) => saved[f] && saved[f][j] !== undefined).map((f) => [f, saved[f][j]])) }; });
   saved.answers = map.map((j) => (j >= 0 && saved.answers ? saved.answers[j] ?? null : null));
-  ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (saved[f]) saved[f] = byIdx(saved[f]); });
-  sig.forEach((g, i) => { const o = orph[g]; if (map[i] < 0 && o) { saved.answers[i] = o.a; ['tries', 'status', 'history', 'ai', 'hintUsed'].forEach((f) => { if (o[f] !== undefined) { saved[f] = saved[f] || {}; saved[f][i] = o[f]; } }); delete orph[g]; } });
+  ['tries', 'status', 'history', 'ai', 'hintUsed', 'exUsed'].forEach((f) => { if (saved[f]) saved[f] = byIdx(saved[f]); });
+  sig.forEach((g, i) => { const o = orph[g]; if (map[i] < 0 && o) { saved.answers[i] = o.a; ['tries', 'status', 'history', 'ai', 'hintUsed', 'exUsed'].forEach((f) => { if (o[f] !== undefined) { saved[f] = saved[f] || {}; saved[f][i] = o[f]; } }); delete orph[g]; } });
   const ok = Object.keys(orph).slice(-60); saved.orphans = Object.fromEntries(ok.map((g) => [g, orph[g]]));
   saved.sig = sig;
   const work = store.get(key + ':work'); if (work) store.set(key + ':work', byIdx(work));
@@ -26952,7 +26959,7 @@ function render() {
       q.draw(cv); box.append(drawable(cv, String(i), { readOnly: !!submitted || !!teacher || locked }));
     }
     const showSol = ((submitted || locked) && CONFIG.SHOW_SOLUTIONS) || teacher;
-    if (state.hints) box.append(hintBar(q, i));
+    if (state.hints) box.append(hintBar(q, i), helpPanel(q, i));
     if (q.mode === 'fr') { box.append(frArea(q, i)); box.append(checkBar(q, i)); if (!teacher && !q.proofQ) box.append(workArea(q, i)); if (showSol) box.append(solNode(q.solution)); app.append(box); return; }
     const ch = el('div', { class: 'choices' });
     q.choices.forEach((c, j) => {
@@ -27414,7 +27421,81 @@ function hintBar(q, i) {
     b.addEventListener('click', () => { state.hintUsed[i] = true; saveState(); rerenderAt(i); });
     bar.append(b);
   }
+  // homework help: a worked twin problem, and the section's notes from the lesson plan
+  if (!state.submitted) {
+    const H = HELP[i] || {}, sm = 'margin:0 0 0 8px;padding:6px 14px;font-size:14px';
+    const row = el('span', { style: 'display:inline-flex;gap:0;flex-wrap:wrap;vertical-align:middle' });
+    if (twinable(q)) row.append(el('button', { class: 'btn secondary' + (H.ex ? ' on' : ''), type: 'button', style: sm, title: 'See a problem like this one solved step by step',
+      onclick: () => { const h = (HELP[i] = HELP[i] || {}); if (h.ex) { h.ex = 0; } else { h.ex = (h.n || 0) + 1; h.n = h.ex; h.step = 0; if (!state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } } rerenderAt(i); } }, H.ex ? '📘 Hide example' : '📘 Worked example'));
+    if (lessonFor(q.tpl)) row.append(el('button', { class: 'btn secondary', type: 'button', style: sm, title: 'Review the notes and class examples for this section',
+      onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.notes = !h.notes; rerenderAt(i); } }, H.notes ? '📖 Hide notes' : '📖 Notes'));
+    if (row.childNodes.length) bar.append(row);
+  }
   return bar;
+}
+/* ---------- homework help: worked twin problems and lesson notes (no AI; everything comes from the question types and lesson plans) ---------- */
+const HELP = {}; // per question on this page: { ex: which twin is showing (0 = hidden), n: twins seen, step: steps shown, notes: notes open }
+const twinable = (q) => !!(q && q.tpl && TEMPLATES[q.tpl] && q.solution);
+// a problem of the same type and format with different numbers (never the student's own question or one of its retry versions)
+function twinOf(q, i, n) {
+  const own = unM(q.stem);
+  for (let k = 0; k < 8; k++) {
+    try {
+      const t = applyMode(TEMPLATES[q.tpl](mulberry32(cyrb53(`${state.seedStr}|q${i}|twin${n}|${k}`))), q.fmt);
+      if (t && unM(t.stem) !== own && t.solution) return t;
+    } catch (e) {}
+  }
+  return null;
+}
+// the lesson plan for a question type's section (the full plan, not a shorter alternate)
+function lessonFor(tpl) {
+  const t = QUESTION_TYPES.find((x) => x.id === tpl); if (!t) return null;
+  return Object.keys(LESSONS).find((k) => !LESSONS[k].base && SETS[k] && !SETS[k].custom && SETS[k].subject === t.subject && SETS[k].title === t.section) || null;
+}
+function helpPanel(q, i) {
+  const H = HELP[i], wrap = el('div', {}); if (!H || state.submitted) return wrap;
+  const W = contentWidth();
+  if (H.ex) {
+    const t = twinOf(q, i, H.ex), box = el('div', { class: 'helpbox' });
+    if (!t) box.append(el('div', { class: 'small' }, 'No worked example is available for this question.'));
+    else {
+      const lines = String(t.solution).split('\n').filter((l) => l.trim()), shown = Math.min(lines.length, (H.step || 0) + 1), done = shown >= lines.length;
+      box.append(el('div', { class: 'helphead' }, '📘 A problem like yours, worked out (different numbers)'), textCanvas(t.stem, W - 34));
+      if (t.draw) { const cv = t.size ? makeCanvas(Math.min(t.size[0], W - 40), Math.round(t.size[1] * Math.min(1, (W - 40) / t.size[0]))) : makeCanvas(Math.min(560, W - 40), 300); try { t.draw(cv); box.append(cv); } catch (e) {} }
+      if (t.mode !== 'fr' && t.choices) box.append(el('div', { class: 'small', style: 'margin:4px 0' }, 'Choices: ', t.choices.map((c, j) => `${LETTERS[j]}. ${unM(c)}`).join('     ')));
+      box.append(el('div', { class: 'helpsteps' }, solNode(lines.slice(0, shown).join('\n'))));
+      const ans = t.mode === 'fr' ? (t.proofQ ? '' : t.fr && t.fr.display) : `${LETTERS[t.answer]}. ${t.choices[t.answer]}`;
+      if (done && ans) box.append(el('div', { class: 'small prevans' }, 'Answer to this example: ', el('strong', { class: 'prevright' }, String(unM(ans)).replace(/(.)\u0305/g, '$1'))));
+      const btns = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' });
+      if (!done) btns.append(el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: () => { H.step = shown; rerenderAt(i); } }, `Next step ▸ (${shown} of ${lines.length})`));
+      else btns.append(el('span', { class: 'small', style: 'align-self:center' }, 'Now try your question the same way.'));
+      btns.append(el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { H.n = (H.n || 0) + 1; H.ex = H.n; H.step = 0; rerenderAt(i); } }, '🔄 Another example'));
+      box.append(btns);
+    }
+    wrap.append(box);
+  }
+  if (H.notes) {
+    const k = lessonFor(q.tpl), L = k && LESSONS[k], box = el('div', { class: 'helpbox notes' });
+    if (L) {
+      const show = L.steps.flatMap((s) => s.show || []), ex = show.filter((x) => /^Example/.test(x.label));
+      const notes = L.steps.filter((s) => (s.show || []).some((x) => /^Example/.test(x.label))).flatMap((s) => s.show).filter((x) => !/^(Example|Is it)/.test(x.label));
+      const fig = (f) => { if (!f || !f.figure) return null; try { const sz = f.figure.size || [400, 300], sc = Math.min(1, (W - 40) / sz[0]), cv = makeCanvas(Math.round(sz[0] * sc), Math.round(sz[1] * sc)); lpFigDraw(f.figure)(cv); return cv; } catch (e) { return null; } };
+      box.append(el('div', { class: 'helphead' }, `📖 Notes: ${SETS[k].title}`));
+      notes.forEach((x) => { box.append(el('div', { style: 'font-weight:700;margin:6px 0 2px' }, x.fixed.topic || x.label), textCanvas(x.fixed.stem, W - 34)); const c = fig(x.fixed); if (c) box.append(c); });
+      if (ex.length) {
+        box.append(el('div', { style: 'font-weight:700;margin:12px 0 2px' }, 'Examples from class'));
+        ex.forEach((x, j) => {
+          const open = H.open && H.open[j], one = el('div', { class: 'helpex' }, el('div', { class: 'small', style: 'font-weight:700' }, `${x.label} · ${x.fixed.topic || ''}`), textCanvas(x.fixed.stem, W - 50));
+          const c = fig(x.fixed); if (c) one.append(c);
+          if (open) { const f = x.fixed, a = f.choices ? `${LETTERS[f.answer]}. ${f.choices[f.answer]}` : f.display; if (a) one.append(el('div', { class: 'small prevans' }, 'Answer: ', el('strong', { class: 'prevright' }, a))); if (f.solution) one.append(solNode(f.solution)); }
+          one.append(el('button', { class: 'btn secondary', type: 'button', style: 'margin:6px 0 0;padding:4px 12px;font-size:13px', onclick: () => { H.open = H.open || {}; H.open[j] = !open; rerenderAt(i); } }, open ? 'Hide the solution' : 'Show how'));
+          box.append(one);
+        });
+      }
+    }
+    wrap.append(box);
+  }
+  return wrap;
 }
 /* ---------- per-question Check button and retries ---------- */
 // how many Checks a question gets on one version before new numbers (multiple choice: always 1)
@@ -27610,7 +27691,7 @@ async function send(pts) {
     set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, subject: SUBJECTS[SETS[state.setKey].subject] || '', setTitle: SETS[state.setKey].title, period: state.period, name: state.name,
     score: sub.score, total: sub.total, percent: Math.round((100 * sub.score) / sub.total),
     detail: state.qs.map((q, i) => { const a = state.answers[i];
-      const tr = (state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '') + (state.hintUsed && state.hintUsed[i] ? '(hint)' : '') + (q.bonus ? '(bonus)' : '');
+      const tr = (state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '') + (state.hintUsed && state.hintUsed[i] ? '(hint)' : '') + (state.exUsed && state.exUsed[i] ? '(example)' : '') + (q.bonus ? '(bonus)' : '');
       if (pts[i] === 1) return `${i + 1}✓${tr}` + (q.proofQ && state.ai[i] && state.ai[i].ai ? '(AI)' : '');
       if (!isAnswered(q, a)) return `${i + 1}✗${tr}–`;
       const part = pts[i] > 0 ? `(${Math.round(100 * pts[i]) / 100} pt)` : ''; // exact partial credit, so a teacher override adds the right amount
@@ -27845,7 +27926,7 @@ function parseDetail(s) {
   const out = [], re = /(?:^|\s)(\d+)([✓✗½])/g; let m; const idx = [];
   while ((m = re.exec(s))) idx.push({ n: +m[1], mark: m[2], at: m.index });
   idx.forEach((x, k) => { const seg = s.slice(x.at, k + 1 < idx.length ? idx[k + 1].at : s.length);
-    out.push({ n: x.n, pts: x.mark === '✓' ? 1 : x.mark === '½' ? 0.5 : 0, hint: seg.includes('(hint)'), bonus: seg.includes('(bonus)'), blank: /✗(\([^)]*\))*–/.test(seg), teacher: seg.includes('(teacher✓'), seg: seg.replace(/\s·\slocked.*$/, '').trim() }); });
+    out.push({ n: x.n, pts: x.mark === '✓' ? 1 : x.mark === '½' ? 0.5 : 0, hint: seg.includes('(hint)') || seg.includes('(example)'), ex: seg.includes('(example)'), bonus: seg.includes('(bonus)'), blank: /✗(\([^)]*\))*–/.test(seg), teacher: seg.includes('(teacher✓'), seg: seg.replace(/\s·\slocked.*$/, '').trim() }); });
   return out;
 }
 // question number → type name, when the order is the same for everyone
@@ -28116,7 +28197,7 @@ function dashAssignment(a) {
     { k: 'lastT', t: 'Turned in', desc: true, show: (r) => dashDate(r.lastT) },
     { k: 'minutes', t: 'Minutes', desc: true },
     { k: 'away', t: 'Left tab', desc: true, bg: (r) => (r.away >= 3 ? '#fbf1dc' : '') },
-    { k: 'hints', t: 'Hints', desc: true, sort: (r) => parseDetail(r.detail).filter((d) => d.hint).length, show: (r) => parseDetail(r.detail).filter((d) => d.hint).length || '' },
+    { k: 'hints', t: 'Help used', desc: true, sort: (r) => parseDetail(r.detail).filter((d) => d.hint).length, show: (r) => parseDetail(r.detail).filter((d) => d.hint).length || '' },
     { k: 'work', t: 'Work', sort: (r) => (r.work ? 1 : 0), show: (r) => (r.work ? el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'View') : '') },
     { k: 'grade', t: '', sort: () => 0, show: (r) => adjustBtn(r) },
     { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn(r) },
@@ -29460,8 +29541,8 @@ function builder() {
     bonusLab, bonusBox,
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
       el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Unchecked = a different version for each student.')),
-    el('label', {}, 'Hints'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
-      el('span', { class: 'small' }, 'Adds a Hint button to every question (the first step of the solution, with the answer hidden). Hints do not change the score; the gradebook detail marks each question where a hint was used.')),
+    el('label', {}, 'Homework help'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
+      el('span', { class: 'small' }, 'Adds homework help to every question: a Hint (the first step, with the answer hidden), a Worked example (a twin problem with different numbers, solved one step at a time), and Notes (the section’s lesson notes and class examples, when there is a lesson plan). Help never changes the score; the gradebook marks each question where a hint or worked example was used. Leave it off for quizzes and tests.')),
     el('label', {}, 'Desmos calculator'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, desmosIn,
       el('span', { class: 'small' }, 'Adds a Desmos button at the bottom of the assignment. It opens the Desmos graphing calculator beside the questions (it is never graded).')),
     el('label', {}, 'Share the work Doc'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, shareIn,
