@@ -162,6 +162,16 @@
   .lp-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
   .lp-h { font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6b6b66); margin: 18px 0 4px; }
   .lp-ul { margin: 4px 0; padding-left: 22px; line-height: 1.45; }
+  .lp-cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .lp-cmp-head { padding: 8px 0; border-bottom: 2px solid var(--line); }
+  .lp-cmp-cell { border-top: 1px solid var(--line); padding: 10px 0; break-inside: avoid; }
+  .lp-cmp-none { background: repeating-linear-gradient(135deg, #f6f5f1, #f6f5f1 8px, #efede7 8px, #efede7 16px); display: flex; align-items: center; justify-content: center; border-radius: 6px; margin: 6px 0; }
+  .lp-cmp-time { font-weight: 700; color: var(--muted, #6b6b66); font-size: 14px; }
+  .lp-cmp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .lp-cmp-chip { font: inherit; font-size: 13px; padding: 3px 9px; border-radius: 999px; border: 1px solid #c6d6ea; background: #f2f6fb; cursor: pointer; }
+  .lp-cmp-chip.cut { background: #f1f0ec; border-color: #dcd9d1; color: #8a877f; text-decoration: line-through; }
+  .lp-cmp-sum { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 10px; font-size: 15px; }
+  @media (max-width: 760px) { .lp-cmp { gap: 0 10px; } .lp-cmp-cell p { display: none; } }
   .lp-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
   @media (max-width: 640px) { .lp-two { grid-template-columns: 1fr; } }
   .lp-step { display: flex; gap: 14px; border-top: 1px solid var(--line); padding: 12px 0; break-inside: avoid; }
@@ -28676,13 +28686,19 @@ const LESSONS = {
   },
 };
 
-const LESSON = { key: null };
+const LESSON = { key: null, compare: false };
 // plan text with fractions or square roots: drawn as math (stacked fractions, full-length radicals)
 function lpMath(text, px = 15, maxW = 640) {
   const t = autoMath(String(text)); if (!hasM(t)) return text;
   const probe = document.createElement('canvas').getContext('2d'); probe.font = `${px}px Georgia, serif`;
   const w = Math.min(maxW, Math.ceil(probe.measureText(unM(t)).width) + 12), cv = textCanvas(t, w, `${px}px Georgia, "Times New Roman", serif`, Math.round(px * 1.5));
   cv.style.display = 'inline-block'; cv.style.maxWidth = 'none'; return cv;
+}
+// a plan's steps with the I can statements added to the TV right after the bell ringer (built from the plan, so an edited plan keeps them up to date)
+function lpWithIcan(L) {
+  const steps = L.steps.map((s) => ({ ...s })), bi = Math.max(0, steps.findIndex((s) => /bell ringer/i.test(s.name)));
+  if (L.iCan && L.iCan.length && steps.length) steps[bi] = { ...steps[bi], afterIcan: true, show: [...(steps[bi].show || []), { label: 'I can statements', fixed: { topic: 'Today’s lesson', stem: L.iCan.map((x) => '•  ' + x).join('\n \n') } }] };
+  return steps;
 }
 function lessonScreen(preKey) {
   teacherNav('lesson');
@@ -28736,11 +28752,14 @@ function lessonScreen(preKey) {
   function draw() {
     out.innerHTML = '';
     const L = lessonOf(LESSON.key), S = lpSet(LESSON.key); if (!L || !S) return;
+    // a full plan and its shorter alternate (e.g. 30 minutes) can be compared side by side
+    const fullKey = LESSONS[LESSON.key].base || LESSON.key, altKey = Object.keys(LESSONS).find((k) => LESSONS[k].base === fullKey);
+    if (LESSON.compare && altKey) return compareDraw(fullKey, altKey);
+    LESSON.compare = false;
     const h = (t) => el('h3', { class: 'lp-h' }, t);
     const list = (arr) => el('ul', { class: 'lp-ul' }, ...arr.map((x) => el('li', {}, x)));
     // the I can statements go on the TV right after the bell ringer (built from the plan, so an edited plan keeps them up to date)
-    const steps = L.steps.map((s) => ({ ...s })), bi = Math.max(0, steps.findIndex((s) => /bell ringer/i.test(s.name)));
-    if (L.iCan && L.iCan.length && steps.length) steps[bi] = { ...steps[bi], afterIcan: true, show: [...(steps[bi].show || []), { label: 'I can statements', fixed: { topic: 'Today’s lesson', stem: L.iCan.map((x) => '•  ' + x).join('\n \n') } }] };
+    const steps = lpWithIcan(L);
     const all = steps.flatMap((s) => s.show || []);
     out.append(el('div', { class: 'card lp' },
       el('div', { class: 'lp-top' }, el('div', {}, el('h2', { style: 'margin:0' }, S.title), el('div', { class: 'small' }, `${SUBJECTS[S.subject] || ''} · ${L.minutes} minutes · ${CONFIG.TEACHER_NAME}`),
@@ -28748,6 +28767,7 @@ function lessonScreen(preKey) {
         el('div', { class: 'lp-btns noprint', style: 'margin:0' },
           L.slides ? el('a', { class: 'btn', href: L.slides, target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none' }, '🖥 Open the slides') : '',
           all.length ? el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, 0) }, '📺 Examples and keys on the TV') : '',
+          altKey ? el('button', { class: 'btn secondary', type: 'button', onclick: () => { LESSON.compare = true; draw(); } }, `⇆ Compare ${lessonOf(fullKey).minutes} and ${lessonOf(altKey).minutes} minutes`) : '',
           LESSON_EDITS.status === 'ok' ? el('button', { class: 'btn secondary', type: 'button', onclick: () => lessonEdit(LESSON.key) }, '✏️ Edit this plan') : '',
           LESSON_EDITS.data[LESSON.key] ? el('span', { class: 'small', style: 'align-self:center' }, '(your edited version)') : '')),
       h('Objective'), el('p', {}, L.objective),
@@ -28781,6 +28801,32 @@ function lessonScreen(preKey) {
       L.mistakes ? el('div', { class: 'lp-two' },
         el('div', {}, h('Watch for these mistakes'), list(L.mistakes)),
         el('div', {}, h('Support'), list(L.support || []), h('Extend'), list(L.extend || []))) : ''));
+  }
+  // side by side: the full plan's flow on the left, the shorter plan's on the right, step for step; parts left out are grayed
+  function compareDraw(fk, ak) {
+    const P = [fk, ak].map((k) => { const L = lessonOf(k), steps = lpWithIcan(L); return { k, L, steps, all: steps.flatMap((s) => s.show || []) }; });
+    const role = (s) => (/bell/i.test(s.name) ? 'bell' : /partner/i.test(s.name) ? 'partner' : /independent/i.test(s.name) || s.practice ? 'indep' : /closure|exit/i.test(s.name) ? 'close' : s.show && s.show.some((x) => /^Example/.test(x.label)) ? 'notes' : 'other:' + s.name);
+    const kept = new Set(P[1].all.map((x) => x.fixed && x.fixed.stem));
+    const cell = (p, s, side) => !s ? el('div', { class: 'lp-cmp-cell lp-cmp-none' }, el('div', { class: 'small' }, 'Left out of the shorter plan')) : el('div', { class: 'lp-cmp-cell' },
+      el('div', { class: 'lp-cmp-time' }, s.time, ' min'), el('div', { class: 'lp-name' }, s.name, s.tag ? el('span', { class: 'lp-tag' }, s.tag) : ''),
+      el('p', { class: 'small', style: 'margin:4px 0' }, s.teacher),
+      s.show ? el('div', { class: 'lp-cmp-chips' }, ...s.show.map((x) => el('button', { type: 'button', class: 'lp-cmp-chip' + (side === 0 && x.fixed && !kept.has(x.fixed.stem) && x.label !== 'I can statements' ? ' cut' : ''), title: 'Show on the TV', onclick: () => tvShow(p.all, p.all.indexOf(x)) }, '📺 ' + x.label))) : '');
+    const roles = []; P.forEach((p) => p.steps.forEach((s) => { const r = role(s); if (!roles.includes(r)) roles.push(r); }));
+    const order = ['bell', ...roles.filter((r) => r.startsWith('other:')), 'notes', 'partner', 'indep', 'close'].filter((r) => roles.includes(r));
+    const exits = P.map((p) => p.all.filter((x) => /^Exit ticket/.test(x.label)).length), exs = P.map((p) => p.all.filter((x) => /^Example/.test(x.label)).length), parts = P.map((p) => p.all.filter((x) => /^Partner/.test(x.label)).length);
+    const head = (p) => el('div', { class: 'lp-cmp-head' }, el('div', { style: 'font-weight:700;font-size:18px' }, `${p.L.minutes}-minute plan`),
+      el('div', { class: 'lp-btns noprint', style: 'margin:6px 0 0' },
+        el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { LESSON.key = p.k; LESSON.compare = false; setLabel(); draw(); } }, 'Open this plan'),
+        ...(p.L.printables || []).map((x) => el('a', { class: 'btn secondary', href: x.file, target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none;margin:0' }, '🖨 ' + x.label))));
+    out.append(el('div', { class: 'card lp' },
+      el('div', { class: 'lp-top' }, el('div', {}, el('h2', { style: 'margin:0' }, SETS[fk].title), el('div', { class: 'small' }, `${SUBJECTS[SETS[fk].subject] || ''} · ${P[0].L.minutes} minutes vs. ${P[1].L.minutes} minutes`)),
+        el('div', { class: 'lp-btns noprint', style: 'margin:0' }, el('button', { class: 'btn secondary', type: 'button', onclick: () => { LESSON.compare = false; draw(); } }, '✕ Close the comparison'))),
+      el('div', { class: 'lp-cmp-sum' },
+        el('div', {}, el('b', {}, 'Examples: '), `${exs[0]} → ${exs[1]}`), el('div', {}, el('b', {}, 'Partner problems: '), `${parts[0]} → ${parts[1]}`), el('div', {}, el('b', {}, 'Exit ticket questions: '), `${exits[0]} → ${exits[1]}`),
+        el('div', {}, el('b', {}, 'Same for both: '), 'objective, I can statements, vocabulary, bell ringer, and the section’s Practice assignment')),
+      el('p', { class: 'small', style: 'margin:6px 0 10px' }, 'Grayed, struck-through screens are in the full plan only. 📺 buttons put that screen on the TV.'),
+      el('div', { class: 'lp-cmp' }, head(P[0]), head(P[1]),
+        ...order.flatMap((r) => P.map((p, side) => cell(p, p.steps.find((s) => role(s) === r), side))))));
   }
   draw(); showNote();
   if (LESSON_EDITS.status !== 'ok') lessonSync().then(() => { if (document.getElementById('title').textContent === 'Lesson plans') { showNote(); draw(); } });
