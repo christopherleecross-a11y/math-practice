@@ -28533,6 +28533,7 @@ function lessonScreen(preKey) {
           s.say ? el('p', {}, el('b', {}, 'Ask: '), el('i', {}, s.say)) : '',
           el('p', { class: 'lp-check' }, el('b', {}, 'Check for understanding: '), s.check),
           s.show ? el('div', { class: 'lp-btns noprint' }, ...s.show.map((x) => el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, all.indexOf(x)) }, '📺 ' + x.label))) : '',
+          ...(s.show || []).filter((x) => /bell ringer/i.test(x.label) && x.fixed && x.fixed.choices).map((x) => ediaPanel(x.fixed)),
           s.practice ? el('div', { class: 'lp-btns noprint' },
             el('button', { class: 'btn secondary', type: 'button', onclick: () => lessonBuild(LESSON.key) }, `Build a ${S.title.split(' ')[0]} assignment`),
             el('button', { class: 'btn secondary', type: 'button', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard')) : ''))),
@@ -28547,6 +28548,29 @@ function lessonScreen(preKey) {
   }
   draw(); showNote();
   if (LESSON_EDITS.status !== 'ok') lessonSync().then(() => { if (document.getElementById('title').textContent === 'Lesson plans') { showNote(); draw(); } });
+}
+/* ---------- bell ringers: copy each part separately, to paste into edia.app (or any quiz form) ---------- */
+function ediaPanel(f) {
+  const plain = (t) => unM(String(t || '')).replace(/̅/g, '').replace(/[ \t]+\n/g, '\n').trim(); // overline marks would paste as stray characters
+  const flash = (b, ok) => { const t = b.textContent; b.textContent = ok ? '✓ Copied' : 'Copy failed'; setTimeout(() => { b.textContent = t; }, 1300); };
+  const copyText = async (txt, b) => { try { await navigator.clipboard.writeText(txt); flash(b, true); } catch { try { const ta = el('textarea', { style: 'position:fixed;left:-9999px' }); ta.value = txt; document.body.append(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); flash(b, ok); } catch { flash(b, false); } } };
+  const copyImg = async (b) => { try { const sz = f.figure.size || [440, 300], cv = makeCanvas(sz[0], sz[1]); cv._stack = false; const ctx = cv._ctx; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.restore(); lpFigDraw(f.figure)(cv);
+    const blob = await new Promise((res) => cv.toBlob(res, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flash(b, true); } catch { flash(b, false); } };
+  const L = 'ABCD', why = plain(f.solution).split('\n').filter((l) => !/^[B-D] = |^[A-D] = .*\.\s+[B-D] = /.test(l)).join('\n') || plain(f.solution);
+  const row = (label, txt, extra) => el('div', { style: 'display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid #ece9e1' },
+    el('div', { style: 'flex:0 0 92px;font-weight:600;font-size:14px;padding-top:6px' }, label),
+    el('div', { style: 'flex:1;min-width:0;white-space:pre-wrap;font-size:15px;padding-top:6px' }, txt),
+    extra || el('button', { class: 'btn secondary', type: 'button', style: 'flex:0 0 auto;margin:0;padding:4px 12px;font-size:13px', onclick: (e) => copyText(txt, e.currentTarget) }, '📋 Copy'));
+  const body = el('div', { style: 'display:none;margin-top:8px;padding:10px 12px;border:1px solid #d9d5cb;border-radius:10px;background:#fbfaf6' },
+    el('p', { class: 'small', style: 'margin:0 0 6px' }, 'Click 📋 Copy beside each part, then paste it into the matching box in edia. Or copy everything at once at the bottom.'),
+    row('Question', plain(f.stem)),
+    f.figure ? row('Picture', '(the diagram)', el('button', { class: 'btn secondary', type: 'button', style: 'flex:0 0 auto;margin:0;padding:4px 12px;font-size:13px', onclick: (e) => copyImg(e.currentTarget) }, '📋 Copy picture')) : '',
+    ...f.choices.map((c, i) => row(`Choice ${L[i]}${i === f.answer ? ' ✓' : ''}`, plain(c))),
+    row('Correct', L[f.answer]),
+    row('Explanation', why),
+    el('div', { style: 'padding-top:8px;border-top:1px solid #ece9e1' }, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: (e) => copyText(`${plain(f.stem)}\n\n${f.choices.map((c, i) => `${L[i]}. ${plain(c)}`).join('\n')}\n\nAnswer: ${L[f.answer]}\n${why}`, e.currentTarget) }, '📋 Copy everything as one block')));
+  const btn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { const open = body.style.display === 'none'; body.style.display = open ? 'block' : 'none'; btn.textContent = open ? '✕ Hide the edia copy' : '📋 Copy the bell ringer for edia'; } }, '📋 Copy the bell ringer for edia');
+  return el('div', { class: 'noprint', style: 'margin-top:6px' }, btn, body);
 }
 /* ---------- editing lesson plans (saved in the teacher's Practice Results sheet, so the edits follow them to any computer) ---------- */
 const LESSON_EDITS = { data: {}, status: 'idle', version: null };
