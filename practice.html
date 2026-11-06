@@ -121,6 +121,8 @@
   .q.wm .choice:not(.sel):not(.right):not(.wrong) { background: transparent; }
   .desmos-panel { position: fixed; top: 0; right: 0; width: min(600px, 100vw); height: 100vh; background: #fff; border-left: 1px solid var(--line); box-shadow: -6px 0 20px rgba(0,0,0,.12); z-index: 900; display: none; flex-direction: column; }
   .desmos-panel.open { display: flex; }
+  .desmos-panel.full { top: 0 !important; left: 0; right: 0; bottom: 0; width: 100vw !important; height: 100vh !important; border: 0 !important; box-shadow: none !important; z-index: 2000; }
+  body.desmos-full { overflow: hidden; }
   .desmos-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
   .desmos-body { flex: 1; min-height: 0; }
   @media (min-width: 1300px) { body.desmos-open { padding-right: 600px; } }
@@ -27361,17 +27363,29 @@ function loadDesmos() {
   });
   return desmosLoading;
 }
+// full screen inside the page (not the browser's full-screen mode, which the test lockdown uses): the panel covers the whole window
+function desmosFull(force) {
+  const p = document.getElementById('desmosPanel'); if (!p) return;
+  const on = force === undefined ? !p.classList.contains('full') : !!force;
+  p.classList.toggle('full', on); document.body.classList.toggle('desmos-full', on);
+  const b = document.getElementById('desmosFull'); if (b) b.textContent = on ? '🗗 Exit full screen' : '⛶ Full screen';
+  if (desmosCalc) setTimeout(() => desmosCalc.resize(), 0);
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('desmos-full')) desmosFull(false); });
 function toggleDesmos(force) {
   let p = document.getElementById('desmosPanel');
   if (!p) {
     p = el('div', { id: 'desmosPanel', class: 'desmos-panel', role: 'dialog', 'aria-label': 'Desmos graphing calculator' },
-      el('div', { class: 'desmos-head' }, el('strong', {}, 'Desmos graphing calculator'), el('button', { class: 'btn secondary', type: 'button', onclick: () => toggleDesmos(false) }, 'Close')),
+      el('div', { class: 'desmos-head' }, el('strong', {}, 'Desmos graphing calculator'),
+        el('span', { style: 'display:flex;gap:8px' },
+          el('button', { id: 'desmosFull', class: 'btn secondary', type: 'button', style: 'margin:0', title: 'Make the calculator fill the screen (press again to go back to the questions)', onclick: () => desmosFull() }, '⛶ Full screen'),
+          el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => toggleDesmos(false) }, 'Close'))),
       el('div', { id: 'desmosBody', class: 'desmos-body' }, el('div', { class: 'small', style: 'padding:14px' }, 'Loading Desmos…')));
     document.body.append(p);
   }
   const open = force === undefined ? !p.classList.contains('open') : !!force;
   p.classList.toggle('open', open); document.body.classList.toggle('desmos-open', open);
-  if (!open) return;
+  if (!open) { desmosFull(false); return; }
   if (desmosCalc) { desmosCalc.resize(); return; }
   loadDesmos().then(() => {
     const b = document.getElementById('desmosBody'); if (!b || desmosCalc) return;
