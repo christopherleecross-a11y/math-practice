@@ -334,6 +334,22 @@ const CONFIG = {
    their own teacher PIN, and only sees their own subjects. Give each teacher a different SALT.
    ===================================================================== */
 const TEACHERS = {
+  // Calculus III practice (Stewart): practice.html?t=calc&subject=calc3. Nothing is saved anywhere: no Sheet, no sign-in.
+  calc: {
+    TEACHER_NAME: 'Calculus III practice',
+    SUBJECTS: ['calc3'],
+    PERIODS: ['Calculus III'],
+    SALT: 'calc3-practice-2026',
+    SCRIPT_URL: '',
+    SIGNIN_URL: '',
+    TEACHER_PIN_HASH: '676594817605674', // Mr. Cross's PIN
+    AI_GRADING: false,
+    HIDE_MENU: false,
+    LOCKDOWN: false,
+    WATERMARK: false,
+    RETRIES: 2,
+    LEAVE_LIMIT: 0,
+  },
   spencer: {
     TEACHER_NAME: 'Mr. Spencer',
     SUBJECTS: ['algebra1', 'algebra2'],
@@ -391,6 +407,7 @@ const SUBJECTS = {
   act:      'ACT Prep',
   algebra1: 'Algebra I',
   algebra2: 'Algebra II',
+  calc3:    'Calculus III',
 };
 { const all = { ...SUBJECTS }; Object.keys(SUBJECTS).forEach((k) => delete SUBJECTS[k]); CONFIG.SUBJECTS.forEach((k) => { if (all[k]) SUBJECTS[k] = all[k]; }); } // each teacher sees only their subjects, in their own order
 const SETS = {
@@ -408,6 +425,15 @@ const SETS = {
   'geo-6-4':       { subject: 'geometry', title: '6.4 The Triangle Midsegment Theorem', items: [['g64Coords', 2], ['g64FindX', 4], ['g64Complete', 4], ['g64Word', 2], ['g64Backward', 1, undefined, 'b']] },
   'geo-6-5':       { subject: 'geometry', title: '6.5 Indirect Proof and Inequalities in One Triangle', items: [['g65FirstStep', 2], ['g65OrderAngles', 3], ['g65OrderSides', 3], ['g65ThirdSide', 3], ['g65Possible', 3]] },
   'geo-6-6':       { subject: 'geometry', title: '6.6 Inequalities in Two Triangles', items: [['g66Hinge', 6], ['g66Flights', 2], ['g66PossibleX', 3]] },
+  // ----- Calculus III (Stewart, Calculus 9th ed.; practice.html?t=calc) -----
+  'calc3-11-1': { subject: 'calc3', title: '11.1 Sequences', items: [['c111RatLimit', 2], ['c111RatLimit', 1, 'fr'], ['c111Term', 2], ['c111Term', 1, 'fr'], ['c111Recur', 2], ['c111Recur', 1, 'fr'], ['c111Bank', 2], ['c111Bank', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
+  'calc3-11-2': { subject: 'calc3', title: '11.2 Series', items: [['c112Geo', 1], ['c112Geo', 1, 'fr'], ['c112Telescope', 1], ['c112Telescope', 1, 'fr'], ['c112Decimal', 1], ['c112Decimal', 1, 'fr'], ['c112Partial', 1], ['c112Partial', 1, 'fr'], ['c112DivTest', 1], ['c112DivTest', 1, 'fr'], ['c112Combo', 1], ['c112Combo', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
+  'calc3-12-5': { subject: 'calc3', title: '12.5 Equations of Lines and Planes', items: [['c125LineHit', 1], ['c125LineHit', 1, 'fr'], ['c125Plane3', 1], ['c125Plane3', 1, 'fr'], ['c125Parallel', 1], ['c125Parallel', 1, 'fr'], ['c125LinePlane', 1], ['c125LinePlane', 1, 'fr'], ['c125Angle', 1], ['c125Angle', 1, 'fr'], ['c125Dist', 1], ['c125Dist', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
+  'calc3-12-6': { subject: 'calc3', title: '12.6 Cylinders and Quadric Surfaces', items: [['c126Type', 2], ['c126Type', 1, 'fr'], ['c126Axis', 2], ['c126Axis', 1, 'fr'], ['c126Trace', 2], ['c126Trace', 1, 'fr'], ['c126Center', 2], ['c126Center', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
+  'calc3-13-1': { subject: 'calc3', title: '13.1 Vector Functions and Space Curves', items: [['c131Domain', 2], ['c131Domain', 1, 'fr'], ['c131Limit', 2], ['c131Limit', 1, 'fr'], ['c131Hit', 2], ['c131Hit', 1, 'fr'], ['c131Surface', 2], ['c131Surface', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
+  'calc3-13-2': { subject: 'calc3', title: '13.2 Derivatives and Integrals of Vector Functions', items: [['c132Deriv', 1], ['c132Deriv', 1, 'fr'], ['c132Unit', 1], ['c132Unit', 1, 'fr'], ['c132Integral', 1], ['c132Integral', 1, 'fr'], ['c132IVP', 1], ['c132IVP', 1, 'fr'], ['c132TLine', 1], ['c132TLine', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
+  'calc3-13-3': { subject: 'calc3', title: '13.3 Arc Length and Curvature', items: [['c133Helix', 2], ['c133Helix', 1, 'fr'], ['c133Poly', 2], ['c133Poly', 1, 'fr'], ['c133Reparam', 2], ['c133Reparam', 1, 'fr'], ['c133Curv', 2], ['c133Curv', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
+  'calc3-13-4': { subject: 'calc3', title: '13.4 Motion in Space: Velocity and Acceleration', items: [['c134Vel', 2], ['c134Vel', 1, 'fr'], ['c134FromAcc', 2], ['c134FromAcc', 1, 'fr'], ['c134Proj', 2], ['c134Proj', 1, 'fr'], ['c134Comp', 2], ['c134Comp', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   // ----- Pre-Calculus -----
   'precalc-p-1':   { subject: 'precalc',  title: 'P.1 Review of Real Numbers', items: [['p1Classify', 2], ['p1Order', 2], ['p1Interval', 4], ['p1AbsVal', 3], ['p1Compare', 2], ['p1Distance', 2]] },
   'precalc-p-2':   { subject: 'precalc',  title: 'P.2 Solving Equations', items: [['p2Linear', 3], ['p2Rational', 3], ['p2Factor', 2], ['p2SqRoots', 2], ['p2CompleteSq', 2], ['p2Quadratic', 3]] },
@@ -27790,6 +27816,397 @@ TEMPLATES.dmChallenge = (r) => {
   }
 };
 
+/* ---------- Calculus III (Stewart, Calculus 9th ed.): 11.1, 11.2, 12.5, 12.6, 13.1–13.4 ---------- */
+const c3V = (v) => `⟨${v.map(fracT).join(', ')}⟩`; // a vector ⟨1, −2, 3/4⟩
+const c3P = (v) => `(${v.map(fracT).join(', ')})`; // a point
+const c3F = (v, names = ['x', 'y', 'z'], pre = '') => v.map((x, i) => ({ label: `${pre}${names[i]} =`, val: x, key: fracL(x) })); // one number box per component
+const c3Dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
+const c3Cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const c3Len = (a) => Math.sqrt(c3Dot(a, a));
+const c3Sup = (k) => String(k).split('').map((d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[+d] || d).join('');
+const c3Pick = (r, ans, pool, n = 3) => shuffle(r, [ans, ...shuffle(r, pool.filter((p) => p !== ans)).slice(0, n)]); // answer + n distractors, mixed
+const c3CoT = (pairs) => pairs.filter(([c]) => c).map(([c, inner], j) => { const a = Math.abs(c), k = a === 1 ? '' : a, x = /^[a-z]$/.test(inner) ? inner : `(${inner})`; return j ? ` ${c < 0 ? MINUS : '+'} ${k}${x}` : `${c < 0 ? MINUS : ''}${k}${x}`; }).join('');
+const c3Lin = (p0, v, t = 't') => (p0 ? `${fmt(p0)}${chTerm(v, t)}` : v ? `${chCo(v)}${t}` : '0'); // 3 − 2t, or −2t when it starts at 0 // 2(x − 1) − (y + 3) + …
+const c3Par = (v) => (fracParts(v) && fracParts(v)[1] !== 1 ? `(${fracT(v)})` : fracT(v)); // a fraction in parentheses
+const c3Sum = (terms) => { let x = ''; terms.forEach(([c, v]) => { if (!c) return; x += x ? (v ? chTerm(c, v) : chAdd(c)) : v ? `${chCo(c)}${v}` : fmt(c); }); return x || '0'; }; // 3 + 2t − t², skipping zeros
+const c3Sel = (label, options, ans, display) => chMix([{ label, options, ans }], display);
+const c3Plane = (n, d) => `${chEqT(n, d)}`; // ax + by + cz = d
+const C3_QUAD = [[1, 2, 2, 3], [2, 3, 6, 7], [1, 4, 8, 9], [2, 6, 9, 11], [4, 4, 7, 9], [2, 10, 11, 15], [6, 6, 7, 11], [1, 12, 12, 17], [3, 4, 12, 13], [8, 9, 12, 17]]; // a² + b² + c² = d²
+const c3Quad = (r) => { const q = pick(r, C3_QUAD), v = shuffle(r, q.slice(0, 3)).map((x) => (r() < 0.4 ? -x : x)); return [v, q[3]]; };
+
+/* ===== 11.1 Sequences ===== */
+TEMPLATES.c111RatLimit = (r) => {
+  const kind = ri(r, 0, 2), p = nz(r, -6, 6), q = ri(r, -9, 9), rr = ri(r, -9, 9), s = ri(r, 1, 7), t = nz(r, -9, 9);
+  let num, den, L, sol;
+  if (kind === 0) { num = b4T([p, q, rr], 'n'); den = b4T([s, 0, t], 'n'); L = p / s; sol = `Divide the top and bottom by n² (the highest power in the denominator). Every term with n left in a denominator → 0, so only the n² coefficients remain:\nlim aₙ = ${s === 1 ? '' : `${fmt(p)}/${s} = `}${fracT(L)}`; }
+  else if (kind === 1) { num = b4T([p, q || 1], 'n'); den = b4T([s, 0, t], 'n'); L = 0; sol = `The numerator has degree 1 and the denominator has degree 2. Divide top and bottom by n²: the top goes to 0 and the bottom goes to ${s}, so the limit is 0.`; }
+  else { const a = pick(r, [4, 9, 16, 25]), b = ri(r, 1, 9); num = `√(${b4T([a, 0, b], 'n')})`; den = b4T([s, Math.abs(q) || 1], 'n'); L = Math.sqrt(a) / s; sol = `Divide top and bottom by n (n = √(n²) for n > 0):\naₙ = √(${a} + ${b}/n²) / (${s} + ${Math.abs(q) || 1}/n) → √${a}/${s} = ${fracT(L)}`.replace(`/1 = `, ' = '); }
+  const disp = fracT(L);
+  return { topic: 'Limit of a sequence', stem: `Find the limit of the sequence aₙ = (${num}) / (${den}).`,
+    ...buildChoices(r, disp, [fracT(s / (p || 1)), fracT(rr / t), L === 0 ? '1' : '0', 'The sequence diverges', fracT(L * 2)], (i) => fracT(L + i + 1)),
+    fr: chNums([{ label: 'lim aₙ =', val: L, key: fracL(L) }], disp), solution: sol };
+};
+TEMPLATES.c111Term = (r) => {
+  const p = ri(r, 1, 5), q = ri(r, -3, 6), rr = ri(r, 1, 6), e = ri(r, 0, 1), k = ri(r, 3, 7);
+  const a = (n) => (n + e) % 2 === 0 ? (p * n + q) / (n * n + rr) : -(p * n + q) / (n * n + rr), v = a(k), disp = fracT(v);
+  const sgn = e ? '(−1)ⁿ⁺¹' : '(−1)ⁿ';
+  return { topic: 'Terms of a sequence', stem: `aₙ = ${sgn} · (${b4T([p, q], 'n')}) / (n² + ${rr}). Find a${String(k).split('').map((d) => '₀₁₂₃₄₅₆₇₈₉'[+d]).join('')}.`,
+    ...buildChoices(r, disp, [fracT(-v), fracT(a(k + 1)), fracT(a(k - 1)), fracT(Math.abs(v))], (i) => fracT(v + i + 1)),
+    fr: chNums([{ label: `a${String(k).split('').map((d) => '₀₁₂₃₄₅₆₇₈₉'[+d]).join('')} =`, val: v, key: fracL(v) }], disp),
+    solution: `Substitute n = ${k}: ${sgn.replace('n', String(k)).replace('ⁿ⁺¹', c3Sup(k) + '⁺¹').replace('ⁿ', c3Sup(k))} = ${(k + e) % 2 === 0 ? '1' : '−1'}\n(${p}(${k})${chAdd(q)}) / (${k}² + ${rr}) = ${p * k + q}/${k * k + rr}\na${String(k).split('').map((d) => '₀₁₂₃₄₅₆₇₈₉'[+d]).join('')} = ${disp}` };
+};
+TEMPLATES.c111Recur = (r) => {
+  const ratio = pick(r, [1 / 2, 1 / 3, 2 / 3, 1 / 4, 3 / 4, -1 / 2]), d = nz(r, -6, 9), a1 = ri(r, -6, 8), s = [a1];
+  for (let i = 1; i < 4; i++) s.push(ratio * s[i - 1] + d);
+  const L = d / (1 - ratio), disp = `a₄ = ${fracT(s[3])}; limit ${fracT(L)}`;
+  return { topic: 'Recursive sequence', stem: `A sequence is defined by a₁ = ${fmt(a1)} and aₙ₊₁ = ${chK(ratio)}aₙ${chAdd(d)}. Find a₄. The sequence converges; find its limit.`,
+    ...buildChoices(r, disp, [`a₄ = ${fracT(s[2])}; limit ${fracT(L)}`, `a₄ = ${fracT(s[3])}; limit ${fracT(d / (1 + ratio))}`, `a₄ = ${fracT(s[3])}; limit ${fracT(d)}`, `a₄ = ${fracT(ratio * s[3] + d)}; limit ${fracT(L)}`], (i) => `a₄ = ${fracT(s[3] + i + 1)}; limit ${fracT(L)}`),
+    fr: chNums([{ label: 'a₄ =', val: s[3], key: fracL(s[3]) }, { label: 'Limit:', val: L, key: fracL(L) }], disp),
+    solution: `a₂ = ${chK(ratio)}(${fmt(a1)})${chAdd(d)} = ${fracT(s[1])}\na₃ = ${chK(ratio)}(${fracT(s[1])})${chAdd(d)} = ${fracT(s[2])}\na₄ = ${chK(ratio)}(${fracT(s[2])})${chAdd(d)} = ${fracT(s[3])}\nIf aₙ → L, then aₙ₊₁ → L too, so L = ${chK(ratio)}L${chAdd(d)}  →  ${chK(1 - ratio)}L = ${fmt(d)}  →  L = ${fracT(L)}` };
+};
+TEMPLATES.c111Bank = (r) => {
+  const k = ri(r, 2, 4), E = (m) => (m === 1 ? 'e' : `e${c3Sup(m)}`);
+  const bank = [
+    [`aₙ = n · sin(${k}/n)`, String(k), `As n → ∞, ${k}/n → 0. Write it as sin(${k}/n)/(1/n) and use lim sin(x)/x = 1 with x = ${k}/n: the limit is ${k}.`],
+    [`aₙ = (1 + ${k}/n)ⁿ`, E(k), `This is the famous limit lim (1 + x/n)ⁿ = eˣ, with x = ${k}. The limit is ${E(k)}.`],
+    [`aₙ = (1 − ${k}/n)ⁿ`, `1/${E(k)}`, `lim (1 + x/n)ⁿ = eˣ with x = −${k}: the limit is e⁻${c3Sup(k)} = 1/${E(k)}.`],
+    ['aₙ = (ln n)/n', '0', 'L’Hospital’s Rule on f(x) = (ln x)/x: (1/x)/1 → 0. The limit is 0.'],
+    [`aₙ = (−1)ⁿ · n/(n + ${k})`, 'The sequence diverges', `n/(n + ${k}) → 1, so the terms swing between values near 1 and near −1. The sequence diverges.`],
+    ['aₙ = cos(nπ)', 'The sequence diverges', 'cos(nπ) = (−1)ⁿ: −1, 1, −1, 1, … It never settles, so the sequence diverges.'],
+    [`aₙ = ${k}ⁿ/n!`, '0', `For n > ${2 * k}, each new factor ${k}/n is less than 1/2, so the terms shrink faster than a geometric sequence. The limit is 0.`],
+    ['aₙ = ⁿ√n  (the nth root of n)', '1', 'ln(n^(1/n)) = (ln n)/n → 0, so n^(1/n) → e⁰ = 1.'],
+    [`aₙ = (2ⁿ + ${k})/3ⁿ`, '0', `= (2/3)ⁿ + ${k}/3ⁿ. Both parts → 0 because |2/3| < 1 and |1/3| < 1. The limit is 0.`],
+    [`aₙ = √(n² + ${2 * k}n) − n`, String(k), `Multiply by the conjugate: ${2 * k}n / (√(n² + ${2 * k}n) + n). Divide top and bottom by n: ${2 * k}/(√(1 + ${2 * k}/n) + 1) → ${2 * k}/2 = ${k}.`],
+    [`aₙ = arctan(${k}n)`, 'π/2', `${k}n → ∞, and arctan x → π/2 as x → ∞. The limit is π/2.`],
+    [`aₙ = (${k}n)²/(n² + 1)`, String(k * k), `Divide by n²: ${k * k}/(1 + 1/n²) → ${k * k}.`],
+  ];
+  const [expr, ans, sol] = pick(r, bank), pool = ['0', '1', String(k), String(k * k), E(k), `1/${E(k)}`, 'π/2', 'The sequence diverges', '∞'];
+  const opts = c3Pick(r, ans, pool);
+  return { topic: 'Does the sequence converge?', stem: `Does the sequence converge or diverge? If it converges, find the limit.\n${expr}`, choices: opts, answer: opts.indexOf(ans),
+    fr: c3Sel('The limit is', opts, ans, ans), solution: sol };
+};
+
+/* ===== 11.2 Series ===== */
+TEMPLATES.c112Geo = (r) => {
+  for (;;) {
+    const p = ri(r, 1, 4), q = ri(r, p + 1, 6); if (gcd(p, q) !== 1) continue;
+    const ratio = (r() < 0.35 ? -1 : 1) * p / q, a = nz(r, -8, 9), st = ri(r, 0, 2), form = r() < 0.5;
+    const S = (a * ratio ** st) / (1 - ratio); if (!fracParts(S)) continue;
+    const terms = [0, 1, 2, 3].map((i) => a * ratio ** (st + i));
+    if (!terms.every((t) => fracParts(t))) continue;
+    const stem = form ? `Find the sum of the series ${terms.map(fracT).join(' + ').replace(/\+ −/g, '− ')} + ⋯` : `Find the sum of the series Σ (n = ${st} to ∞) of ${fmt(a)} · (${fracT(ratio)})ⁿ.`;
+    const disp = fracT(S);
+    return { topic: 'Geometric series', stem,
+      ...buildChoices(r, disp, [fracT(a / (1 - ratio)), fracT(terms[0] / (1 + ratio)), fracT(terms[1] / (1 - ratio)), 'The series diverges'], (i) => fracT(S + i + 1)),
+      fr: chNums([{ label: 'Sum =', val: S, key: fracL(S) }], disp),
+      solution: `Geometric series: first term ${fracT(terms[0])}, ratio r = ${fracT(ratio)}. Since |r| < 1, it converges.\nSum = first term ÷ (1 − r) = ${c3Par(terms[0])} ÷ (1 − ${chPF(ratio)}) = ${c3Par(terms[0])} ÷ ${c3Par(1 - ratio)} = ${disp}` };
+  }
+};
+TEMPLATES.c112Telescope = (r) => {
+  const k = ri(r, 1, 2), a = ri(r, 0, 3), c = k * ri(r, 1, 6), S = (c / k) * Array.from({ length: k }, (_, i) => 1 / (a + 1 + i)).reduce((x, y) => x + y, 0), disp = fracT(S);
+  const n1 = a ? `(n + ${a})` : 'n', n2 = `(n + ${a + k})`;
+  return { topic: 'Telescoping series', stem: `Find the sum: Σ (n = 1 to ∞) of ${c} / (${n1}${n2}).`,
+    ...buildChoices(r, disp, [fracT(c / (a + 1)), fracT(c / k), fracT(S / 2), 'The series diverges', fracT(c * S)], (i) => fracT(S + i + 1)),
+    fr: chNums([{ label: 'Sum =', val: S, key: fracL(S) }], disp),
+    solution: `Partial fractions: ${c}/(${n1}${n2}) = ${fracT(c / k)}[1/${n1} − 1/${n2}]\nWrite out the partial sum: the terms cancel in pairs except the first ${k === 1 ? 'one' : 'two'}, ${Array.from({ length: k }, (_, i) => fracT(1 / (a + 1 + i))).join(' + ')}, and terms that go to 0.\nSum = ${c / k === 1 ? '' : fracT(c / k) + ' · '}${k === 1 ? fracT(1 / (a + 1)) : `(${Array.from({ length: k }, (_, i) => fracT(1 / (a + 1 + i))).join(' + ')})`} = ${disp}` };
+};
+TEMPLATES.c112Decimal = (r) => {
+  const ol = (s) => s.split('').map((d) => d + '̅').join('');
+  if (r() < 0.5) { const W = ri(r, 0, 4), ab = ri(r, 10, 98); if (ab % 11 === 0) return TEMPLATES.c112Decimal(r); const v = W + ab / 99, disp = fracT(v);
+    return { topic: 'Repeating decimal as a fraction', stem: `Write ${W}.${ol(String(ab))} as a fraction, using a geometric series.`, ...buildChoices(r, disp, [fracT(W + ab / 100), fracT(W + ab / 90), fracT(ab / 99), fracT(W + ab / 999)], (i) => fracT(v + (i + 1) / 99)),
+      fr: chNums([{ label: 'Fraction:', val: v, key: fracL(v) }], disp), solution: `${W}.${ol(String(ab))} = ${W} + ${ab}/100 + ${ab}/100² + ⋯\nThe part after ${W} is geometric: first term ${ab}/100, ratio 1/100.\nSum = (${ab}/100)/(1 − 1/100) = ${ab}/99, so the number is ${W} + ${ab}/99 = ${disp}` }; }
+  const c = ri(r, 1, 9), d = ri(r, 1, 9); if (c === d) return TEMPLATES.c112Decimal(r);
+  const v = c / 10 + d / 90, disp = fracT(v);
+  return { topic: 'Repeating decimal as a fraction', stem: `Write 0.${c}${ol(String(d))} as a fraction, using a geometric series.`, ...buildChoices(r, disp, [fracT(c / 10 + d / 99), fracT((10 * c + d) / 99), fracT(c / 10 + d / 100), fracT((10 * c + d) / 90)], (i) => fracT(v + (i + 1) / 90)),
+    fr: chNums([{ label: 'Fraction:', val: v, key: fracL(v) }], disp), solution: `0.${c}${ol(String(d))} = ${c}/10 + ${d}/100 + ${d}/1000 + ⋯\nAfter ${c}/10 the terms are geometric: first term ${d}/100, ratio 1/10, sum = (${d}/100)/(9/10) = ${fracT(d / 90)}\nTotal: ${c}/10 + ${fracT(d / 90)} = ${disp}` };
+};
+TEMPLATES.c112Partial = (r) => {
+  const p = nz(r, -5, 6), q = ri(r, -4, 6), rr = ri(r, 1, 5), t = ri(r, 1, 6), k = ri(r, 2, 5); if (p * t === q * rr) return TEMPLATES.c112Partial(r);
+  const s = (n) => (p * n + q) / (rr * n + t), ak = s(k) - s(k - 1), S = p / rr;
+  if (!fracParts(ak)) return TEMPLATES.c112Partial(r);
+  const disp = `sum ${fracT(S)}; a${'₀₁₂₃₄₅₆₇₈₉'[k]} = ${fracT(ak)}`;
+  return { topic: 'Partial sums', stem: `The nth partial sum of a series Σaₙ is sₙ = (${b4T([p, q], 'n')})/(${b4T([rr, t], 'n')}). Find the sum of the series and the term a${'₀₁₂₃₄₅₆₇₈₉'[k]}.`,
+    ...buildChoices(r, disp, [`sum ${fracT(S)}; a${'₀₁₂₃₄₅₆₇₈₉'[k]} = ${fracT(s(k))}`, `sum ${fracT(q / t)}; a${'₀₁₂₃₄₅₆₇₈₉'[k]} = ${fracT(ak)}`, `sum 0; a${'₀₁₂₃₄₅₆₇₈₉'[k]} = ${fracT(ak)}`, `sum ${fracT(S)}; a${'₀₁₂₃₄₅₆₇₈₉'[k]} = ${fracT(s(k + 1) - s(k))}`].filter((x) => !/\d\.\d/.test(x)), (i) => `sum ${fracT(S)}; a${'₀₁₂₃₄₅₆₇₈₉'[k]} = ${fracT(ak + i + 1)}`),
+    fr: chNums([{ label: 'Sum of the series:', val: S, key: fracL(S) }, { label: `a${'₀₁₂₃₄₅₆₇₈₉'[k]} =`, val: ak, key: fracL(ak) }], disp),
+    solution: `The sum is the limit of the partial sums: lim sₙ = ${rr === 1 || gcd(Math.abs(p), rr) === 1 ? fracT(S) : `${fmt(p)}/${rr} = ${fracT(S)}`} (divide top and bottom by n).\nEach term is the difference of two partial sums: a${'₀₁₂₃₄₅₆₇₈₉'[k]} = s${'₀₁₂₃₄₅₆₇₈₉'[k]} − s${'₀₁₂₃₄₅₆₇₈₉'[k - 1]} = ${fracT(s(k))} − ${chPF(s(k - 1))} = ${fracT(ak)}` };
+};
+TEMPLATES.c112DivTest = (r) => {
+  const k = ri(r, 2, 6), good = pick(r, [[`Σ n/(${k}n + 1)`, `n/(${k}n + 1) → 1/${k}, not 0`], [`Σ (n² + 1)/(${k}n² − 1)`, `the terms → 1/${k}, not 0`], [`Σ cos(1/n)`, 'cos(1/n) → cos 0 = 1, not 0'], [`Σ (1 + 1/n)ⁿ`, 'the terms → e, not 0'], [`Σ ${k}ⁿ/(${k}ⁿ + 1)`, 'the terms → 1, not 0']]);
+  const bad = shuffle(r, ['Σ 1/n', 'Σ 1/n²', `Σ ${k}/(n² + 1)`, 'Σ 1/√n', `Σ (1/${k})ⁿ`, 'Σ (ln n)/n', `Σ 1/(${k}n + 1)`]).slice(0, 3);
+  const opts = shuffle(r, [good[0], ...bad]);
+  return { topic: 'Test for Divergence', stem: 'Which series does the Test for Divergence show diverges? (Each sum runs from n = 1 to ∞.)', choices: opts, answer: opts.indexOf(good[0]),
+    fr: c3Sel('Series:', opts, good[0], good[0]),
+    solution: `Test for Divergence: if lim aₙ ≠ 0, the series diverges.\nFor ${good[0]}: ${good[1]}, so it diverges.\nIn the other three the terms → 0, so the test says nothing about them (some converge, and Σ 1/n, Σ 1/√n, and Σ (ln n)/n diverge for other reasons).` };
+};
+TEMPLATES.c112Combo = (r) => {
+  const a = nz(r, -6, 8), b = ri(r, 2, 6), c = nz(r, -5, 6), S = a / (b - 1) + c, disp = fracT(S);
+  return { topic: 'Sum of two series', stem: `Find the sum: Σ (n = 1 to ∞) of [ ${a}/${b}ⁿ ${c < 0 ? MINUS : '+'} ${Math.abs(c)}/(n(n + 1)) ].`.replace(`[ ${a}/`, `[ ${fmt(a)}/`),
+    ...buildChoices(r, disp, [fracT(a / (b - 1)), fracT(a * b / (b - 1) + c), fracT(a / b + c), fracT(a / (b - 1) + c / 2)], (i) => fracT(S + i + 1)),
+    fr: chNums([{ label: 'Sum =', val: S, key: fracL(S) }], disp),
+    solution: `Both series converge, so add their sums.\nGeometric: Σ ${fmt(a)}/${b}ⁿ has first term ${fracT(a / b)} and ratio 1/${b}: sum = (${fracT(a / b)})/(1 − 1/${b}) = ${fracT(a / (b - 1))}\nTelescoping: 1/(n(n + 1)) = 1/n − 1/(n + 1), so Σ 1/(n(n + 1)) = 1, and Σ ${fmt(c)}/(n(n + 1)) = ${fmt(c)}\nTotal: ${fracT(a / (b - 1))}${chAdd(c)} = ${disp}` };
+};
+
+/* ===== 12.5 Equations of Lines and Planes ===== */
+TEMPLATES.c125LineHit = (r) => {
+  for (;;) {
+    const ax = ri(r, 0, 2), P = [ri(r, -5, 5), ri(r, -5, 5), ri(r, -5, 5)], v = [nz(r, -4, 4), nz(r, -4, 4), nz(r, -4, 4)]; if (!P[ax]) continue;
+    const t = -P[ax] / v[ax], X = P.map((p, i) => p + t * v[i]); if (!X.every((x) => fracParts(x))) continue;
+    const Q = P.map((p, i) => p + v[i]), plane = ['yz', 'xz', 'xy'][ax], disp = c3P(X);
+    return { topic: 'Where a line meets a coordinate plane', stem: `Find the point where the line through P${c3P(P)} and Q${c3P(Q)} meets the ${plane}-plane.`,
+      ...buildChoices(r, disp, [c3P(P.map((p, i) => p - t * v[i])), c3P(P.map((p, i) => (i === ax ? 0 : p))), c3P(X.map((x, i) => (i === ax ? 0 : -x))), c3P(P.map((p, i) => p + v[i] * (t + 1)))], (i) => c3P(X.map((x, j) => (j === (ax + 1) % 3 ? x + i + 1 : x)))),
+      fr: chNums(c3F(X), disp),
+      solution: `Direction: Q − P = ${c3V(v)}. Line: x = ${c3Lin(P[0], v[0])}, y = ${c3Lin(P[1], v[1])}, z = ${c3Lin(P[2], v[2])}\nOn the ${plane}-plane, ${'xyz'[ax]} = 0: ${c3Lin(P[ax], v[ax])} = 0  →  t = ${fracT(t)}\nPoint: ${disp}` };
+  }
+};
+TEMPLATES.c125Plane3 = (r) => {
+  for (;;) {
+    const P = [ri(r, -4, 4), ri(r, -4, 4), ri(r, -4, 4)], u = [ri(r, -3, 3), ri(r, -3, 3), ri(r, -3, 3)], w = [ri(r, -3, 3), ri(r, -3, 3), ri(r, -3, 3)];
+    let n = c3Cross(u, w); if (n.filter((x) => x).length < 2) continue;
+    const g = n.reduce((a, b) => gcd(a, Math.abs(b)), 0); n = n.map((x) => x / g); if (n.find((x) => x) < 0) n = n.map((x) => -x);
+    const d = c3Dot(n, P), Q = P.map((p, i) => p + u[i]), R = P.map((p, i) => p + w[i]), disp = c3Plane(n, d);
+    const prop = (v) => { const x = v.map((s) => pxConst(String(s || '').replace(/^\s*[a-z]\s*=/i, ''))); if (!x.every(isFinite) || x.slice(0, 3).every((y) => Math.abs(y) < 1e-9)) return false;
+      const all = [...n, d], i0 = all.findIndex((y) => y !== 0), k = x[i0] / all[i0]; return Math.abs(k) > 1e-9 && x.every((y, i) => Math.abs(y - k * all[i]) < 1e-6 * Math.max(1, Math.abs(y))); };
+    return { topic: 'Plane through three points', stem: `Find an equation of the plane through P${c3P(P)}, Q${c3P(Q)}, and R${c3P(R)}. Write it as ax + by + cz = d.`,
+      ...buildChoices(r, disp, [c3Plane(n, -d), c3Plane([n[1], n[0], n[2]], d), c3Plane(n.map((x, i) => (i === 2 ? -x : x)), d), c3Plane(u, c3Dot(u, P))].filter((s) => !/^0 =/.test(s)), (i) => c3Plane(n, d + i + 1)),
+      fr: { fields: ['a', 'b', 'c', 'd'].map((x) => ({ kind: 'expr', keys: 'num', label: x + ' =' })), key: [...n, d].map(String), display: disp + '   (any nonzero multiple is also right)', check: prop, score: (v) => (prop(v) ? 1 : 0) },
+      solution: `Two vectors in the plane: PQ = ${c3V(u)}, PR = ${c3V(w)}\nNormal: PQ × PR = ${c3V(c3Cross(u, w))}${g !== 1 ? `, or divided by ${g}: ${c3V(n)}` : ''}\nUse point P: ${c3CoT(n.map((c, i) => [c, chMinus(P[i], 'xyz'[i])]))} = 0\n${disp}` };
+  }
+};
+TEMPLATES.c125Parallel = (r) => {
+  const n = [nz(r, -5, 5), nz(r, -5, 5), ri(r, -5, 5)], e = ri(r, -9, 9), P = [ri(r, -5, 5), ri(r, -5, 5), ri(r, -5, 5)], d = c3Dot(n, P), line = r() < 0.5, disp = `d = ${fmt(d)}`;
+  return { topic: 'Parallel and perpendicular planes', stem: line ? `Find the plane through ${c3P(P)} that is perpendicular to the line x = 1${chTerm(n[0], 't')}, y = 2${chTerm(n[1], 't')}, z = ${n[2] ? '3' + chTerm(n[2], 't') : '3'}. Its equation is ${chEqT(n, 0).replace(/ = 0$/, '')} = d. Find d.`
+      : `Find the plane through ${c3P(P)} parallel to the plane ${chEqT(n, e)}. Its equation is ${chEqT(n, 0).replace(/ = 0$/, '')} = d. Find d.`,
+    ...buildChoices(r, disp, [`d = ${fmt(e)}`, `d = ${fmt(-d)}`, `d = ${fmt(c3Dot(n, P) + e)}`, `d = ${fmt(P.reduce((a, b) => a + b, 0))}`], (i) => `d = ${fmt(d + i + 1)}`),
+    fr: chNums([{ label: 'd =', val: d }], disp),
+    solution: `${line ? 'The line’s direction vector is perpendicular to the plane, so it is a normal vector' : 'Parallel planes have the same normal vector'}: n = ${c3V(n)}.\nSubstitute the point: d = ${chSubT(n, P)} = ${fmt(d)}` };
+};
+TEMPLATES.c125LinePlane = (r) => {
+  for (;;) {
+    const P = [ri(r, -5, 5), ri(r, -5, 5), ri(r, -5, 5)], v = [nz(r, -3, 3), ri(r, -3, 3), nz(r, -3, 3)], n = [nz(r, -4, 4), ri(r, -4, 4), nz(r, -4, 4)], t = nz(r, -3, 3);
+    if (!c3Dot(n, v)) continue;
+    const X = P.map((p, i) => p + t * v[i]), d = c3Dot(n, X), disp = c3P(X);
+    return { topic: 'Where a line meets a plane', stem: `Find the point where the line x = ${c3Lin(P[0], v[0])}, y = ${c3Lin(P[1], v[1])}, z = ${c3Lin(P[2], v[2])} meets the plane ${chEqT(n, d)}.`,
+      ...buildChoices(r, disp, [c3P(P.map((p, i) => p - t * v[i])), c3P(P), c3P(P.map((p, i) => p + (t + 1) * v[i])), c3P(v.map((x) => x * t))], (i) => c3P(X.map((x, j) => (j ? x : x + i + 1)))),
+      fr: chNums(c3F(X), disp),
+      solution: `Substitute the line into the plane:\n${c3CoT(n.map((c, i) => [c, c3Lin(P[i], v[i])]))} = ${fmt(d)}\n${fmt(c3Dot(n, P))}${chTerm(c3Dot(n, v), 't')} = ${fmt(d)}  →  t = ${fmt(t)}\nPoint: ${disp}` };
+  }
+};
+TEMPLATES.c125Angle = (r) => {
+  for (;;) {
+    const n1 = [ri(r, -3, 3), ri(r, -3, 3), ri(r, -3, 3)], n2 = [ri(r, -3, 3), ri(r, -3, 3), ri(r, -3, 3)];
+    if (c3Len(n1) === 0 || c3Len(n2) === 0 || n1.filter((x) => x).length < 2 || n2.filter((x) => x).length < 2) continue;
+    const cs = Math.abs(c3Dot(n1, n2)) / (c3Len(n1) * c3Len(n2)); if (cs > 0.999) continue;
+    const ang = Math.round(Math.acos(cs) * 180 / Math.PI), disp = `${ang}°`, e1 = ri(r, -6, 6), e2 = ri(r, -6, 6);
+    return { topic: 'Angle between two planes', stem: `Find the angle between the planes ${chEqT(n1, e1)} and ${chEqT(n2, e2)}, to the nearest degree. (Give the acute angle, or 90° if they are perpendicular.)`,
+      ...buildChoices(r, disp, [`${90 - ang}°`, `${180 - ang}°`, `${Math.round(Math.asin(Math.min(1, cs)) * 180 / Math.PI) + 3}°`, `${ang + 7}°`].filter((s) => s !== disp), (i) => `${ang + 2 * (i + 1)}°`),
+      fr: chNums([{ label: 'Angle (degrees):', val: Math.acos(cs) * 180 / Math.PI, key: String(ang), tol: 0.6 / Math.max(1, ang) }], disp),
+      solution: `The angle between planes is the angle between their normals: n₁ = ${c3V(n1)}, n₂ = ${c3V(n2)}\ncos θ = |n₁ · n₂| / (|n₁||n₂|) = |${fmt(c3Dot(n1, n2))}| / (√${c3Dot(n1, n1)} · √${c3Dot(n2, n2)}) ≈ ${cs.toFixed(4)}\nθ ≈ ${ang}°` };
+  }
+};
+TEMPLATES.c125Dist = (r) => {
+  const n = [nz(r, -4, 4), ri(r, -4, 4), nz(r, -4, 4)], d = ri(r, -9, 9), P = [ri(r, -5, 5), ri(r, -5, 5), ri(r, -5, 5)], top = Math.abs(c3Dot(n, P) - d);
+  if (!top) return TEMPLATES.c125Dist(r);
+  const D = top / c3Len(n), disp = exactT(D);
+  return { topic: 'Distance from a point to a plane', stem: `Find the distance from the point ${c3P(P)} to the plane ${chEqT(n, d)}. Give an exact answer.`,
+    ...buildChoices(r, disp, [exactT(top / c3Dot(n, n)), exactT(top), exactT(Math.abs(c3Dot(n, P) + d) / c3Len(n) || D * 2), exactT(D * 2)], (i) => exactT(D + i + 1)),
+    fr: chNums([{ label: 'Distance:', val: D, key: exactL(D) }], disp),
+    solution: `D = |ax₀ + by₀ + cz₀ − d| / √(a² + b² + c²)\n= |${chSubT(n, P)}${d ? ` − ${chP(d)}` : ''}| / √${c3Dot(n, n)} = ${top}/√${c3Dot(n, n)} = ${disp}` };
+};
+
+/* ===== 12.6 Cylinders and Quadric Surfaces ===== */
+const C3_SURF = ['ellipsoid', 'hyperboloid of one sheet', 'hyperboloid of two sheets', 'cone', 'elliptic paraboloid', 'hyperbolic paraboloid', 'elliptic cylinder', 'parabolic cylinder'];
+function c3Surface(r, kind) { // → { eq, axis }
+  const V = shuffle(r, ['x', 'y', 'z']), a = ri(r, 1, 9), b = ri(r, 1, 9), c = ri(r, 1, 9), k = pick(r, [1, 4, 9, 16, 36]);
+  const T = (terms, rhs) => { const t = shuffle(r, terms); let s = ''; t.forEach(([co, v]) => { s += s ? chTerm(co, v) : `${chCo(co)}${v}`; }); return `${s} = ${rhs}`; };
+  const sq = (v) => v + '²';
+  switch (kind) {
+    case 0: return { eq: T([[a, sq(V[0])], [b, sq(V[1])], [c, sq(V[2])]], k), axis: null };
+    case 1: return { eq: T([[a, sq(V[0])], [b, sq(V[1])], [-c, sq(V[2])]], k), axis: V[2] };
+    case 2: return { eq: T([[-a, sq(V[0])], [-b, sq(V[1])], [c, sq(V[2])]], k), axis: V[2] };
+    case 3: return { eq: T([[a, sq(V[0])], [b, sq(V[1])], [-c, sq(V[2])]], 0), axis: V[2] };
+    case 4: return { eq: `${V[2]} = ${chCo(a)}${sq(V[0])} + ${chCo(b)}${sq(V[1])}`, axis: V[2] };
+    case 5: return { eq: `${V[2]} = ${chCo(a)}${sq(V[0])} − ${chCo(b)}${sq(V[1])}`, axis: V[2] };
+    case 6: return { eq: T([[a, sq(V[0])], [b, sq(V[1])]], k), axis: V[2] };
+    default: return { eq: `${V[1]} = ${chCo(a)}${sq(V[0])}`, axis: V[2] };
+  }
+}
+TEMPLATES.c126Type = (r) => {
+  const kind = ri(r, 0, 7), { eq } = c3Surface(r, kind), ans = C3_SURF[kind], opts = c3Pick(r, ans, C3_SURF);
+  const why = ['All three squared terms are positive and the right side is positive.', 'Two squared terms are positive and one is negative, with a positive right side.', 'One squared term is positive and two are negative, with a positive right side.', 'Two squared terms are positive, one is negative, and the right side is 0.', 'One variable is to the first power and equals a sum of two squares with the same sign.', 'One variable is to the first power and equals a difference of squares (a saddle).', 'One variable is missing, and the other two are squared with the same sign: an ellipse extended along the missing axis.', 'One variable is missing, and the equation is a parabola in the other two: a parabola extended along the missing axis.'][kind];
+  return { topic: 'Identify the quadric surface', stem: `Identify the surface:  ${eq}`, choices: opts, answer: opts.indexOf(ans), fr: c3Sel('This surface is a(n)', opts, ans, ans), solution: `${why}\nSo it is a${/^[aeiou]/.test(ans) ? 'n' : ''} ${ans}.` };
+};
+TEMPLATES.c126Axis = (r) => {
+  const kind = pick(r, [1, 2, 3, 4, 5, 6, 7]), { eq, axis } = c3Surface(r, kind), ans = `the ${axis}-axis`, opts = ['the x-axis', 'the y-axis', 'the z-axis'];
+  const why = kind === 1 || kind === 3 ? `The negative squared term is ${axis}², so the surface is centered on the ${axis}-axis.` : kind === 2 ? `The positive squared term is ${axis}², so the two sheets open along the ${axis}-axis.` : kind >= 6 ? `The variable ${axis} is missing, so the surface runs parallel to the ${axis}-axis.` : `${axis} is the variable to the first power, so the surface opens along the ${axis}-axis.`;
+  return { topic: 'Axis of a quadric surface', stem: `The surface ${eq} is a${/^[aeiou]/.test(C3_SURF[kind]) ? 'n' : ''} ${C3_SURF[kind]}. Along which axis does it lie (or open)?`, choices: opts, answer: opts.indexOf(ans), fr: c3Sel('It lies along', opts, ans, ans), solution: why };
+};
+TEMPLATES.c126Trace = (r) => {
+  const [kk, m, c] = pick(r, [[3, 4, 5], [4, 3, 5], [6, 8, 10], [5, 12, 13], [12, 5, 13], [8, 6, 10]]), a = ri(r, 1, 2) * c, b = ri(r, 1, 2) * c, sgn = r() < 0.5 ? 1 : -1;
+  const A = a * m / c, B = b * m / c, disp = `${fmt(A)} in the x-direction, ${fmt(B)} in the y-direction`;
+  return { topic: 'Traces of an ellipsoid', stem: `The trace of the ellipsoid x²/${a * a} + y²/${b * b} + z²/${c * c} = 1 in the plane z = ${fmt(sgn * kk)} is an ellipse. Find its semi-axes (half the width in the x-direction and in the y-direction).`,
+    ...buildChoices(r, disp, [`${a} in the x-direction, ${b} in the y-direction`, `${fmt(a * kk / c)} in the x-direction, ${fmt(b * kk / c)} in the y-direction`, `${fmt(A * A)} in the x-direction, ${fmt(B * B)} in the y-direction`, `${fmt(B)} in the x-direction, ${fmt(A)} in the y-direction`].filter((s) => s !== disp), (i) => `${fmt(A + i + 1)} in the x-direction, ${fmt(B)} in the y-direction`),
+    fr: chNums([{ label: 'Semi-axis in the x-direction:', val: A }, { label: 'Semi-axis in the y-direction:', val: B }], disp),
+    solution: `Put z = ${fmt(sgn * kk)}: x²/${a * a} + y²/${b * b} = 1 − ${kk * kk}/${c * c} = ${m * m}/${c * c}\nDivide by ${m * m}/${c * c}: x²/${fmt(A * A)} + y²/${fmt(B * B)} = 1\nSemi-axes: √${fmt(A * A)} = ${fmt(A)} and √${fmt(B * B)} = ${fmt(B)}` };
+};
+TEMPLATES.c126Center = (r) => {
+  const kind = ri(r, 0, 2), h = ri(r, -4, 4), k = ri(r, -4, 4), l = ri(r, -4, 4), a = ri(r, 1, 4), b = ri(r, 1, 4), c = ri(r, 1, 4), R = pick(r, [4, 9, 16, 36]);
+  const co = kind === 0 ? [a, b, c] : kind === 1 ? [a, b, -c] : [-a, b, -c], C = [h, k, l];
+  const rhs = R - co[0] * h * h - co[1] * k * k - co[2] * l * l;
+  let s = ''; [[co[0], 'x²'], [-2 * co[0] * h, 'x'], [co[1], 'y²'], [-2 * co[1] * k, 'y'], [co[2], 'z²'], [-2 * co[2] * l, 'z']].forEach(([q, v]) => { if (!q) return; s += s ? chTerm(q, v) : `${chCo(q)}${v}`; });
+  const ans = C3_SURF[kind], disp = `${ans}, center ${c3P(C)}`, opts = C3_SURF.slice(0, 4);
+  return { topic: 'Complete the square', stem: `Complete the square to identify the surface and find its center:\n${s} = ${fmt(rhs)}`,
+    ...buildChoices(r, disp, [`${ans}, center ${c3P(C.map((x) => -x))}`, ...opts.filter((o) => o !== ans).map((o) => `${o}, center ${c3P(C)}`)], (i) => `${ans}, center ${c3P(C.map((x, j) => (j ? x : x + i + 1)))}`),
+    fr: chMix([{ label: 'The surface is a(n)', options: opts, ans }, ...c3F(C, ['x', 'y', 'z'], 'center ').map((f) => ({ ...f, label: f.label }))], disp),
+    solution: `Group and complete the square in each variable:\n${[[co[0], 'x', h], [co[1], 'y', k], [co[2], 'z', l]].map(([q, v, m], j) => { const t = `${Math.abs(q) === 1 ? '' : Math.abs(q)}${m ? `(${chMinus(m, v)})` : v}²`; return j ? ` ${q < 0 ? MINUS : '+'} ${t}` : `${q < 0 ? MINUS : ''}${t}`; }).join('')} = ${R}\nCenter ${c3P(C)}. ${['All three squared terms are positive: an ellipsoid.', 'Two positive squared terms and one negative, right side positive: a hyperboloid of one sheet.', 'One positive squared term and two negative, right side positive: a hyperboloid of two sheets.'][kind]}` };
+};
+
+/* ===== 13.1 Vector Functions and Space Curves ===== */
+TEMPLATES.c131Domain = (r) => {
+  const a = ri(r, -6, 0), c = a + ri(r, 1, 4), b = c + ri(r, 1, 4), I = `[${fmt(a)}, ${fmt(c)}) ∪ (${fmt(c)}, ${fmt(b)})`;
+  const opts = shuffle(r, [I, `[${fmt(a)}, ${fmt(b)})`, `(${fmt(a)}, ${fmt(c)}) ∪ (${fmt(c)}, ${fmt(b)}]`, `[${fmt(a)}, ${fmt(c)}) ∪ (${fmt(c)}, ${fmt(b)}]`]);
+  return { topic: 'Domain of a vector function', stem: `Find the domain of r(t) = ⟨√(${chMinus(a, 't')}), ln(${fmt(b)} − t), 1/${c ? `(${chMinus(c, 't')})` : 't'}⟩.`.replace('ln(0 − t)', 'ln(−t)'), choices: opts, answer: opts.indexOf(I), fr: c3Sel('Domain:', opts, I, I),
+    solution: `Each component must be defined.\n√(${chMinus(a, 't')}): t ≥ ${fmt(a)}\nln(${fmt(b)} − t): t < ${fmt(b)}\n1/${c ? `(${chMinus(c, 't')})` : 't'}: t ≠ ${fmt(c)}\nTogether: ${I}` };
+};
+TEMPLATES.c131Limit = (r) => {
+  const kinds = shuffle(r, [0, 1, 2, 3, 4]).slice(0, 3), comps = kinds.map((kd) => { const k = nz(r, -5, 5), K = Math.abs(k), kt = chCo(k) + 't';
+    return [[`sin(${kt})/t`, k, `sin(${kt})/t = ${fmt(k)} · sin(${kt})/(${kt}) → ${fmt(k)}`], [`(${k === 1 ? 'eᵗ' : `e^(${kt})`} − 1)/t`, k, `the derivative of ${k === 1 ? 'eᵗ' : `e^(${kt})`} at t = 0 is ${fmt(k)} (or use L’Hospital’s Rule)`], [`(t² ${k < 0 ? MINUS : '+'} ${K === 1 ? '' : K}t)/t`, k, `= t ${k < 0 ? MINUS : '+'} ${K} → ${fmt(k)}`], [`tan(${kt})/t`, k, `tan(${kt})/t = ${fmt(k)} · tan(${kt})/(${kt}) → ${fmt(k)}`], ['(1 − cos t)/t', 0, 'multiply by (1 + cos t): sin² t/(t(1 + cos t)) → 1 · 0/2 = 0']][kd]; });
+  const L = comps.map((c) => c[1]), disp = c3V(L);
+  return { topic: 'Limit of a vector function', stem: `Find lim (t → 0) of r(t) = ⟨${comps.map((c) => c[0]).join(', ')}⟩.`,
+    ...buildChoices(r, disp, [c3V(L.map((x) => -x)), c3V([0, 0, 0]), c3V(L.map((x) => (x ? 1 : 0))), c3V([L[1], L[0], L[2]])].filter((s) => s !== disp), (i) => c3V(L.map((x, j) => (j === i % 3 ? x + 1 : x)))),
+    fr: chNums(c3F(L, ['1st component', '2nd component', '3rd component']), disp),
+    solution: `Take the limit of each component:\n${comps.map((c) => `${c[0]}: ${c[2]}`).join('\n')}\nLimit: ${disp}` };
+};
+TEMPLATES.c131Hit = (r) => {
+  const a = nz(r, -4, 4), m = nz(r, -4, 4), X = [a * m, m * m, m ** 3], disp = c3P(X);
+  return { topic: 'Where a space curve meets a plane', stem: `The curve r(t) = ⟨${chCo(a)}t, t², t³⟩ passes through the origin. At what other point does it meet the plane z = ${chCo(m)}y?`,
+    ...buildChoices(r, disp, [c3P([-a * m, m * m, -(m ** 3)]), c3P([a, 1, 1]), c3P([a * m * m, m ** 4, m ** 6]), c3P([m, m * m, m ** 3])].filter((s) => s !== disp), (i) => c3P([X[0] + i + 1, X[1], X[2]])),
+    fr: chNums(c3F(X), disp),
+    solution: `On the curve, z = t³ and y = t². The plane needs t³ = ${chCo(m)}t²  →  t²(t − ${chP(m)}) = 0  →  t = 0 or t = ${fmt(m)}\nt = 0 is the origin. t = ${fmt(m)} gives ${disp}`.replace('− (−', '+ (').replace(/\+ \((\d+)\)/, '+ $1') };
+};
+TEMPLATES.c131Surface = (r) => {
+  const a = ri(r, 2, 5), b = ri(r, 2, 5), c = ri(r, 1, 4);
+  const bank = [[`⟨${a} cos t, ${a} sin t, ${chCo(c)}t⟩`, `x² + y² = ${a * a}`, `x² + y² = ${a * a} cos² t + ${a * a} sin² t = ${a * a}: the curve is a helix on this cylinder.`],
+    ['⟨t cos t, t sin t, t⟩', 'x² + y² = z²', 'x² + y² = t² = z²: the curve spirals on this cone.'],
+    [`⟨${a} cos t, ${b === a ? b + 1 : b} sin t, t⟩`, `x²/${a * a} + y²/${(b === a ? b + 1 : b) ** 2} = 1`, `(x/${a})² + (y/${b === a ? b + 1 : b})² = cos² t + sin² t = 1: an elliptic cylinder.`],
+    [`⟨t, t², ${chCo(c)}t⟩`, 'y = x²', 'x = t and y = t², so y = x²: a parabolic cylinder.'],
+    ['⟨t cos t, t, t sin t⟩', 'x² + z² = y²', 'x² + z² = t² = y²: a cone around the y-axis.']];
+  const [cur, ans, why] = pick(r, bank), pool = bank.map((x) => x[1]).concat([`x² + y² = ${a}`, 'x² + y² = z', 'z = x²']), opts = c3Pick(r, ans, pool);
+  return { topic: 'Which surface contains the curve?', stem: `The curve r(t) = ${cur} lies on which surface?`, choices: opts, answer: opts.indexOf(ans), fr: c3Sel('Surface:', opts, ans, ans), solution: why };
+};
+
+/* ===== 13.2 Derivatives and Integrals of Vector Functions ===== */
+TEMPLATES.c132Deriv = (r) => {
+  const comps = shuffle(r, [0, 1, 2, 3]).slice(0, 3).map((kd) => { const a = nz(r, -4, 5), p = nz(r, -5, 5), k = nz(r, -3, 3);
+    return [[`${chCo(a)}t³${chTerm(p, 't')}`, p, `${chCo(3 * a)}t²${chAdd(p)} → ${fmt(p)}`], [`${chCo(a)}e^(${chCo(k)}t)`, a * k, `${chCo(a * k)}e^(${chCo(k)}t) → ${fmt(a * k)}`], [`${chCo(a)}sin(${chCo(k)}t)`, a * k, `${chCo(a * k)}cos(${chCo(k)}t) → ${fmt(a * k)}`], [`${chCo(a)}ln(1${chTerm(k, 't')})`, a * k, `${fmt(a * k)}/(1${chTerm(k, 't')}) → ${fmt(a * k)}`]][kd]; });
+  const D = comps.map((c) => c[1]), disp = c3V(D);
+  return { topic: 'Derivative of a vector function', stem: `r(t) = ⟨${comps.map((c) => c[0]).join(', ')}⟩. Find r′(0).`.replace(/e\^\(t\)/g, 'eᵗ'),
+    ...buildChoices(r, disp, [c3V(D.map((x) => -x)), c3V(D.map((x, i) => (i === 0 ? 0 : x))), c3V([D[2], D[1], D[0]]), c3V(D.map((x) => x * 2))].filter((s) => s !== disp), (i) => c3V(D.map((x, j) => (j === i % 3 ? x + 1 : x)))),
+    fr: chNums(c3F(D, ['1st component', '2nd component', '3rd component']), disp),
+    solution: `Differentiate each component, then put t = 0:\n${comps.map((c) => `(${c[0]})′ = ${c[2]}`).join('\n')}\nr′(0) = ${disp}`.replace(/e\^\(t\)/g, 'eᵗ') };
+};
+TEMPLATES.c132Unit = (r) => {
+  const [[A, B, C], len] = pick(r, [[[6, 2, 3], 7], [[2, 6, 9], 11], [[6, 6, 3], 9], [[12, 4, 6], 14], [[3, 6, 6], 9], [[6, 2, 9], 11]]);
+  if (A * A + B * B + C * C !== len * len) return TEMPLATES.c132Unit(r);
+  const t0 = r() < 0.5 ? 1 : -1, a = A, b = B / 2, c = C / 3, d = [A, 2 * b * t0, 3 * c], T = d.map((x) => x / len), disp = c3V(T);
+  return { topic: 'Unit tangent vector', stem: `r(t) = ⟨${chCo(a)}t, ${chCo(b)}t², ${chCo(c)}t³⟩. Find the unit tangent vector T(${fmt(t0)}).`,
+    ...buildChoices(r, disp, [c3V(d), c3V(d.map((x) => x / (Math.abs(d[0]) + Math.abs(d[1]) + Math.abs(d[2])))), c3V([a, b * t0, c].map((x) => x / len)), c3V(T.map((x) => -x))], (i) => c3V(T.map((x, j) => (j === i % 3 ? x + 1 / len : x)))),
+    fr: chNums(c3F(T, ['1st component', '2nd component', '3rd component']), disp),
+    solution: `r′(t) = ⟨${a}, ${fmt(2 * b)}t, ${fmt(3 * c)}t²⟩, so r′(${fmt(t0)}) = ${c3V(d)}\n|r′(${fmt(t0)})| = √(${d.map((x) => x * x).join(' + ')}) = ${len}\nT(${fmt(t0)}) = r′(${fmt(t0)}) / |r′(${fmt(t0)})| = ${disp}` };
+};
+TEMPLATES.c132Integral = (r) => {
+  const T = ri(r, 1, 2), m = ri(r, 1, 3), n = ri(r, 0, 2), a = nz(r, -6, 6), b = nz(r, -6, 6), c = nz(r, -5, 5);
+  const I = [a * T ** (m + 1) / (m + 1), b * T ** (n + 1) / (n + 1), c * T], disp = c3V(I), pw = (k) => (k === 0 ? '' : k === 1 ? 't' : `t${c3Sup(k)}`);
+  const f = (co, k) => (k === 0 ? fmt(co) : `${chCo(co)}${pw(k)}`);
+  return { topic: 'Integral of a vector function', stem: `Evaluate the integral from 0 to ${T} of ⟨${f(a, m)}, ${f(b, n)}, ${fmt(c)}⟩ dt.`,
+    ...buildChoices(r, disp, [c3V([a * m * T ** (m - 1), n ? b * n * T ** (n - 1) : 0, 0]), c3V([a * T ** (m + 1), b * T ** (n + 1), c * T]), c3V([a * T ** m / (m + 1), b * T ** n / (n + 1), c]), c3V(I.map((x) => x / 2))].filter((s) => s !== disp), (i) => c3V(I.map((x, j) => (j === i % 3 ? x + 1 : x)))),
+    fr: chNums(c3F(I, ['1st component', '2nd component', '3rd component']), disp),
+    solution: `Integrate each component from 0 to ${T}:\n∫ ${f(a, m)} dt = ${chCo(a / (m + 1))}t${c3Sup(m + 1)} → ${fracT(I[0])}\n∫ ${f(b, n)} dt = ${n + 1 === 1 ? chCo(b) + 't' : chCo(b / (n + 1)) + 't' + c3Sup(n + 1)} → ${fracT(I[1])}\n∫ ${fmt(c)} dt = ${chCo(c)}t → ${fracT(I[2])}\nResult: ${disp}` };
+};
+TEMPLATES.c132IVP = (r) => {
+  const a = nz(r, -5, 5), b = nz(r, -4, 4), c = nz(r, -3, 3), p = ri(r, -5, 5), q = ri(r, -5, 5), s = ri(r, -5, 5), T = ri(r, 1, 3), R = [p + a * T, q + b * T * T, s + c * T ** 3], disp = c3P(R);
+  return { topic: 'Find r(t) from r′(t)', stem: `r′(t) = ⟨${fmt(a)}, ${chCo(2 * b)}t, ${chCo(3 * c)}t²⟩ and r(0) = ⟨${fmt(p)}, ${fmt(q)}, ${fmt(s)}⟩. Find r(${T}).`,
+    ...buildChoices(r, disp, [c3P([a * T, b * T * T, c * T ** 3]), c3P([p + a, q + 2 * b * T, s + 3 * c * T * T]), c3P([p + a * T, q + 2 * b * T * T, s + 3 * c * T ** 3])], (i) => c3P(R.map((x, j) => (j === i % 3 ? x + 1 : x)))),
+    fr: chNums(c3F(R, ['1st component', '2nd component', '3rd component']), disp),
+    solution: `Integrate: r(t) = ⟨${chCo(a)}t, ${chCo(b)}t², ${chCo(c)}t³⟩ + C. r(0) = C = ⟨${fmt(p)}, ${fmt(q)}, ${fmt(s)}⟩\nr(t) = ⟨${c3Lin(p, a)}, ${c3Lin(q, b, 't²')}, ${c3Lin(s, c, 't³')}⟩\nr(${T}) = ${disp}` };
+};
+TEMPLATES.c132TLine = (r) => {
+  const a = nz(r, -3, 4), t0 = nz(r, -3, 3), X = [2 * a * t0 / 3, t0 * t0 / 3, 0], disp = c3P(X);
+  return { topic: 'Tangent line to a space curve', stem: `Find where the tangent line to r(t) = ⟨${chCo(a)}t, t², t³⟩ at t = ${fmt(t0)} crosses the xy-plane.`,
+    ...buildChoices(r, disp, [c3P([a * t0, t0 * t0, 0]), c3P([a * t0 / 3, 2 * t0 * t0 / 3, 0]), c3P([-2 * a * t0 / 3, t0 * t0 / 3, 0]), c3P([2 * a * t0 / 3, -t0 * t0 / 3, 0])], (i) => c3P([X[0] + i + 1, X[1], 0])),
+    fr: chNums(c3F(X), disp),
+    solution: `Point: r(${fmt(t0)}) = ${c3P([a * t0, t0 * t0, t0 ** 3])}. Direction: r′(t) = ⟨${fmt(a)}, 2t, 3t²⟩, so r′(${fmt(t0)}) = ${c3V([a, 2 * t0, 3 * t0 * t0])}\nTangent line: ⟨${fmt(a * t0)}${chTerm(a, 's')}, ${t0 * t0}${chTerm(2 * t0, 's')}, ${fmt(t0 ** 3)}${chTerm(3 * t0 * t0, 's')}⟩\nxy-plane: z = 0  →  ${fmt(t0 ** 3)}${chTerm(3 * t0 * t0, 's')} = 0  →  s = ${fracT(-t0 / 3)}\nPoint: ${disp}` };
+};
+
+/* ===== 13.3 Arc Length and Curvature ===== */
+TEMPLATES.c133Helix = (r) => {
+  const [a, b, h] = pick(r, [[3, 4, 5], [4, 3, 5], [5, 12, 13], [12, 5, 13], [6, 8, 10], [8, 6, 10]]), k = ri(r, 1, 4), L = h * k, piT = (n) => (n === 1 ? 'π' : `${n}π`), disp = piT(L);
+  return { topic: 'Arc length of a helix', stem: `Find the length of the helix r(t) = ⟨${a} cos t, ${a} sin t, ${b}t⟩ from t = 0 to t = ${piT(k)}.`,
+    ...buildChoices(r, disp, [piT(a * k), piT((a + b) * k), piT(2 * L), piT(b * k)].filter((s) => s !== disp), (i) => piT(L + i + 1)),
+    fr: chNums([{ label: 'Length:', val: L * Math.PI, key: `${L}\\pi` }], disp),
+    solution: `r′(t) = ⟨−${a} sin t, ${a} cos t, ${b}⟩\n|r′(t)| = √(${a * a} sin² t + ${a * a} cos² t + ${b * b}) = √(${a * a} + ${b * b}) = ${h}\nL = ∫₀^(${piT(k)}) ${h} dt = ${h} · ${piT(k)} = ${disp}` };
+};
+TEMPLATES.c133Poly = (r) => {
+  const fam = r() < 0.5, a = ri(r, 1, 3), T = ri(r, 1, 3);
+  const L = fam ? a * (T ** 3 / 3 + 2 * T) : a * (6 * T + 2 * T ** 3), disp = fracT(L);
+  const curve = fam ? `⟨${chCo(2 * a)}t, ${chCo(a)}t², ${chCo(a / 3)}t³⟩` : `⟨${6 * a}t, ${3 * a}√2 t², ${chCo(2 * a)}t³⟩`;
+  const speed = fam ? `${a === 1 ? '' : a}(t² + 2)` : `${6 * a}(1 + t²)`;
+  return { topic: 'Arc length', stem: `Find the length of r(t) = ${curve} from t = 0 to t = ${T}.`,
+    ...buildChoices(r, disp, [fracT(fam ? a * (T ** 3 + 2 * T) : a * (6 * T + 6 * T ** 3)), fracT(fam ? a * (T * T + 2) : 6 * a * (1 + T * T)), fracT(L / 2), fracT(fam ? a * T ** 3 / 3 : 2 * a * T ** 3)], (i) => fracT(L + i + 1)),
+    fr: chNums([{ label: 'Length:', val: L, key: fracL(L) }], disp),
+    solution: (fam ? `r′(t) = ⟨${2 * a}, ${2 * a}t, ${chCo(a)}t²⟩\n|r′(t)| = √(${4 * a * a} + ${4 * a * a}t² + ${chCo(a * a)}t⁴) = ${a === 1 ? '' : a}√((t² + 2)²) = ${speed}`
+      : `r′(t) = ⟨${6 * a}, ${6 * a}√2 t, ${6 * a}t²⟩\n|r′(t)| = √(${36 * a * a} + ${72 * a * a}t² + ${36 * a * a}t⁴) = ${6 * a}√((1 + t²)²) = ${speed}`)
+      + `\nL = ∫₀^${T} ${speed} dt = ${disp}  (the expression under the root is a perfect square)` };
+};
+TEMPLATES.c133Reparam = (r) => {
+  const [v, len] = c3Quad(r), P = [ri(r, -5, 5), ri(r, -5, 5), ri(r, -5, 5)], m = ri(r, 1, 3), X = P.map((p, i) => p + m * v[i]), disp = c3P(X);
+  return { topic: 'Reparametrize by arc length', stem: `Starting at P${c3P(P)} and moving in the direction of v = ${c3V(v)}, where are you after traveling an arc length of ${m * len}? (Use r(t) = P + t v.)`,
+    ...buildChoices(r, disp, [c3P(P.map((p, i) => p + m * len * v[i])), c3P(P.map((p, i) => p + v[i])), c3P(P.map((p, i) => p - m * v[i])), c3P(v.map((x) => m * x))], (i) => c3P(X.map((x, j) => (j === i % 3 ? x + 1 : x)))),
+    fr: chNums(c3F(X), disp),
+    solution: `|r′(t)| = |v| = √(${v.map((x) => x * x).join(' + ')}) = ${len}, so the arc length is s = ${len}t, and t = s/${len}.\ns = ${m * len} gives t = ${m}: r(${m}) = P + ${m === 1 ? '' : m}v = ${disp}` };
+};
+TEMPLATES.c133Curv = (r) => {
+  const kind = ri(r, 0, 2); let stem, k, sol;
+  if (kind === 0) { const a = ri(r, 2, 6), b = ri(r, 1, 6); k = a / (a * a + b * b); stem = `Find the curvature of the helix r(t) = ⟨${a} cos t, ${a} sin t, ${chCo(b)}t⟩.`; sol = `κ = |r′ × r″| / |r′|³\nr′ = ⟨−${a} sin t, ${a} cos t, ${b}⟩, |r′| = √${a * a + b * b}\nr″ = ⟨−${a} cos t, −${a} sin t, 0⟩, |r′ × r″| = ${a}√${a * a + b * b}\nκ = ${a}√${a * a + b * b} / (${a * a + b * b}√${a * a + b * b}) = ${a}/${a * a + b * b} = ${fracT(k)}`.replace(/1√/g, '√'); }
+  else if (kind === 1) { const a = nz(r, -5, 5), h = ri(r, -4, 4), c = ri(r, -5, 5); k = 2 * Math.abs(a); stem = `Find the curvature of y = ${b4T([a, -2 * a * h, a * h * h + c])} at its vertex.`; sol = `κ = |y″| / (1 + (y′)²)^(3/2). At the vertex y′ = 0, and y″ = ${fmt(2 * a)}.\nκ = |${fmt(2 * a)}|/1 = ${k}`; }
+  else { const R = ri(r, 2, 9); k = 1 / R; stem = `Find the curvature of r(t) = ⟨${R} cos t, ${R} sin t⟩ (a circle).`; sol = `r′ = ⟨−${R} sin t, ${R} cos t⟩, |r′| = ${R}; T = ⟨−sin t, cos t⟩, |T′| = 1\nκ = |T′|/|r′| = 1/${R}. (A circle of radius R has curvature 1/R.)`; }
+  const disp = fracT(k);
+  return { topic: 'Curvature', stem, ...buildChoices(r, disp, [fracT(1 / k), fracT(k * 2), fracT(k / 2), fracT(k + 1)].filter((s) => s !== disp), (i) => fracT(k + i + 2)),
+    fr: chNums([{ label: 'κ =', val: k, key: fracL(k) }], disp), solution: sol };
+};
+
+/* ===== 13.4 Motion in Space: Velocity and Acceleration ===== */
+TEMPLATES.c134Vel = (r) => {
+  const a = nz(r, -3, 3), b = nz(r, -6, 6), c = nz(r, -2, 2), t0 = ri(r, 1, 2), v = [2 * a * t0, b, 3 * c * t0 * t0], A = [2 * a, 0, 6 * c * t0], sp = c3Len(v), disp = `a(${t0}) = ${c3V(A)}; speed ${exactT(sp)}`;
+  return { topic: 'Velocity, speed, and acceleration', stem: `A particle has position r(t) = ⟨${chCo(a)}t², ${chCo(b)}t, ${chCo(c)}t³⟩. Find its acceleration and its speed at t = ${t0}.`,
+    ...buildChoices(r, disp, [`a(${t0}) = ${c3V(v)}; speed ${exactT(c3Len(A))}`, `a(${t0}) = ${c3V(A)}; speed ${exactT(Math.abs(v[0]) + Math.abs(v[1]) + Math.abs(v[2]))}`, `a(${t0}) = ${c3V([2 * a, 0, 6 * c])}; speed ${exactT(sp)}`, `a(${t0}) = ${c3V(A)}; speed ${exactT(c3Dot(v, v))}`], (i) => `a(${t0}) = ${c3V(A)}; speed ${exactT(sp + i + 1)}`),
+    fr: chNums([...c3F(A, ['1st component', '2nd component', '3rd component'], 'a: '), { label: 'Speed:', val: sp, key: exactL(sp) }], disp),
+    solution: `v(t) = r′(t) = ⟨${fmt(2 * a)}t, ${fmt(b)}, ${fmt(3 * c)}t²⟩, so v(${t0}) = ${c3V(v)}\na(t) = v′(t) = ⟨${fmt(2 * a)}, 0, ${fmt(6 * c)}t⟩, so a(${t0}) = ${c3V(A)}\nSpeed = |v(${t0})| = √(${v.map((x) => x * x).join(' + ')}) = ${exactT(sp)}` };
+};
+TEMPLATES.c134FromAcc = (r) => {
+  const al = 2 * nz(r, -3, 3), be = 6 * nz(r, -2, 2), ga = 2 * nz(r, -3, 3), v0 = [ri(r, -4, 4), ri(r, -4, 4), ri(r, -4, 4)], r0 = [ri(r, -5, 5), ri(r, -5, 5), ri(r, -5, 5)], T = ri(r, 1, 2);
+  const R = [r0[0] + v0[0] * T + al * T * T / 2, r0[1] + v0[1] * T + be * T ** 3 / 6, r0[2] + v0[2] * T + ga * T * T / 2], disp = c3P(R);
+  return { topic: 'Position from acceleration', stem: `A particle has acceleration a(t) = ⟨${fmt(al)}, ${chCo(be)}t, ${fmt(ga)}⟩, initial velocity v(0) = ${c3V(v0)}, and initial position r(0) = ${c3V(r0)}. Find its position at t = ${T}.`,
+    ...buildChoices(r, disp, [c3P([r0[0] + al * T * T / 2, r0[1] + be * T ** 3 / 6, r0[2] + ga * T * T / 2]), c3P([r0[0] + v0[0] * T + al * T * T, r0[1] + v0[1] * T + be * T ** 3 / 2, r0[2] + v0[2] * T + ga * T * T]), c3P(R.map((x, i) => x - r0[i])), c3P([v0[0] + al * T, v0[1] + be * T * T / 2, v0[2] + ga * T])].filter((s) => s !== disp), (i) => c3P(R.map((x, j) => (j === i % 3 ? x + 1 : x)))),
+    fr: chNums(c3F(R), disp),
+    solution: `v(t) = v(0) + ∫ a dt = ⟨${c3Lin(v0[0], al)}, ${c3Lin(v0[1], be / 2, 't²')}, ${c3Lin(v0[2], ga)}⟩\nr(t) = r(0) + ∫ v dt = ⟨${[[r0[0], v0[0], al / 2, 't²'], [r0[1], v0[1], be / 6, 't³'], [r0[2], v0[2], ga / 2, 't²']].map(([c0, c1, c2, pw]) => c3Sum([[c0, ''], [c1, 't'], [c2, pw]])).join(', ')}⟩\nr(${T}) = ${disp}` };
+};
+TEMPLATES.c134Proj = (r) => {
+  const th = pick(r, [30, 45, 60]), v0 = 16 * ri(r, 2, 8), s2 = th === 45 ? 1 : Math.sqrt(3) / 2, sn2 = { 30: 1 / 4, 45: 1 / 2, 60: 3 / 4 }[th];
+  const R = v0 * v0 * s2 / 32, H = v0 * v0 * sn2 / 64, disp = `range ${exactT(R)} ft; max height ${fmt(H)} ft`;
+  return { topic: 'Projectile motion', stem: `A ball is launched from the ground at ${v0} ft/s at an angle of ${th}° above the horizontal. Ignoring air resistance (g = 32 ft/s²), find how far away it lands (exact) and its maximum height.`,
+    ...buildChoices(r, disp, [`range ${exactT(R / 2)} ft; max height ${fmt(H)} ft`, `range ${exactT(R)} ft; max height ${fmt(H * 2)} ft`, `range ${exactT(v0 * v0 / 32)} ft; max height ${fmt(v0 * v0 / 64)} ft`, `range ${exactT(R * 2)} ft; max height ${fmt(H / 2)} ft`].filter((s) => s !== disp), (i) => `range ${exactT(R)} ft; max height ${fmt(H + 4 * (i + 1))} ft`),
+    fr: chNums([{ label: 'Range (ft):', val: R, key: exactL(R) }, { label: 'Maximum height (ft):', val: H }], disp),
+    solution: `r(t) = ⟨(${v0} cos ${th}°)t, (${v0} sin ${th}°)t − 16t²⟩\nLands when y = 0: t = ${v0} sin ${th}° / 16 = ${exactT(v0 * Math.sqrt(sn2) / 16)} s\nRange: x = ${v0} cos ${th}° · ${exactT(v0 * Math.sqrt(sn2) / 16)} = ${exactT(R)} ft\nHighest at half that time (y′ = 0): t = ${exactT(v0 * Math.sqrt(sn2) / 32)} s, height = ${fmt(H)} ft` };
+};
+TEMPLATES.c134Comp = (r) => {
+  const [p, m, h] = pick(r, [[3, 4, 5], [4, 3, 5], [6, 8, 10], [8, 6, 10], [5, 12, 13], [12, 5, 13]]), t0 = m % 2 === 0 && r() < 0.5 ? 2 : 1, b = m / (2 * t0);
+  const aT = (2 * b * m) / h, aN = (p * 2 * b) / h, disp = `a_T = ${fracT(aT)}, a_N = ${fracT(aN)}`;
+  return { topic: 'Tangential and normal components of acceleration', stem: `r(t) = ⟨${p}t, ${chCo(b)}t²⟩. Find the tangential and normal components of acceleration at t = ${t0}.`,
+    ...buildChoices(r, disp, [`a_T = ${fracT(aN)}, a_N = ${fracT(aT)}`, `a_T = ${fracT(2 * b * m)}, a_N = ${fracT(p * 2 * b)}`, `a_T = ${fracT(aT)}, a_N = ${fracT(2 * b)}`, `a_T = ${fracT(2 * b)}, a_N = 0`].filter((s) => s !== disp), (i) => `a_T = ${fracT(aT + i + 1)}, a_N = ${fracT(aN)}`),
+    fr: chNums([{ label: 'a_T =', val: aT, key: fracL(aT) }, { label: 'a_N =', val: aN, key: fracL(aN) }], disp),
+    solution: `r′(t) = ⟨${p}, ${fracT(2 * b)}t⟩, r″(t) = ⟨0, ${fracT(2 * b)}⟩. At t = ${t0}: r′ = ⟨${p}, ${m}⟩, |r′| = ${h}\na_T = (r′ · r″)/|r′| = (${m} · ${fracT(2 * b)})/${h} = ${fracT(aT)}\na_N = |r′ × r″|/|r′| = |${p} · ${fracT(2 * b)} − ${m} · 0|/${h} = ${fracT(aN)}` };
+};
+
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
   { id: 'angleSum',           subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Triangle Sum Theorem', desc: 'Angles written in x — find x or an angle' },
@@ -29438,6 +29855,44 @@ QUESTION_TYPES.push({ id: 'b22Challenge', subject: 'algebra2', section: '2.2 Cha
 QUESTION_TYPES.push({ id: 'b23Challenge', subject: 'algebra2', section: '2.3 Focus of a Parabola', label: '★ Challenge: Parabola from focus and directrix', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'b24Challenge', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: '★ Challenge: Quadratic through three points', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'dmChallenge', subject: 'precalc', section: "4.5 DeMoivre's Theorem", label: '★ Challenge: The smallest power of a + bi that is real', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
+/* Calculus III (only for practice.html?t=calc) */
+QUESTION_TYPES.push({ id: 'c111RatLimit', subject: 'calc3', section: '11.1 Sequences', label: 'Limit of a rational sequence', desc: 'Divide by the highest power of n.' });
+QUESTION_TYPES.push({ id: 'c111Term', subject: 'calc3', section: '11.1 Sequences', label: 'Find a term', desc: 'Substitute n into a formula with (−1)ⁿ.' });
+QUESTION_TYPES.push({ id: 'c111Recur', subject: 'calc3', section: '11.1 Sequences', label: 'Recursive sequence', desc: 'Find a₄ and the limit of aₙ₊₁ = r·aₙ + d.' });
+QUESTION_TYPES.push({ id: 'c111Bank', subject: 'calc3', section: '11.1 Sequences', label: 'Converge or diverge?', desc: 'Famous limits: (1 + k/n)ⁿ, n sin(k/n), kⁿ/n!, and more.' });
+QUESTION_TYPES.push({ id: 'c112Geo', subject: 'calc3', section: '11.2 Series', label: 'Geometric series', desc: 'Sum, including series that start at n = 0, 1, or 2.' });
+QUESTION_TYPES.push({ id: 'c112Telescope', subject: 'calc3', section: '11.2 Series', label: 'Telescoping series', desc: 'Partial fractions, then cancel.' });
+QUESTION_TYPES.push({ id: 'c112Decimal', subject: 'calc3', section: '11.2 Series', label: 'Repeating decimal as a fraction', desc: 'Using a geometric series.' });
+QUESTION_TYPES.push({ id: 'c112Partial', subject: 'calc3', section: '11.2 Series', label: 'Partial sums', desc: 'Sum of the series and one term from sₙ.' });
+QUESTION_TYPES.push({ id: 'c112DivTest', subject: 'calc3', section: '11.2 Series', label: 'Test for Divergence', desc: 'Which series has terms that don’t go to 0?' });
+QUESTION_TYPES.push({ id: 'c112Combo', subject: 'calc3', section: '11.2 Series', label: 'Sum of two series', desc: 'A geometric series plus a telescoping one.' });
+QUESTION_TYPES.push({ id: 'c125LineHit', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: 'Line meets a coordinate plane', desc: 'Line through two points.' });
+QUESTION_TYPES.push({ id: 'c125Plane3', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: 'Plane through three points', desc: 'Cross product for the normal.' });
+QUESTION_TYPES.push({ id: 'c125Parallel', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: 'Parallel or perpendicular plane', desc: 'Find d in ax + by + cz = d.' });
+QUESTION_TYPES.push({ id: 'c125LinePlane', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: 'Line meets a plane', desc: 'Substitute the line into the plane.' });
+QUESTION_TYPES.push({ id: 'c125Angle', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: 'Angle between planes', desc: 'Angle between the normals.' });
+QUESTION_TYPES.push({ id: 'c125Dist', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: 'Distance from a point to a plane', desc: 'Exact answer.' });
+QUESTION_TYPES.push({ id: 'c126Type', subject: 'calc3', section: '12.6 Cylinders and Quadric Surfaces', label: 'Identify the surface', desc: 'Ellipsoids, hyperboloids, cones, paraboloids, cylinders.' });
+QUESTION_TYPES.push({ id: 'c126Axis', subject: 'calc3', section: '12.6 Cylinders and Quadric Surfaces', label: 'Axis of the surface', desc: 'Which axis it lies along or opens along.' });
+QUESTION_TYPES.push({ id: 'c126Trace', subject: 'calc3', section: '12.6 Cylinders and Quadric Surfaces', label: 'Traces of an ellipsoid', desc: 'The ellipse in a plane z = k.' });
+QUESTION_TYPES.push({ id: 'c126Center', subject: 'calc3', section: '12.6 Cylinders and Quadric Surfaces', label: 'Complete the square', desc: 'Type and center.' });
+QUESTION_TYPES.push({ id: 'c131Domain', subject: 'calc3', section: '13.1 Vector Functions and Space Curves', label: 'Domain of a vector function', desc: 'Where every component is defined.' });
+QUESTION_TYPES.push({ id: 'c131Limit', subject: 'calc3', section: '13.1 Vector Functions and Space Curves', label: 'Limit of a vector function', desc: 'Component by component.' });
+QUESTION_TYPES.push({ id: 'c131Hit', subject: 'calc3', section: '13.1 Vector Functions and Space Curves', label: 'Curve meets a plane', desc: 'The twisted cubic and a plane.' });
+QUESTION_TYPES.push({ id: 'c131Surface', subject: 'calc3', section: '13.1 Vector Functions and Space Curves', label: 'Which surface contains the curve?', desc: 'Helixes, cones, cylinders.' });
+QUESTION_TYPES.push({ id: 'c132Deriv', subject: 'calc3', section: '13.2 Derivatives and Integrals of Vector Functions', label: 'Derivative of a vector function', desc: 'r′(0).' });
+QUESTION_TYPES.push({ id: 'c132Unit', subject: 'calc3', section: '13.2 Derivatives and Integrals of Vector Functions', label: 'Unit tangent vector', desc: 'T = r′/|r′|.' });
+QUESTION_TYPES.push({ id: 'c132Integral', subject: 'calc3', section: '13.2 Derivatives and Integrals of Vector Functions', label: 'Integral of a vector function', desc: 'Definite integral, component by component.' });
+QUESTION_TYPES.push({ id: 'c132IVP', subject: 'calc3', section: '13.2 Derivatives and Integrals of Vector Functions', label: 'Find r(t) from r′(t)', desc: 'With an initial condition.' });
+QUESTION_TYPES.push({ id: 'c132TLine', subject: 'calc3', section: '13.2 Derivatives and Integrals of Vector Functions', label: 'Tangent line', desc: 'Where it crosses the xy-plane.' });
+QUESTION_TYPES.push({ id: 'c133Helix', subject: 'calc3', section: '13.3 Arc Length and Curvature', label: 'Arc length of a helix', desc: 'Answer in terms of π.' });
+QUESTION_TYPES.push({ id: 'c133Poly', subject: 'calc3', section: '13.3 Arc Length and Curvature', label: 'Arc length', desc: 'The speed is a perfect square.' });
+QUESTION_TYPES.push({ id: 'c133Reparam', subject: 'calc3', section: '13.3 Arc Length and Curvature', label: 'Reparametrize by arc length', desc: 'Where you are after traveling a distance s.' });
+QUESTION_TYPES.push({ id: 'c133Curv', subject: 'calc3', section: '13.3 Arc Length and Curvature', label: 'Curvature', desc: 'Helix, parabola at its vertex, circle.' });
+QUESTION_TYPES.push({ id: 'c134Vel', subject: 'calc3', section: '13.4 Motion in Space: Velocity and Acceleration', label: 'Acceleration and speed', desc: 'From position r(t).' });
+QUESTION_TYPES.push({ id: 'c134FromAcc', subject: 'calc3', section: '13.4 Motion in Space: Velocity and Acceleration', label: 'Position from acceleration', desc: 'Integrate twice with initial conditions.' });
+QUESTION_TYPES.push({ id: 'c134Proj', subject: 'calc3', section: '13.4 Motion in Space: Velocity and Acceleration', label: 'Projectile motion', desc: 'Range and maximum height (g = 32 ft/s²).' });
+QUESTION_TYPES.push({ id: 'c134Comp', subject: 'calc3', section: '13.4 Motion in Space: Velocity and Acceleration', label: 'Tangential and normal components', desc: 'a_T and a_N.' });
 ['g64Backward', 'g65AlgSides', 'trigProveHard'].forEach((id) => { const t = QUESTION_TYPES.find((x) => x.id === id); if (t) { t.challenge = true; if (!t.label.startsWith('★')) t.label = '★ Challenge: ' + t.label; } });
 // keep each section's types together (types added later, like the challenges, join their section instead of starting a second copy of it)
 { const order = new Map(); QUESTION_TYPES.forEach((t) => { const k = t.subject + '|' + t.section; if (!order.has(k)) order.set(k, order.size); });
@@ -32739,7 +33194,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 2: 'Reasoning and Proofs', 3: 'Parallel and Perpendicular Lines', 4: 'Transformations', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 2: 'Reasoning and Proofs', 3: 'Parallel and Perpendicular Lines', 4: 'Transformations', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, calc3: { 11: 'Sequences, Series, and Power Series', 12: 'Vectors and the Geometry of Space', 13: 'Vector Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0), b = secs[sec].ids.reduce((a, id) => a + (bonusCounts[id] || 0), 0);
     return [n ? `${n} chosen` : '', b ? `★ ${b} bonus` : ''].filter(Boolean).join(' · '); };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
