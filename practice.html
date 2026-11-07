@@ -434,7 +434,7 @@ const SETS = {
   'geo-6-5':       { subject: 'geometry', title: '6.5 Indirect Proof and Inequalities in One Triangle', items: [['g65FirstStep', 2], ['g65OrderAngles', 3], ['g65OrderSides', 3], ['g65ThirdSide', 3], ['g65Possible', 3]] },
   'geo-6-6':       { subject: 'geometry', title: '6.6 Inequalities in Two Triangles', items: [['g66Hinge', 6], ['g66Flights', 2], ['g66PossibleX', 3]] },
   // ----- Calculus III (Stewart, Calculus 9th ed.; practice.html?t=calc) -----
-  'calc3-11-1': { subject: 'calc3', title: '11.1 Sequences', items: [['c111RatLimit', 2], ['c111RatLimit', 1, 'fr'], ['c111Term', 2], ['c111Term', 1, 'fr'], ['c111Recur', 2], ['c111Recur', 1, 'fr'], ['c111Bank', 2], ['c111Bank', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
+  'calc3-11-1': { subject: 'calc3', title: '11.1 Sequences', items: [['c111RatLimit', 2], ['c111RatLimit', 1, 'fr'], ['c111Term', 2], ['c111Term', 1, 'fr'], ['c111Recur', 2], ['c111Recur', 1, 'fr'], ['c111Bank', 2], ['c111Bank', 1, 'fr'], ['c111Formula', 1], ['c111Formula', 2, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-11-2': { subject: 'calc3', title: '11.2 Series', items: [['c112Geo', 1], ['c112Geo', 1, 'fr'], ['c112Telescope', 1], ['c112Telescope', 1, 'fr'], ['c112Decimal', 1], ['c112Decimal', 1, 'fr'], ['c112Partial', 1], ['c112Partial', 1, 'fr'], ['c112DivTest', 1], ['c112DivTest', 1, 'fr'], ['c112Combo', 1], ['c112Combo', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-12-5': { subject: 'calc3', title: '12.5 Equations of Lines and Planes', items: [['c125LineHit', 1], ['c125LineHit', 1, 'fr'], ['c125Plane3', 1], ['c125Plane3', 1, 'fr'], ['c125Parallel', 1], ['c125Parallel', 1, 'fr'], ['c125LinePlane', 1], ['c125LinePlane', 1, 'fr'], ['c125Angle', 1], ['c125Angle', 1, 'fr'], ['c125Dist', 1], ['c125Dist', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-12-6': { subject: 'calc3', title: '12.6 Cylinders and Quadric Surfaces', items: [['c126Type', 2], ['c126Type', 1, 'fr'], ['c126Axis', 2], ['c126Axis', 1, 'fr'], ['c126Trace', 2], ['c126Trace', 1, 'fr'], ['c126Center', 2], ['c126Center', 1, 'fr']], lockdown: false, retries: 2, attempts: 10, desmos: true },
@@ -28215,6 +28215,41 @@ TEMPLATES.c134Comp = (r) => {
     solution: `r′(t) = ⟨${p}, ${fracT(2 * b)}t⟩, r″(t) = ⟨0, ${fracT(2 * b)}⟩. At t = ${t0}: r′ = ⟨${p}, ${m}⟩, |r′| = ${h}\na_T = (r′ · r″)/|r′| = (${m} · ${fracT(2 * b)})/${h} = ${fracT(aT)}\na_N = |r′ × r″|/|r′| = |${p} · ${fracT(2 * b)} − ${m} · 0|/${h} = ${fracT(aN)}` };
 };
 
+/* 11.1: a formula for the general term from the first few terms */
+TEMPLATES.c111Formula = (r) => {
+  const fam = ri(r, 0, 5), S = fam === 4 ? 0 : pick(r, [0, 1, 2]);
+  const sg = (s, n) => (s === 0 ? 1 : s === 1 ? (n % 2 ? 1 : -1) : n % 2 ? -1 : 1);
+  const sT = (s) => ['', '(−1)ⁿ⁻¹', '(−1)ⁿ'][s], sL = (s) => ['', '(-1)^{n-1}', '(-1)^{n}'][s];
+  const P = (t) => (/[ +−-]/.test(t) ? `(${t})` : t), F = (s, nT, dT) => `${s ? sT(s) + ' · ' : ''}${dT === '1' ? nT : `${P(nT)}/${P(dT)}`}`;
+  let num, den, nT, dT, nL, dL, alts, why;
+  if (fam === 0) { const a = ri(r, 0, 3), b = ri(r, 2, 5); num = (n) => n + a; den = (n) => b ** n; nT = a ? `n + ${a}` : 'n'; nL = a ? `n+${a}` : 'n'; dT = `${b}ⁿ`; dL = `${b}^{n}`;
+    alts = [[S, nT, `${b}ⁿ⁺¹`], [S, a ? `n + ${a + 1}` : 'n + 1', dT], [S, nT, `${b}n`]]; why = [`the numerators go up by 1, starting at ${1 + a}`, `the denominators are powers of ${b}: ${b}, ${b * b}, ${b ** 3}, …`]; }
+  else if (fam === 1) { const a = ri(r, 0, 2), c = a + ri(r, 1, 3); num = (n) => n + a; den = (n) => n + c; nT = a ? `n + ${a}` : 'n'; nL = a ? `n+${a}` : 'n'; dT = `n + ${c}`; dL = `n+${c}`;
+    alts = [[S, nT, `n + ${c + 1}`], [S, `n + ${a + 1}`, dT], [S, nT, c > 1 ? `${c}n` : `n + ${c + 2}`]]; why = [`the numerators go up by 1, starting at ${1 + a}`, `the denominators go up by 1, starting at ${1 + c}`]; }
+  else if (fam === 2) { const k = ri(r, 2, 4), m = pick(r, [-1, 1, 2].filter((x) => k + x > 1)); num = () => 1; den = (n) => k * n + m; nT = '1'; nL = '1'; dT = `${k}n ${m < 0 ? '−' : '+'} ${Math.abs(m)}`; dL = `${k}n${m < 0 ? '-' : '+'}${Math.abs(m)}`;
+    alts = [[S, '1', `${k}n`], [S, '1', `n + ${k + m - 1}`], [S, '1', `${k}n ${m < 0 ? '+' : '−'} ${Math.abs(m)}`]]; why = ['every numerator is 1', `the denominators go up by ${k}, starting at ${k + m}, so they are ${dT}`]; }
+  else if (fam === 3) { const k = ri(r, 2, 3); num = (n) => n * n; den = (n) => k ** n; nT = 'n²'; nL = 'n^{2}'; dT = `${k}ⁿ`; dL = `${k}^{n}`;
+    alts = [[S, '2n', dT], [S, 'n²', `${k}n`], [S, 'n²', `${k}ⁿ⁺¹`]]; why = ['the numerators are the perfect squares 1, 4, 9, 16, …', `the denominators are powers of ${k}: ${k}, ${k * k}, ${k ** 3}, …`]; }
+  else if (fam === 5) { const odd = r() < 0.5; num = (n) => (odd ? 2 * n - 1 : 2 * n); den = (n) => (odd ? 2 * n : 2 * n + 1); nT = odd ? '2n − 1' : '2n'; nL = odd ? '2n-1' : '2n'; dT = odd ? '2n' : '2n + 1'; dL = odd ? '2n' : '2n+1';
+    alts = [[S, odd ? '2n + 1' : '2n − 1', dT], [S, nT, odd ? '2n + 2' : '2n − 1'], [S, 'n', dT]]; why = [odd ? 'the numerators are the odd numbers 1, 3, 5, …' : 'the numerators are the even numbers 2, 4, 6, …', odd ? 'the denominators are the even numbers 2, 4, 6, …' : 'the denominators are the odd numbers 3, 5, 7, …']; }
+  else { // geometric
+    const c = nz(r, -5, 6), [p, q] = pick(r, [[1, 2], [2, 3], [1, 3], [3, 4], [3, 2], [1, 4]]), ratio = (r() < 0.5 ? -1 : 1) * p / q, f = (n) => c * ratio ** (n - 1);
+    const rt = `${fmt(c)}(${fracT(ratio)})ⁿ⁻¹`.replace(/^1\(/, '(').replace(/^−1\(/, '−('), rl = `${c === 1 ? '' : c === -1 ? '-' : c}\\left(${ratio < 0 ? '-' : ''}\\frac{${p}}{${q}}\\right)^{n-1}`;
+    const terms = [1, 2, 3, 4, 5].map((n) => fracT(f(n)));
+    const W = [`${fmt(c)}(${fracT(ratio)})ⁿ`, `${fmt(c)}(${fracT(1 / ratio)})ⁿ⁻¹`, `${fmt(c)}(${fracT(-ratio)})ⁿ⁻¹`].map((w) => 'aₙ = ' + w.replace(/^1\(/, '(').replace(/^−1\(/, '−('));
+    return b8ruleQ(r, { topic: 'Find a formula for the sequence', stem: `Find a formula for the general term aₙ of the sequence, starting with n = 1 and assuming the pattern continues:\n{${terms.join(', ')}, …}`,
+      f, ruleT: rt, ruleL: rl, wrongs: W,
+      solution: `Each term is the one before it times ${fracT(ratio)} (for example, ${terms[1]} ÷ ${terms[0].startsWith('−') ? `(${terms[0]})` : terms[0]} = ${fracT(ratio)}), so the sequence is geometric with first term ${fmt(c)} and ratio ${fracT(ratio)}.\naₙ = (first term) · (ratio)ⁿ⁻¹ = ${rt}\nCheck: n = 1 gives ${fmt(c)} ✓` });
+  }
+  const f = (n) => (sg(S, n) * num(n)) / den(n), tT = (n) => `${sg(S, n) < 0 ? '−' : ''}${den(n) === 1 ? num(n) : `${num(n)}/${den(n)}`}`;
+  const ruleT = F(S, nT, dT), ruleL = `${sL(S)}${dL === '1' ? nL : `\\frac{${nL}}{${dL}}`}`;
+  const W = [...[0, 1, 2].filter((s) => s !== S).map((s) => F(s, nT, dT)), ...alts.map(([s, a, b]) => F(s, a, b))].map((w) => 'aₙ = ' + w);
+  const signWhy = S === 0 ? 'all the terms are positive' : S === 1 ? 'the signs alternate, starting with +, so use (−1)ⁿ⁻¹ (it is +1 when n = 1)' : 'the signs alternate, starting with −, so use (−1)ⁿ (it is −1 when n = 1)';
+  return b8ruleQ(r, { topic: 'Find a formula for the sequence', stem: `Find a formula for the general term aₙ of the sequence, starting with n = 1 and assuming the pattern continues:\n{${[1, 2, 3, 4, 5].map(tT).join(', ')}, …}`,
+    f, ruleT, ruleL, wrongs: W,
+    solution: `Look at each part separately:\n• ${why[0]}: ${nT}\n• ${why[1]}${fam === 2 ? '' : `: ${dT}`}\n• ${signWhy}\naₙ = ${ruleT}\nCheck: n = 1 gives ${tT(1)} ✓` });
+};
+
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
   { id: 'angleSum',           subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Triangle Sum Theorem', desc: 'Angles written in x — find x or an angle' },
@@ -29867,6 +29902,7 @@ QUESTION_TYPES.push({ id: 'dmChallenge', subject: 'precalc', section: "4.5 DeMoi
 QUESTION_TYPES.push({ id: 'c111RatLimit', subject: 'calc3', section: '11.1 Sequences', label: 'Limit of a rational sequence', desc: 'Divide by the highest power of n.' });
 QUESTION_TYPES.push({ id: 'c111Term', subject: 'calc3', section: '11.1 Sequences', label: 'Find a term', desc: 'Substitute n into a formula with (−1)ⁿ.' });
 QUESTION_TYPES.push({ id: 'c111Recur', subject: 'calc3', section: '11.1 Sequences', label: 'Recursive sequence', desc: 'Find a₄ and the limit of aₙ₊₁ = r·aₙ + d.' });
+QUESTION_TYPES.push({ id: 'c111Formula', subject: 'calc3', section: '11.1 Sequences', label: 'Find a formula from the terms', desc: 'Given the first five terms, write aₙ (signs, powers, odd/even, geometric).' });
 QUESTION_TYPES.push({ id: 'c111Bank', subject: 'calc3', section: '11.1 Sequences', label: 'Converge or diverge?', desc: 'Famous limits: (1 + k/n)ⁿ, n sin(k/n), kⁿ/n!, and more.' });
 QUESTION_TYPES.push({ id: 'c112Geo', subject: 'calc3', section: '11.2 Series', label: 'Geometric series', desc: 'Sum, including series that start at n = 0, 1, or 2.' });
 QUESTION_TYPES.push({ id: 'c112Telescope', subject: 'calc3', section: '11.2 Series', label: 'Telescoping series', desc: 'Partial fractions, then cancel.' });
