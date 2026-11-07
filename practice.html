@@ -238,6 +238,10 @@
 .lp-picksec:hover { background: #eef3fa; }
 .lp-picksec.on { background: #e3ecf8; font-weight: 600; }
 @media print { .lp-pick { display: none; } }
+/* late work on the results dashboard: the whole row, name, and grade in red */
+tr.dash-late td { background: #fdecea; color: #b42318; }
+tr.dash-late td a { color: #b42318 !important; }
+tr.dash-late td strong { color: #b42318; }
 </style>
 </head>
 <body>
@@ -31013,6 +31017,9 @@ const byStudent = (p) => String(perOrder(p.period)).padStart(2, '0') + '|' + las
 const dashDate = (t) => { const d = new Date(t), now = new Date(); const same = d.toDateString() === now.toDateString();
   return same ? 'Today ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
 const pctT = (p) => Math.round(100 * p) + '%';
+// late work: the student's FIRST turn-in came after the Classroom due date for their period (PracticeResults.gs version 13 sends the due dates)
+const dashDue = (r) => { const d = DASH.data && DASH.data.dues; if (!d || !r || !r.set || !r.period) return 0; return d[(String(r.set).indexOf('custom:') === 0 ? r.set + '|' + r.title : r.set) + '\n' + r.period] || 0; };
+const dashLate = (r) => { const due = r && r.firstT ? dashDue(r) : 0; return due && r.firstT > due ? due : 0; };
 const band = (p) => (p >= 0.9 ? '#e7f3e4' : p >= 0.7 ? '#f3f6e2' : p >= 0.5 ? '#fbf1dc' : '#f9e1de');
 // "3✓(try 2)(hint) 4✗– 5½(…)" → [{n, pts, hint}]
 function parseDetail(s) {
@@ -31124,6 +31131,8 @@ async function dashboard() {
     return;
   }
   DASH.data = g; dashRender();
+  if (g.v >= 5 && !(g.v >= 8)) app.prepend(el('div', { class: 'card', style: 'border-left:4px solid #c9a227' }, el('strong', {}, 'Late work isn’t marked yet'),
+    el('p', { class: 'small', style: 'margin:4px 0 0' }, 'To show late work in red, paste the new PracticeResults.gs (version 13) into your Apps Script, then Deploy > Manage deployments > Edit > Version: New version > Deploy.')));
   if (!(g.v >= 5)) app.prepend(el('div', { class: 'card', style: 'border-left:4px solid #c0392b' }, el('strong', {}, 'Your Apps Script needs updating'),
     el('p', {}, 'The script your Sheet is running is older than this page, so some features won’t work (unlocking students, deleting assignments, remembering assignment settings, picking up an assignment you were building on another computer). In the Apps Script editor, replace everything with the newest PracticeResults.gs, save, then Deploy > Manage deployments > pencil icon > Version: New version > Deploy. The web app URL stays the same.')));
   dashWatch();
@@ -31191,7 +31200,7 @@ function dashRender() {
 }
 
 // table helper with clickable headers
-function dashTable(cols, data, key) {
+function dashTable(cols, data, key) { // rows that dashLate() flags are drawn red
   const sk = DASH.sort in Object.fromEntries(cols.map((c) => [c.k, 1])) ? DASH.sort : cols[0].k;
   const c0 = cols.find((c) => c.k === sk), val = c0.sort || ((r) => r[sk]);
   const sorted = data.slice().sort((a, b) => { const x = val(a), y = val(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * DASH.dir; });
@@ -31199,8 +31208,8 @@ function dashTable(cols, data, key) {
     c.t + (c.k === sk ? (DASH.dir > 0 ? ' ▲' : ' ▼') : ''));
   return el('div', { style: 'overflow-x:auto' }, el('table', { style: 'width:100%;border-collapse:collapse;font-size:15px' },
     el('thead', {}, el('tr', {}, ...cols.map(th))),
-    el('tbody', {}, ...sorted.map((r) => el('tr', {}, ...cols.map((c) => { const v = c.show ? c.show(r) : r[c.k];
-      return el('td', { style: `padding:7px 10px;border-bottom:1px solid var(--line);${c.bg ? 'background:' + c.bg(r) : ''}` }, v instanceof Node ? v : String(v ?? '')); }))))));
+    el('tbody', {}, ...sorted.map((r) => { const late = dashLate(r); return el('tr', late ? { class: 'dash-late', title: 'Turned in after the due date (' + dashDate(late) + ')' } : {}, ...cols.map((c) => { const v = c.show ? c.show(r) : r[c.k];
+      return el('td', { style: `padding:7px 10px;border-bottom:1px solid var(--line);${c.bg && !late ? 'background:' + c.bg(r) : ''}` }, v instanceof Node ? v : String(v ?? '')); })); }))));
 }
 const linkBtn = (text, on) => el('a', { href: '#', style: 'color:var(--accent);font-weight:600;text-decoration:none', onclick: (e) => { e.preventDefault(); on(); } }, text);
 const tile = (big, small, color) => el('div', { style: `flex:1;min-width:130px;padding:14px;border-radius:10px;background:${color || 'var(--accent-soft)'}` }, el('div', { style: 'font-size:26px;font-weight:700' }, big), el('div', { class: 'small' }, small));
@@ -31208,8 +31217,8 @@ const caps = (t) => (String(t).match(/[A-Z]/g) || []).length;
 function bestRows(rows) { // each student's best try (and how many tries); rows the teacher reset don't count
   const m = {};
   rows.filter((r) => !/^RESET/.test(r.version || '')).forEach((r) => { const k = who(r.period, r.name), b = m[k];
-    if (!b) m[k] = { ...r, tries: 1, lastT: r.t, shown: r.name }; else { b.tries++; b.lastT = Math.max(b.lastT, r.t); if (caps(r.name) > caps(b.shown)) b.shown = r.name;
-      if (r.pct > b.pct || (r.pct === b.pct && r.t > b.t)) Object.assign(m[k], r, { tries: b.tries, lastT: b.lastT, shown: b.shown }); } });
+    if (!b) m[k] = { ...r, tries: 1, lastT: r.t, firstT: r.t, shown: r.name }; else { b.tries++; b.lastT = Math.max(b.lastT, r.t); b.firstT = Math.min(b.firstT, r.t); if (caps(r.name) > caps(b.shown)) b.shown = r.name;
+      if (r.pct > b.pct || (r.pct === b.pct && r.t > b.t)) Object.assign(m[k], r, { tries: b.tries, lastT: b.lastT, firstT: b.firstT, shown: b.shown }); } });
   return Object.values(m).map((b) => ({ ...b, name0: b.name, name: b.shown })); // name0: the spelling on that row of the Sheet // show the best-capitalized spelling the student typed
 }
 function dashCsv(name, head, lines) {
@@ -31279,15 +31288,15 @@ function dashAssignment(a) {
 
   // students
   const scard = el('div', { class: 'card' }, el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap' }, el('strong', {}, 'Students who turned it in'),
-    best.length ? el('button', { class: 'btn secondary', style: 'margin-top:0;padding:7px 14px', onclick: () => dashCsv(a.title, ['Period', 'Name', 'Best score', 'Out of', 'Percent', 'Tries', 'Last turned in', 'Minutes', 'Times left tab', 'Hints', 'Work'],
-      best.map((r) => [r.period, r.name, r.score, r.total, Math.round(100 * r.pct), r.tries, new Date(r.lastT).toLocaleString(), r.minutes, r.away, parseDetail(r.detail).filter((d) => d.hint).length, r.work])) }, 'Download CSV') : ''));
+    best.length ? el('button', { class: 'btn secondary', style: 'margin-top:0;padding:7px 14px', onclick: () => dashCsv(a.title, ['Period', 'Name', 'Best score', 'Out of', 'Percent', 'Tries', 'Last turned in', 'Late', 'Minutes', 'Times left tab', 'Hints', 'Work'],
+      best.map((r) => [r.period, r.name, r.score, r.total, Math.round(100 * r.pct), r.tries, new Date(r.lastT).toLocaleString(), dashLate(r) ? 'late' : '', r.minutes, r.away, parseDetail(r.detail).filter((d) => d.hint).length, r.work])) }, 'Download CSV') : ''));
   if (!best.length) scard.append(el('p', {}, 'Nobody has turned this in yet.'));
   else scard.append(dashTable([
     { k: 'name', t: 'Student', sort: byStudent, show: (r) => linkBtn(r.name, () => { DASH.student = { period: r.period, name: r.name }; dashRender(); }) },
     { k: 'period', t: 'Period', sort: (r) => perOrder(r.period) * 1000 + 0 },
     { k: 'pct', t: 'Best', desc: true, show: (r) => el('span', {}, el('strong', {}, pctT(r.pct)), el('span', { class: 'small' }, ` (${r.score}/${r.total})`)), bg: (r) => band(r.pct) },
     { k: 'tries', t: 'Tries', desc: true },
-    { k: 'lastT', t: 'Turned in', desc: true, show: (r) => dashDate(r.lastT) },
+    { k: 'lastT', t: 'Turned in', desc: true, show: (r) => dashLate(r) ? el('span', {}, dashDate(r.firstT), el('strong', {}, ' · LATE')) : dashDate(r.lastT) },
     { k: 'minutes', t: 'Minutes', desc: true },
     { k: 'away', t: 'Left tab', desc: true, bg: (r) => (r.away >= 3 ? '#fbf1dc' : '') },
     { k: 'hints', t: 'Help used', desc: true, sort: (r) => parseDetail(r.detail).filter((d) => d.hint).length, show: (r) => parseDetail(r.detail).filter((d) => d.hint).length || '' },
@@ -31295,6 +31304,7 @@ function dashAssignment(a) {
     { k: 'grade', t: '', sort: () => 0, show: (r) => adjustBtn(r) },
     { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn(r) },
   ], best));
+  if (best.some(dashLate)) scard.append(el('p', { class: 'small', style: 'margin-top:10px;color:#b42318' }, 'Red rows: the student first turned it in after the Classroom due date for their period. Hover a red row to see the due date.'));
   app.append(scard);
 
   if (wip.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Started but not turned in'),
@@ -31323,7 +31333,7 @@ function dashStudent(s) {
       { k: 'title', t: 'Assignment', sort: (r) => r.title },
       { k: 'pct', t: 'Best', desc: true, show: (r) => el('span', {}, el('strong', {}, pctT(r.pct)), el('span', { class: 'small' }, ` (${r.score}/${r.total})`)), bg: (r) => band(r.pct) },
       { k: 'tries', t: 'Tries', desc: true },
-      { k: 'lastT', t: 'Turned in', desc: true, show: (r) => dashDate(r.lastT) },
+      { k: 'lastT', t: 'Turned in', desc: true, show: (r) => dashLate(r) ? el('span', {}, dashDate(r.firstT), el('strong', {}, ' · LATE')) : dashDate(r.lastT) },
       { k: 'minutes', t: 'Minutes', desc: true },
       { k: 'missed', t: 'Missed', sort: (r) => parseDetail(r.detail).filter((d) => d.pts < 1).length, show: (r) => parseDetail(r.detail).filter((d) => d.pts < 1).map((d) => '#' + d.n).join(' ') },
       { k: 'work', t: 'Work', sort: (r) => (r.work ? 1 : 0), show: (r) => (r.work ? el('a', { href: r.work, target: '_blank', rel: 'noopener', style: 'color:var(--accent)' }, 'View') : '') },
