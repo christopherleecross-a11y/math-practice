@@ -26687,10 +26687,10 @@ TEMPLATES.b74Challenge = (r) => {
     const a = nz(r, -6, 6), b = nz(r, -6, 6), p = nz(r, -5, 5), q = nz(r, -5, 5); if (p === q) continue;
     const m = a + b, n = a * q + b * p; if (!m) continue;
     const disp = `(${g4Lin(m, n)})/[(${g4Lin(1, p)})(${g4Lin(1, q)})]`;
-    return { topic: 'Challenge: add with unlike denominators', stem: `Add and write as a single fraction: ${a}/(${g4Lin(1, p)}) ${b < 0 ? MINUS : '+'} ${Math.abs(b)}/(${g4Lin(1, q)}). The result is (mx + n)/[(${g4Lin(1, p)})(${g4Lin(1, q)})]. Find m and n.`,
+    return { topic: 'Challenge: add with unlike denominators', stem: `Add and write as a single fraction: ${fmt(a)}/(${g4Lin(1, p)}) ${b < 0 ? MINUS : '+'} ${Math.abs(b)}/(${g4Lin(1, q)}). The result is (mx + n)/[(${g4Lin(1, p)})(${g4Lin(1, q)})]. Find m and n.`,
       ...chPairChoices(r, m, n, 'm', 'n', [[m, a * p + b * q], [a * b, n], [m, a + b], [m, -n]]),
       fr: chNums([{ label: 'm =', val: m }, { label: 'n =', val: n }], chPair(m, n, 'm', 'n')),
-      solution: `LCD: (${g4Lin(1, p)})(${g4Lin(1, q)})\n${a}(${g4Lin(1, q)}) + ${chP(b)}(${g4Lin(1, p)}) = ${g4Lin(a, a * q)}${b === 1 ? ' + x' : b === -1 ? ` ${MINUS} x` : `${chAdd(b)}x`}${chAdd(b * p)} = ${g4Lin(m, n)}\nResult: ${disp}, so m = ${fmt(m)} and n = ${fmt(n)}` };
+      solution: `LCD: (${g4Lin(1, p)})(${g4Lin(1, q)})\n${fmt(a)}(${g4Lin(1, q)}) + ${chP(b)}(${g4Lin(1, p)}) = ${g4Lin(a, a * q)}${b === 1 ? ' + x' : b === -1 ? ` ${MINUS} x` : `${chAdd(b)}x`}${chAdd(b * p)} = ${g4Lin(m, n)}\nResult: ${disp}, so m = ${fmt(m)} and n = ${fmt(n)}` };
   }
 };
 /* 7.5: two pipes (work problem) */
@@ -26706,6 +26706,350 @@ TEMPLATES.b75Challenge = (r) => {
       ...buildChoices(r, `${fracT(ans)} ${item[2]}`, [...new Set(kind ? [(a + b) / 2, a + b, Math.abs(a - b), a * b / Math.abs(a - b || 1)] : [a * t / (a + t), Math.abs(a - t), a + t, 2 * t])].filter((v) => fracParts(v) && v > 0 && v !== ans).map((v) => `${fracT(v)} ${item[2]}`), (i) => `${fracT(ans + i + 1)} ${item[2]}`),
       fr: chNums([{ label: `Time (${item[2]}):`, val: ans }], `${fracT(ans)} ${item[2]}`),
       solution: `Rates add: (1/${a}) + (1/${kind ? b : 'b'}) = 1/${kind ? 't' : chK(t)}\n${kind ? `1/t = ${fracT(1 / a + 1 / b)}  →  t = ${fracT(t)}` : `1/b = 1/${chK(t)} − 1/${a} = ${fracT(1 / t - 1 / a)}  →  b = ${fracT(b)}`} ${item[2]}` };
+  }
+};
+
+/* ---------- ★ Challenge questions, batch 6: Geometry 11–12, Algebra II 8–9, Pre-Calc P ---------- */
+const chPiFR = (label, k) => ({ label, val: k * Math.PI, key: k === 1 ? '\\pi' : `${fracL(k)}\\pi`.replace(/^\\frac\{(\d+)\}\{(\d+)\}\\pi$/, '\\frac{$1\\pi}{$2}') });
+const chPiK = (k) => (k === 1 ? 'π' : fracT(k).includes('/') ? fracT(k).replace(/^1\//, '/').replace('/', 'π/') : `${fracT(k)}π`);
+const b3sub = (n) => String(n).split('').map((d) => '₀₁₂₃₄₅₆₇₈₉'[+d]).join('');
+const chTerm = (v, sym) => (v === 1 ? ` + ${sym}` : v === -1 ? ` ${MINUS} ${sym}` : v ? `${chAdd(v)}${sym}` : ''); // “ + 3x”, “ − x”, or nothing
+const chC = (n, k) => { let v = 1; for (let i = 0; i < k; i++) v = v * (n - i) / (i + 1); return Math.round(v); };
+
+/* Geometry 11.1: radius from an arc length, then the circumference */
+TEMPLATES.g111Challenge = (r) => {
+  for (;;) {
+    const th = pick(r, [20, 30, 40, 45, 60, 72, 80, 90, 120, 135, 150, 210, 240, 270, 300]), rad = ri(r, 2, 24), k = th * rad / 180; if (!fracParts(k)) continue;
+    const disp = `radius ${rad}, circumference ${chPiK(2 * rad)}`;
+    return { topic: 'Challenge: radius from an arc length', stem: `In a circle, a ${th}° arc has length ${chPiK(k)} centimeters. Find the radius and the circumference of the circle (in terms of π).`,
+      ...buildChoices(r, disp, [`radius ${fmt(2 * rad)}, circumference ${chPiK(4 * rad)}`, `radius ${rad}, circumference ${chPiK(rad)}`, `radius ${fracT(180 * k / th / 2)}, circumference ${chPiK(rad)}`, `radius ${rad}, circumference ${chPiK(rad * rad)}`].filter((w, i, Z) => Z.indexOf(w) === i && w !== disp), (i) => `radius ${rad + i + 1}, circumference ${chPiK(2 * (rad + i + 1))}`),
+      fr: chNums([{ label: 'Radius (cm):', val: rad }, chPiFR('Circumference (cm):', 2 * rad)], disp),
+      solution: `Arc length = (${th}/360) · 2πr\n${chPiK(k)} = (${th}/360) · 2πr = (${chPiK(th / 180)})r  →  r = ${rad} cm\nCircumference = 2πr = ${chPiK(2 * rad)} cm` };
+  }
+};
+/* Geometry 11.2: the central angle from a sector's area, then its arc length */
+TEMPLATES.g112Challenge = (r) => {
+  for (;;) {
+    const rad = ri(r, 2, 15), th = pick(r, [30, 40, 45, 60, 72, 90, 120, 135, 150, 216, 240, 270]), A = th / 360 * rad * rad, L = th / 360 * 2 * rad; if (!fracParts(A) || !fracParts(L)) continue;
+    const disp = `${th}°; arc length ${chPiK(L)}`;
+    return { topic: 'Challenge: from a sector to its angle', stem: `A sector of a circle with radius ${rad} inches has an area of ${chPiK(A)} square inches. Find the central angle of the sector and the length of its arc (in terms of π).`,
+      ...buildChoices(r, disp, [`${fracT(360 * A / rad)}°; arc length ${chPiK(L * rad / 2)}`, `${th}°; arc length ${chPiK(L * 2)}`, `${fracT(th / 2)}°; arc length ${chPiK(L / 2)}`, `${th}°; arc length ${chPiK(A)}`].filter((w, i, Z) => Z.indexOf(w) === i && w !== disp), (i) => `${th + 10 * (i + 1)}°; arc length ${chPiK(L)}`),
+      fr: chNums([{ label: 'Central angle (degrees):', val: th }, chPiFR('Arc length (in.):', L)], disp),
+      solution: `Sector area = (θ/360) · πr²:  ${chPiK(A)} = (θ/360) · ${rad * rad}π  →  θ = ${th}°\nArc length = (θ/360) · 2πr = (${th}/360) · ${2 * rad}π = ${chPiK(L)} in.` };
+  }
+};
+/* Geometry 11.3: area and apothem of a regular hexagon (exact) */
+TEMPLATES.g113Challenge = (r) => {
+  const s = 2 * ri(r, 1, 8), ap = s * Math.sqrt(3) / 2, A = 1.5 * Math.sqrt(3) * s * s, disp = `apothem ${exactT(ap)}, area ${exactT(A)}`;
+  return { topic: 'Challenge: area of a regular hexagon', stem: `A regular hexagon has sides ${s} meters long. Find its apothem and its area. Give exact answers.`,
+    ...buildChoices(r, disp, [`apothem ${exactT(ap)}, area ${exactT(A / 2)}`, `apothem ${exactT(s * Math.sqrt(2) / 2)}, area ${exactT(3 * Math.sqrt(2) * s * s / 2)}`, `apothem ${exactT(s * Math.sqrt(3))}, area ${exactT(A * 2)}`, `apothem ${s / 2}, area ${fmt(1.5 * s * s)}`].filter((w, i, Z) => Z.indexOf(w) === i && w !== disp), (i) => `apothem ${exactT(ap)}, area ${exactT(A + (i + 1) * Math.sqrt(3))}`),
+    fr: chNums([{ label: 'Apothem (m):', val: ap, key: exactL(ap) }, { label: 'Area (m²):', val: A, key: exactL(A) }], disp),
+    solution: `The central angle is 360° ÷ 6 = 60°, so the apothem splits a 60° isosceles triangle into two 30°-60°-90° triangles with short leg ${s / 2}.\nApothem = ${exactT(ap)}\nPerimeter = 6 · ${s} = ${6 * s}\nArea = ½ · apothem · perimeter = ½ · ${exactT(ap)} · ${6 * s} = ${exactT(A)} m²` };
+};
+/* Geometry 11.4: the largest pen along a river (fence on three sides) */
+TEMPLATES.g114Challenge = (r) => {
+  const L = 8 * ri(r, 5, 60), w = L / 4, len = L / 2, A = w * len, disp = `${fmt(w)} ft by ${fmt(len)} ft; ${fmt(A)} ft²`;
+  return { topic: 'Challenge: best dimensions', stem: `You have ${L} feet of fence to make a rectangular pen along a straight river. The river side needs no fence. What dimensions give the largest area, and what is that area? (Try several widths and look for the pattern.)`,
+    ...buildChoices(r, disp, [`${fmt(L / 3)} ft by ${fmt(L / 3)} ft; ${fmt(chR1(L * L / 9))} ft²`, `${fmt(L / 4)} ft by ${fmt(L / 4)} ft; ${fmt(L * L / 16)} ft²`, `${fmt(L / 6)} ft by ${fmt(2 * L / 3)} ft; ${fmt(chR1(L * L / 9))} ft²`, `${fmt(w)} ft by ${fmt(len)} ft; ${fmt(A * 2)} ft²`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `${fmt(w + i + 1)} ft by ${fmt(L - 2 * (w + i + 1))} ft; ${fmt((w + i + 1) * (L - 2 * (w + i + 1)))} ft²`),
+    fr: chNums([{ label: 'Width (the two sides away from the river, ft):', val: w }, { label: 'Length (parallel to the river, ft):', val: len }, { label: 'Largest area (ft²):', val: A }], disp),
+    solution: `Let w = each side going away from the river. The side along the river is ${L} − 2w.\nArea = w(${L} − 2w). Try values: w = ${fmt(w - 10)} → ${fmt((w - 10) * (L - 2 * (w - 10)))};  w = ${fmt(w)} → ${fmt(A)};  w = ${fmt(w + 10)} → ${fmt((w + 10) * (L - 2 * (w + 10)))}\nThe area is largest at w = ${fmt(w)} (one quarter of the fence), so the pen is ${fmt(w)} ft by ${fmt(len)} ft, with area ${fmt(A)} ft².` };
+};
+/* Geometry 12.1: Euler's Formula to find the vertices, then name the solid */
+TEMPLATES.g121Challenge = (r) => {
+  const n = ri(r, 3, 8), poly = { 3: 'triangular', 4: 'rectangular', 5: 'pentagonal', 6: 'hexagonal', 7: 'heptagonal', 8: 'octagonal' }[n], prism = r() < 0.5;
+  const F = prism ? n + 2 : n + 1, E = prism ? 3 * n : 2 * n, V = E - F + 2, name = `${poly} ${prism ? 'prism' : 'pyramid'}`, disp = `${V} vertices; ${name}`;
+  const opts = shuffle(r, [...new Set([name, `${poly} ${prism ? 'pyramid' : 'prism'}`, `${{ 3: 'rectangular', 4: 'pentagonal', 5: 'hexagonal', 6: 'heptagonal', 7: 'octagonal', 8: 'triangular' }[n]} ${prism ? 'prism' : 'pyramid'}`, `${{ 3: 'octagonal', 4: 'triangular', 5: 'rectangular', 6: 'pentagonal', 7: 'hexagonal', 8: 'heptagonal' }[n]} ${prism ? 'pyramid' : 'prism'}`])]);
+  return { topic: 'Challenge: Euler’s Formula', stem: `A polyhedron has ${F} faces and ${E} edges. All of its faces are ${prism ? 'rectangles except two congruent bases' : 'triangles except one base'}. How many vertices does it have, and what is the solid?`,
+    ...buildChoices(r, disp, [`${E - F} vertices; ${name}`, `${V} vertices; ${poly} ${prism ? 'pyramid' : 'prism'}`, `${E + F - 2} vertices; ${name}`, `${V + 2} vertices; ${name}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `${V + i + 3} vertices; ${name}`),
+    fr: { fields: [{ kind: 'number', label: 'Vertices:' }, { kind: 'select', label: 'The solid is a', options: opts }], key: [String(V), name], display: disp,
+      check: (v) => numEq(v[0], V) && v[1] === name, score: (v) => (numEq(v[0], V) ? 0.5 : 0) + (v[1] === name ? 0.5 : 0) },
+    solution: `Euler’s Formula: F + V = E + 2  →  ${F} + V = ${E} + 2  →  V = ${V}\n${prism ? `A prism with n-sided bases has n + 2 faces: n + 2 = ${F}, so n = ${n}` : `A pyramid with an n-sided base has n + 1 faces: n + 1 = ${F}, so n = ${n}`}, a ${name}.` };
+};
+/* Geometry 12.2: a cylinder's radius from its surface area, then its volume */
+TEMPLATES.g122Challenge = (r) => {
+  const rad = ri(r, 2, 10), h = ri(r, 2, 15), S = 2 * rad * rad + 2 * rad * h, V = rad * rad * h, disp = `radius ${rad}; volume ${chPiK(V)}`;
+  return { topic: 'Challenge: cylinder from its surface area', stem: `A right cylinder has height ${h} feet and a surface area of ${chPiK(S)} square feet. Find the radius, then the volume (in terms of π).`,
+    ...buildChoices(r, disp, [`radius ${rad}; volume ${chPiK(2 * rad * h)}`, `radius ${h}; volume ${chPiK(h * h * rad)}`, `radius ${rad}; volume ${chPiK(V / 3)}`, `radius ${rad + 1}; volume ${chPiK((rad + 1) ** 2 * h)}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `radius ${rad}; volume ${chPiK(V + h * (i + 1))}`),
+    fr: chNums([{ label: 'Radius (ft):', val: rad }, chPiFR('Volume (ft³):', V)], disp),
+    solution: `S = 2πr² + 2πrh:  ${chPiK(S)} = 2πr² + ${2 * h}πr\nDivide by 2π: r² + ${h}r − ${S / 2} = 0  →  (r − ${rad})(r + ${rad + h}) = 0  →  r = ${rad}\nV = πr²h = π(${rad})²(${h}) = ${chPiK(V)} ft³` };
+};
+/* Geometry 12.3: a cone's slant height, then its surface area */
+TEMPLATES.g123Challenge = (r) => {
+  const T = pick(r, CH_TRIPLES), sw = r() < 0.5, rad = sw ? T[0] : T[1], h = sw ? T[1] : T[0], l = T[2], S = rad * rad + rad * l, disp = `slant height ${l}; surface area ${chPiK(S)}`;
+  return { topic: 'Challenge: cone surface area', stem: `A right cone has radius ${rad} cm and height ${h} cm. Find its slant height and its surface area (in terms of π).`,
+    ...buildChoices(r, disp, [`slant height ${l}; surface area ${chPiK(rad * l)}`, `slant height ${h}; surface area ${chPiK(rad * rad + rad * h)}`, `slant height ${l}; surface area ${chPiK(rad * rad + 2 * rad * l)}`, `slant height ${rad + h}; surface area ${chPiK(rad * rad + rad * (rad + h))}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `slant height ${l}; surface area ${chPiK(S + i + 1)}`),
+    fr: chNums([{ label: 'Slant height (cm):', val: l }, chPiFR('Surface area (cm²):', S)], disp),
+    solution: `The radius, height, and slant height form a right triangle: ℓ = √(${rad}² + ${h}²) = ${l} cm\nS = πr² + πrℓ = ${rad * rad}π + ${rad * l}π = ${chPiK(S)} cm²` };
+};
+/* Geometry 12.4: pour water from a box into a cylinder */
+TEMPLATES.g124Challenge = (r) => {
+  const a = ri(r, 4, 20), b = ri(r, 4, 20), c = ri(r, 2, 10), R = ri(r, 3, 10), V = a * b * c, h = V / (Math.PI * R * R), disp = `${V} in.³; about ${fmt(chR1(h))} in. deep`;
+  return { topic: 'Challenge: pour from a box into a cylinder', stem: `A rectangular container ${a} in. by ${b} in. is filled with water to a depth of ${c} in. The water is poured into an empty cylinder with radius ${R} in. How much water is there, and how deep is it in the cylinder? Round the depth to the nearest tenth.`,
+    ...buildChoices(r, disp, [`${V} in.³; about ${fmt(chR1(V / (2 * Math.PI * R)))} in. deep`, `${V} in.³; about ${fmt(chR1(V / (R * R)))} in. deep`, `${V} in.³; about ${fmt(chR1(V / (Math.PI * 4 * R * R)))} in. deep`, `${2 * (a * b + b * c + a * c)} in.³; about ${fmt(chR1(h))} in. deep`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `${V} in.³; about ${fmt(chR1(h + i + 1))} in. deep`),
+    fr: chNums([{ label: 'Volume of water (in.³):', val: V }, chTolNum('Depth in the cylinder (in.):', h)], disp),
+    solution: `Water: V = ${a} · ${b} · ${c} = ${V} in.³\nIn the cylinder: πr²h = ${V}  →  h = ${V}/(π · ${R * R}) ≈ ${fmt(chR1(h))} in.` };
+};
+/* Geometry 12.5: a frustum (cone with its top cut off) */
+TEMPLATES.g125Challenge = (r) => {
+  const R = 2 * ri(r, 1, 6), H = 2 * ri(r, 2, 9), Vb = R * R * H / 3, Vs = (R / 2) ** 2 * (H / 2) / 3, Vf = Vb - Vs, disp = `${chPiK(Vf)}`;
+  return { topic: 'Challenge: a cone with its top cut off', stem: `A cone has radius ${R} cm and height ${H} cm. A plane parallel to the base cuts it halfway up, and the top (a smaller cone) is removed. Find the volume of the part that is left (in terms of π).`,
+    ...buildChoices(r, disp, [chPiK(Vb / 2), chPiK(Vs), chPiK(Vb - Vb / 4), chPiK(Vb)].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => chPiK(Vf + i + 1)),
+    fr: chNums([chPiFR('Volume (cm³):', Vf)], disp),
+    solution: `Whole cone: V = ⅓πr²h = ⅓π(${R})²(${H}) = ${chPiK(Vb)}\nThe top cone is similar with scale factor ½ (radius ${R / 2}, height ${H / 2}): V = ⅓π(${R / 2})²(${H / 2}) = ${chPiK(Vs)}  (that’s (½)³ = ⅛ of the whole)\nLeft over: ${chPiK(Vb)} − ${chPiK(Vs)} = ${chPiK(Vf)} cm³` };
+};
+/* Geometry 12.6: a sphere inside a cube — the sphere's volume and the empty space */
+TEMPLATES.g126Challenge = (r) => {
+  const s = 2 * ri(r, 1, 9), V = s ** 3 / 6, empty = s ** 3 - V * Math.PI, disp = `sphere ${chPiK(V)}; empty space ≈ ${fmt(chR1(empty))}`;
+  return { topic: 'Challenge: a sphere in a cube', stem: `A sphere fits exactly inside a cube with edges ${s} inches long (it touches all six faces). Find the volume of the sphere (in terms of π) and the volume of the empty space inside the cube (to the nearest tenth).`,
+    ...buildChoices(r, disp, [`sphere ${chPiK(s ** 3 * 4 / 3)}; empty space ≈ ${fmt(chR1(s ** 3 - Math.PI * s ** 3 * 4 / 3))}`, `sphere ${chPiK(V)}; empty space ≈ ${fmt(chR1(s ** 3 - V))}`, `sphere ${chPiK(s * s)}; empty space ≈ ${fmt(chR1(s ** 3 - Math.PI * s * s))}`, `sphere ${chPiK(V * 2)}; empty space ≈ ${fmt(chR1(s ** 3 - 2 * V * Math.PI))}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `sphere ${chPiK(V)}; empty space ≈ ${fmt(chR1(empty + i + 1))}`),
+    fr: chNums([chPiFR('Volume of the sphere (in.³):', V), chTolNum('Empty space (in.³):', empty)], disp),
+    solution: `The sphere’s diameter equals the edge, so r = ${s / 2}.\nSphere: V = (4/3)πr³ = (4/3)π(${s / 2})³ = ${chPiK(V)} in.³\nCube: ${s}³ = ${s ** 3} in.³\nEmpty space: ${s ** 3} − ${chPiK(V)} ≈ ${fmt(chR1(empty))} in.³` };
+};
+/* Geometry 12.7: the mass of a hollow pipe */
+TEMPLATES.g127Challenge = (r) => {
+  const R = ri(r, 3, 8), t = ri(r, 1, Math.min(2, R - 1)), L = 10 * ri(r, 3, 20), d = pick(r, [2.7, 7.8, 8.9, 1.2, 11.3]), rIn = R - t, V = Math.PI * (R * R - rIn * rIn) * L, m = V * d;
+  const metal = { 2.7: 'aluminum', 7.8: 'steel', 8.9: 'copper', 1.2: 'plastic', 11.3: 'lead' }[d], disp = `≈ ${fmt(chR1(V))} cm³; ≈ ${fmt(chR1(m))} g`;
+  return { topic: 'Challenge: mass of a hollow pipe', stem: `${/^[aeiou]/.test(metal) ? "An" : "A"} ${metal} pipe is ${L} cm long. Its outer radius is ${R} cm and its walls are ${t} cm thick. ${metal[0].toUpperCase() + metal.slice(1)} has a density of ${d} g/cm³. Find the volume of the ${metal} and the mass of the pipe. Round to the nearest tenth.`,
+    ...buildChoices(r, disp, [[Math.PI * R * R * L, Math.PI * R * R * L * d], [Math.PI * rIn * rIn * L, Math.PI * rIn * rIn * L * d], [V, V / d], [Math.PI * (R - rIn) ** 2 * L, Math.PI * (R - rIn) ** 2 * L * d]].map(([u, w]) => `≈ ${fmt(chR1(u))} cm³; ≈ ${fmt(chR1(w))} g`).filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `≈ ${fmt(chR1(V))} cm³; ≈ ${fmt(chR1(m + 10 * (i + 1)))} g`),
+    fr: chNums([chTolNum('Volume of metal (cm³):', V), chTolNum('Mass (g):', m)], disp),
+    solution: `The inner radius is ${R} − ${t} = ${rIn} cm.\nVolume of metal = outer cylinder − hole = π(${R}²)(${L}) − π(${rIn}²)(${L}) = ${(R * R - rIn * rIn) * L}π ≈ ${fmt(chR1(V))} cm³\nMass = density × volume = ${d} × ${fmt(chR1(V))} ≈ ${fmt(chR1(m))} g` };
+};
+/* Geometry 12.8: rotate a triangle bounded by lines around the x-axis */
+TEMPLATES.g128Challenge = (r) => {
+  for (;;) {
+    const m = pick(r, [0.5, 1, 2, 3, 1.5, 0.25]), a = ri(r, 2, 9), R = m * a; if (!Number.isInteger(R * 2)) continue;
+    const V = R * R * a / 3; if (!fracParts(V)) continue;
+    const disp = `a cone; ${chPiK(V)}`;
+    return { topic: 'Challenge: solid of revolution', stem: `The region bounded by y = ${fracT(m) === '1' ? '' : chK(m)}x, the x-axis, and x = ${a} is rotated around the x-axis. Describe the solid and find its volume (in terms of π).`,
+      ...buildChoices(r, disp, [`a cylinder; ${chPiK(R * R * a)}`, `a cone; ${chPiK(a * a * R / 3)}`, `a cone; ${chPiK(R * R * a)}`, `a sphere; ${chPiK(4 * R ** 3 / 3)}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `a cone; ${chPiK(V + i + 1)}`),
+      fr: { fields: [{ kind: 'select', label: 'The solid is a', options: ['cone', 'cylinder', 'sphere', 'pyramid'] }, { kind: 'expr', keys: 'num', label: 'Volume:' }], key: ['cone', chPiFR('', V).key], display: disp,
+        check: (v) => v[0] === 'cone' && numOk(v[1], V * Math.PI), score: (v) => (v[0] === 'cone' ? 0.5 : 0) + (numOk(v[1], V * Math.PI) ? 0.5 : 0) },
+      solution: `The region is a right triangle with vertices (0, 0), (${a}, 0), and (${a}, ${fracT(R)}). Spinning it around the x-axis makes a cone.\nIts height is ${a} (along the x-axis) and its radius is the height of the triangle, ${fracT(R)}.\nV = ⅓πr²h = ⅓π(${fracT(R)})²(${a}) = ${chPiK(V)}` };
+  }
+};
+
+/* ---------- Algebra II chapter 8 ---------- */
+/* 8.1: a sum in summation notation with i² */
+TEMPLATES.b81Challenge = (r) => {
+  const n = ri(r, 4, 12), a = pick(r, [1, 2, 3, -1]), b = ri(r, -5, 6), sq = n * (n + 1) * (2 * n + 1) / 6, S = a * sq + b * n;
+  return { topic: 'Challenge: a sum with i²', stem: `Find the sum.   Σ (from i = 1 to ${n}) (${a === 1 ? '' : a === -1 ? MINUS : a}i²${chAdd(b)})`,
+    ...buildChoices(r, fmt(S), [...new Set([fmt(a * sq + b), fmt(a * n * (n + 1) / 2 + b * n), fmt(a * n * n + b * n), fmt(S - b * n)])].filter((x) => x !== fmt(S)), (i) => fmt(S + n * (i + 1))),
+    fr: chNums([{ label: 'Sum:', val: S }], fmt(S)),
+    solution: `Split the sum: ${a === 1 ? '' : fmt(a) + ' · '}Σ i² + Σ ${chP(b)}\nΣ i² (i = 1 to ${n}) = n(n + 1)(2n + 1)/6 = ${n}(${n + 1})(${2 * n + 1})/6 = ${sq}\nΣ ${chP(b)} (${n} terms) = ${fmt(b * n)}\nTotal: ${a === 1 ? '' : `${fmt(a)}(${sq}) = ${fmt(a * sq)}; `}${fmt(a * sq)}${chAdd(b * n)} = ${fmt(S)}` };
+};
+/* 8.2: an arithmetic series from two terms */
+TEMPLATES.b82Challenge = (r) => {
+  for (;;) {
+    const a1 = ri(r, -10, 15), d = nz(r, -4, 7), m = ri(r, 2, 6), k = m + ri(r, 3, 9), n = ri(r, 12, 30), am = a1 + (m - 1) * d, ak = a1 + (k - 1) * d, S = n * (2 * a1 + (n - 1) * d) / 2;
+    return { topic: 'Challenge: arithmetic series from two terms', stem: `In an arithmetic sequence, a${b3sub(m)} = ${fmt(am)} and a${b3sub(k)} = ${fmt(ak)}. Find the sum of the first ${n} terms.`,
+      ...buildChoices(r, fmt(S), [...new Set([fmt(n * (a1 + (n - 1) * d)), fmt(n * (2 * am + (n - 1) * d) / 2), fmt(S + n * d), fmt(n * (a1 + a1 + n * d) / 2)])].filter((x) => x !== fmt(S)), (i) => fmt(S + 10 * (i + 1))),
+      fr: chNums([{ label: `S${b3sub(n)} =`, val: S }], fmt(S)),
+      solution: `d = (${fmt(ak)} − ${chP(am)})/(${k} − ${m}) = ${fmt(d)}\na₁ = a${b3sub(m)} − ${m - 1}d = ${fmt(am)} − ${chP((m - 1) * d)} = ${fmt(a1)}\na${b3sub(n)} = a₁ + ${n - 1}d = ${fmt(a1 + (n - 1) * d)}\nS${b3sub(n)} = n(a₁ + a${b3sub(n)})/2 = ${n}(${fmt(a1)} + ${chP(a1 + (n - 1) * d)})/2 = ${fmt(S)}` };
+  }
+};
+/* 8.3: a geometric series from two terms */
+TEMPLATES.b83Challenge = (r) => {
+  for (;;) {
+    const rr = pick(r, [2, 3, -2, -3, 4]), a1 = pick(r, [1, 2, 3, 4, 5, -1, -2]), m = ri(r, 2, 3), k = m + pick(r, [2, 3]), n = ri(r, 5, 8);
+    const am = a1 * rr ** (m - 1), ak = a1 * rr ** (k - 1), S = a1 * (1 - rr ** n) / (1 - rr); if (Math.abs(S) > 200000 || (k - m) % 2 === 0 && rr < 0) continue;
+    return { topic: 'Challenge: geometric series from two terms', stem: `In a geometric sequence, a${b3sub(m)} = ${fmt(am)} and a${b3sub(k)} = ${fmt(ak)}. Find r, a₁, and the sum of the first ${n} terms.`,
+      ...buildChoices(r, `r = ${fmt(rr)}, a₁ = ${fmt(a1)}, S${b3sub(n)} = ${fmt(S)}`, [`r = ${fmt(rr)}, a₁ = ${fmt(a1)}, S${b3sub(n)} = ${fmt(a1 * (1 - rr ** (n + 1)) / (1 - rr))}`, `r = ${fmt(rr)}, a₁ = ${fmt(am)}, S${b3sub(n)} = ${fmt(am * (1 - rr ** n) / (1 - rr))}`, `r = ${fmt((ak - am) / (k - m))}, a₁ = ${fmt(a1)}, S${b3sub(n)} = ${fmt(S)}`, `r = ${fmt(-rr)}, a₁ = ${fmt(a1)}, S${b3sub(n)} = ${fmt(a1 * (1 - (-rr) ** n) / (1 + rr))}`].filter((x, i, Z) => Z.indexOf(x) === i && !/\./.test(x)), (i) => `r = ${fmt(rr)}, a₁ = ${fmt(a1)}, S${b3sub(n)} = ${fmt(S + i + 1)}`),
+      fr: chNums([{ label: 'r =', val: rr }, { label: 'a₁ =', val: a1 }, { label: `S${b3sub(n)} =`, val: S }], `r = ${fmt(rr)}, a₁ = ${fmt(a1)}, S${b3sub(n)} = ${fmt(S)}`),
+      solution: `a${b3sub(k)}/a${b3sub(m)} = r${b3sup(k - m)}  →  r${b3sup(k - m)} = ${fmt(ak)}/${chP(am)} = ${fmt(ak / am)}  →  r = ${fmt(rr)}\na₁ = a${b3sub(m)}/r${m - 1 > 1 ? b3sup(m - 1) : ''} = ${fmt(am)}/${chP(rr ** (m - 1))} = ${fmt(a1)}\nS${b3sub(n)} = a₁(1 − r${b3sup(n)})/(1 − r) = ${fmt(a1)}(1 − ${chP(rr ** n)})/(1 − ${chP(rr)}) = ${fmt(S)}` };
+  }
+};
+/* 8.4: total distance traveled by a bouncing ball */
+TEMPLATES.b84Challenge = (r) => {
+  for (;;) {
+    const h = pick(r, [6, 8, 10, 12, 15, 16, 18, 20, 24, 30]), [p, q] = pick(r, [[1, 2], [2, 3], [3, 4], [3, 5], [4, 5], [1, 3], [2, 5]]), f = p / q, D = h + 2 * h * f / (1 - f); if (!fracParts(D)) continue;
+    const disp = `${fracT(D)} ft`;
+    return { topic: 'Challenge: a bouncing ball', stem: `A ball is dropped from ${h} feet. Each time it hits the ground, it bounces back up to ${p}/${q} of its previous height. If it keeps bouncing forever, what is the total vertical distance it travels (down and up)?`,
+      ...buildChoices(r, disp, [fracT(h / (1 - f)), fracT(2 * h / (1 - f)), fracT(h + h * f / (1 - f)), fracT(h * f / (1 - f))].filter((x) => fracParts(parseFloat(x)) || true).map((x) => `${x} ft`).filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `${fracT(D + i + 2)} ft`),
+      fr: chNums([{ label: 'Total distance (ft):', val: D }], disp),
+      solution: `First fall: ${h} ft. After that, each bounce goes up and comes back down the same distance.\nUp distances: ${fracT(h * f)} + ${fracT(h * f * f)} + … = ${chK(h * f)}/(1 − ${p}/${q}) = ${fracT(h * f / (1 - f))} (infinite geometric series)\nTotal: ${h} + 2(${fracT(h * f / (1 - f))}) = ${fracT(D)} ft` };
+  }
+};
+/* 8.5: terms of a recursive rule aₙ = r·aₙ₋₁ + c */
+TEMPLATES.b85Challenge = (r) => {
+  const a1 = ri(r, -3, 5), k = pick(r, [2, 3, -2]), c = ri(r, -4, 5), n = ri(r, 5, 7), T = [a1]; for (let i = 1; i < 10; i++) T.push(k * T[i - 1] + c);
+  const disp = `a${b3sub(n)} = ${fmt(T[n - 1])}, a${b3sub(n + 1)} = ${fmt(T[n])}`;
+  return { topic: 'Challenge: a recursive rule', stem: `A sequence has a₁ = ${fmt(a1)} and aₙ = ${chCo(k)}aₙ₋₁${chAdd(c)}. Find a${b3sub(n)} and a${b3sub(n + 1)}.`,
+    ...chPairChoices(r, T[n - 1], T[n], `a${b3sub(n)}`, `a${b3sub(n + 1)}`, [[T[n - 2], T[n - 1]], [T[n], T[n + 1]], [k * T[n - 1], k * T[n]], [a1 + (n - 1) * c, a1 + n * c]]),
+    fr: chNums([{ label: `a${b3sub(n)} =`, val: T[n - 1] }, { label: `a${b3sub(n + 1)} =`, val: T[n] }], disp),
+    solution: `Use each term to get the next: aₙ = ${chCo(k)}aₙ₋₁${chAdd(c)}\n${T.slice(0, n + 1).map((t, i) => `a${b3sub(i + 1)} = ${fmt(t)}`).join(',  ')}` };
+};
+
+/* ---------- Algebra II chapter 9 ---------- */
+/* 9.1: the 68-95-99.7 rule — a percent, then a count */
+TEMPLATES.b91Challenge = (r) => {
+  const mu = 5 * ri(r, 10, 40), sd = pick(r, [2, 3, 4, 5, 6, 8, 10]), cuts = [-3, -2, -1, 0, 1, 2, 3], pct = [0.15, 2.35, 13.5, 34, 34, 13.5, 2.35, 0.15];
+  for (;;) {
+    const i = ri(r, 0, 5), j = ri(r, i + 1, 6); if (j - i < 2 && r() < 0.6) continue;
+    const P = pct.slice(i + 1, j + 1).reduce((s, v) => s + v, 0), N = pick(r, [200, 400, 500, 800, 1000, 2000]), cnt = Math.round(N * P / 100), lo = mu + cuts[i] * sd, hi = mu + cuts[j] * sd;
+    const disp = `${fmt(P)}%; about ${cnt} people`;
+    return { topic: 'Challenge: the 68-95-99.7 rule', stem: `Heights in a group of ${N} people are normally distributed with mean ${mu} and standard deviation ${sd}. What percent of the heights are between ${lo} and ${hi}? About how many people is that?`,
+      ...buildChoices(r, disp, [[P / 2], [68], [95], [100 - P]].map(([v]) => `${fmt(v)}%; about ${Math.round(N * v / 100)} people`).filter((x, k, Z) => Z.indexOf(x) === k && x !== disp), (k) => `${fmt(P + k + 1)}%; about ${Math.round(N * (P + k + 1) / 100)} people`),
+      fr: chNums([{ label: 'Percent:', val: P }, { label: 'Number of people:', val: cnt, tol: 1.01 / Math.max(1, cnt) }], disp),
+      solution: `${[[lo, cuts[i]], [hi, cuts[j]]].map(([v, c]) => c ? `${v} is μ ${c < 0 ? MINUS : '+'} ${Math.abs(c)}σ` : `${v} is the mean`).join(' and ')}.\nAdd the areas between them (34%, 13.5%, 2.35%, 0.15% going out from the mean): ${j - i > 1 ? `${pct.slice(i + 1, j + 1).map(fmt).join('% + ')}% = ` : ''}${fmt(P)}%\n${fmt(P)}% of ${N} ≈ ${cnt} people` };
+  }
+};
+/* 9.2: test a claim with a simulation */
+TEMPLATES.b92Challenge = (r) => {
+  const n = pick(r, [40, 50, 60, 80, 100]), heads = Math.round(n * (0.5 + pick(r, [0.04, 0.06, 0.1, 0.12, 0.16]))), ph = heads / n, sims = 200, tail = pick(r, [1, 2, 3, 6, 9, 14, 20, 30]), pv = tail / sims, rej = pv < 0.05;
+  const disp = `${fmt(ph)}; ${rej ? 'reject the claim' : 'do not reject the claim'}`;
+  return { topic: 'Challenge: test a claim with a simulation', stem: `Someone claims a coin is fair. You flip it ${n} times and get ${heads} heads. In ${sims} simulations of ${n} flips of a fair coin, ${tail} gave a proportion of heads at least as large as yours. What is your sample proportion, and should you reject the claim that the coin is fair (using 5% as the cutoff)?`,
+    ...buildChoices(r, disp, [`${fmt(ph)}; ${rej ? 'do not reject the claim' : 'reject the claim'}`, `${fmt(pv)}; ${rej ? 'reject the claim' : 'do not reject the claim'}`, `${fmt(heads / sims)}; ${rej ? 'reject the claim' : 'do not reject the claim'}`].filter((x) => x !== disp), (i) => `${fmt(ph + 0.01 * (i + 1))}; ${rej ? 'reject the claim' : 'do not reject the claim'}`),
+    fr: { fields: [{ kind: 'number', label: 'Sample proportion of heads:' }, { kind: 'select', label: 'Conclusion:', options: ['reject the claim', 'do not reject the claim'] }], key: [String(ph), rej ? 'reject the claim' : 'do not reject the claim'], display: disp,
+      check: (v) => numEq(v[0], ph) && v[1] === (rej ? 'reject the claim' : 'do not reject the claim'), score: (v) => (numEq(v[0], ph) ? 0.5 : 0) + (v[1] === (rej ? 'reject the claim' : 'do not reject the claim') ? 0.5 : 0) },
+    solution: `Sample proportion: ${heads}/${n} = ${fmt(ph)}\nIn the simulations, a result this extreme happened ${tail} out of ${sims} times: ${fmt(pv * 100)}%.\n${rej ? `That is less than 5%, so your result would be unlikely with a fair coin: reject the claim.` : `That is not less than 5%, so your result could easily happen with a fair coin: do not reject the claim.`}` };
+};
+/* 9.3: a stratified sample */
+TEMPLATES.b93Challenge = (r) => {
+  for (;;) {
+    const g = [ri(r, 100, 400), ri(r, 100, 400), ri(r, 100, 400), ri(r, 100, 400)], N = g.reduce((s, v) => s + v, 0), n = pick(r, [40, 50, 60, 80, 100]);
+    const share = g.map((v) => v * n / N); if (share.some((v) => Math.abs(v - Math.round(v)) > 1e-9)) { if (r() < 0.97) continue; }
+    const i = ri(r, 0, 3), j = (i + ri(r, 1, 3)) % 4, gr = ['9th graders', '10th graders', '11th graders', '12th graders'];
+    const si = g[i] * n / N, sj = g[j] * n / N; if (!Number.isInteger(si) || !Number.isInteger(sj)) continue;
+    return { topic: 'Challenge: a stratified sample', stem: `A school has ${g.map((v, k) => `${v} ${gr[k]}`).join(', ')}. You take a stratified random sample of ${n} students, with each grade represented in proportion to its size. How many ${gr[i]} and how many ${gr[j]} should be in the sample?`,
+      ...chPairChoices(r, si, sj, gr[i], gr[j], [[n / 4, n / 4], [sj, si], [Math.round(g[i] / 10), Math.round(g[j] / 10)]].filter(([u, v]) => Number.isInteger(u) && Number.isInteger(v))),
+      fr: chNums([{ label: `${gr[i]}:`, val: si }, { label: `${gr[j]}:`, val: sj }], chPair(si, sj, gr[i], gr[j])),
+      solution: `Total students: ${N}. Each grade’s share of the sample matches its share of the school.\n${gr[i]}: ${g[i]}/${N} × ${n} = ${si}\n${gr[j]}: ${g[j]}/${N} × ${n} = ${sj}` };
+  }
+};
+/* 9.4: random assignment — how many ways, and the chance two friends are both treated */
+TEMPLATES.b94Challenge = (r) => {
+  const n = 2 * ri(r, 4, 7), k = n / 2, ways = chC(n, k), both = chC(n - 2, k - 2), p = both / ways, disp = `${ways} ways; ${fracT(p)}`;
+  return { topic: 'Challenge: random assignment', stem: `${n} volunteers are randomly split into a treatment group of ${k} and a control group of ${k}. How many different treatment groups are possible? What is the probability that two particular friends both end up in the treatment group?`,
+    ...buildChoices(r, disp, [`${ways * 2} ways; ${fracT(p)}`, `${ways} ways; ${fracT(0.25)}`, `${ways} ways; ${fracT((k / n) * (k / n))}`, `${chC(n, 2)} ways; ${fracT(p)}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `${ways} ways; ${fracT(Math.min(0.9, p + 0.05 * (i + 1)))}`),
+    fr: chNums([{ label: 'Possible treatment groups:', val: ways }, { label: 'Probability both friends are treated:', val: p }], disp),
+    solution: `Choosing ${k} of ${n} people (order doesn’t matter): C(${n}, ${k}) = ${ways}\nGroups with both friends: they fill 2 spots, and the other ${k - 2} spots come from the other ${n - 2} people: C(${n - 2}, ${k - 2}) = ${both}\nProbability: ${both}/${ways} = ${fracT(p)}  (or ${k}/${n} · ${k - 1}/${n - 1})` };
+};
+/* 9.5: margin of error and sample size */
+TEMPLATES.b95Challenge = (r) => {
+  const n = pick(r, [100, 400, 625, 1600, 2500]), pct = ri(r, 30, 70), m = 100 / Math.sqrt(n), target = pick(r, [2, 2.5, 4, 5].filter((t) => t !== m)), need = Math.ceil(1 / (target / 100) ** 2);
+  const disp = `±${fmt(m)}%; ${fmt(pct - m)}% to ${fmt(pct + m)}%; ${need} people`;
+  return { topic: 'Challenge: margin of error', stem: `In a random survey of ${n} voters, ${pct}% support a new park. Find the margin of error (±1/√n) and the interval likely to contain the true percent. How many people would you need to survey for a margin of error of ±${fmt(target)}%?`,
+    ...buildChoices(r, disp, [`±${fmt(m / 10)}%; ${fmt(pct - m / 10)}% to ${fmt(pct + m / 10)}%; ${need} people`, `±${fmt(m)}%; ${fmt(pct - m)}% to ${fmt(pct + m)}%; ${Math.ceil(1 / (target / 100))} people`, `±${fmt(m)}%; ${fmt(pct - 2 * m)}% to ${fmt(pct + 2 * m)}%; ${need} people`, `±${fmt(2 * m)}%; ${fmt(pct - 2 * m)}% to ${fmt(pct + 2 * m)}%; ${need * 2} people`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `±${fmt(m)}%; ${fmt(pct - m)}% to ${fmt(pct + m)}%; ${need + 100 * (i + 1)} people`),
+    fr: chNums([{ label: 'Margin of error (±, percent):', val: m }, { label: 'Interval: from (percent)', val: pct - m }, { label: 'to (percent)', val: pct + m }, { label: `Sample size for ±${fmt(target)}%:`, val: need }], disp),
+    solution: `Margin of error ≈ ±1/√n = ±1/√${n} = ±${String(m / 100)} = ±${fmt(m)}%\nInterval: ${pct}% − ${fmt(m)}% to ${pct}% + ${fmt(m)}% = ${fmt(pct - m)}% to ${fmt(pct + m)}%\nFor ±${fmt(target)}%: 1/√n = ${String(target / 100)}  →  √n = ${fmt(100 / target)}  →  n = ${need}` };
+};
+/* 9.6: experimental difference and the number of resamplings */
+TEMPLATES.b96Challenge = (r) => {
+  for (;;) {
+    const n = ri(r, 4, 6), T = Array.from({ length: n }, () => ri(r, 8, 20)), C = Array.from({ length: n }, () => ri(r, 5, 17)), mt = T.reduce((s, v) => s + v, 0) / n, mc = C.reduce((s, v) => s + v, 0) / n, d = mt - mc;
+    if (!fracParts(d) || !Number.isInteger(d * 10)) continue;
+    const ways = chC(2 * n, n), disp = `difference ${fmt(d)}; ${ways} resamplings`;
+    return { topic: 'Challenge: analyze an experiment', stem: `In an experiment, the treatment group scored ${T.join(', ')} and the control group scored ${C.join(', ')}. Find the experimental difference of the means (treatment − control). If you resample by mixing all ${2 * n} scores and splitting them into two groups of ${n}, how many different splits are possible?`,
+      ...buildChoices(r, disp, [`difference ${fmt(-d)}; ${ways} resamplings`, `difference ${fmt(d)}; ${ways / 2} resamplings`, `difference ${fmt(d)}; ${chC(2 * n, 2)} resamplings`, `difference ${fmt(d * n)}; ${ways} resamplings`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `difference ${fmt(d + 0.5 * (i + 1))}; ${ways} resamplings`),
+      fr: chNums([{ label: 'Experimental difference:', val: d }, { label: 'Possible resamplings:', val: ways }], disp),
+      solution: `Treatment mean: ${T.reduce((s, v) => s + v, 0)}/${n} = ${fmt(mt)};  control mean: ${C.reduce((s, v) => s + v, 0)}/${n} = ${fmt(mc)}\nExperimental difference: ${fmt(mt)} − ${fmt(mc)} = ${fmt(d)}\nResamplings: choose which ${n} of the ${2 * n} scores go in the first group: C(${2 * n}, ${n}) = ${ways}` };
+  }
+};
+
+/* ---------- Pre-Calc P ---------- */
+/* P.1: count the integers in an absolute value inequality */
+TEMPLATES.pP1Challenge = (r) => {
+  for (;;) {
+    const a = pick(r, [1, 2, 3]), b = ri(r, -9, 9), c = ri(r, 3, 15), strict = r() < 0.5, lo = (-c - b) / a, hi = (c - b) / a;
+    let cnt = 0; for (let x = Math.ceil(lo - 1); x <= Math.floor(hi + 1); x++) { const v = Math.abs(a * x + b); if (strict ? v < c : v <= c) cnt++; }
+    const disp = `${fracT(lo)} ${strict ? '<' : '≤'} x ${strict ? '<' : '≤'} ${fracT(hi)}; ${cnt} integers`;
+    return { topic: 'Challenge: integers in an interval', stem: `Solve |${g4Lin(a, b)}| ${strict ? '<' : '≤'} ${c}, and find how many integers satisfy the inequality.`,
+      ...buildChoices(r, disp, [`${fracT(lo)} ${strict ? '<' : '≤'} x ${strict ? '<' : '≤'} ${fracT(hi)}; ${cnt + (strict ? 2 : -2)} integers`, `x ${strict ? '<' : '≤'} ${fracT(lo)} or x ${strict ? '>' : '≥'} ${fracT(hi)}; ${cnt} integers`, `${fracT((-c + b) / a)} ${strict ? '<' : '≤'} x ${strict ? '<' : '≤'} ${fracT((c + b) / a)}; ${cnt} integers`, `${fracT(lo)} ${strict ? '<' : '≤'} x ${strict ? '<' : '≤'} ${fracT(hi)}; ${cnt + 1} integers`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `${fracT(lo)} ${strict ? '<' : '≤'} x ${strict ? '<' : '≤'} ${fracT(hi)}; ${cnt + i + 2} integers`),
+      fr: chNums([{ label: 'Lower endpoint:', val: lo }, { label: 'Upper endpoint:', val: hi }, { label: 'Number of integers:', val: cnt }], disp),
+      solution: `|${g4Lin(a, b)}| ${strict ? '<' : '≤'} ${c} means ${MINUS}${c} ${strict ? '<' : '≤'} ${g4Lin(a, b)} ${strict ? '<' : '≤'} ${c}\n${fracT(lo)} ${strict ? '<' : '≤'} x ${strict ? '<' : '≤'} ${fracT(hi)}\nIntegers in that interval: ${Array.from({ length: Math.floor(hi + 1) - Math.ceil(lo - 1) + 1 }, (_, k) => Math.ceil(lo - 1) + k).filter((x) => (strict ? Math.abs(a * x + b) < c : Math.abs(a * x + b) <= c)).map(fmt).join(', ')} (${cnt} of them)` };
+  }
+};
+/* P.2: a radical equation with an extraneous solution */
+TEMPLATES.pP2Challenge = (r) => {
+  for (;;) {
+    const s = ri(r, 2, 10), t = ri(r, -6, s - 1), b = ri(r, -5, 5); // √(x + a) = x − b with roots: x − b = s (valid) and x − b = t... set x = s + b valid
+    // (x − b)² = x + a: roots x₁ = s + b (where x₁ − b = s ≥ 0) and x₂ (where x₂ − b < 0, extraneous); product/sum: sum = 2b + 1, so x₂ = 2b + 1 − x₁
+    const x1 = s + b, x2 = 2 * b + 1 - x1, a = (x1 - b) ** 2 - x1; if (x2 - b >= 0 || x2 + a < 0 || a === 0) continue;
+    const S = b3Sol(r, { zeros: [{ v: [x1, 0] }], text: fmt(x1), latex: String(x1), wrongs: [`x = ${[x1, x2].sort((u, v) => u - v).map(fmt).join(', ')}`, `x = ${fmt(x2)}`, `x = ${fmt(x1 + 1)}`] });
+    return { topic: 'Challenge: radical equation', stem: `Solve and check for extraneous solutions.   √(x${chAdd(a)}) = x${chAdd(-b)}`, ...S,
+      solution: `Square both sides: x${chAdd(a)} = ${b ? `(x${chAdd(-b)})² = ` : ''}${b4T([1, -2 * b, b * b])}\n0 = ${b4T([1, -2 * b - 1, b * b - a])} = (${chMinus(x1)})(${chMinus(x2)})  →  x = ${fmt(x1)} or x = ${fmt(x2)}\nCheck x = ${fmt(x2)}: the right side is ${fmt(x2 - b)} < 0, but a square root can’t be negative, so it is extraneous.\nSolution: x = ${fmt(x1)}` };
+  }
+};
+/* P.3: a circle from the endpoints of a diameter */
+TEMPLATES.pP3Challenge = (r) => {
+  for (;;) {
+    const A = [ri(r, -8, 8), ri(r, -8, 8)], B = [ri(r, -8, 8), ri(r, -8, 8)]; if ((A[0] + B[0]) % 2 || (A[1] + B[1]) % 2 || (A[0] === B[0] && A[1] === B[1])) continue;
+    const C = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], R2 = (A[0] - C[0]) ** 2 + (A[1] - C[1]) ** 2, disp = `center ${ptT(C)}, r² = ${R2}`;
+    return { topic: 'Challenge: circle from a diameter', stem: `The points ${ptT(A)} and ${ptT(B)} are the endpoints of a diameter of a circle. Find the center and r², then write the standard equation.`,
+      ...buildChoices(r, disp, [`center ${ptT(C)}, r² = ${4 * R2}`, `center ${ptT([(B[0] - A[0]) / 2, (B[1] - A[1]) / 2])}, r² = ${R2}`, `center ${ptT(C)}, r² = ${fmt(chR2(Math.sqrt(R2)))}`, `center ${ptT([-C[0], -C[1]])}, r² = ${R2}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `center ${ptT(C)}, r² = ${R2 + i + 1}`),
+      fr: { fields: [{ kind: 'expr', keys: 'point', label: 'Center:' }, { kind: 'expr', keys: 'num', label: 'r² =' }], key: [`\\left(${C[0]},${C[1]}\\right)`, String(R2)], display: disp, check: (v) => onePointOk(v[0], C) && numOk(v[1], R2), score: (v) => (onePointOk(v[0], C) ? 0.5 : 0) + (numOk(v[1], R2) ? 0.5 : 0) },
+      solution: `Center = midpoint of the diameter: ${ptT(C)}\nr² = (distance from the center to an endpoint)² = (${fmt(A[0])} − ${chP(C[0])})² + (${fmt(A[1])} − ${chP(C[1])})² = ${R2}\nEquation: ${C[0] ? `(x${chAdd(-C[0])})²` : 'x²'} + ${C[1] ? `(y${chAdd(-C[1])})²` : 'y²'} = ${R2}` };
+  }
+};
+/* P.4: the perpendicular bisector of a segment */
+TEMPLATES.pP4Challenge = (r) => {
+  for (;;) {
+    const A = [ri(r, -8, 8), ri(r, -8, 8)], B = [ri(r, -8, 8), ri(r, -8, 8)]; if (A[0] === B[0] || A[1] === B[1]) continue;
+    const M = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], m = -(B[0] - A[0]) / (B[1] - A[1]), b = M[1] - m * M[0], disp = `y = ${chCo(m)}x${chAdd(b)}`;
+    return { topic: 'Challenge: perpendicular bisector', stem: `Write the equation of the perpendicular bisector of the segment from ${ptT(A)} to ${ptT(B)} in slope-intercept form.`,
+      ...buildChoices(r, disp, [`y = ${chCo(-1 / m)}x${chAdd(M[1] + M[0] / m)}`, `y = ${chCo(-m)}x${chAdd(M[1] + m * M[0])}`, `y = ${chCo(m)}x${chAdd(A[1] - m * A[0])}`, `y = ${chCo(1 / m)}x${chAdd(M[1] - M[0] / m)}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `y = ${chCo(m)}x${chAdd(b + i + 1)}`),
+      fr: chNums([{ label: 'Slope:', val: m }, { label: 'y-intercept:', val: b }], disp),
+      solution: `Midpoint: ${ptT(M)}.  Slope of the segment: ${fracT(-1 / m)}, so the perpendicular slope is ${fracT(m)}.\ny${chAdd(-M[1])} = ${chK(m)}(x${chAdd(-M[0])})  →  ${disp}` };
+  }
+};
+/* P.5: simplify the difference quotient of a quadratic */
+TEMPLATES.pP5Challenge = (r) => {
+  const a = nz(r, -4, 5), b = ri(r, -8, 8), c = ri(r, -9, 9), disp = `${chCo(2 * a)}x${a === 1 ? ' + h' : a === -1 ? ` ${MINUS} h` : `${chAdd(a)}h`}${chAdd(b)}`;
+  return { topic: 'Challenge: difference quotient', stem: `Let f(x) = ${b4T([a, b, c])}. Simplify the difference quotient [f(x + h) − f(x)]/h (h ≠ 0). The result has the form px + qh + r. Find p, q, and r.`,
+    ...buildChoices(r, `p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b)}`, [`p = ${fmt(a)}, q = ${fmt(a)}, r = ${fmt(b)}`, `p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b + c)}`, `p = ${fmt(2 * a)}, q = 0, r = ${fmt(b)}`, `p = ${fmt(2 * a)}, q = ${fmt(2 * a)}, r = ${fmt(b)}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== `p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b)}`), (i) => `p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b + i + 1)}`),
+    fr: chNums([{ label: 'p =', val: 2 * a }, { label: 'q =', val: a }, { label: 'r =', val: b }], disp),
+    solution: `f(x + h) = ${chCo(a)}(x + h)²${b ? `${chAdd(b)}(x + h)` : ''}${chAdd(c)} = ${chCo(a)}x² + ${chP(2 * a)}xh + ${a === 1 ? '' : chP(a)}h²${b ? `${chTerm(b, 'x')}${chTerm(b, 'h')}` : ''}${chAdd(c)}\nf(x + h) − f(x) = ${chP(2 * a)}xh + ${a === 1 ? '' : chP(a)}h²${b ? chTerm(b, 'h') : ''}\nDivide by h: ${disp}, so p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b)}` };
+};
+/* P.6: average rate of change and where the function turns */
+TEMPLATES.pP6Challenge = (r) => {
+  for (;;) {
+    const a = nz(r, -3, 3), h = ri(r, -4, 4), k = ri(r, -9, 9), x1 = ri(r, -5, 3), x2 = x1 + ri(r, 2, 6), f = (x) => a * (x - h) ** 2 + k, rate = (f(x2) - f(x1)) / (x2 - x1);
+    const co = [a, -2 * a * h, a * h * h + k], disp = `average rate ${fracT(rate)}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(h)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(h)}`;
+    return { topic: 'Challenge: rate of change and turning point', stem: `For f(x) = ${b4T(co)}, find the average rate of change from x = ${fmt(x1)} to x = ${fmt(x2)}. Then find where f changes from ${a > 0 ? 'decreasing to increasing' : 'increasing to decreasing'}.`,
+      ...buildChoices(r, disp, [`average rate ${fracT(-rate)}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(h)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(h)}`, `average rate ${fracT(rate)}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(-h)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(-h)}`, `average rate ${fracT(f(x2) - f(x1))}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(h)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(h)}`, `average rate ${fracT(rate)}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(k)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(k)}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `average rate ${fracT(rate + i + 1)}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(h)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(h)}`),
+      fr: chNums([{ label: 'Average rate of change:', val: rate }, { label: 'x-value where it turns:', val: h }], disp),
+      solution: `Average rate = [f(${fmt(x2)}) − f(${chP(x1)})]/(${fmt(x2)} − ${chP(x1)}) = (${fmt(f(x2))} − ${chP(f(x1))})/${x2 - x1} = ${fracT(rate)}\nThe graph is a parabola opening ${a > 0 ? 'up' : 'down'} with vertex at x = −b/(2a) = ${fmt(h)}, so it turns there.` };
+  }
+};
+/* P.7: a step function — postage */
+TEMPLATES.pP7Challenge = (r) => {
+  const base = pick(r, [0.6, 0.66, 0.73, 0.8]), add = pick(r, [0.2, 0.24, 0.28, 0.3]), w1 = ri(r, 2, 6) + pick(r, [0.2, 0.5, 0.8]), w2 = ri(r, 1, 7), C = (w) => base + add * (Math.ceil(w) - 1), money = (v) => `$${v.toFixed(2)}`;
+  if (Math.ceil(w1) === w2) return TEMPLATES.pP7Challenge(r);
+  const disp = `${money(C(w1))} and ${money(C(w2))}`;
+  return { topic: 'Challenge: a step function', stem: `Mailing a letter costs ${money(base)} for the first ounce and ${money(add)} for each additional ounce or part of an ounce (every started ounce counts). Find the cost of a ${fmt(w1)}-ounce letter and of a ${w2}-ounce letter.`,
+    ...buildChoices(r, disp, [`${money(base + add * Math.floor(w1 - 1))} and ${money(C(w2))}`, `${money(base + add * Math.ceil(w1))} and ${money(base + add * w2)}`, `${money(add * Math.ceil(w1))} and ${money(add * w2)}`, `${money(base * Math.ceil(w1))} and ${money(base * w2)}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `${money(C(w1) + 0.1 * (i + 1))} and ${money(C(w2))}`),
+    fr: chNums([{ label: `Cost of ${fmt(w1)} oz ($):`, val: C(w1), key: C(w1).toFixed(2) }, { label: `Cost of ${w2} oz ($):`, val: C(w2), key: C(w2).toFixed(2) }], disp),
+    solution: `${fmt(w1)} oz: the first ounce plus ${Math.ceil(w1) - 1} more started ounces → ${base.toFixed(2)} + ${Math.ceil(w1) - 1}(${add.toFixed(2)}) = ${money(C(w1))}\n${w2} oz: the first ounce plus ${w2 - 1} more → ${base.toFixed(2)} + ${w2 - 1}(${add.toFixed(2)}) = ${money(C(w2))}` };
+};
+/* P.8: where a point on f moves under several transformations */
+TEMPLATES.pP8Challenge = (r) => {
+  const p = ri(r, -5, 5), q = ri(r, -6, 6), h = nz(r, -4, 4), a = pick(r, [2, 3, -2, -1, 0.5]), k = nz(r, -5, 5), P = [p + h, a * q + k];
+  const g = `g(x) = ${chCo(a)}f(x${chAdd(-h)})${chAdd(k)}`, disp = ptT(P);
+  return { topic: 'Challenge: follow a point through transformations', stem: `The point (${fmt(p)}, ${fmt(q)}) is on the graph of y = f(x). Find the matching point on the graph of ${g}.`,
+    ...buildChoices(r, disp, [ptT([p - h, a * q + k]), ptT([p + h, a * (q + k)]), ptT([a * p + h, q + k]), ptT([p + h, -a * q + k])].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => ptT([P[0], P[1] + i + 1])),
+    fr: chPtFR([{ label: 'Point:', P }], disp),
+    solution: `x − ${chP(h)} must equal ${fmt(p)} for the input of f to match, so x = ${fmt(p)} + ${chP(h)} = ${fmt(P[0])}.\nThen y = ${chK(a)} · f(${fmt(p)})${chAdd(k)} = ${chK(a)}(${fmt(q)})${chAdd(k)} = ${fmt(P[1])}.\nThe point is ${disp}.` };
+};
+/* P.9: the domain of √(a − x²) composed, and a value */
+TEMPLATES.pP9Challenge = (r) => {
+  const s = ri(r, 2, 9), a = s * s, c = pick(r, [...Array(s).keys()].filter((t) => Number.isInteger(Math.sqrt(a - t * t)))), val = Math.sqrt(a - c * c), sg = pick(r, [1, -1]);
+  const disp = `domain ${MINUS}${s} ≤ x ≤ ${s}; (f ∘ g)(${fmt(sg * c)}) = ${val}`;
+  return { topic: 'Challenge: domain of a composition', stem: `Let f(x) = √x and g(x) = ${a} − x². Find the domain of f ∘ g and the value of (f ∘ g)(${fmt(sg * c)}).`,
+    ...buildChoices(r, disp, [`domain x ≥ 0; (f ∘ g)(${fmt(sg * c)}) = ${val}`, `domain ${MINUS}${a} ≤ x ≤ ${a}; (f ∘ g)(${fmt(sg * c)}) = ${val}`, `domain all real numbers; (f ∘ g)(${fmt(sg * c)}) = ${val}`, `domain ${MINUS}${s} ≤ x ≤ ${s}; (f ∘ g)(${fmt(sg * c)}) = ${fmt(a - Math.sqrt(Math.abs(c)))}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `domain ${MINUS}${s} ≤ x ≤ ${s}; (f ∘ g)(${fmt(sg * c)}) = ${val + i + 1}`),
+    fr: chNums([{ label: 'Domain: smallest x', val: -s }, { label: 'Domain: largest x', val: s }, { label: `(f ∘ g)(${fmt(sg * c)}) =`, val }], disp),
+    solution: `(f ∘ g)(x) = √(${a} − x²). The expression under the root can’t be negative: ${a} − x² ≥ 0  →  x² ≤ ${a}  →  ${MINUS}${s} ≤ x ≤ ${s}\n(f ∘ g)(${fmt(sg * c)}) = √(${a} − ${c * c}) = √${a - c * c} = ${val}` };
+};
+/* P.10: values of the inverse of (ax + b)/(cx + d) */
+TEMPLATES.pP10Challenge = (r) => {
+  for (;;) {
+    const a = nz(r, -4, 4), b = ri(r, -6, 6), c = pick(r, [1, 2, -1]), d = ri(r, -6, 6); if (a * d - b * c === 0) continue;
+    const f = (x) => (a * x + b) / (c * x + d), x1 = ri(r, -4, 5), x2 = ri(r, -4, 5); if (x1 === x2 || c * x1 + d === 0 || c * x2 + d === 0) continue;
+    const y1 = f(x1), y2 = f(x2); if (!fracParts(y1) || !fracParts(y2)) continue;
+    const disp = `f⁻¹(${fracT(y1)}) = ${fmt(x1)}, f⁻¹(${fracT(y2)}) = ${fmt(x2)}`;
+    return { topic: 'Challenge: values of an inverse', stem: `Let f(x) = (${g4Lin(a, b)})/(${g4Lin(c, d)}). Find the inverse function, then find f⁻¹(${fracT(y1)}) and f⁻¹(${fracT(y2)}).`,
+      ...buildChoices(r, disp, [`f⁻¹(${fracT(y1)}) = ${fracT(f(y1))}, f⁻¹(${fracT(y2)}) = ${fracT(f(y2))}`, `f⁻¹(${fracT(y1)}) = ${fmt(-x1)}, f⁻¹(${fracT(y2)}) = ${fmt(-x2)}`, `f⁻¹(${fracT(y1)}) = ${fracT(1 / y1)}, f⁻¹(${fracT(y2)}) = ${fracT(1 / y2)}`].filter((x) => !/Infinity|NaN/.test(x) && x !== disp), (i) => `f⁻¹(${fracT(y1)}) = ${fmt(x1 + i + 1)}, f⁻¹(${fracT(y2)}) = ${fmt(x2)}`),
+      fr: chNums([{ label: `f⁻¹(${fracT(y1)}) =`, val: x1 }, { label: `f⁻¹(${fracT(y2)}) =`, val: x2 }], disp),
+      solution: `Switch x and y and solve: x = (${g4Lin(a, b, 'y')})/(${g4Lin(c, d, 'y')})  →  x(${g4Lin(c, d, 'y')}) = ${g4Lin(a, b, 'y')}  →  y = (${g4Lin(-d, b)})/(${g4Lin(c, -a)})\nf⁻¹(x) = (${g4Lin(-d, b)})/(${g4Lin(c, -a)})\nf⁻¹(${fracT(y1)}) = ${fmt(x1)}  and  f⁻¹(${fracT(y2)}) = ${fmt(x2)}  (check: f(${fmt(x1)}) = ${fracT(y1)}, f(${fmt(x2)}) = ${fracT(y2)})` };
   }
 };
 
@@ -28261,6 +28605,41 @@ QUESTION_TYPES.push(
   { id: 'b73Challenge', subject: 'algebra2', section: '7.3 Multiplying and Dividing Rational Expressions', label: '★ Challenge: Simplify, evaluate, and list excluded values', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
   { id: 'b74Challenge', subject: 'algebra2', section: '7.4 Adding and Subtracting Rational Expressions', label: '★ Challenge: Add with unlike denominators', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
   { id: 'b75Challenge', subject: 'algebra2', section: '7.5 Solving Rational Equations', label: '★ Challenge: Working together', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+);
+QUESTION_TYPES.push(
+  { id: 'g111Challenge', subject: 'geometry', section: '11.1 Circumference and Arc Length', label: '★ Challenge: Radius from an arc length', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g112Challenge', subject: 'geometry', section: '11.2 Areas of Circles and Sectors', label: '★ Challenge: Central angle from a sector’s area', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g113Challenge', subject: 'geometry', section: '11.3 Areas of Polygons', label: '★ Challenge: Apothem and area of a regular hexagon', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g114Challenge', subject: 'geometry', section: '11.4 Modeling with Area', label: '★ Challenge: Largest pen along a river', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g121Challenge', subject: 'geometry', section: '12.1 Cross Sections of Solids', label: '★ Challenge: Euler’s Formula, then name the solid', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g122Challenge', subject: 'geometry', section: '12.2 Surface Areas of Prisms and Cylinders', label: '★ Challenge: Cylinder radius from its surface area', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g123Challenge', subject: 'geometry', section: '12.3 Surface Areas of Pyramids and Cones', label: '★ Challenge: Cone: slant height, then surface area', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g124Challenge', subject: 'geometry', section: '12.4 Volumes of Prisms and Cylinders', label: '★ Challenge: Pour from a box into a cylinder', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g125Challenge', subject: 'geometry', section: '12.5 Volumes of Pyramids and Cones', label: '★ Challenge: A cone with its top cut off', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g126Challenge', subject: 'geometry', section: '12.6 Surface Areas and Volumes of Spheres', label: '★ Challenge: A sphere inside a cube', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g127Challenge', subject: 'geometry', section: '12.7 Modeling with Surface Area and Volume', label: '★ Challenge: Mass of a hollow pipe', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'g128Challenge', subject: 'geometry', section: '12.8 Solids of Revolution', label: '★ Challenge: Rotate a triangle bounded by lines', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b81Challenge', subject: 'algebra2', section: '8.1 Defining and Using Sequences and Series', label: '★ Challenge: A sum with i²', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b82Challenge', subject: 'algebra2', section: '8.2 Analyzing Arithmetic Sequences and Series', label: '★ Challenge: Arithmetic series from two terms', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b83Challenge', subject: 'algebra2', section: '8.3 Analyzing Geometric Sequences and Series', label: '★ Challenge: Geometric series from two terms', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b84Challenge', subject: 'algebra2', section: '8.4 Finding Sums of Infinite Geometric Series', label: '★ Challenge: A bouncing ball', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b85Challenge', subject: 'algebra2', section: '8.5 Using Recursive Rules with Sequences', label: '★ Challenge: Terms of a recursive rule', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b91Challenge', subject: 'algebra2', section: '9.1 Using Normal Distributions', label: '★ Challenge: 68-95-99.7: a percent and a count', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b92Challenge', subject: 'algebra2', section: '9.2 Populations, Samples, and Hypotheses', label: '★ Challenge: Test a claim with a simulation', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b93Challenge', subject: 'algebra2', section: '9.3 Collecting Data', label: '★ Challenge: A stratified sample', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b94Challenge', subject: 'algebra2', section: '9.4 Experimental Design', label: '★ Challenge: Random assignment: groups and a probability', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b95Challenge', subject: 'algebra2', section: '9.5 Making Inferences from Sample Surveys', label: '★ Challenge: Margin of error and sample size', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'b96Challenge', subject: 'algebra2', section: '9.6 Making Inferences from Experiments', label: '★ Challenge: Experimental difference and resamplings', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP1Challenge', subject: 'precalc', section: 'P.1 Review of Real Numbers', label: '★ Challenge: Integers in an absolute value inequality', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP2Challenge', subject: 'precalc', section: 'P.2 Solving Equations', label: '★ Challenge: Radical equation with an extraneous solution', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP3Challenge', subject: 'precalc', section: 'P.3 The Cartesian Plane and Graphs of Equations', label: '★ Challenge: Circle from the endpoints of a diameter', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP4Challenge', subject: 'precalc', section: 'P.4 Linear Equations in Two Variables', label: '★ Challenge: Perpendicular bisector of a segment', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP5Challenge', subject: 'precalc', section: 'P.5 Functions', label: '★ Challenge: Difference quotient of a quadratic', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP6Challenge', subject: 'precalc', section: 'P.6 Analyzing Graphs of Functions', label: '★ Challenge: Average rate of change and the turning point', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP7Challenge', subject: 'precalc', section: 'P.7 A Library of Parent Functions', label: '★ Challenge: A step function: postage', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP8Challenge', subject: 'precalc', section: 'P.8 Transformations of Functions', label: '★ Challenge: Follow a point through transformations', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP9Challenge', subject: 'precalc', section: 'P.9 Combinations of Functions: Composite Functions', label: '★ Challenge: Domain of a composition', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
+  { id: 'pP10Challenge', subject: 'precalc', section: 'P.10 Inverse Functions', label: '★ Challenge: Values of the inverse of (ax + b)/(cx + d)', desc: 'Harder, multi-step: made for a bonus question', challenge: true },
 );
 ['g64Backward', 'g65AlgSides', 'trigProveHard'].forEach((id) => { const t = QUESTION_TYPES.find((x) => x.id === id); if (t) { t.challenge = true; if (!t.label.startsWith('★')) t.label = '★ Challenge: ' + t.label; } });
 // keep each section's types together (types added later, like the challenges, join their section instead of starting a second copy of it)
