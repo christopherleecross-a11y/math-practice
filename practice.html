@@ -29463,6 +29463,13 @@ let CUSTOM_KEY = null;
 const mixItems = (mix) => mix.split('_').map((p) => p.split('.')).filter(([id, n]) => TEMPLATES[id] && +n > 0)
   .map(([id, n, f, b]) => (b === 'b' ? [id, Math.min(20, Math.floor(+n)), f === 'fr' ? 'fr' : 'mc', 'b'] : [id, Math.min(20, Math.floor(+n)), f === 'fr' ? 'fr' : 'mc']));
 // percent added to the score for each bonus question answered right, from a link (bpct=5); half percents allowed
+// "Same questions for everyone": the versions the teacher picked in Try it as a student, from a link (pv=0.3_4.1 → question 1 is its 3rd new version, question 5 its 1st)
+const picksOf = (q) => { const o = {}; String(q.get('pv') || '').split('_').forEach((p) => { const [i, k] = p.split('.').map(Number); if (Number.isInteger(i) && i >= 0 && i < 200 && Number.isInteger(k) && k > 0 && k < 10000) o[i] = k; }); return Object.keys(o).length ? o : undefined; };
+const picksText = (o) => Object.entries(o || {}).filter(([, k]) => k > 0).sort((a, b) => a[0] - b[0]).map(([i, k]) => `${i}.${k}`).join('_');
+// which built assignment a set of picks belongs to (picks only make sense for these exact questions)
+let BUILDER_UPDATE = null;
+window.addEventListener('storage', (e) => { if (e.key && e.key.endsWith('builder:picks') && BUILDER_UPDATE) BUILDER_UPDATE(); });
+const pickSig = (q) => [customKeyFor(q), q.get('mix'), q.get('order') === 'mixed' ? 'm' : '', q.get('g') || ''].join('|');
 const bonusPctOf = (q) => (q.has('bpct') ? Math.max(0.5, Math.min(50, Math.round(2 * (+q.get('bpct') || 5)) / 2)) : undefined);
 // a bonus question: wrong costs nothing, right adds the teacher's bonus points
 const isBonus = (q) => !!(q && q.bonus);
@@ -29473,7 +29480,7 @@ function registerCustomUrl(url) {
   const items = mixItems(mix);
   if (!items.length) return null;
   const key = customKeyFor(q);
-  if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1', bonusPct: bonusPctOf(q), gen: q.get('g') === '2' ? 2 : undefined };
+  if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1', bonusPct: bonusPctOf(q), gen: q.get('g') === '2' ? 2 : undefined , picks: q.get('same') === '1' ? picksOf(q) : undefined };
   return key;
 }
 (function loadCustom() {
@@ -29492,7 +29499,7 @@ function registerCustomUrl(url) {
   const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, desmos, shareWork, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, desmos, shareWork, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined, picks: same ? picksOf(q) : undefined };
 })();
 
 /* ---------- question generation ---------- */
@@ -29535,7 +29542,9 @@ function generate(setKey, period, sid, attempt = 1) {
     const reg = qs.filter((q) => !q.bonus), bon = qs.filter(isBonus);
     qs = SETS[setKey].shuffle ? [...shuffle(r, reg), ...shuffle(r, bon)] : [...reg, ...bon];
   } else if (SETS[setKey].shuffle) qs = shuffle(r, qs);
-  return { qs, seedStr, version: cyrb53(seedStr).toString(36).slice(-6).toUpperCase() };
+  const picks = attempt === 1 && setting(setKey, 'same') && SETS[setKey].picks; // the versions the teacher picked
+  if (picks) Object.entries(picks).forEach(([i, k]) => { if (qs[i]) try { qs[i] = regenQuestion(seedStr, qs[i], +i, 'p' + k); } catch {} });
+  return { qs, seedStr, version: cyrb53((picks ? picksText(picks) + '|' : '') + seedStr).toString(36).slice(-6).toUpperCase() };
 }
 // a fresh version of question i for retry number t (same type and format, new numbers)
 function regenQuestion(seedStr, old, i, t) {
@@ -29836,7 +29845,8 @@ function startScreen(teacher = false) {
   }
   const pass = teacher || PREVIEW ? null : signinPass();
   if (PREVIEW && !teacher) card.append(el('div', { style: 'padding:10px 14px;border-radius:10px;background:#fbf1dc;margin-bottom:6px' },
-    el('strong', {}, 'Teacher preview. '), 'You’re trying this as a student. Nothing is saved to your gradebook, and Google sign-in is skipped.'));
+    el('strong', {}, 'Teacher preview. '), 'You’re trying this as a student. Nothing is saved to your gradebook, and Google sign-in is skipped.',
+    SETS[setKey] && SETS[setKey].custom && setting(setKey, 'same') ? el('div', { style: 'margin-top:6px' }, el('strong', {}, 'Same questions for everyone is on: '), 'click 🔄 New version on any question until it’s exactly what you want, then click ✓ Use these questions. That makes them the questions every student gets.') : ''));
   if (pass) { // signed in with Google
     const err0 = el('div', { class: 'err' });
     const pSel = pass.ps.length > 1 ? el('select', { id: 'period' }, el('option', { value: '' }, 'Which class is this for?'), ...pass.ps.map((p) => el('option', { value: p }, p + ' period'))) : null;
@@ -29930,7 +29940,8 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
   document.getElementById('title').textContent = SETS[setKey].title;
   document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period` + (PREVIEW ? ' · preview, not saved' : '');
   if (PREVIEW && !teacher) document.getElementById('subtitle').append(' ', el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:4px 12px;font-size:14px', title: 'Start over with a different set of numbers',
-    onclick: () => { if (((store.get(`practice:${CONFIG.SALT}:${setKey}:${period}:${PREVIEW_ID}`) || {}).answers || []).some((a) => a != null && a !== '' && !(Array.isArray(a) && !a.some((x) => x != null && x !== ''))) && !confirm('Start over with new questions? Your answers on this page will be cleared.')) return; PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); window.scrollTo(0, 0); begin(setKey, period, name, false, 1, null, true); } }, '🔄 New questions'), el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:4px 12px;font-size:14px', title: 'Show the questions one at a time, large, for the TV', onclick: () => previewTV(0) }, '📺 Show on the TV'));
+    onclick: () => { if (setting(setKey, 'same') && SETS[setKey].custom && state && state.setKey === setKey) { state.qs.forEach((_, i) => previewNewQ(i, true)); pickBar(); window.scrollTo(0, 0); return; } // same for everyone: a new version of every question
+      if (((store.get(`practice:${CONFIG.SALT}:${setKey}:${period}:${PREVIEW_ID}`) || {}).answers || []).some((a) => a != null && a !== '' && !(Array.isArray(a) && !a.some((x) => x != null && x !== ''))) && !confirm('Start over with new questions? Your answers on this page will be cleared.')) return; PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); window.scrollTo(0, 0); begin(setKey, period, name, false, 1, null, true); } }, '🔄 New questions'), el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:4px 12px;font-size:14px', title: 'Show the questions one at a time, large, for the TV', onclick: () => previewTV(0) }, '📺 Show on the TV'));
   const sid = sidOf(name, rid);
   const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${sid}`;
   if (!teacher && CONFIG.SCRIPT_URL && !noCloud) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
@@ -30645,15 +30656,36 @@ function previewTV(i) {
   tvShow(state.qs.map((q, k) => ({ label: `Question ${k + 1}`, q, tpl: q.tpl, mode: q.fmt })), i);
 }
 // "Try it as a student": another version of one question (nothing here is graded or saved)
-function previewNewQ(i) {
-  state.pvVer = state.pvVer || {};
+function previewNewQ(i, quiet) {
+  state.pvVer = state.pvVer || { ...(SETS[state.setKey].picks || {}) };
   state.pvVer[i] = (state.pvVer[i] || 0) + 1;
   try { state.qs[i] = regenQuestion(state.seedStr, state.origQs[i], i, 'p' + state.pvVer[i]); } catch { return; }
   state.answers[i] = null; delete state.status[i]; if (state.misses) delete state.misses[i]; if (state.flash) delete state.flash[i];
   if (state.history) delete state.history[i]; state.tries[i] = 0;
   delete state.drawings[String(i)]; delete state.drawings['L' + i];
   saveState(); rerenderAt(i);
+  if (!quiet) pickBar();
 }
+// Same questions for everyone: after the teacher swaps questions in Try it as a student, offer to make these THE questions
+function pickBar() {
+  if (!PREVIEW || !state || !setting(state.setKey, 'same') || !SETS[state.setKey].custom) return;
+  const params = new URLSearchParams(location.search), pv = picksText(state.pvVer), was = params.get('pv') || '';
+  let bar = document.getElementById('pickbar');
+  if (pv === was) { if (bar) bar.remove(); return; }
+  const studentLink = () => { const q = new URLSearchParams(location.search); q.delete('preview'); if (pv) q.set('pv', pv); else q.delete('pv'); return location.origin + location.pathname + '?' + q.toString(); };
+  const n = Object.keys(state.pvVer).filter((k) => state.pvVer[k] > 0).length, msg = el('span', { class: 'small', style: 'flex-basis:100%' });
+  const use = el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: () => {
+    store.set(TK('builder:picks'), { sig: pickSig(params), pv, t: Date.now() });
+    const q = new URLSearchParams(location.search); if (pv) q.set('pv', pv); else q.delete('pv'); history.replaceState(null, '', location.pathname + '?' + q.toString());
+    bar.remove(); alertBox('These are now the questions. Go back to the Build an assignment tab: its student link (and Assign in Google Classroom) now gives everyone exactly these questions.');
+  } }, '✓ Use these questions');
+  const copy = el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: async () => { try { await navigator.clipboard.writeText(studentLink()); copy.textContent = 'Copied!'; } catch { msg.textContent = studentLink(); } setTimeout(() => (copy.textContent = 'Copy student link'), 1800); } }, 'Copy student link');
+  const box = el('div', { id: 'pickbar', style: 'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:60;max-width:min(680px,94vw);display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-radius:12px;background:#fff;border:2px solid var(--accent);box-shadow:0 6px 24px rgba(0,0,0,.18)' },
+    el('strong', { style: 'flex:1;min-width:200px' }, `You changed ${n} question${n === 1 ? '' : 's'}. Everyone will get the questions you see now.`), use, copy, msg);
+  if (bar) bar.replaceWith(box); else document.body.append(box);
+  bar = box;
+}
+const alertBox = (text) => { const b = el('div', { style: 'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:60;max-width:min(620px,94vw);padding:12px 16px;border-radius:12px;background:#e7f3e4;border:2px solid #4e9a51;box-shadow:0 6px 24px rgba(0,0,0,.18);font-weight:600' }, '✓ ' + text); document.body.append(b); setTimeout(() => b.remove(), 7000); };
 // the version a student just missed, with its worked-out solution (shown above the new version)
 function prevTry(i, W) {
   const hist = state.history && state.history[i]; if (!hist || !hist.length || !state.origQs || !state.origQs[i]) return null;
@@ -32588,6 +32620,7 @@ function builder() {
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
       retries: +q.get('retries') || 0, checks: +q.get('checks') || 1, bonusPct: bonusPctOf(q) || 5, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', desmos: q.get('desmos') === '1', shareWork: q.get('sw') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
       leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), gen: q.get('g') === '2' ? 2 : 1, note, t: Date.now() });
+    if (q.get('same') === '1' && q.get('pv')) store.set(TK('builder:picks'), { sig: pickSig(q), pv: q.get('pv'), t: Date.now() }); // keep the questions picked for that link
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
@@ -32693,7 +32726,7 @@ function builder() {
     leaveLab, leaveBox,
     bonusLab, bonusBox,
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
-      el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Unchecked = a different version for each student.')),
+      el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Then use Try it as a student to swap any question for a new version until it’s exactly what you want. Unchecked = a different version for each student.')),
     el('label', {}, 'Homework help'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
       el('span', { class: 'small' }, 'Adds homework help to every question: a Hint (the first step, with the answer hidden), a Worked example (a twin problem with different numbers, solved one step at a time), and Notes (the section’s lesson notes and class examples, when there is a lesson plan). Help never changes the score; the gradebook marks each question where a hint or worked example was used. Leave it off for quizzes and tests.')),
     el('label', {}, 'Desmos calculator'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, desmosIn,
@@ -32799,6 +32832,8 @@ function builder() {
   const linkIn = el('input', { type: 'text', readonly: 'readonly', style: 'font-size:14px' });
   const keyLink = el('a', { target: '_blank', rel: 'noopener' }, 'Open the answer key for this assignment');
   const tryLink = el('a', { target: '_blank', rel: 'noopener' }, 'Try it as a student');
+  const pickedNote = el('div', { class: 'small', style: 'display:none;margin-top:8px;padding:8px 10px;border-radius:8px;background:#e7f3e4' });
+  BUILDER_UPDATE = () => { if (document.body.contains(linkIn)) update(); }; // picks made in the Try it as a student tab
   const codeOut = el('code', { style: 'display:block;white-space:pre-wrap;word-break:break-all;padding:8px;margin-top:6px;font-size:12px' });
   const msg = el('div', { class: 'err' });
   const remember = () => { if (!linkIn.value) return; try { const q = new URL(linkIn.value).searchParams; rememberAssignment(linkIn.value, q.get('title') || 'Custom Practice', q.get('subject') || '', customKeyFor(q)); } catch {} };
@@ -32827,7 +32862,7 @@ function builder() {
     el('p', { class: 'small' }, 'Don’t post these in Google Classroom. A student who adds “view” to their own link gets nothing; the share links have a code made from your settings.'));
   const out = el('div', { class: 'card' },
     el('div', {}, 'Total questions: ', totalEl), msg,
-    el('label', {}, 'Student link (post this in Google Classroom)'), linkIn, copyBtn,
+    el('label', {}, 'Student link (post this in Google Classroom)'), linkIn, pickedNote, copyBtn,
     classroomAssignBox(() => linkIn.value, () => titleIn.value.trim() || 'Custom Practice', () => built()),
     el('p', { class: 'small', style: 'margin-top:14px' }, tryLink, ' · ', keyLink, ' · ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); const k = linkIn.value && registerCustomUrl(linkIn.value); if (k) { printScreen(k); window.scrollTo(0, 0); } } }, 'Print it')),
     el('details', { style: 'margin-top:10px' }, el('summary', { class: 'small' }, 'Make it a permanent menu item (optional)'),
@@ -32930,6 +32965,12 @@ function builder() {
     if (shareIn.checked) q.set('sw', '1');
     if (!editId || saved.gen === 2) q.set('g', '2');
     if (editId) q.set('id', editId);
+    // questions the teacher picked in "Try it as a student" (Same questions for everyone only)
+    const pk = store.get(TK('builder:picks')), pkOn = sameIn.checked && pk && pk.pv && pk.sig === pickSig(q);
+    if (pkOn) q.set('pv', pk.pv);
+    pickedNote.replaceChildren(...(pkOn ? [`✓ Everyone gets the questions you picked in Try it as a student (${pk.pv.split('_').length} swapped for a new version). `,
+      linkBtn('Go back to the original questions', () => { store.set(TK('builder:picks'), null); update(); })] : []));
+    pickedNote.style.display = pkOn ? '' : 'none';
     const url = location.origin + location.pathname + '?' + q.toString();
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1'; shareA.value = shareLink(url, true); shareQ.value = shareLink(url, false);
     if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
