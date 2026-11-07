@@ -27902,7 +27902,7 @@ TEMPLATES.c112Geo = (r) => {
     const S = (a * ratio ** st) / (1 - ratio); if (!fracParts(S)) continue;
     const terms = [0, 1, 2, 3].map((i) => a * ratio ** (st + i));
     if (!terms.every((t) => fracParts(t))) continue;
-    const stem = form ? `Find the sum of the series ${terms.map(fracT).join(' + ').replace(/\+ −/g, '− ')} + ⋯` : `Find the sum of the series Σ (n = ${st} to ∞) of ${fmt(a)} · (${fracT(ratio)})ⁿ.`;
+    const stem = form ? `Find the sum of the series ${terms.map(fracT).join(' + ').replace(/\+ −/g, '− ')} + ⋯` : `Find the sum of the series Σ (n = ${st} to ∞) of ${a === 1 ? '' : a === -1 ? MINUS : fmt(a) + ' · '}(${fracT(ratio)})ⁿ.`;
     const disp = fracT(S);
     return { topic: 'Geometric series', stem,
       ...buildChoices(r, disp, [fracT(a / (1 - ratio)), fracT(terms[0] / (1 + ratio)), fracT(terms[1] / (1 - ratio)), 'The series diverges'], (i) => fracT(S + i + 1)),
@@ -31129,10 +31129,10 @@ function hintBar(q, i) {
 /* ---------- homework help: worked twin problems and lesson notes (no AI; everything comes from the question types and lesson plans) ---------- */
 /* ---------- “Try another”: a practice version of a question (never graded or saved) ---------- */
 const MORE = {}; // per question on this page: { open, n: which practice version, pick: the choices tried, show: solution shown }
-function moreQ(q, i, n) { // a new question of the same kind; multiple choice when the type has choices, so it can be checked right here
+function moreQ(q, i, n) { // a new question of the same kind, in the same format as the real one (multiple choice or typed answer)
   for (let k = 0; k < 8; k++) {
     try {
-      const t = TEMPLATES[q.tpl](mulberry32(cyrb53(`${state.seedStr}|q${i}|more${n}|${k}`))), m = applyMode(t, t.choices && !t.twoPart ? 'mc' : q.fmt);
+      const t = TEMPLATES[q.tpl](mulberry32(cyrb53(`${state.seedStr}|q${i}|more${n}|${k}`))), m = applyMode(t, q.fmt);
       if (m && m.solution && unM(m.stem) !== unM(q.stem)) return m;
     } catch (e) {}
   }
@@ -31141,7 +31141,8 @@ function moreQ(q, i, n) { // a new question of the same kind; multiple choice wh
 function moreBox(q, i) {
   if (state.teacher || !setting(state.setKey, 'more') || !twinable(q)) return el('span');
   const M = MORE[i], W = contentWidth();
-  const again = (label) => el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { MORE[i] = { open: true, n: ((M && M.n) || 0) + 1, pick: [] }; rerenderAt(i); } }, label);
+  const key = 'more' + i; // the practice answer rides along in state.answers under this name (never saved: JSON keeps only the real questions)
+  const again = (label) => el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { MORE[i] = { open: true, n: ((M && M.n) || 0) + 1, pick: [] }; delete state.answers[key]; rerenderAt(i); } }, label);
   if (!M || !M.open) return el('div', { class: 'morebar' }, again('🔁 Try another'), el('span', { class: 'small' }, 'More practice like this question (not graded)'));
   const t = moreQ(q, i, M.n), box = el('div', { class: 'morebox' });
   box.append(el('div', { class: 'helphead' }, `🔁 Practice question ${M.n}: same kind, new numbers (not graded)`));
@@ -31149,8 +31150,17 @@ function moreBox(q, i) {
   box.append(textCanvas(t.stem, W - 34));
   if (t.draw) { const cv = t.size ? makeCanvas(Math.min(t.size[0], W - 40), Math.round(t.size[1] * Math.min(1, (W - 40) / t.size[0]))) : makeCanvas(Math.min(560, W - 40), 300); try { t.draw(cv); box.append(cv); } catch (e) {} }
   const answer = t.mode === 'fr' ? (t.proofQ ? '' : t.fr && t.fr.display) : `${LETTERS[t.answer]}. ${t.choices[t.answer]}`;
-  const got = t.mode !== 'fr' && M.pick.includes(t.answer), showSol = M.show || got;
-  if (t.mode !== 'fr' && t.choices) {
+  const typed = t.mode === 'fr' && t.fr && !t.fr.fields.some((f) => f.kind === 'proof' || f.kind === 'graph'); // answer boxes like the real question
+  const got = (t.mode !== 'fr' && M.pick.includes(t.answer)) || (typed && M.res === 1), showSol = M.show || got;
+  if (typed) {
+    const real = state; // draw the answer boxes with frArea, as if this were an open question (even after the assignment is turned in)
+    state = { ...real, submitted: null, teacher: false, status: { [key]: got || M.show ? 'done' : undefined } };
+    try { box.append(frArea(t, key)); } finally { state = real; }
+    if (!got && !M.show) box.append(el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px' },
+      el('button', { class: 'btn checkbtn', type: 'button', style: 'margin:0', onclick: () => { hideVK(); const a = state.answers[key]; if (!isAnswered(t, a)) { M.res = 'blank'; } else M.res = scoreOf(t, a); rerenderAt(i); } }, 'Check'),
+      M.res === 'blank' ? el('span', { class: 'small' }, 'Type an answer first.') : M.res !== undefined ? el('span', { class: 'small', style: 'color:var(--bad)' }, M.res > 0 ? '◐ Partly right. Fix the rest and check again, or show the answer.' : '✗ Not quite. Try again, or show the answer.') : ''));
+    if (got) box.append(el('div', { class: 'tag good', style: 'display:inline-block;margin-top:6px' }, '✓ Correct!'));
+  } else if (t.mode !== 'fr' && t.choices) {
     const ch = el('div', { class: 'choices' });
     t.choices.forEach((c, j) => {
       const tried = M.pick.includes(j), cls = 'choice' + (tried ? (j === t.answer ? ' sel right' : ' sel wrong') : '') + (M.show && j === t.answer ? ' right' : '');
@@ -31165,7 +31175,7 @@ function moreBox(q, i) {
   } else if (M.show && answer) box.append(el('div', { class: 'small prevans' }, 'Answer: ', el('strong', { class: 'prevright' }, String(unM(answer)).replace(/(.)\u0305/g, '$1'))));
   if (showSol) box.append(solNode(t.solution));
   const btns = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' });
-  if (!showSol) btns.append(el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { M.show = true; rerenderAt(i); } }, t.mode === 'fr' ? 'Show the answer' : 'Show the solution'));
+  if (!showSol) btns.append(el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { M.show = true; rerenderAt(i); } }, t.mode === 'fr' && !typed ? 'Show the answer' : 'Show the solution'));
   btns.append(again('🔁 Another one'), el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { M.open = false; rerenderAt(i); } }, 'Close'));
   box.append(btns);
   return box;
