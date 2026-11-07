@@ -242,6 +242,10 @@
 tr.dash-late td { background: #fdecea; color: #b42318; }
 tr.dash-late td a { color: #b42318 !important; }
 tr.dash-late td strong { color: #b42318; }
+/* “Try another” practice versions */
+.morebar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.morebar .btn { margin: 0; padding: 7px 14px; font-size: 14px; }
+.morebox { margin-top: 12px; padding: 12px 14px; border: 2px dashed var(--accent); border-radius: 10px; background: #f7faff; }
 </style>
 </head>
 <body>
@@ -302,6 +306,9 @@ const CONFIG = {
   // DESMOS = true puts a Desmos graphing calculator button on every assignment. Usually set per assignment instead:
   // desmos: true in SETS, or the builder's "Desmos calculator" box. Students open it beside the questions; it is never graded.
   DESMOS: false,
+  // MORE = true puts a “Try another” button on every question: a new version of the same kind of question, for extra practice
+  // (it is never graded or saved). Usually set per assignment instead: more: true in SETS, or the builder's “Try another” box.
+  MORE: false,
   // SHARE_WORK = true shares each student's work Google Doc (their answers, the correct answers, and the solutions) with
   // them, view-only, when they turn in any assignment. Usually set per assignment instead: shareWork: true in SETS, or the
   // builder's "Share the work Doc" box. Needs SEND_WORK and the student's Classroom ID (Google sign-in or the roster list).
@@ -349,6 +356,7 @@ const TEACHERS = {
     WATERMARK: false,
     RETRIES: 2,
     LEAVE_LIMIT: 0,
+    MORE: true, // a “Try another” button on every question
   },
   spencer: {
     TEACHER_NAME: 'Mr. Spencer',
@@ -29935,7 +29943,7 @@ function registerCustomUrl(url) {
   const items = mixItems(mix);
   if (!items.length) return null;
   const key = customKeyFor(q);
-  if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1', bonusPct: bonusPctOf(q), gen: q.get('g') === '2' ? 2 : undefined , picks: q.get('same') === '1' ? picksOf(q) : undefined };
+  if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1', bonusPct: bonusPctOf(q), gen: q.get('g') === '2' ? 2 : undefined , more: q.get('more') === '1', picks: q.get('same') === '1' ? picksOf(q) : undefined };
   return key;
 }
 (function loadCustom() {
@@ -29950,11 +29958,11 @@ function registerCustomUrl(url) {
   const retries = Math.max(0, Math.min(5, Math.floor(+q.get('retries') || 0)));
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
   const checks = Math.max(1, Math.min(5, Math.floor(+q.get('checks') || 1)));
-  const same = q.get('same') === '1', hints = q.get('hints') === '1', desmos = q.get('desmos') === '1', shareWork = q.get('sw') === '1', redo = q.get('redo') === 'missed' ? 'missed' : 'all';
+  const same = q.get('same') === '1', hints = q.get('hints') === '1', more = q.get('more') === '1', desmos = q.get('desmos') === '1', shareWork = q.get('sw') === '1', redo = q.get('redo') === 'missed' ? 'missed' : 'all';
   const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, desmos, shareWork, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined, picks: same ? picksOf(q) : undefined };
+  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, more, desmos, shareWork, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined, picks: same ? picksOf(q) : undefined };
 })();
 
 /* ---------- question generation ---------- */
@@ -30015,6 +30023,7 @@ const setting = (setKey, name) => {
   if (name === 'same') return !!CONFIG.SAME_FOR_EVERYONE;
   if (name === 'hints') return !!CONFIG.HINTS;
   if (name === 'desmos') return !!CONFIG.DESMOS;
+  if (name === 'more') return !!CONFIG.MORE;
   if (name === 'shareWork') return !!CONFIG.SHARE_WORK;
   if (name === 'leaveLimit') return CONFIG.LEAVE_LIMIT || 0;
   if (name === 'redo') return CONFIG.REDO === 'missed' ? 'missed' : 'all';
@@ -30509,7 +30518,7 @@ function render() {
     }
     const showSol = ((submitted || locked) && CONFIG.SHOW_SOLUTIONS) || teacher;
     if (state.hints) box.append(hintBar(q, i), helpPanel(q, i));
-    if (q.mode === 'fr') { box.append(frArea(q, i)); box.append(checkBar(q, i)); if (!teacher && !q.proofQ) box.append(workArea(q, i)); if (showSol) box.append(solNode(q.solution)); app.append(box); return; }
+    if (q.mode === 'fr') { box.append(frArea(q, i)); box.append(checkBar(q, i)); if (!teacher && !q.proofQ) box.append(workArea(q, i)); if (showSol) box.append(solNode(q.solution)); box.append(moreBox(q, i)); app.append(box); return; }
     const ch = el('div', { class: 'choices' });
     q.choices.forEach((c, j) => {
       let cls = 'choice';
@@ -30526,6 +30535,7 @@ function render() {
     box.append(checkBar(q, i));
     if (!teacher) box.append(workArea(q, i));
     if (showSol) box.append(solNode(q.solution));
+    box.append(moreBox(q, i));
     app.append(box);
   });
   if (!submitted && !teacher) {
@@ -30997,6 +31007,49 @@ function hintBar(q, i) {
   return bar;
 }
 /* ---------- homework help: worked twin problems and lesson notes (no AI; everything comes from the question types and lesson plans) ---------- */
+/* ---------- “Try another”: a practice version of a question (never graded or saved) ---------- */
+const MORE = {}; // per question on this page: { open, n: which practice version, pick: the choices tried, show: solution shown }
+function moreQ(q, i, n) { // a new question of the same kind; multiple choice when the type has choices, so it can be checked right here
+  for (let k = 0; k < 8; k++) {
+    try {
+      const t = TEMPLATES[q.tpl](mulberry32(cyrb53(`${state.seedStr}|q${i}|more${n}|${k}`))), m = applyMode(t, t.choices && !t.twoPart ? 'mc' : q.fmt);
+      if (m && m.solution && unM(m.stem) !== unM(q.stem)) return m;
+    } catch (e) {}
+  }
+  return null;
+}
+function moreBox(q, i) {
+  if (state.teacher || !setting(state.setKey, 'more') || !twinable(q)) return el('span');
+  const M = MORE[i], W = contentWidth();
+  const again = (label) => el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { MORE[i] = { open: true, n: ((M && M.n) || 0) + 1, pick: [] }; rerenderAt(i); } }, label);
+  if (!M || !M.open) return el('div', { class: 'morebar' }, again('🔁 Try another'), el('span', { class: 'small' }, 'More practice like this question (not graded)'));
+  const t = moreQ(q, i, M.n), box = el('div', { class: 'morebox' });
+  box.append(el('div', { class: 'helphead' }, `🔁 Practice question ${M.n}: same kind, new numbers (not graded)`));
+  if (!t) { box.append(el('div', { class: 'small' }, 'No practice version is available for this question.')); return box; }
+  box.append(textCanvas(t.stem, W - 34));
+  if (t.draw) { const cv = t.size ? makeCanvas(Math.min(t.size[0], W - 40), Math.round(t.size[1] * Math.min(1, (W - 40) / t.size[0]))) : makeCanvas(Math.min(560, W - 40), 300); try { t.draw(cv); box.append(cv); } catch (e) {} }
+  const answer = t.mode === 'fr' ? (t.proofQ ? '' : t.fr && t.fr.display) : `${LETTERS[t.answer]}. ${t.choices[t.answer]}`;
+  const got = t.mode !== 'fr' && M.pick.includes(t.answer), showSol = M.show || got;
+  if (t.mode !== 'fr' && t.choices) {
+    const ch = el('div', { class: 'choices' });
+    t.choices.forEach((c, j) => {
+      const tried = M.pick.includes(j), cls = 'choice' + (tried ? (j === t.answer ? ' sel right' : ' sel wrong') : '') + (M.show && j === t.answer ? ' right' : '');
+      const b = el('button', { class: cls, type: 'button', 'aria-label': `Practice choice ${LETTERS[j]}` }, el('span', { class: 'letter' }, LETTERS[j]), textCanvas(c, Math.min(W - 100, 500), '17px Georgia, "Times New Roman", serif'));
+      if (got || M.show || tried) b.disabled = true; else b.addEventListener('click', () => { M.pick.push(j); rerenderAt(i); });
+      ch.append(b);
+    });
+    box.append(ch);
+    const last = M.pick[M.pick.length - 1];
+    if (got) box.append(el('div', { class: 'tag good', style: 'display:inline-block;margin-top:6px' }, M.pick.length === 1 ? '✓ Correct!' : '✓ Correct on that try'));
+    else if (last !== undefined && !M.show) box.append(el('div', { class: 'small', style: 'margin-top:6px;color:var(--bad)' }, '✗ Not that one. Try another choice, or show the solution.'));
+  } else if (M.show && answer) box.append(el('div', { class: 'small prevans' }, 'Answer: ', el('strong', { class: 'prevright' }, String(unM(answer)).replace(/(.)\u0305/g, '$1'))));
+  if (showSol) box.append(solNode(t.solution));
+  const btns = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' });
+  if (!showSol) btns.append(el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { M.show = true; rerenderAt(i); } }, t.mode === 'fr' ? 'Show the answer' : 'Show the solution'));
+  btns.append(again('🔁 Another one'), el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { M.open = false; rerenderAt(i); } }, 'Close'));
+  box.append(btns);
+  return box;
+}
 const HELP = {}; // per question on this page: { ex: which twin is showing (0 = hidden), n: twins seen, step: steps shown, notes: notes open }
 const twinable = (q) => !!(q && q.tpl && TEMPLATES[q.tpl] && q.solution);
 // a problem of the same type and format with different numbers (never the student's own question or one of its retry versions)
@@ -33034,6 +33087,8 @@ function builder() {
   sameIn.checked = !!saved.same;
   const hintsIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   const desmosIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
+  const moreIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
+  moreIn.checked = !!saved.more;
   hintsIn.checked = !!saved.hints;
   desmosIn.checked = !!saved.desmos;
   const shareIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
@@ -33073,7 +33128,7 @@ function builder() {
     const q = u.searchParams, mix = q.get('mix');
     if (!mix) { editMsg.textContent = 'That link isn’t a built assignment (it has no question list). Pick a menu assignment from the list instead.'; return; }
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
-      retries: +q.get('retries') || 0, checks: +q.get('checks') || 1, bonusPct: bonusPctOf(q) || 5, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', desmos: q.get('desmos') === '1', shareWork: q.get('sw') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
+      retries: +q.get('retries') || 0, checks: +q.get('checks') || 1, bonusPct: bonusPctOf(q) || 5, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', more: q.get('more') === '1', desmos: q.get('desmos') === '1', shareWork: q.get('sw') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
       leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), gen: q.get('g') === '2' ? 2 : 1, note, t: Date.now() });
     if (q.get('same') === '1' && q.get('pv')) store.set(TK('builder:picks'), { sig: pickSig(q), pv: q.get('pv'), t: Date.now() }); // keep the questions picked for that link
     builder(); window.scrollTo(0, 0);
@@ -33081,7 +33136,7 @@ function builder() {
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
     const S = SETS[key]; if (!S) return;
     store.set(TK('builder:last'), { ...loadItems(S.items.map(([id, n, m, b]) => [id, n, m === 'fr' ? 'fr' : 'mc', b])), bonusPct: S.bonusPct || 5, title: S.title, subject: S.subject, order: S.shuffle ? 'mixed' : 'grouped',
-      retries: S.retries || 0, checks: S.checks || 1, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, desmos: !!S.desmos, shareWork: !!S.shareWork, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
+      retries: S.retries || 0, checks: S.checks || 1, attempts: S.attempts || 1, lockdown: S.lockdown !== false, same: !!S.same, hints: !!S.hints, more: !!S.more, desmos: !!S.desmos, shareWork: !!S.shareWork, redo: S.redo === 'missed' ? 'missed' : 'all', leaveLimit: S.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, t: Date.now() });
     builder(); window.scrollTo(0, 0);
   };
   const loadEdit = () => loadFromUrl(editIn.value);
@@ -33184,6 +33239,8 @@ function builder() {
       el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Then use Try it as a student to swap any question for a new version until it’s exactly what you want. Unchecked = a different version for each student.')),
     el('label', {}, 'Homework help'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
       el('span', { class: 'small' }, 'Adds homework help to every question: a Hint (the first step, with the answer hidden), a Worked example (a twin problem with different numbers, solved one step at a time), and Notes (the section’s lesson notes and class examples, when there is a lesson plan). Help never changes the score; the gradebook marks each question where a hint or worked example was used. Leave it off for quizzes and tests.')),
+    el('label', {}, '“Try another” button'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, moreIn,
+      el('span', { class: 'small' }, 'Adds a “Try another” button to every question. It gives the student a new question of the same kind, with new numbers, to practice on: they pick an answer, see if it’s right, and can see the solution. It is never graded and doesn’t change their score.')),
     el('label', {}, 'Desmos calculator'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, desmosIn,
       el('span', { class: 'small' }, 'Adds a Desmos button at the bottom of the assignment. It opens the Desmos graphing calculator beside the questions (it is never graded).')),
     el('label', {}, 'Share the work Doc'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, shareIn,
@@ -33328,6 +33385,7 @@ function builder() {
   sameIn.addEventListener('change', update);
   hintsIn.addEventListener('change', update);
   desmosIn.addEventListener('change', update);
+  moreIn.addEventListener('change', update);
   shareIn.addEventListener('change', update);
   redoSel.addEventListener('change', update);
 
@@ -33386,7 +33444,7 @@ function builder() {
     const title = titleIn.value.trim() || 'Custom Practice';
     changedNow = false;
     const prevLast = store.get(TK('builder:last')) || {};
-    const nextLast = { counts, formats, frCounts, bonusCounts, bonusFormats, seq, bonusPct: +bonusPctIn.value || 5, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, desmos: desmosIn.checked, shareWork: shareIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
+    const nextLast = { counts, formats, frCounts, bonusCounts, bonusFormats, seq, bonusPct: +bonusPctIn.value || 5, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: hintsIn.checked, more: moreIn.checked, desmos: desmosIn.checked, shareWork: shareIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
     const sig = draftSig(nextLast);
     if (sig === store.get(TK('builder:sentSig'))) nextLast.t = prevLast.t || 0;
     else if (opening) { // first look at what was already here: copy it only if it came from loading an assignment just now
@@ -33417,6 +33475,7 @@ function builder() {
     if (sameIn.checked) q.set('same', '1');
     if (hintsIn.checked) q.set('hints', '1');
     if (desmosIn.checked) q.set('desmos', '1');
+    if (moreIn.checked) q.set('more', '1');
     if (shareIn.checked) q.set('sw', '1');
     if (!editId || saved.gen === 2) q.set('g', '2');
     if (editId) q.set('id', editId);
@@ -33495,7 +33554,7 @@ function viewScreen() {
     el('p', { class: 'small' }, `${total} question${total === 1 ? '' : 's'}: `, S.items.map(([id, n, m, b]) => `${b === 'b' ? '★ BONUS: ' : ''}${name(id)} (${n}${m === 'fr' ? ', free response' : ''})`).join('; '), '.',
       S.items.some((it) => it[3] === 'b') ? ` Bonus questions come last: +${fmt(setting(setKey, 'bonusPct'))}% added to the score for each one right, nothing off if wrong.` : ''),
     el('p', { class: 'small' }, `Every student gets ${setting(setKey, 'same') ? 'the same version' : 'their own version with different numbers'}${S.shuffle ? ', in a mixed-up order' : ''}. `,
-      `Tries per question: ${ret + 1}${ret && setting(setKey, 'checks') > 1 ? ` (typed answers: ${setting(setKey, 'checks')} checks per version)` : ''}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. Desmos calculator: ${yes(setting(setKey, 'desmos'))}. Work Doc shared with the student: ${yes(setting(setKey, 'shareWork'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
+      `Tries per question: ${ret + 1}${ret && setting(setKey, 'checks') > 1 ? ` (typed answers: ${setting(setKey, 'checks')} checks per version)` : ''}. Attempts at the whole assignment: ${att >= 99 ? 'unlimited' : att}. Hints: ${yes(setting(setKey, 'hints'))}. “Try another” button: ${yes(setting(setKey, 'more'))}. Desmos calculator: ${yes(setting(setKey, 'desmos'))}. Work Doc shared with the student: ${yes(setting(setKey, 'shareWork'))}. Full-screen lockdown: ${yes(setting(setKey, 'lockdown'))}${setting(setKey, 'lockdown') && leave ? ` (locks after leaving ${leave} time${leave === 1 ? '' : 's'})` : ''}.`),
     el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
       el('button', { class: 'btn secondary', type: 'button', onclick: () => { sample++; draw(); } }, 'Show another version'),
       ans ? ansBtn : '',
@@ -33525,7 +33584,7 @@ function copyIntoBuilder(link) {
   const g = (k, d) => (q.has(k) ? q.get(k) : d);
   store.set(TK('builder:last'), { counts: c, formats: f, frCounts: frc, bonusCounts: bc, bonusFormats: bf, seq: builderSeq(items), bonusPct: (mix ? bonusPctOf(q) : set && set.bonusPct) || 5, title: g('title', set ? set.title : ''), subject: SUBJECTS[g('subject', set ? set.subject : '')] ? g('subject', set ? set.subject : '') : Object.keys(SUBJECTS)[0],
     order: g('order', set && set.shuffle ? 'mixed' : '') === 'mixed' ? 'mixed' : 'grouped', retries: +g('retries', set ? set.retries || 0 : 0) || 0, checks: +g('checks', set ? set.checks || 1 : 1) || 1, attempts: +g('attempts', set ? set.attempts || 1 : 1) || 1,
-    lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', desmos: g('desmos', '') === '1', shareWork: g('sw', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
+    lockdown: g('lock', '1') !== '0', same: g('same', '') === '1', hints: g('hints', '') === '1', more: g('more', '') === '1', desmos: g('desmos', '') === '1', shareWork: g('sw', '') === '1', redo: g('redo', '') === 'missed' ? 'missed' : 'all', leaveLimit: CONFIG.LEAVE_LIMIT || 0, editId: null, gen: 2, copied: true,
     note: 'This is a copy of a shared assignment. Check the title and settings, then copy your own student link below.', t: Date.now() });
   return true;
 }
