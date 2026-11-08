@@ -32913,7 +32913,10 @@ function tvShow(list, at) {
     if (T.on) body.append(big);
     const w = W();
     if (q.bonus) body.append(el('div', { style: 'display:inline-block;margin:0 0 8px;padding:6px 16px;border-radius:999px;background:#fbf1dc;border:2px solid #d4a72c;color:#8a6d0f;font-weight:800;font-size:24px;letter-spacing:.5px' }, `★ BONUS · extra credit${state && state.setKey && SETS[state.setKey] ? ` (+${+setting(state.setKey, 'bonusPct')}%)` : ''}`));
-    body.append(el('div', { class: 'tv-label' }, `${list[i].label}${fresh && list[i].fixed ? ' · new numbers' : ''}${q.topic && q.topic !== list[i].label ? ` · ${q.topic}` : ''}`), ...String(q.stem).split('\n').map((ln) => textCanvas(ln, w, font, 42)));
+    body.append(el('div', { class: 'tv-label' }, `${list[i].label}${fresh && list[i].fixed ? ' · new numbers' : ''}${q.topic && q.topic !== list[i].label ? ` · ${q.topic}` : ''}`), ...(() => { // notes screens (theorems, summaries) get space between statements, and more at a blank line
+      const notes = !q.choices && !(q.fr && q.fr.display) && !q.solution;
+      return String(q.stem).split('\n').map((ln) => { if (notes && !ln.trim()) return el('div', { style: 'height:22px' }); const cv = textCanvas(ln, w, font, 42); if (notes) { cv.style.display = 'block'; cv.style.marginBottom = '16px'; } return cv; });
+    })());
     if (q.draw) {
       const graph = q.topic.startsWith('Graphs'), sz = q.size || (graph ? [620, 330] : [560, 300]);
       const cv = makeCanvas(sz[0], sz[1]); cv._stack = false; try { q.draw(cv); } catch {}
