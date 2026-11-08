@@ -10827,10 +10827,10 @@ TEMPLATES.g64Coords = (r) => {
     const T = (L) => `${D}${ptT(L[0])}, ${E}${ptT(L[1])}, ${F}${ptT(L[2])}`, correct = T(M);
     const wrongs = [T([mid(p, q), mid(q, s), mid(s, p)]), T(M.map(([x, y]) => [y, x])), T([[p[0] + s[0], p[1] + s[1]], M[1], M[2]]), T([M[0], M[1], mid(p, s)])].filter((w) => w !== correct);
     const ok = (v) => M.map((P, i) => onePointOk(v[i], P));
-    return { topic: 'Midsegments on the coordinate plane', stem: `△${A}${B}${C} has vertices ${A}${ptT(p)}, ${B}${ptT(q)}, and ${C}${ptT(s)}. ${D}, ${E}, and ${F} are the midpoints of ${SEG(A + C)}, ${SEG(C + B)}, and ${SEG(B + A)}. Find the coordinates of ${D}, ${E}, and ${F}.`,
+    return { topic: 'Midsegments on the coordinate plane', stem: `△${A}${B}${C} has vertices ${A}${ptT(p)}, ${B}${ptT(q)}, and ${C}${ptT(s)}. \n• ${D} is the midpoint of ${SEG(A + C)}.\n• ${E} is the midpoint of ${SEG(C + B)}.\n• ${F} is the midpoint of ${SEG(B + A)}.\nFind the coordinates of ${D}, ${E}, and ${F}.`,
       ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T([M[0], M[1], [M[2][0] + i + 1, M[2][1]]])),
-      fr: { fields: [D, E, F].map((n) => ({ kind: 'expr', keys: 'point', label: `${n}:` })), key: M.map(([x, y]) => `\\left(${fracL(x)},${fracL(y)}\\right)`), display: correct, check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 3 },
-      solution: `Midpoint formula ((x₁ + x₂)/2, (y₁ + y₂)/2): ${correct}. Each midsegment, such as ${SEG(D + E)}, is parallel to the third side (${SEG(A + B)}) and half as long.` };
+      fr: { fields: [[D, A + C], [E, C + B], [F, B + A]].map(([n, sg]) => ({ kind: 'expr', keys: 'point', label: `${n} (midpoint of ${SEG(sg)}):` })), key: M.map(([x, y]) => `\\left(${fracL(x)},${fracL(y)}\\right)`), display: correct, check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 3 },
+      solution: `Midpoint formula: ((x₁ + x₂)/2, (y₁ + y₂)/2). Use the two endpoints of each segment.\n${[[D, A, p, C, s, M[0]], [E, C, s, B, q, M[1]], [F, B, q, A, p, M[2]]].map(([n, a1, P1, a2, P2, Mm]) => `${n} is the midpoint of ${SEG(a1 + a2)}, so use ${a1}${ptT(P1)} and ${a2}${ptT(P2)}: ${n} = ((${fmt(P1[0])} + ${chP(P2[0])})/2, (${fmt(P1[1])} + ${chP(P2[1])})/2) = ${ptT(Mm)}`).join('\n')}\nEach midsegment, such as ${SEG(D + E)}, is parallel to the third side (${SEG(A + B)}) and half as long.` };
   }
 };
 TEMPLATES.g64FindX = (r) => {
