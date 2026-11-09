@@ -434,6 +434,12 @@ const SETS = {
   'geo-6-5':       { subject: 'geometry', title: '6.5 Indirect Proof and Inequalities in One Triangle', items: [['g65FirstStep', 2], ['g65OrderAngles', 3], ['g65OrderSides', 3], ['g65ThirdSide', 3], ['g65Possible', 3]] },
   'geo-6-6':       { subject: 'geometry', title: '6.6 Inequalities in Two Triangles', items: [['g66Hinge', 6], ['g66Flights', 2], ['g66PossibleX', 3]] },
   // ----- Calculus III (Stewart, Calculus 9th ed.; practice.html?t=calc) -----
+  'act-3-1': { subject: 'act', title: '3.1 Real and Complex Number Systems', items: [['act3CpxAdd', 2], ['act3CpxMult', 3], ['act3CpxDiv', 2], ['act3QuadRoots', 2], ['act3Conj', 2], ['act3Classify', 3]] },
+  'act-3-2': { subject: 'act', title: '3.2 Number Line and Absolute Value', items: [['act3Dist', 2], ['act3Mid', 2], ['act3AbsEq', 2], ['act3AbsIneq', 3], ['act3AbsGraph', 1], ['act3Tolerance', 1], ['act3IntBetween', 1], ['act3NLFrac', 1], ['act3Percent', 2]] },
+  'act-3-3': { subject: 'act', title: '3.3 Exponents', items: [['act3ExpMono', 6], ['act3ExpBase', 5]] },
+  'act-3-4': { subject: 'act', title: '3.4 Imaginary and Complex Numbers', items: [['act3CpxDist', 4], ['act3CpxMid', 3], ['act3CpxMod', 4]] },
+  'act-3-5': { subject: 'act', title: '3.5 Vectors', items: [['act3VecMag', 4], ['act3VecOps', 2], ['act3Displace', 3], ['act3VecFind', 2]] },
+  'act-3-6': { subject: 'act', title: '3.6 Matrices', items: [['act3MatRead', 1], ['act3MatAdd', 2], ['act3MatScalar', 2], ['act3MatMult', 2], ['act3MatDet', 2], ['act3MatRevenue', 2]] },
   'calc3-11-1': { subject: 'calc3', title: '11.1 Sequences', items: [['c111RatLimit', 2], ['c111RatLimit', 1, 'fr'], ['c111Term', 2], ['c111Term', 1, 'fr'], ['c111Recur', 2], ['c111Recur', 1, 'fr'], ['c111Bank', 2], ['c111Bank', 1, 'fr'], ['c111Formula', 1], ['c111Formula', 2, 'fr'], ['c111Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-11-2': { subject: 'calc3', title: '11.2 Series', items: [['c112Geo', 1], ['c112Geo', 1, 'fr'], ['c112Telescope', 1], ['c112Telescope', 1, 'fr'], ['c112Decimal', 1], ['c112Decimal', 1, 'fr'], ['c112Partial', 1], ['c112Partial', 1, 'fr'], ['c112DivTest', 1], ['c112DivTest', 1, 'fr'], ['c112Combo', 1], ['c112Combo', 1, 'fr'], ['c112Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-12-5': { subject: 'calc3', title: '12.5 Equations of Lines and Planes', items: [['c125LineHit', 1], ['c125LineHit', 1, 'fr'], ['c125Plane3', 1], ['c125Plane3', 1, 'fr'], ['c125Parallel', 1], ['c125Parallel', 1, 'fr'], ['c125LinePlane', 1], ['c125LinePlane', 1, 'fr'], ['c125Angle', 1], ['c125Angle', 1, 'fr'], ['c125Dist', 1], ['c125Dist', 1, 'fr'], ['c125Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
@@ -9579,7 +9585,23 @@ function tcLineW(ctx, l) { // width of a line exactly as textCanvas draws it
   if (l.startsWith(NOWRAP)) l = l.slice(1);
   return l.split(/((?:.\u0305)+)/).reduce((t, part) => { if (!part) return t; const txt = part.replace(/\u0305/g, ''); return t + txt.split('∥').reduce((u, seg, i) => u + (i ? tcParW(ctx) : 0) + (seg ? ctx.measureText(seg).width : 0), 0); }, 0);
 }
+// a matrix written as [1, 2; 3, 4] (a whole answer choice) is drawn as a matrix with brackets
+const MATRIX_TEXT = /^\[\s*[−-]?[\d./]+(\s*,\s*[−-]?[\d./]+)*(\s*;\s*[−-]?[\d./]+(\s*,\s*[−-]?[\d./]+)*)+\s*\]$/;
+function matrixCanvas(text, font, lh) {
+  const rows = text.trim().slice(1, -1).split(';').map((row) => row.split(',').map((x) => x.trim().replace(/-/g, MINUS)));
+  const probe = document.createElement('canvas').getContext('2d'); probe.font = font;
+  const fs = parseFloat((/(\d+(?:\.\d+)?)px/.exec(font) || [0, 17])[1]), cw = Math.max(...rows.flat().map((x) => probe.measureText(x).width)) + fs * 0.9, rh = fs * 1.45;
+  const cols = Math.max(...rows.map((row) => row.length)), W = Math.ceil(cw * cols + 16), H = Math.ceil(rh * rows.length + 8);
+  const cv = makeCanvas(W, H), c = cv._ctx; cv.style.maxWidth = '100%'; cv.style.width = W + 'px';
+  c.font = font; c.fillStyle = '#1d1d1b'; c.strokeStyle = '#1d1d1b'; c.lineWidth = Math.max(1.2, fs / 14); c.textAlign = 'center'; c.textBaseline = 'middle';
+  const top = 4, bot = H - 4, br = fs * 0.3;
+  c.beginPath(); c.moveTo(4 + br, top); c.lineTo(4, top); c.lineTo(4, bot); c.lineTo(4 + br, bot); c.stroke();
+  c.beginPath(); c.moveTo(W - 4 - br, top); c.lineTo(W - 4, top); c.lineTo(W - 4, bot); c.lineTo(W - 4 - br, bot); c.stroke();
+  rows.forEach((row, i) => row.forEach((x, j) => c.fillText(x, 8 + cw * j + cw / 2, top + rh * i + rh / 2 + 1)));
+  return cv;
+}
 function textCanvas(text, width, font = TEXT_FONT, lh = 26) {
+  if (MATRIX_TEXT.test(String(text).trim())) return matrixCanvas(String(text), font, lh);
   text = autoMath(text);
   if (hasM(text)) return mathTextCanvas(text, width, font, lh);
   const probe = document.createElement('canvas').getContext('2d');
@@ -28327,6 +28349,488 @@ TEMPLATES.c134Challenge = (r) => { // projectile from a height at 30°
   }
 };
 
+/* ---------- ACT Prep chapter 3 start ---------- */
+/* ---------- ACT Prep (ACT Math Practice Questions 2025–2026, Vibrant Publishers): Chapter 3 Number and Quantity ---------- */
+// every ACT question is multiple choice with 4 answer choices
+const aq3C = (a, b) => { // a complex number in standard form: 3 − 2i, −i, 4, 5i
+  a = Math.round(a * 1e9) / 1e9; b = Math.round(b * 1e9) / 1e9;
+  if (!b) return fmt(a);
+  const im = Math.abs(b) === 1 ? 'i' : `${fmt(Math.abs(b))}i`;
+  if (!a) return (b < 0 ? MINUS : '') + im;
+  return `${fmt(a)} ${b < 0 ? MINUS : '+'} ${im}`;
+};
+const aq3CF = (a, b) => { // with fractions: 9/13 − 19/13 i
+  if (!b) return fracT(a);
+  const im = Math.abs(b) === 1 ? 'i' : `${fracT(Math.abs(b))}i`;
+  if (!a) return (b < 0 ? MINUS : '') + im;
+  return `${fracT(a)} ${b < 0 ? MINUS : '+'} ${im}`;
+};
+const aq3P = (a, b) => `(${aq3C(a, b)})`;
+const aq3Sup = (n) => String(n).replace('-', MINUS).split('').map((d) => ({ '−': '⁻' })[d] || '⁰¹²³⁴⁵⁶⁷⁸⁹'[+d] || d).join('');
+const aq3Pow = (base, e) => (e === 1 ? base : `${base}${aq3Sup(e)}`);
+const aq3Mono = (k, terms) => { // 4x⁻²y⁵ from a coefficient and [[var, exponent], …]
+  const v = terms.filter(([, e]) => e).map(([x, e]) => aq3Pow(x, e)).join('');
+  if (!v) return fmt(k);
+  return (k === 1 ? '' : k === -1 ? MINUS : fmt(k)) + v;
+};
+const aq3Rt = (n) => (n < 0 ? `${MINUS}${aq3Rt(-n)}` : Number.isInteger(Math.sqrt(n)) ? String(Math.sqrt(n)) : rootText(n).text); // √52 → 2√13
+const aq3Big = (c) => /[¹²³⁴⁵⁶⁷⁸⁹][⁰¹²³⁴⁵⁶⁷⁸⁹]|⁰/.test(c); // exponents of 10 or more (or 0) are left out of answer choices
+const aq3Mc = (r, correct, cands, fallback, topic, stem, solution, extra = {}) => ({ topic, stem, ...buildChoices(r, correct, cands.filter((c) => c !== correct && !aq3Big(c)), (i) => { const f = fallback(i); return f && aq3Big(f) ? null : f; }), solution: solution.replace(/(^|[\s(+−])1i/g, '$1i'), ...extra });
+const AQ3_TRIPLES = [[3, 4, 5], [5, 12, 13], [6, 8, 10], [8, 15, 17], [9, 12, 15], [7, 24, 25], [12, 16, 20], [20, 21, 29]];
+
+/* ===== 3.1 Real and complex number systems ===== */
+TEMPLATES.act3CpxAdd = (r) => {
+  const a = nz(r, -9, 9), b = nz(r, -9, 9), c = nz(r, -9, 9), d = nz(r, -9, 9), sub = r() < 0.45, s = sub ? -1 : 1;
+  const re = a + s * c, im = b + s * d, op = sub ? MINUS : '+';
+  const kind = ri(r, 0, 2);
+  const stem = kind === 0 ? `What is ${aq3P(a, b)} ${op} ${aq3P(c, d)}?`
+    : kind === 1 ? (sub ? `An engineer models a signal as S = ${aq3C(a, b)}. The noise in the signal is represented as N = ${aq3C(c, d)}. What is the resulting signal R when the noise is subtracted from the original signal?`
+      : `A scientist models a signal as z = ${aq3C(a, b)}, where i represents the imaginary unit. Another signal is modeled as w = ${aq3C(c, d)}. What is the combined signal z + w?`)
+      : `If z = ${aq3C(a, b)} and w = ${aq3C(c, d)}, what is the value of z ${op} w?`;
+  return aq3Mc(r, aq3C(re, im), [aq3C(a - s * c, b - s * d), aq3C(re, b - s * d), aq3C(a - s * c, im), aq3C(re, -im), aq3C(-re, im)], (i) => aq3C(re + i + 1, im), 'Adding and subtracting complex numbers', stem,
+    `${sub ? 'Subtract' : 'Add'} the real parts and the imaginary parts separately${sub ? ' (distribute the minus sign to both parts)' : ''}.\nReal: ${fmt(a)} ${op} ${c < 0 ? `(${fmt(c)})` : fmt(c)} = ${fmt(re)}\nImaginary: ${fmt(b)} ${op} ${d < 0 ? `(${fmt(d)})` : fmt(d)} = ${fmt(im)}\nAnswer: ${aq3C(re, im)}`);
+};
+TEMPLATES.act3CpxMult = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 1) { // (a + bi)²
+    const a = nz(r, -6, 6), b = nz(r, -5, 5), re = a * a - b * b, im = 2 * a * b;
+    return aq3Mc(r, aq3C(re, im), [aq3C(a * a + b * b, im), aq3C(a * a, b * b), aq3C(re, a * b), aq3C(a * a - b * b, 0)], (i) => aq3C(re + i + 1, im), 'Multiplying complex numbers', `What is the value of ${aq3P(a, b)}²?`,
+      `${aq3P(a, b)}² = ${aq3P(a, b)}${aq3P(a, b)} = ${fmt(a * a)} ${im < 0 ? MINUS : '+'} ${fmt(Math.abs(a * b))}i ${im < 0 ? MINUS : '+'} ${fmt(Math.abs(a * b))}i + ${fmt(b * b)}i²\nSince i² = −1: ${fmt(a * a)} − ${fmt(b * b)} ${im < 0 ? MINUS : '+'} ${fmt(Math.abs(im))}i = ${aq3C(re, im)}`);
+  }
+  if (kind === 2) { // z times ki
+    const a = nz(r, -9, 12), b = nz(r, -9, 12), k = nz(r, -4, 4), re = -k * b, im = k * a;
+    return aq3Mc(r, aq3C(re, im), [aq3C(k * b, k * a), aq3C(k * a, k * b), aq3C(re, -im), aq3C(-re, -im)], (i) => aq3C(re, im + i + 1), 'Multiplying complex numbers',
+      `A mechanical system uses the complex number z = ${aq3C(a, b)} to represent a displacement. The system multiplies z by ${aq3C(0, k)}. What is the resulting complex number?`,
+      `${aq3C(0, k)}${aq3P(a, b)} = ${aq3C(0, k * a)} ${k * b < 0 ? MINUS : '+'} ${fmt(Math.abs(k * b))}i²\nSince i² = −1, ${fmt(k * b)}i² = ${fmt(-k * b)}.\nAnswer: ${aq3C(re, im)}`);
+  }
+  const a = nz(r, -6, 6), b = nz(r, -6, 6), c = nz(r, -6, 6), d = nz(r, -6, 6), re = a * c - b * d, im = a * d + b * c;
+  const stem = kind === 3 ? `An electronics engineer is analyzing a circuit where the current is represented by the complex number I = ${aq3C(a, b)} amperes, and the voltage across a component is given by V = ${aq3C(c, d)} volts. The power P (in volt-amperes) is calculated as P = I × V. What is the power P in terms of real and imaginary parts?`
+    : pick(r, [`What is the product of ${aq3P(a, b)} and ${aq3P(c, d)}?`, `A physicist multiplies two complex numbers: z₁ = ${aq3C(a, b)} and z₂ = ${aq3C(c, d)}. What is the product of z₁ and z₂?`]);
+  return aq3Mc(r, aq3C(re, im), [aq3C(a * c + b * d, im), aq3C(a * c, b * d), aq3C(re, a * d - b * c), aq3C(a + c, b + d)], (i) => aq3C(re + i + 1, im), 'Multiplying complex numbers', stem,
+    `Use FOIL: ${aq3P(a, b)}${aq3P(c, d)} = ${fmt(a * c)} ${a * d < 0 ? MINUS : '+'} ${fmt(Math.abs(a * d))}i ${b * c < 0 ? MINUS : '+'} ${fmt(Math.abs(b * c))}i ${b * d < 0 ? MINUS : '+'} ${fmt(Math.abs(b * d))}i²\nSince i² = −1: real part ${fmt(a * c)} ${b * d < 0 ? '+' : MINUS} ${fmt(Math.abs(b * d))} = ${fmt(re)}, imaginary part ${fmt(a * d)} ${b * c < 0 ? MINUS : '+'} ${fmt(Math.abs(b * c))} = ${fmt(im)}\nAnswer: ${aq3C(re, im)}`);
+};
+TEMPLATES.act3CpxDiv = (r) => {
+  for (;;) {
+    const realTop = r() < 0.3, a = realTop ? nz(r, 2, 9) : nz(r, -8, 8), b = realTop ? 0 : nz(r, -8, 8), c = nz(r, -5, 5), d = nz(r, -5, 5), D = c * c + d * d;
+    const re = (a * c + b * d) / D, im = (b * c - a * d) / D;
+    if (Number.isInteger(re) && Number.isInteger(im) && r() < 0.6) continue; // mostly fraction answers, like the book
+    const kind = realTop ? 0 : ri(r, 0, 2);
+    const stem = kind === 1 ? `Let z₁ = ${aq3C(a, b)} and z₂ = ${aq3C(c, d)}. Simplify z = z₁/z₂ into standard form a + bi.`
+      : kind === 2 ? `Sophia is analyzing a set of circuits. In one circuit, the current is represented as ${aq3C(c, d)}, where i is the imaginary unit (i² = −1). The voltage is represented as ${aq3C(a, b)}. To calculate the impedance Z of the circuit, she uses the formula Z = voltage/current. What is the impedance Z, simplified into standard form a + bi?`
+        : `What is the standard form of ${b ? aq3P(a, b) : fmt(a)}/${aq3P(c, d)}?`;
+    return aq3Mc(r, aq3CF(re, im), [aq3CF((a * c - b * d) / D, (b * c + a * d) / D), aq3CF((a * c + b * d) / (c * c - d * d || 1), (b * c - a * d) / (c * c - d * d || 1)), aq3CF(a / c, b / d), aq3CF(re, -im), aq3CF(a * c + b * d, b * c - a * d)],
+      (i) => aq3CF(re + i + 1, im), 'Dividing complex numbers', stem,
+      `Multiply the top and bottom by the conjugate of the denominator, ${aq3C(c, -d)}.\nBottom: ${aq3P(c, d)}${aq3P(c, -d)} = ${fmt(c * c)} + ${fmt(d * d)} = ${D}\nTop: ${b ? aq3P(a, b) : fmt(a)}${aq3P(c, -d)} = ${aq3C(a * c + b * d, b * c - a * d)}\nz = (${aq3C(a * c + b * d, b * c - a * d)})/${D} = ${aq3CF(re, im)}`);
+  }
+};
+TEMPLATES.act3QuadRoots = (r) => {
+  const p = nz(r, -5, 5), q = ri(r, 1, 5), B = -2 * p, C = p * p + q * q;
+  const eq = `x² ${B < 0 ? MINUS : '+'} ${Math.abs(B) === 1 ? '' : Math.abs(B)}x + ${C} = 0`;
+  if (r() < 0.5) {
+    const opts = [fmt(p), fmt(-p), fmt(2 * p), fmt(q)].filter((v, i, A) => A.indexOf(v) === i);
+    return aq3Mc(r, fmt(p), opts, (i) => fmt(p + 2 * (i + 1)), 'Complex roots of a quadratic', `A quadratic equation ${eq} has complex roots. Let the roots of the equation be a + bi and a − bi, where a and b are real numbers. What is the value of a, the real part of the roots?`,
+      `Quadratic formula: x = (${fmt(-B)} ± √(${B * B} − 4(${C})))/2 = (${fmt(-B)} ± √(${fmt(B * B - 4 * C)}))/2\n√(${fmt(B * B - 4 * C)}) = ${2 * q}i, so x = ${fmt(p)} ± ${q === 1 ? '' : q}i.\nThe real part is a = ${fmt(p)}.`);
+  }
+  const R = (x, y) => `${fmt(x)} ± ${y === 1 ? '' : fmt(y)}i`;
+  return aq3Mc(r, R(p, q), [R(-p, q), R(p, 2 * q), R(2 * p, q), R(p, q * q)], (i) => R(p, q + i + 1), 'Complex roots of a quadratic', `What are the roots of the equation ${eq}?`,
+    `Quadratic formula: x = (${fmt(-B)} ± √(${B * B} − 4(${C})))/2 = (${fmt(-B)} ± √(${fmt(B * B - 4 * C)}))/2\n√(${fmt(B * B - 4 * C)}) = √(${4 * q * q}) · i = ${2 * q}i\nx = (${fmt(-B)} ± ${2 * q}i)/2 = ${R(p, q)}`);
+};
+TEMPLATES.act3Conj = (r) => {
+  const a = nz(r, -9, 9), b = nz(r, -9, 9), kind = ri(r, 0, 2);
+  if (kind === 2) {
+    const opts = ['0', fmt(a), '1', MINUS + '1'].filter((v, i, A) => A.indexOf(v) === i);
+    return aq3Mc(r, '0', opts, (i) => fmt(i + 2), 'Real and complex numbers', `If z = ${fmt(a)} + bi is a complex number where b is a real number, which value of b makes z a purely real number?`,
+      `A complex number is purely real when its imaginary part is 0. So b = 0 and z = ${fmt(a)}.`);
+  }
+  const ctx = kind === 1;
+  const stem = ctx ? `Freddy is analyzing a circuit. The current is represented as ${aq3C(a, b)}, where i is the imaginary unit (i² = −1). The voltage is represented as ${aq3C(nz(r, 1, 9), nz(r, -9, 9))}. To calculate the impedance Z, he uses the formula Z = voltage/current. What is the conjugate of the denominator in Freddy’s calculation?`
+    : `A wave’s displacement is modeled as z = a + bi, where a is the real part and b is the imaginary part. If z = ${aq3C(a, b)}, what is the conjugate z̄?`;
+  return aq3Mc(r, aq3C(a, -b), [aq3C(-a, b), aq3C(-a, -b), aq3C(a, b), aq3C(b, a)], (i) => aq3C(a + i + 1, -b), 'Complex conjugates', stem,
+    `The conjugate of a + bi is a − bi: keep the real part and change the sign of the imaginary part.${ctx ? ` The denominator is the current, ${aq3C(a, b)}.` : ''}\nConjugate: ${aq3C(a, -b)}`);
+};
+TEMPLATES.act3Classify = (r) => {
+  const nonSq = shuffle(r, [2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15, 17, 18, 20, 32]), sq = pick(r, [4, 9, 16, 25, 36, 49, 64, 81]), kind = ri(r, 0, 4);
+  if (kind === 0) {
+    return aq3Mc(r, `√${sq}`, nonSq.slice(0, 3).map((n) => `√${n}`), () => null, 'Rational and irrational numbers', 'Which of the following is a rational number?',
+      `√${sq} = ${Math.sqrt(sq)}, a whole number, so it is rational. The square roots of numbers that are not perfect squares are irrational.`);
+  }
+  if (kind === 1) {
+    const m = ri(r, 2, 6), n = nonSq[0], p = ri(r, 2, 9), q = ri(r, 2, 9), s = ri(r, 1, 4), t = ri(r, 2, 9);
+    return aq3Mc(r, `√${n} × ${m}`, [`${p} × ${q}`, `√${sq} × ${m}`, `${s}/${t} × ${q}/${p}`], () => null, 'Rational and irrational numbers', 'Which of the following is irrational?',
+      `√${n} is irrational because ${n} is not a perfect square, and a nonzero rational number times an irrational number is irrational.\nThe others are rational: ${p} × ${q} = ${p * q}, √${sq} × ${m} = ${Math.sqrt(sq) * m}, and a fraction times a fraction is a fraction.`);
+  }
+  if (kind === 2) {
+    const a = nz(r, 2, 9), b = nz(r, -9, 9);
+    return aq3Mc(r, aq3C(a, b), [`√${nonSq[0]}`, `√${nonSq[1]}`, 'π'], () => null, 'Real and complex numbers', 'Which of the following is not a real number?',
+      `${aq3C(a, b)} has a nonzero imaginary part, so it is not a real number. √${nonSq[0]}, √${nonSq[1]}, and π are irrational, but they are still real numbers.`);
+  }
+  if (kind === 3) {
+    const k = ri(r, 2, 9), n = nonSq[0];
+    return aq3Mc(r, 'Irrational', ['Rational', 'Whole number', 'Undefined'], () => null, 'Rational and irrational numbers', `If x = ${k} + √${n}, what can be said about x?`,
+      `√${n} is irrational (${n} is not a perfect square). A rational number plus an irrational number is irrational, so x is irrational.`);
+  }
+  const k = ri(r, 2, 9), a = ri(r, 1, 9), b = nz(r, -9, 9);
+  return aq3Mc(r, String(k), [aq3C(a, b), `${MINUS}i`, `${k}i`], () => null, 'Real and complex numbers', 'Which of the following numbers is both real and complex?',
+    `Every real number is also a complex number (${k} = ${k} + 0i). The other choices have a nonzero imaginary part, so they are complex but not real.`);
+};
+
+/* ===== 3.2 Number line and absolute value ===== */
+const aq3NL = (marks, lo, hi, step, lab, segs = [], dots = []) => (cv) => { // a number line with labeled points, shaded segments, and dots
+  const c = cv._ctx, W = cv._w, H = cv._h, X = (t) => 30 + ((t - lo) / (hi - lo)) * (W - 60), y = H / 2 + 6;
+  c.clearRect(0, 0, W, H);
+  a2line(c, X, y, { lo, hi, tick: step, lab });
+  if (segs.length) a2paint(c, X, y, { lo, hi }, segs, '#1f5fa8');
+  dots.forEach(([x, closed]) => a2dot(c, X, y, x, closed, '#1f5fa8'));
+  c.font = 'bold 14px system-ui, sans-serif'; c.fillStyle = '#1f5fa8'; c.textAlign = 'center'; c.textBaseline = 'bottom';
+  marks.forEach(([x, name]) => { c.beginPath(); c.arc(X(x), y, 5, 0, 2 * Math.PI); c.fill(); c.fillText(name, X(x), y - 10); });
+};
+TEMPLATES.act3Dist = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 0) {
+    const p = ri(r, -12, -1), q = ri(r, 1, 12), d = q - p;
+    const ctx = pick(r, [`On a number line, what is the distance between ${fmt(p)} and ${fmt(q)}?`, `Three cities are located along a straight highway: City A is at x = ${fmt(p)}, City B is at x = ${fmt(q)}, and City C is at x = ${q + ri(r, 2, 8)}. What is the distance between City A and City B?`]);
+    return aq3Mc(r, String(d), [String(Math.abs(q + p)), String(d + 1), String(Math.max(Math.abs(p), q))], (i) => String(d + i + 2), 'Distance on the number line', ctx,
+      `Distance = |${fmt(q)} − (${fmt(p)})| = |${d}| = ${d}`);
+  }
+  if (kind === 1) {
+    const C = ri(r, -3, 4), dA = ri(r, 2, 9), dB = r() < 0.15 ? dA : ri(r, 2, 9), A = C - dA, B = C + dB, [n1, n2, n3] = shuffle(r, ['Anna', 'Ben', 'Carla', 'Diego', 'Elena', 'Femi']).slice(0, 3);
+    const ans = dA < dB ? n1 : dA > dB ? n2 : 'Both are equally close';
+    return aq3Mc(r, ans, [n1, n2, 'Both are equally close', 'Neither is close'], () => null, 'Distance on the number line',
+      `A group of friends decides to meet at a park. Their locations on a straight road are represented by points on a number line:\n${n1}: x = ${fmt(A)}    ${n2}: x = ${fmt(B)}    ${n3}: x = ${fmt(C)}\nWho is closer to ${n3}: ${n1} or ${n2}?`,
+      `${n1} to ${n3}: |${fmt(A)} − ${C < 0 ? `(${fmt(C)})` : fmt(C)}| = ${dA}\n${n2} to ${n3}: |${fmt(B)} − ${C < 0 ? `(${fmt(C)})` : fmt(C)}| = ${dB}\n${dA === dB ? 'They are the same distance away.' : `${ans} is closer.`}`);
+  }
+  if (kind === 2) {
+    for (;;) {
+      const x0 = ri(r, -3, 4), P = [ri(r, -14, -6), ri(r, -5, -1), ri(r, 3, 8), ri(r, 9, 15)], D = P.map((p) => Math.abs(p - x0)), mx = Math.max(...D);
+      if (D.filter((d) => d === mx).length > 1) continue;
+      const i = D.indexOf(mx), names = ['A', 'B', 'C', 'D'];
+      return aq3Mc(r, names[i], names.filter((n) => n !== names[i]), () => null, 'Distance on the number line',
+        `Four points, A, B, C, and D, are located on a number line at A = ${fmt(P[0])}, B = ${fmt(P[1])}, C = ${fmt(P[2])}, and D = ${fmt(P[3])}, respectively. Which of the following points is farthest from x = ${fmt(x0)}?`,
+        `Find each distance from ${fmt(x0)}: ${names.map((n, k) => `${n}: ${D[k]}`).join(',  ')}\nThe greatest distance is ${mx}, so ${names[i]} is farthest.`);
+    }
+  }
+  const A = ri(r, -14, -4), B = ri(r, -2, 6), C = B + ri(r, 2, 12), ab = B - A, bc = C - B, ans = Math.abs(ab - bc);
+  return aq3Mc(r, String(ans), [String(ab + bc), String(ab), String(bc)], (i) => String(ans + i + 1), 'Distance on the number line',
+    `On a number line, points A, B, and C are located at x = ${fmt(A)}, x = ${fmt(B)}, and x = ${fmt(C)}, respectively. What is the absolute difference between the distance from A to B and the distance from B to C?`,
+    `AB = |${fmt(B)} − (${fmt(A)})| = ${ab}\nBC = |${fmt(C)} − ${B < 0 ? `(${fmt(B)})` : fmt(B)}| = ${bc}\n|${ab} − ${bc}| = ${ans}`);
+};
+TEMPLATES.act3Mid = (r) => {
+  if (r() < 0.6) {
+    const p = ri(r, -12, 4), q = p + 2 * ri(r, 2, 9), m = (p + q) / 2;
+    return aq3Mc(r, fmt(m), [fmt((q - p) / 2), fmt(q - p), fmt(-m)], (i) => fmt(m + i + 1), 'Midpoint on the number line', `On the number line, what is the midpoint between ${fmt(p)} and ${fmt(q)}?`,
+      `Midpoint = (${fmt(p)} + ${q < 0 ? `(${fmt(q)})` : fmt(q)})/2 = ${fmt(p + q)}/2 = ${fmt(m)}`);
+  }
+  const P = -4 * ri(r, 2, 6), Q = 4 * ri(r, 1, 4), R = (P + Q) / 2, S = (R + Q) / 2;
+  return aq3Mc(r, fmt(S), [fmt(R), fmt((P + S) / 2), fmt((P + Q) / 4)], (i) => fmt(S + i + 1), 'Midpoint on the number line',
+    `Two points, P and Q, are located at x = ${fmt(P)} and x = ${fmt(Q)}, respectively. If R is the midpoint between P and Q, and S is the midpoint between R and Q, what is the location of S?`,
+    `R = (${fmt(P)} + ${fmt(Q)})/2 = ${fmt(R)}\nS = (${fmt(R)} + ${fmt(Q)})/2 = ${fmt(S)}`);
+};
+TEMPLATES.act3AbsEq = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) {
+    const a = ri(r, -9, 9), d = ri(r, 3, 12), A = (x, y) => `${fmt(Math.max(x, y))} or ${fmt(Math.min(x, y))}`;
+    const stem = pick(r, [`On a number line, the distance between two points is ${d}. If one point is ${fmt(a)}, what is the other?`, `Let a = ${fmt(a)}. If x satisfies |x − a| = ${d}, what are the possible values of x?`]);
+    return aq3Mc(r, A(a + d, a - d), [A(d - a, -a - d), A(a + d, d - a), A(-(a + d), d - a)].filter((x) => x !== A(a + d, a - d)), (i) => A(a + d + i + 1, a - d), 'Absolute value equations', stem,
+      `The other point is ${d} units to the right or to the left of ${fmt(a)}:\n${fmt(a)} + ${d} = ${fmt(a + d)}   or   ${fmt(a)} − ${d} = ${fmt(a - d)}`);
+  }
+  for (;;) {
+    const a = kind === 1 ? ri(r, 2, 4) : 1, b = nz(r, -9, 9), c = ri(r, 2, 12), s1 = (b + c) / a, s2 = (b - c) / a;
+    if (!Number.isInteger(s1) && !Number.isInteger(s2)) continue;
+    const A = (x, y) => `x = ${fracT(x)} or x = ${fracT(y)}`, lhs = `|${a === 1 ? '' : a}x ${b < 0 ? '+' : MINUS} ${Math.abs(b)}|`;
+    return aq3Mc(r, A(s1, s2), [A((c - b) / a, (-c - b) / a), A(s1, -s1), A((b + c) / a, (c - b) / a), A(c + b, b - c)], (i) => A(s1 + i + 1, s2), 'Absolute value equations', `Solve for x in the equation ${lhs} = ${c}.`,
+      `${a === 1 ? 'x' : `${a}x`} ${b < 0 ? '+' : MINUS} ${Math.abs(b)} = ${c}   or   ${a === 1 ? 'x' : `${a}x`} ${b < 0 ? '+' : MINUS} ${Math.abs(b)} = ${MINUS}${c}\n${a === 1 ? 'x' : `${a}x`} = ${fmt(b + c)}   or   ${a === 1 ? 'x' : `${a}x`} = ${fmt(b - c)}\nx = ${fracT(s1)}   or   x = ${fracT(s2)}`);
+  }
+};
+TEMPLATES.act3AbsIneq = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 2) { // which value satisfies
+    const b = nz(r, -6, 6), c = ri(r, 2, 8), lo = -c - b, hi = c - b, inside = [ri(r, lo + 1, hi - 1), ri(r, lo + 1, hi - 1), ri(r, lo + 1, hi - 1)];
+    const out = r() < 0.5 ? hi + ri(r, 1, 4) : lo - ri(r, 1, 4), uniq = [...new Set(inside)].map(String);
+    while (uniq.length < 3) { const v = String(ri(r, lo + 1, hi - 1)); if (!uniq.includes(v)) uniq.push(v); if (hi - lo < 4) break; }
+    return aq3Mc(r, fmt(out), uniq.map((v) => fmt(+v)), (i) => fmt(lo + i), 'Absolute value inequalities', `Which of the following values of x satisfies |x ${b < 0 ? MINUS : '+'} ${Math.abs(b)}| > ${c}?`,
+      `|x ${b < 0 ? MINUS : '+'} ${Math.abs(b)}| > ${c} means x ${b < 0 ? MINUS : '+'} ${Math.abs(b)} > ${c} or x ${b < 0 ? MINUS : '+'} ${Math.abs(b)} < ${MINUS}${c}, so x > ${fmt(hi)} or x < ${fmt(lo)}.\nOnly ${fmt(out)} is in that set.`);
+  }
+  for (;;) {
+    const a = pick(r, [1, 1, 2, 3]), b = nz(r, -9, 9), c = ri(r, 2, 10), lo = (-c - b) / a, hi = (c - b) / a;
+    if (!fracParts(lo) || !fracParts(hi)) continue;
+    const inside = kind === 0, strict = r() < 0.4, op = inside ? (strict ? '<' : '≤') : (strict ? '>' : '≥'), le = strict ? '<' : '≤', ge = strict ? '>' : '≥';
+    const IN = (x, y) => `${fracT(x)} ${le} x ${le} ${fracT(y)}`, OUT = (x, y) => `x ${le} ${fracT(x)} or x ${ge} ${fracT(y)}`;
+    const ans = inside ? IN(lo, hi) : OUT(lo, hi);
+    const lhs = `|${a === 1 ? '' : a}x ${b < 0 ? MINUS : '+'} ${Math.abs(b)}|`;
+    const wr = inside ? [OUT(lo, hi), IN((-c + b) / a, (c + b) / a), IN(-hi, hi)] : [IN(lo, hi), OUT((-c + b) / a, (c + b) / a), OUT(-hi, hi)];
+    return aq3Mc(r, ans, wr, (i) => (inside ? IN(lo - i - 1, hi) : OUT(lo - i - 1, hi)), 'Absolute value inequalities', `Which of the following represents the solution to ${lhs} ${op} ${c}?`,
+      inside ? `${lhs} ${op} ${c} means ${MINUS}${c} ${le} ${a === 1 ? 'x' : `${a}x`} ${b < 0 ? MINUS : '+'} ${Math.abs(b)} ${le} ${c}.\n${b < 0 ? 'Add' : 'Subtract'} ${Math.abs(b)}: ${fmt(-c - b)} ${le} ${a === 1 ? 'x' : `${a}x`} ${le} ${fmt(c - b)}${a === 1 ? '' : `\nDivide by ${a}: ${IN(lo, hi)}`}`
+        : `${lhs} ${op} ${c} means ${a === 1 ? 'x' : `${a}x`} ${b < 0 ? MINUS : '+'} ${Math.abs(b)} ${ge} ${c}  or  ${a === 1 ? 'x' : `${a}x`} ${b < 0 ? MINUS : '+'} ${Math.abs(b)} ${le} ${MINUS}${c}.\n${a === 1 ? 'x' : `${a}x`} ${ge} ${fmt(c - b)}  or  ${a === 1 ? 'x' : `${a}x`} ${le} ${fmt(-c - b)}${a === 1 ? '' : `\nDivide by ${a}: x ${ge} ${fracT(hi)} or x ${le} ${fracT(lo)}`}\nAnswer: ${ans}`);
+  }
+};
+TEMPLATES.act3AbsGraph = (r) => {
+  const m = ri(r, -4, 4), d = ri(r, 2, 5), inside = r() < 0.6, lo = m - d, hi = m + d;
+  const sg = (v) => (v < 0 ? `+ ${-v}` : `${MINUS} ${v}`), E = (mm, op, dd) => (mm ? `|x ${sg(mm)}| ${op} ${dd}` : `|x| ${op} ${dd}`);
+  const ans = E(m, inside ? '≤' : '≥', d);
+  const draw = aq3NL([], -10, 10, 1, 1, inside ? [{ a: lo, b: hi }] : [{ a: -Infinity, b: lo }, { a: hi, b: Infinity }], [[lo, true], [hi, true]]);
+  const op = inside ? '≤' : '≥', fl = inside ? '≥' : '≤';
+  return aq3Mc(r, ans, [m ? E(-m, op, d) : E(d, op, d), E(m, fl, d), E(m, op, 2 * d), m ? E(d, op, Math.abs(m)) : E(m, op, d + 1)].filter((x) => x !== ans), (i) => E(m + i + 1, op, d),
+    'Absolute value inequalities', 'Which absolute value inequality has the same solution set as the number line shown below?',
+    `The graph is centered at ${fmt(m)} (halfway between ${fmt(lo)} and ${fmt(hi)}) and its endpoints are ${d} units from the center.\n${inside ? `Every point within ${d} of ${fmt(m)}` : `Every point at least ${d} away from ${fmt(m)}`}: ${ans}`,
+    { draw, size: [560, 90] });
+};
+TEMPLATES.act3Tolerance = (r) => {
+  if (r() < 0.5) {
+    const L = pick(r, [8, 12, 2.5, 6, 10, 4.75]), t = pick(r, [0.001, 0.005, 0.01, 0.02]), v = pick(r, ['k', 'x', 'd']);
+    const thing = pick(r, [`the length of the major axis, ${v}, of an ellipse cut from sheet metal`, `the diameter, ${v}, of a machined bolt`, `the width, ${v}, of a cut board`]);
+    const ans = `|${v} ${MINUS} ${fmt(L)}| ≤ ${fmt(t)}`;
+    return aq3Mc(r, ans, [`|${v} + ${fmt(L)}| ≤ ${fmt(t)}`, `|${v} ${MINUS} ${fmt(t)}| ≤ ${fmt(L)}`, `|${v} ${MINUS} ${fmt(L)}| ≥ ${fmt(t)}`], () => null, 'Absolute value: tolerance',
+      `A machine is set so that ${thing} must be within ${fmt(t)} inches of the desired length of ${fmt(L)} inches. Which of the following statements is true about ${v}?`,
+      `“Within ${fmt(t)} of ${fmt(L)}” means the distance between ${v} and ${fmt(L)} is at most ${fmt(t)}: ${ans}`);
+  }
+  const N = pick(r, [490, 250, 120, 600, 48, 75]), k = ri(r, 2, 9), item = pick(r, ['tennis balls', 'paper clips', 'nails', 'screws']);
+  const R = (a, b) => `${fmt(a)} ≤ x ≤ ${fmt(b)}`;
+  return aq3Mc(r, R(N - k, N + k), [R(N, N + k), R(N - k, N), R(N - 2 * k, N + 2 * k)], (i) => R(N - k - i - 1, N + k), 'Absolute value: tolerance',
+    `A company packages ${N} ${item} per box, but each box may contain up to ${k} ${item} more or less. What range of ${item} is acceptable in a single box?`,
+    `|x − ${N}| ≤ ${k}, so ${N} − ${k} ≤ x ≤ ${N} + ${k}: ${R(N - k, N + k)}`);
+};
+TEMPLATES.act3IntBetween = (r) => {
+  for (;;) {
+    const q1 = pick(r, [2, 3, 4, 5]), q2 = pick(r, [2, 3, 4, 5]), lo = ri(r, -24, 6) / q1, hi = lo + ri(r, 5, 30) / q2;
+    if (Number.isInteger(lo) || Number.isInteger(hi) || hi - lo < 1.2) continue;
+    const n = Math.floor(hi) - Math.ceil(lo) + 1;
+    return aq3Mc(r, String(n), [String(n + 1), String(n - 1), String(n + 2)], (i) => String(n + i + 3), 'Integers on the number line', `How many integers lie between ${fracT(lo)} and ${fracT(hi)}?`,
+      `${fracT(lo)} ≈ ${fmt(Math.round(lo * 100) / 100)} and ${fracT(hi)} ≈ ${fmt(Math.round(hi * 100) / 100)}.\nThe integers between them are ${fmt(Math.ceil(lo))} through ${fmt(Math.floor(hi))}: ${fmt(Math.floor(hi))} − (${fmt(Math.ceil(lo))}) + 1 = ${n} integers.`);
+  }
+};
+TEMPLATES.act3NLFrac = (r) => {
+  for (;;) {
+    const a = pick(r, [0, 0, -1, -3, 1, -2]), len = pick(r, [1, 2, 3, 4, 6]), n = pick(r, [4, 6, 8, 5, 10]), k = ri(r, 1, n - 1), v = a + (k * len) / n;
+    if (Number.isInteger(v)) continue;
+    const b = a + len;
+    return aq3Mc(r, fracT(v), [fracT(k / n), fracT(a + (k + 1) * len / n), fracT(a + k / (n + 1) * len), fracT(v + len / n / 2)].filter((x) => x !== fracT(v)), (i) => fracT(v + (i + 2) * len / n), 'Fractions on the number line',
+      `A number line is divided into ${n} equal parts between ${fmt(a)} and ${fmt(b)}. What number is at the ${['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth'][k - 1]} mark to the right of ${fmt(a)}?`,
+      `Each part is ${len}/${n} = ${fracT(len / n)} long.\n${fmt(a)} + ${k} · ${fracT(len / n)} = ${fracT(v)}`);
+  }
+};
+TEMPLATES.act3Percent = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) {
+    const orig = pick(r, [550, 400, 250, 800, 120, 640]), pct = pick(r, [10, 12, 15, 20, 25, 30, 35]), sale = orig * (1 - pct / 100), item = pick(r, ['laptop computer', 'bicycle', 'television', 'phone']);
+    return aq3Mc(r, `${pct}%`, [`${100 - pct}%`, `${Math.round((orig - sale) / sale * 100)}%`, `${pct + 5}%`].filter((x) => x !== `${pct}%`), (i) => `${pct + i + 2}%`, 'Percents',
+      `The sale price for a ${item} has been discounted to $${fmt(sale)}. If the normal price is $${fmt(orig)}, what is the discount expressed as a percent?`,
+      `Discount = $${fmt(orig)} − $${fmt(sale)} = $${fmt(orig - sale)}\nPercent = ${fmt(orig - sale)}/${fmt(orig)} = ${fmt(pct / 100)} = ${pct}%`);
+  }
+  if (kind === 1) {
+    const p1 = pick(r, [25, 30, 40]), p2 = pick(r, [20, 25, 50]), left = 24 * (1 - p1 / 100) * (1 - p2 / 100);
+    return aq3Mc(r, fmt(left), [fmt(24 * (1 - (p1 + p2) / 100)), fmt(24 * (1 - p1 / 100) * p2 / 100), fmt(24 - left)], (i) => fmt(left + i + 1), 'Percents',
+      `Zack spends ${p1}% of his day at school. Of the other ${100 - p1}% of his day, Zack spends ${p2}% doing homework. How many hours are left in Zack’s day that are not spent in school or doing homework?`,
+      `Not at school: 24 × ${fmt(1 - p1 / 100)} = ${fmt(24 * (1 - p1 / 100))} hours\nHomework: ${p2}% of that = ${fmt(24 * (1 - p1 / 100) * p2 / 100)} hours\nLeft: ${fmt(24 * (1 - p1 / 100))} − ${fmt(24 * (1 - p1 / 100) * p2 / 100)} = ${fmt(left)} hours`);
+  }
+  const h = ri(r, 10, 60), q = ri(r, 3, 20), A = 2 * h, B = 8 * q;
+  return aq3Mc(r, String(A + B), [String(h + q), String(A + 2 * q), String(A + 4 * q)], (i) => String(A + B + i + 1), 'Fractions of a number',
+    `One-half of a number is ${h}. One-fourth of one-half of another number is ${q}. What is the sum of the two numbers?`,
+    `First number: ½x = ${h}, so x = ${A}.\nSecond number: ¼ · ½ · y = ${q}, so y/8 = ${q} and y = ${B}.\nSum: ${A} + ${B} = ${A + B}`);
+};
+
+/* ===== 3.3 Exponents ===== */
+TEMPLATES.act3ExpMono = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { // (x^a y^b)^n ÷ x^c y^d
+    const a = ri(r, 2, 4), b = ri(r, 2, 4), n = ri(r, 2, 4), c = ri(r, 1, 6), d = ri(r, 1, 6), ex = a * n - c, ey = b * n - d;
+    if (!ex || !ey || Math.abs(ex) > 9 || Math.abs(ey) > 9 || a * n > 9 || b * n > 9) return TEMPLATES.act3ExpMono(r);
+    const M = (p, q) => aq3Mono(1, [['x', p], ['y', q]]);
+    return aq3Mc(r, M(ex, ey), [M(a + n - c, b + n - d), M(a * n + c, b * n + d), M(ex, b - d), M(a * n * c, b * n * d)], (i) => M(ex + i + 1, ey), 'Exponent rules',
+      `Simplify (${M(a, b)})${aq3Sup(n)} ÷ ${M(c, d)}`,
+      `Power of a power: multiply exponents. (${M(a, b)})${aq3Sup(n)} = ${M(a * n, b * n)}\nQuotient: subtract exponents. ${M(a * n, b * n)} ÷ ${M(c, d)} = ${M(ex, ey)}`);
+  }
+  if (kind === 1) { // k a^p b^q / (j a^s b^t)
+    const j = pick(r, [2, 3, 4]), k = j * ri(r, 2, 5), p = ri(r, 3, 8), q = ri(r, 1, 5), s = ri(r, 1, p - 1); let t = ri(r, 1, 6); if (t === q) t = q + 1;
+    const M = (co, e1, e2) => aq3Mono(co, [['a', e1], ['b', e2]]);
+    return aq3Mc(r, M(k / j, p - s, q - t), [M(k - j, p - s, q - t), M(k / j, p + s, q + t), M(k / j, p - s, t - q), M(k * j, p - s, q - t)], (i) => M(k / j + i + 1, p - s, q - t), 'Exponent rules',
+      `Simplify the expression (${M(k, p, q)})/(${M(j, s, t)})`,
+      `Divide the coefficients: ${k} ÷ ${j} = ${k / j}\nSubtract exponents: ${aq3Pow('a', p)}/${aq3Pow('a', s)} = ${aq3Pow('a', p - s)}, and ${aq3Pow('b', q)}/${aq3Pow('b', t)} = ${aq3Pow('b', q - t)}\nAnswer: ${M(k / j, p - s, q - t)}`);
+  }
+  // (a^p b^q)^m / (a^s b^t)^n with a negative exponent
+  const p = ri(r, 1, 3), q = -ri(r, 1, 2), m = ri(r, 2, 3), s = -ri(r, 1, 2), t = ri(r, 1, 3), n = ri(r, 2, 3);
+  const ea = p * m - s * n, eb = q * m - t * n, M = (e1, e2) => aq3Mono(1, [['a', e1], ['b', e2]]);
+  if (!ea || !eb || Math.abs(ea) > 9 || Math.abs(eb) > 9) return TEMPLATES.act3ExpMono(r);
+  return aq3Mc(r, M(ea, eb), [M(p * m + s * n, q * m + t * n), M(p + m - s - n, q + m - t - n), M(ea, -eb), M(-ea, eb)], (i) => M(ea + i + 1, eb), 'Exponent rules',
+    `Simplify (${M(p, q)})${aq3Sup(m)}/(${M(s, t)})${aq3Sup(n)}`,
+    `Top: (${M(p, q)})${aq3Sup(m)} = ${M(p * m, q * m)}\nBottom: (${M(s, t)})${aq3Sup(n)} = ${M(s * n, t * n)}\nSubtract exponents: a: ${p * m} − (${fmt(s * n)}) = ${ea},  b: ${fmt(q * m)} − ${t * n} = ${fmt(eb)}\nAnswer: ${M(ea, eb)}`);
+};
+TEMPLATES.act3ExpBase = (r) => {
+  const B = pick(r, [2, 3, 5]), kind = ri(r, 0, 2), P = (e) => `${B}${aq3Sup(e)}`;
+  if (kind === 0) {
+    const m = ri(r, 2, 5), n = ri(r, 2, 4);
+    return aq3Mc(r, P(m + n), [P(m * n), `${B * B}${aq3Sup(m + n)}`, `${B * B}${aq3Sup(m * n)}`], (i) => (i < 9 && m + n - 1 - i > 0 ? P(m + n - 1 - i) : null), 'Exponent rules', `Simplify the expression ${P(m)} · ${P(n)}`,
+      `Same base: add the exponents. ${P(m)} · ${P(n)} = ${B}${aq3Sup(m)}${'⁺'}${aq3Sup(n)} = ${P(m + n)}`);
+  }
+  if (kind === 1) {
+    const m = ri(r, 3, 6), n = ri(r, 2, 3), k = ri(r, 2, m + n - 1), e = m + n - k;
+    return aq3Mc(r, P(e), [P(m * n - k), P(m + n + k), P(k - m - n)].filter((x) => x !== P(e)), (i) => P(e + i + 1 <= 9 ? e + i + 1 : e - (i + 1)), 'Exponent rules',
+      pick(r, [`Simplify (${P(m)} · ${P(n)})/${P(k)}`, `Simplify the expression (${P(m)} · ${P(n)}) ÷ ${P(k)}`]),
+      `Multiply: add exponents. ${P(m)} · ${P(n)} = ${P(m + n)}\nDivide: subtract exponents. ${P(m + n)} ÷ ${P(k)} = ${P(e)}`);
+  }
+  const a = ri(r, 2, 5), b = ri(r, 2, 6), p = ri(r, 2, 3), q = ri(r, 1, 3), e = b * p - a * q;
+  if (!e || Math.abs(e) > 9 || b * p > 9 || a * q > 9) return TEMPLATES.act3ExpBase(r);
+  return aq3Mc(r, `2${aq3Sup(e)}`, [b + p - a - q, b * p + a * q, a * p - b * q, e + 2].filter((x) => x && x !== e).map((x) => `2${aq3Sup(x)}`), (i) => `2${aq3Sup(e + i + 1)}`, 'Exponent rules',
+    `If x = 2${aq3Sup(a)} and y = 2${aq3Sup(b)}, find the value of ${aq3Pow('y', p)}/${aq3Pow('x', q)}.`,
+    `${aq3Pow('y', p)} = (2${aq3Sup(b)})${p === 1 ? '' : aq3Sup(p)} = 2${aq3Sup(b * p)}\n${aq3Pow('x', q)} = (2${aq3Sup(a)})${q === 1 ? '' : aq3Sup(q)} = 2${aq3Sup(a * q)}\n2${aq3Sup(b * p)}/2${aq3Sup(a * q)} = 2${aq3Sup(e)}`);
+};
+
+/* ===== 3.4 Imaginary and complex numbers ===== */
+TEMPLATES.act3CpxDist = (r) => {
+  const kind = ri(r, 0, 2);
+  const pt = () => [ri(r, -6, 8), ri(r, -6, 8)];
+  if (kind === 2) { // two legs
+    const A = pt(), B = pt(), C = pt(), d1 = (A[0] - B[0]) ** 2 + (A[1] - B[1]) ** 2, d2 = (B[0] - C[0]) ** 2 + (B[1] - C[1]) ** 2, d3 = (A[0] - C[0]) ** 2 + (A[1] - C[1]) ** 2;
+    if (!d1 || !d2) return TEMPLATES.act3CpxDist(r);
+    const S = (x, y) => `√${x} + √${y}`;
+    return aq3Mc(r, S(d1, d2), [S(d1, d3), `√${d1 + d2}`, S(Math.abs(A[0] - B[0]) + Math.abs(A[1] - B[1]), Math.abs(B[0] - C[0]) + Math.abs(B[1] - C[1]))].filter((x) => x !== S(d1, d2)), (i) => S(d1 + i + 1, d2), 'Distance in the complex plane',
+      `A drone moves from ${aq3C(...A)} to ${aq3C(...B)}. Later, it travels to ${aq3C(...C)}. What is the total distance traveled by the drone?`,
+      `Treat a + bi as the point (a, b).\nFirst leg: √((${fmt(B[0] - A[0])})² + (${fmt(B[1] - A[1])})²) = √${d1}\nSecond leg: √((${fmt(C[0] - B[0])})² + (${fmt(C[1] - B[1])})²) = √${d2}\nTotal: √${d1} + √${d2}`);
+  }
+  const A = pt(), B = pt(), dx = B[0] - A[0], dy = B[1] - A[1], d2 = dx * dx + dy * dy;
+  if (!dx || !dy) return TEMPLATES.act3CpxDist(r);
+  const ans = aq3Rt(d2);
+  const stem = kind === 0 ? `Find the distance between ${aq3C(...A)} and ${aq3C(...B)} in the complex plane.` : `A ship starts at point ${aq3C(...A)} on a map and sails to point ${aq3C(...B)}. What is the distance traveled by the ship?`;
+  return aq3Mc(r, ans, [String(Math.abs(dx) + Math.abs(dy)), aq3Rt(Math.abs(dx * dx - dy * dy) || d2 + 2), aq3Rt((A[0] + B[0]) ** 2 + (A[1] + B[1]) ** 2 || d2 + 3), String(d2)].filter((x) => x !== ans), (i) => aq3Rt(d2 + i + 1), 'Distance in the complex plane', stem,
+    `Treat a + bi as the point (a, b): (${fmt(A[0])}, ${fmt(A[1])}) and (${fmt(B[0])}, ${fmt(B[1])}).\nd = √((${fmt(dx)})² + (${fmt(dy)})²) = √(${dx * dx} + ${dy * dy}) = √${d2}${ans !== `√${d2}` ? ` = ${ans}` : ''}`);
+};
+TEMPLATES.act3CpxMid = (r) => {
+  const a = ri(r, -9, 9), b = ri(r, -9, 9), c = a + 2 * nz(r, -5, 5), d = b + 2 * nz(r, -5, 5), mx = (a + c) / 2, my = (b + d) / 2;
+  if (r() < 0.35) {
+    return aq3Mc(r, fmt(mx + my), [fmt(mx - my), fmt(a + c + b + d), fmt(mx)], (i) => fmt(mx + my + i + 1), 'Midpoint in the complex plane',
+      `Two points in the complex plane are ${aq3C(a, b)} and ${aq3C(c, d)}. A third point, x + yi, lies exactly halfway between these two points. What is the value of x + y?`,
+      `Midpoint: x = (${fmt(a)} + ${c < 0 ? `(${fmt(c)})` : fmt(c)})/2 = ${fmt(mx)},  y = (${fmt(b)} + ${d < 0 ? `(${fmt(d)})` : fmt(d)})/2 = ${fmt(my)}\nx + y = ${fmt(mx + my)}`);
+  }
+  const stem = pick(r, [`What is the midpoint of the complex numbers ${aq3C(a, b)} and ${aq3C(c, d)}?`, `Two cities on a grid are located at ${aq3C(a, b)} and ${aq3C(c, d)}. What is the midpoint of the two cities?`]);
+  return aq3Mc(r, aq3C(mx, my), [aq3C(a + c, b + d), aq3C((c - a) / 2, (d - b) / 2), aq3C(mx, -my), aq3C(my, mx)], (i) => aq3C(mx + i + 1, my), 'Midpoint in the complex plane', stem,
+    `Average the real parts and the imaginary parts.\nReal: (${fmt(a)} + ${c < 0 ? `(${fmt(c)})` : fmt(c)})/2 = ${fmt(mx)}\nImaginary: (${fmt(b)} + ${d < 0 ? `(${fmt(d)})` : fmt(d)})/2 = ${fmt(my)}\nMidpoint: ${aq3C(mx, my)}`);
+};
+TEMPLATES.act3CpxMod = (r) => {
+  if (r() < 0.5) {
+    const [p, q, h] = pick(r, AQ3_TRIPLES), [a, b] = shuffle(r, [p, q]), sb = r() < 0.4 ? -1 : 1;
+    const stem = pick(r, [`In an electrical circuit, the impedance Z (in ohms) is modeled by the equation Z = R + Xi, where R is the resistance (in ohms) and X is the reactance (in ohms). If the impedance of the circuit is given as Z = ${aq3C(a, sb * b)}, what is the magnitude of Z?`,
+      `What is the distance between the complex numbers ${aq3C(a, sb * b)} and 0 + 0i?`, `What is the absolute value (modulus) of z = ${aq3C(a, sb * b)}?`]);
+    return aq3Mc(r, String(h), [String(a + b), String(a), String(b), String(a * a + b * b)], (i) => String(h + i + 1), 'Magnitude of a complex number', stem,
+      `|a + bi| = √(a² + b²) = √(${a}² + ${b}²) = √(${a * a} + ${b * b}) = √${h * h} = ${h}`);
+  }
+  const a = nz(r, -9, 9), b = nz(r, -9, 9), v = a * a + b * b;
+  const stem = pick(r, [`If z = ${aq3C(a, b)}, what is the result of z · z̄?`, `What is the product of ${aq3C(a, b)} and its complex conjugate?`]);
+  return aq3Mc(r, String(v), [fmt(a * a - b * b), aq3C(a * a, -b * b), aq3C(a, -b), String(Math.abs(a) + Math.abs(b))].filter((x) => x !== String(v)), (i) => String(v + i + 1), 'Complex conjugates', stem,
+    `z̄ = ${aq3C(a, -b)}.\n${aq3P(a, b)}${aq3P(a, -b)} = ${a * a} − ${b * b}i² = ${a * a} + ${b * b} = ${v}\n(A number times its conjugate is always a² + b², a real number.)`);
+};
+
+/* ===== 3.5 Vectors ===== */
+const aq3V = (v) => `(${v.map(fmt).join(', ')})`;
+TEMPLATES.act3VecMag = (r) => {
+  if (r() < 0.45) {
+    const [p, q, h] = pick(r, AQ3_TRIPLES), v = [r() < 0.3 ? -p : p, r() < 0.3 ? -q : q];
+    return aq3Mc(r, String(h), [String(p + q), aq3Rt(p + q), String(h * h)], (i) => String(h + i + 1), 'Magnitude of a vector', `Vector A = ${aq3V(v)}. What is the magnitude of A?`,
+      `|A| = √(${v[0] < 0 ? `(${fmt(v[0])})` : v[0]}² + ${v[1] < 0 ? `(${fmt(v[1])})` : v[1]}²) = √(${p * p} + ${q * q}) = √${h * h} = ${h}`);
+  }
+  for (;;) {
+    const A = [ri(r, -6, 9), ri(r, -6, 12)], B = [ri(r, -6, 9), ri(r, -9, 9)], sub = r() < 0.5, R = [A[0] + (sub ? -B[0] : B[0]), A[1] + (sub ? -B[1] : B[1])], d2 = R[0] ** 2 + R[1] ** 2;
+    if (!R[0] || !R[1]) continue;
+    const W = [A[0] + (sub ? B[0] : -B[0]), A[1] + (sub ? B[1] : -B[1])], ans = aq3Rt(d2);
+    return aq3Mc(r, ans, [aq3Rt(W[0] ** 2 + W[1] ** 2 || d2 + 2), String(Math.abs(R[0]) + Math.abs(R[1])), String(d2)].filter((x) => x !== ans), (i) => aq3Rt(d2 + i + 1), 'Magnitude of a vector',
+      `Vector A = ${aq3V(A)} and vector B = ${aq3V(B)}. What is the magnitude of A ${sub ? MINUS : '+'} B?`,
+      `A ${sub ? MINUS : '+'} B = (${fmt(A[0])} ${sub ? MINUS : '+'} ${B[0] < 0 ? `(${fmt(B[0])})` : fmt(B[0])}, ${fmt(A[1])} ${sub ? MINUS : '+'} ${B[1] < 0 ? `(${fmt(B[1])})` : fmt(B[1])}) = ${aq3V(R)}\n|A ${sub ? MINUS : '+'} B| = √(${R[0] ** 2} + ${R[1] ** 2}) = √${d2}${ans !== `√${d2}` ? ` = ${ans}` : ''}`);
+  }
+};
+TEMPLATES.act3VecOps = (r) => {
+  const D = [nz(r, -6, 6), nz(r, -6, 6)], E = [nz(r, -6, 6), nz(r, -6, 6)], k = pick(r, [2, 3, 4, -2, -3]);
+  if (r() < 0.5) {
+    const R = D.map((x) => k * x);
+    return aq3Mc(r, aq3V(R), [aq3V([k * D[0], D[1]]), aq3V(D.map((x) => x + k)), aq3V([-R[0], R[1]]), aq3V([R[0], -R[1]])], (i) => aq3V([R[0] + i + 1, R[1]]), 'Scalar multiplication of vectors',
+      `Vector D = ${aq3V(D)}. If ${k < 0 ? `${MINUS}${-k}` : k}D is the scaled version of D, what is ${k < 0 ? `${MINUS}${-k}` : k}D?`,
+      `Multiply each component by ${fmt(k)}: (${fmt(k)} · ${fmt(D[0])}, ${fmt(k)} · ${fmt(D[1])}) = ${aq3V(R)}`);
+  }
+  const R = [k * D[0] + E[0], k * D[1] + E[1]];
+  return aq3Mc(r, aq3V(R), [aq3V([D[0] + E[0], D[1] + E[1]]), aq3V([k * (D[0] + E[0]), k * (D[1] + E[1])]), aq3V([k * D[0] - E[0], k * D[1] - E[1]])], (i) => aq3V([R[0], R[1] + i + 1]), 'Vector operations',
+    `Vectors u = ${aq3V(D)} and v = ${aq3V(E)}. What is ${fmt(k)}u + v?`,
+    `${fmt(k)}u = ${aq3V(D.map((x) => k * x))}\n${fmt(k)}u + v = (${fmt(k * D[0])} + ${E[0] < 0 ? `(${fmt(E[0])})` : fmt(E[0])}, ${fmt(k * D[1])} + ${E[1] < 0 ? `(${fmt(E[1])})` : fmt(E[1])}) = ${aq3V(R)}`);
+};
+TEMPLATES.act3Displace = (r) => {
+  const tri = r() < 0.75, [p0, q0] = tri ? pick(r, AQ3_TRIPLES) : [ri(r, 3, 12), ri(r, 3, 12)], s = tri ? pick(r, [1, 2, 10, 20, 50]) : 1, p = p0 * s, q = q0 * s, d2 = p * p + q * q, ans = aq3Rt(d2);
+  const [h1, h2] = shuffle(r, [pick(r, ['east', 'west']), pick(r, ['north', 'south'])]), plane = r() < 0.3;
+  const stem = plane ? `An airplane moves at ${p} mph ${h1} and ${q} mph ${h2}. What is the magnitude of its resultant velocity?` : pick(r, [`A ship sails ${p} miles ${h1} and ${q} miles ${h2}. How far is the ship from its starting point?`, `A car drives ${p} miles ${h1} and ${q} miles ${h2}. What is the magnitude of the car’s displacement from its starting point?`]);
+  const u = plane ? ' mph' : ' miles', opts = [String(p + q), String(Math.abs(p - q) || p), aq3Rt(Math.abs(p * p - q * q) || d2 + 1)].map((x) => x + u);
+  return aq3Mc(r, ans + u, opts.filter((x) => x !== ans + u), (i) => aq3Rt(d2 + i + 1) + u, 'Vectors: displacement', stem,
+    `The two directions are perpendicular, so use the Pythagorean theorem:\n√(${p}² + ${q}²) = √(${p * p} + ${q * q}) = √${d2}${ans !== `√${d2}` ? ` = ${ans}` : ''}${u}`);
+};
+TEMPLATES.act3VecFind = (r) => {
+  const [p, q, h] = pick(r, AQ3_TRIPLES), [x, b] = shuffle(r, [p, q]);
+  return aq3Mc(r, String(x), [String(h - b), aq3Rt(h * h + b * b), String(b)].filter((v) => v !== String(x)), (i) => String(x + i + 1), 'Magnitude of a vector',
+    `A vector E has components (x, ${b}), where x > 0. If the magnitude of E is ${h}, what is the value of x?`,
+    `x² + ${b}² = ${h}²\nx² = ${h * h} − ${b * b} = ${x * x}\nx = ${x}`);
+};
+
+/* ===== 3.6 Matrices ===== */
+const aq3MatQ = (r, topic, stem, items, M, wrongs, solution, rows) => {
+  const c = b1matT(M), W = [...new Set(wrongs.map(b1matT))].filter((w) => w !== c);
+  return { topic, stem, draw: b1matDraw(items), size: [520, 40 + 26 * (rows || 2)], ...buildChoices(r, c, W, (i) => b1matT(M.map((row, j) => row.map((v, k) => (j === 1 && k === 1 ? v + i + 1 : v))))), solution };
+};
+TEMPLATES.act3MatRead = (r) => {
+  const n = ri(r, 3, 4), M = [...Array(n)].map(() => [ri(r, 70, 99), ri(r, 70, 99)]), si = ri(r, 0, n - 1), sj = ri(r, 0, 1), subj = shuffle(r, ['math', 'science', 'English', 'history']).slice(0, 2);
+  const ord = ['first', 'second', 'third', 'fourth'], ans = String(M[si][sj]);
+  const cands = [M[si][1 - sj], M[(si + 1) % n][sj], M[sj % n][si % 2], M[(si + 2) % n][1 - sj]].map(String);
+  return { topic: 'Reading a matrix', stem: `A school tracks its students’ grades in two subjects: ${subj[0]} and ${subj[1]}. There are ${n} students, and their grades are represented in the matrix below, where rows represent students and columns represent subjects (${subj[0]}, then ${subj[1]}). What is the ${subj[sj]} grade for the ${ord[si]} student?`,
+    draw: b1matDraw([{ M }]), size: [520, 40 + 26 * n], ...buildChoices(r, ans, cands, (i) => String(+ans + i + 1)),
+    solution: `Row ${si + 1} is the ${ord[si]} student and column ${sj + 1} is ${subj[sj]}. The entry in row ${si + 1}, column ${sj + 1} is ${ans}.` };
+};
+TEMPLATES.act3MatAdd = (r) => {
+  const A = [[ri(r, 10, 30), ri(r, 10, 30)], [ri(r, 10, 30), ri(r, 5, 20)]], B = [[ri(r, 10, 25), ri(r, 5, 20)], [ri(r, 10, 25), ri(r, 5, 15)]], S = b1mop(A, B, (x, y) => x + y);
+  const sub = r() < 0.3, M = sub ? b1mop(A, B, (x, y) => x - y) : S;
+  return aq3MatQ(r, sub ? 'Subtracting matrices' : 'Adding matrices',
+    `A restaurant has two locations. Matrix A shows the sales at Location 1 and matrix B shows the sales at Location 2. In both, the rows represent beverages and desserts, and the columns represent Week 1 and Week 2. ${sub ? 'The owner wants to know how many more items Location 1 sold than Location 2, A − B.' : 'The owner wants to calculate the total sales for both locations, A + B.'} What is the resulting matrix?`,
+    ['A =', { M: A }, '  B =', { M: B }], M, [sub ? S : b1mop(A, B, (x, y) => x - y), A, [[M[0][0], M[0][1]], [M[1][0] + 2, M[1][1] + 2]], [[M[0][0], M[1][0]], [M[0][1], M[1][1]]]],
+    `${sub ? 'Subtract' : 'Add'} the entries in the same position:\n[${A[0][0]} ${sub ? '−' : '+'} ${B[0][0]}, ${A[0][1]} ${sub ? '−' : '+'} ${B[0][1]}; ${A[1][0]} ${sub ? '−' : '+'} ${B[1][0]}, ${A[1][1]} ${sub ? '−' : '+'} ${B[1][1]}] = ${b1matT(M)}`);
+};
+TEMPLATES.act3MatScalar = (r) => {
+  const A = [[ri(r, 1, 9), ri(r, 1, 9)], [ri(r, 1, 9), ri(r, 1, 9)]], k = ri(r, 2, 5), M = b1mop(A, null, (x) => k * x);
+  return aq3MatQ(r, 'Scalar multiplication', `If the scalar ${k} is multiplied with the matrix below, what is the resulting matrix?`, [{ M: A }], M,
+    [b1mop(A, null, (x) => x + k), [[M[0][0], M[0][1]], [A[1][0], A[1][1]]], [[M[0][0], A[0][1]], [M[1][0], A[1][1]]], [[M[0][0], M[0][1]], [M[1][0], M[1][1] + k]]],
+    `Multiply every entry by ${k}: ${b1matT(M)}`);
+};
+TEMPLATES.act3MatMult = (r) => {
+  const A = [[nz(r, -4, 5), nz(r, -4, 5)], [nz(r, -4, 5), nz(r, -4, 5)]], B = [[nz(r, -4, 5), nz(r, -4, 5)], [nz(r, -4, 5), nz(r, -4, 5)]];
+  const mul = (X, Y) => [[0, 1].map((j) => X[0][0] * Y[0][j] + X[0][1] * Y[1][j]), [0, 1].map((j) => X[1][0] * Y[0][j] + X[1][1] * Y[1][j])], M = mul(A, B);
+  return aq3MatQ(r, 'Multiplying matrices', 'Matrices A and B are shown below. Find A × B.', ['A =', { M: A }, '  B =', { M: B }], M,
+    [b1mop(A, B, (x, y) => x * y), mul(B, A), [[A[0][0] * B[0][0] + A[0][1] * B[0][1], A[0][0] * B[1][0] + A[0][1] * B[1][1]], [A[1][0] * B[0][0] + A[1][1] * B[0][1], A[1][0] * B[1][0] + A[1][1] * B[1][1]]]],
+    `Row times column, entry by entry:\nRow 1 · Column 1: (${A[0][0]})(${B[0][0]}) + (${A[0][1]})(${B[1][0]}) = ${fmt(M[0][0])}\nRow 1 · Column 2: (${A[0][0]})(${B[0][1]}) + (${A[0][1]})(${B[1][1]}) = ${fmt(M[0][1])}\nRow 2 · Column 1: (${A[1][0]})(${B[0][0]}) + (${A[1][1]})(${B[1][0]}) = ${fmt(M[1][0])}\nRow 2 · Column 2: (${A[1][0]})(${B[0][1]}) + (${A[1][1]})(${B[1][1]}) = ${fmt(M[1][1])}\nA × B = ${b1matT(M)}`.replace(/\(-/g, `(${MINUS}`));
+};
+TEMPLATES.act3MatDet = (r) => {
+  if (r() < 0.55) {
+    const C = [[nz(r, -6, 9), nz(r, -6, 9)], [nz(r, -6, 9), nz(r, -6, 9)]], a = C[0][0], b = C[0][1], c = C[1][0], d = C[1][1], det = a * d - b * c;
+    return { topic: 'Determinant of a 2 × 2 matrix', stem: 'Find the determinant of matrix C shown below.', draw: b1matDraw(['C =', { M: C }]), size: [520, 92],
+      ...buildChoices(r, fmt(det), [fmt(a * d + b * c), fmt(b * c - a * d), fmt(a * b - c * d), fmt(a * c - b * d)], (i) => fmt(det + i + 1)),
+      solution: `det = ad − bc = (${fmt(a)})(${fmt(d)}) − (${fmt(b)})(${fmt(c)}) = ${fmt(a * d)} − ${b * c < 0 ? `(${fmt(b * c)})` : fmt(b * c)} = ${fmt(det)}` };
+  }
+  for (;;) { // det [p k; k q] = m·k with a negative answer
+    const k1 = ri(r, 1, 6), k2 = -ri(r, k1 + 1, 10), prod = -k1 * k2, m = -(k1 + k2), facs = [];
+    for (let p = 2; p <= 9; p++) if (prod % p === 0 && prod / p >= 2 && prod / p <= 9) facs.push(p);
+    if (!facs.length) continue;
+    const p = pick(r, facs), q = prod / p;
+    return { topic: 'Determinant of a 2 × 2 matrix', stem: `For the matrix shown below, the determinant is ${m} times k. If k < 0, what is the value of k?`, draw: b1matDraw([{ M: [[p, 'k'], ['k', q]] }]), size: [520, 92],
+      ...buildChoices(r, fmt(k2), [fmt(-k1), fmt(k1), fmt(-k2)], (i) => fmt(k2 - i - 1)),
+      solution: `det = (${p})(${q}) − k · k = ${prod} − k²\nSet it equal to ${m}k: ${prod} − k² = ${m}k\nk² + ${m}k − ${prod} = 0\n(k − ${k1})(k + ${-k2}) = 0, so k = ${k1} or k = ${fmt(k2)}\nSince k < 0, k = ${fmt(k2)}.` };
+  }
+};
+TEMPLATES.act3MatRevenue = (r) => {
+  const kind = ri(r, 0, 1);
+  if (kind === 0) { // one row times a column (thousands)
+    const P = [[ri(r, 2, 8) * 5, ri(r, 2, 8) * 5, ri(r, 2, 8) * 5], [ri(r, 2, 8) * 5, ri(r, 2, 8) * 5, ri(r, 2, 8) * 5]], Q = [ri(r, 1, 4), ri(r, 1, 4), ri(r, 1, 4)], t = ri(r, 0, 1);
+    const tot = P[t].reduce((s, v, j) => s + v * Q[j], 0) * 1000, $ = (v) => `$${v.toLocaleString('en-US')}`;
+    return { topic: 'Matrices in context', stem: `A company tracks the performance of two teams over three months using matrix P below. The rows represent Team A and Team B, and the columns represent months 1, 2, and 3. Matrix Q represents the revenue multiplier (in thousands of dollars) for each month. What is the total revenue for Team ${'AB'[t]}?`,
+      draw: b1matDraw(['P =', { M: P }, '  Q =', { M: Q.map((v) => [v]) }]), size: [520, 120],
+      ...buildChoices(r, $(tot), [$(P[1 - t].reduce((s, v, j) => s + v * Q[j], 0) * 1000), $(P[t].reduce((s, v) => s + v, 0) * Q.reduce((s, v) => s + v, 0) * 1000), $((P[0].reduce((s, v, j) => s + v * Q[j], 0) + P[1].reduce((s, v, j) => s + v * Q[j], 0)) * 1000)], (i) => $(tot + 5000 * (i + 1))),
+      solution: `Multiply Team ${'AB'[t]}’s row by the column Q: ${P[t].map((v, j) => `${v}(${Q[j]})`).join(' + ')} = ${tot / 1000}\nIn thousands of dollars: ${$(tot)}` };
+  }
+  const A = [[ri(r, 8, 20), ri(r, 8, 20)], [ri(r, 8, 20), ri(r, 8, 20)]], p = pick(r, [3, 4, 5, 6]), sum = A.flat().reduce((s, v) => s + v, 0);
+  return { topic: 'Matrices in context', stem: `A delivery company uses matrix A below to represent the number of packages delivered on two weekdays by two delivery teams. Each delivery team earns $${p} per package. What is the total earnings for both teams combined?`,
+    draw: b1matDraw(['A =', { M: A }]), size: [520, 92],
+    ...buildChoices(r, `$${sum * p}`, [`$${(A[0][0] + A[0][1]) * p}`, `$${sum * p + 5 * p}`, `$${(A[0][0] + A[1][1]) * p}`], (i) => `$${sum * p + 10 * (i + 1)}`),
+    solution: `Total packages: ${A.flat().join(' + ')} = ${sum}\nEarnings: ${sum} × $${p} = $${sum * p}` };
+};
+/* ---------- ACT Prep chapter 3 end ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
   { id: 'angleSum',           subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Triangle Sum Theorem', desc: 'Angles written in x — find x or an angle' },
@@ -29976,6 +30480,36 @@ QUESTION_TYPES.push({ id: 'b23Challenge', subject: 'algebra2', section: '2.3 Foc
 QUESTION_TYPES.push({ id: 'b24Challenge', subject: 'algebra2', section: '2.4 Modeling with Quadratic Functions', label: '★ Challenge: Quadratic through three points', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'dmChallenge', subject: 'precalc', section: "4.5 DeMoivre's Theorem", label: '★ Challenge: The smallest power of a + bi that is real', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 /* Calculus III (only for practice.html?t=calc) */
+QUESTION_TYPES.push({ id: 'act3CpxAdd', subject: 'act', section: '3.1 Real and Complex Number Systems', label: 'Add or subtract complex numbers', desc: '(a + bi) ± (c + di), plain or signal context (#3, 5, 15, 26)' });
+QUESTION_TYPES.push({ id: 'act3CpxMult', subject: 'act', section: '3.1 Real and Complex Number Systems', label: 'Multiply complex numbers', desc: 'Products, squares, z · ki, P = I × V (#2, 4, 14, 18, 25)' });
+QUESTION_TYPES.push({ id: 'act3CpxDiv', subject: 'act', section: '3.1 Real and Complex Number Systems', label: 'Divide complex numbers', desc: 'Standard form using the conjugate; impedance (#6, 16, 24)' });
+QUESTION_TYPES.push({ id: 'act3QuadRoots', subject: 'act', section: '3.1 Real and Complex Number Systems', label: 'Complex roots of a quadratic', desc: 'Real part or both roots a ± bi (#1, 12)' });
+QUESTION_TYPES.push({ id: 'act3Conj', subject: 'act', section: '3.1 Real and Complex Number Systems', label: 'Conjugates and purely real numbers', desc: 'Conjugate of z or of a denominator; b that makes z real (#19–21)' });
+QUESTION_TYPES.push({ id: 'act3Classify', subject: 'act', section: '3.1 Real and Complex Number Systems', label: 'Rational, irrational, real, complex', desc: 'Classify numbers (#10, 11, 17, 22, 23, 29)' });
+QUESTION_TYPES.push({ id: 'act3Dist', subject: 'act', section: '3.2 Number Line and Absolute Value', label: 'Distance on a number line', desc: 'Distances, who is closer, farthest point (#32, 35, 42, 43, 45, 64)' });
+QUESTION_TYPES.push({ id: 'act3Mid', subject: 'act', section: '3.2 Number Line and Absolute Value', label: 'Midpoint on a number line', desc: 'Midpoint, midpoint of a midpoint (#56, 60, 73)' });
+QUESTION_TYPES.push({ id: 'act3AbsEq', subject: 'act', section: '3.2 Number Line and Absolute Value', label: 'Absolute value equations', desc: '|ax − b| = c; points a given distance away (#47, 48, 57, 63, 71)' });
+QUESTION_TYPES.push({ id: 'act3AbsIneq', subject: 'act', section: '3.2 Number Line and Absolute Value', label: 'Absolute value inequalities', desc: 'Solution sets and values that satisfy (#31, 39, 50, 55, 59, 62, 66, 70)' });
+QUESTION_TYPES.push({ id: 'act3AbsGraph', subject: 'act', section: '3.2 Number Line and Absolute Value', label: 'Inequality from a number line graph', desc: 'Match a graph to |x − m| ≤ d or ≥ d (#46)' });
+QUESTION_TYPES.push({ id: 'act3Tolerance', subject: 'act', section: '3.2 Number Line and Absolute Value', label: 'Tolerance', desc: 'Within d of a target: |x − L| ≤ d, or a range (#13, 33)' });
+QUESTION_TYPES.push({ id: 'act3IntBetween', subject: 'act', section: '3.2 Number Line and Absolute Value', label: 'Integers between two fractions', desc: 'Count the integers (#52, 61)' });
+QUESTION_TYPES.push({ id: 'act3NLFrac', subject: 'act', section: '3.2 Number Line and Absolute Value', label: 'Fractions on a number line', desc: 'The kth mark of n equal parts (#49, 51, 58, 65)' });
+QUESTION_TYPES.push({ id: 'act3Percent', subject: 'act', section: '3.2 Number Line and Absolute Value', label: 'Percents and fractions of numbers', desc: 'Discount percent, time left, half/fourth (#36–38)' });
+QUESTION_TYPES.push({ id: 'act3ExpMono', subject: 'act', section: '3.3 Exponents', label: 'Simplify with exponent rules', desc: 'Monomials, powers, quotients, negative exponents (#76–78, 81, 85)' });
+QUESTION_TYPES.push({ id: 'act3ExpBase', subject: 'act', section: '3.3 Exponents', label: 'Powers of the same base', desc: '2ⁿ, 3ⁿ products and quotients; y^p/x^q (#80, 82–84)' });
+QUESTION_TYPES.push({ id: 'act3CpxDist', subject: 'act', section: '3.4 Imaginary and Complex Numbers', label: 'Distance in the complex plane', desc: 'Two points, a ship, a drone with two legs (#27, 87, 88, 93)' });
+QUESTION_TYPES.push({ id: 'act3CpxMid', subject: 'act', section: '3.4 Imaginary and Complex Numbers', label: 'Midpoint in the complex plane', desc: 'Midpoint, or x + y of the midpoint (#90, 94, 95)' });
+QUESTION_TYPES.push({ id: 'act3CpxMod', subject: 'act', section: '3.4 Imaginary and Complex Numbers', label: 'Magnitude and z · z̄', desc: '|a + bi| and a number times its conjugate (#28, 89, 91, 92)' });
+QUESTION_TYPES.push({ id: 'act3VecMag', subject: 'act', section: '3.5 Vectors', label: 'Magnitude of a vector', desc: '|A|, |A + B|, |A − B| (#97, 99, 104)' });
+QUESTION_TYPES.push({ id: 'act3VecOps', subject: 'act', section: '3.5 Vectors', label: 'Scalar multiples and sums', desc: 'kD, ku + v (#101)' });
+QUESTION_TYPES.push({ id: 'act3Displace', subject: 'act', section: '3.5 Vectors', label: 'Displacement', desc: 'Two perpendicular moves; Pythagorean theorem (#98, 102, 103)' });
+QUESTION_TYPES.push({ id: 'act3VecFind', subject: 'act', section: '3.5 Vectors', label: 'Missing component', desc: '(x, b) with a given magnitude (#105)' });
+QUESTION_TYPES.push({ id: 'act3MatRead', subject: 'act', section: '3.6 Matrices', label: 'Reading a matrix', desc: 'Rows and columns in context (#108)' });
+QUESTION_TYPES.push({ id: 'act3MatAdd', subject: 'act', section: '3.6 Matrices', label: 'Adding and subtracting matrices', desc: 'In context (#109)' });
+QUESTION_TYPES.push({ id: 'act3MatScalar', subject: 'act', section: '3.6 Matrices', label: 'Scalar multiplication', desc: 'k times a matrix (#115)' });
+QUESTION_TYPES.push({ id: 'act3MatMult', subject: 'act', section: '3.6 Matrices', label: 'Multiplying matrices', desc: '2 × 2 times 2 × 2 (#110)' });
+QUESTION_TYPES.push({ id: 'act3MatDet', subject: 'act', section: '3.6 Matrices', label: 'Determinant', desc: 'ad − bc; determinant equal to a multiple of k (#96, 111, 114)' });
+QUESTION_TYPES.push({ id: 'act3MatRevenue', subject: 'act', section: '3.6 Matrices', label: 'Matrices in context', desc: 'Revenue from a row times a column; total earnings (#107, 112, 113)' });
 QUESTION_TYPES.push({ id: 'c111Challenge', subject: 'calc3', section: '11.1 Sequences', label: '★ Challenge: Limit of aₙ₊₁ = √(k + aₙ)', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c112Challenge', subject: 'calc3', section: '11.2 Series', label: '★ Challenge: Split into two geometric series', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c125Challenge', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: '★ Challenge: Distance between skew lines', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
@@ -33534,7 +34068,7 @@ function builder() {
   // each section folds up; sections with questions chosen start open
   // chapters fold up too: each chapter holds its sections
   const openSaved = store.get(TK('builder:open')) || {}, secs = {};
-  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 2: 'Reasoning and Proofs', 3: 'Parallel and Perpendicular Lines', 4: 'Transformations', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, calc3: { 11: 'Sequences, Series, and Power Series', 12: 'Vectors and the Geometry of Space', 13: 'Vector Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
+  const CH_TITLES = { geometry: { 1: 'Basics of Geometry', 2: 'Reasoning and Proofs', 3: 'Parallel and Perpendicular Lines', 4: 'Transformations', 5: 'Congruent Triangles', 6: 'Relationships Within Triangles', 7: 'Quadrilaterals and Other Polygons', 8: 'Similarity', 9: 'Right Triangles and Trigonometry', 10: 'Circles', 11: 'Circumference and Area', 12: 'Surface Area and Volume' }, algebra1: { 1: 'Solving Linear Equations', 2: 'Solving Linear Inequalities', 3: 'Graphing Linear Functions', 4: 'Writing Linear Functions', 5: 'Solving Systems of Linear Equations', 6: 'Exponential Functions' , 7: 'Polynomials', 8: 'Data Analysis and Displays', 9: 'Probability'}, algebra2: { 1: 'Linear Functions, Linear Systems, and Matrices', 2: 'Quadratic Functions', 3: 'Quadratic Equations and Complex Numbers', 4: 'Polynomial Functions', 5: 'Rational Exponents and Radical Functions', 6: 'Exponential and Logarithmic Functions', 7: 'Rational Functions', 8: 'Sequences and Series', 9: 'Data Analysis and Statistics' }, act: { 3: 'Number and Quantity', 4: 'Algebra', 5: 'Functions', 6: 'Geometry', 7: 'Statistics and Probability', 8: 'Practice Tests' }, calc3: { 11: 'Sequences, Series, and Power Series', 12: 'Vectors and the Geometry of Space', 13: 'Vector Functions' }, precalc: { P: 'Prerequisites', 1: 'Trigonometry', 2: 'Analytic Trigonometry', 3: 'Additional Topics in Trigonometry', 4: 'Complex Numbers', 5: 'Exponential and Logarithmic Functions', 6: 'Topics in Analytic Geometry' } };
   const badgeText = (sec) => { const n = secs[sec].ids.reduce((a, id) => a + (counts[id] || 0), 0), b = secs[sec].ids.reduce((a, id) => a + (bonusCounts[id] || 0), 0);
     return [n ? `${n} chosen` : '', b ? `★ ${b} bonus` : ''].filter(Boolean).join(' · '); };
   const refreshBadges = () => Object.keys(secs).forEach((sec) => { secs[sec].badge.textContent = badgeText(sec); });
