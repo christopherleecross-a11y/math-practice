@@ -30050,6 +30050,7 @@ const mixItems = (mix) => mix.split('_').map((p) => p.split('.')).filter(([id, n
 // percent added to the score for each bonus question answered right, from a link (bpct=5); half percents allowed
 // "Same questions for everyone": the versions the teacher picked in Try it as a student, from a link (pv=0.3_4.1 → question 1 is its 3rd new version, question 5 its 1st)
 const picksOf = (q) => { const o = {}; String(q.get('pv') || '').split('_').forEach((p) => { const [i, k] = p.split('.').map(Number); if (Number.isInteger(i) && i >= 0 && i < 200 && Number.isInteger(k) && k > 0 && k < 10000) o[i] = k; }); return Object.keys(o).length ? o : undefined; };
+const versionOf = (seedStr, picks) => { const t = picksText(picks); return cyrb53((t ? t + '|' : '') + seedStr).toString(36).slice(-6).toUpperCase(); };
 const picksText = (o) => Object.entries(o || {}).filter(([, k]) => k > 0).sort((a, b) => a[0] - b[0]).map(([i, k]) => `${i}.${k}`).join('_');
 // which built assignment a set of picks belongs to (picks only make sense for these exact questions)
 let BUILDER_UPDATE = null;
@@ -30129,7 +30130,7 @@ function generate(setKey, period, sid, attempt = 1) {
   } else if (SETS[setKey].shuffle) qs = shuffle(r, qs);
   const picks = attempt === 1 && setting(setKey, 'same') && SETS[setKey].picks; // the versions the teacher picked
   if (picks) Object.entries(picks).forEach(([i, k]) => { if (qs[i]) try { qs[i] = regenQuestion(seedStr, qs[i], +i, 'p' + k); } catch {} });
-  return { qs, seedStr, version: cyrb53((picks ? picksText(picks) + '|' : '') + seedStr).toString(36).slice(-6).toUpperCase() };
+  return { qs, seedStr, version: versionOf(seedStr, picks) };
 }
 // a fresh version of question i for retry number t (same type and format, new numbers)
 function regenQuestion(seedStr, old, i, t) {
@@ -30567,6 +30568,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
     drawings: (!teacher && store.get(key + ':draw')) || {}, drawOn: {}, work: (!teacher && store.get(key + ':work')) || {} };
   if (!teacher) { saveState(); store.set(base + ':meta', meta); }
   render();
+  previewVersion();
   startLockdown();
 }
 function saveState() {
@@ -31306,6 +31308,15 @@ function previewNewQ(i, quiet) {
   delete state.drawings[String(i)]; delete state.drawings['L' + i];
   saveState(); rerenderAt(i);
   if (!quiet) pickBar();
+  previewVersion();
+}
+// Try it as a student: the version code, to compare with the Version a student's turned-in page (and the Results) shows
+function previewVersion() {
+  if (!PREVIEW || !state) return;
+  const v = state.teacher ? state.version : versionOf(state.seedStr, state.pvVer || SETS[state.setKey].picks);
+  let tag = document.getElementById('pvvertag');
+  if (!tag) { tag = el('span', { id: 'pvvertag' }); document.getElementById('subtitle').append(tag); }
+  tag.textContent = ` · Version ${v}`;
 }
 // Same questions for everyone: after the teacher swaps questions in Try it as a student, offer to make these THE questions
 function pickBar() {
@@ -31318,11 +31329,11 @@ function pickBar() {
   const use = el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: () => {
     store.set(TK('builder:picks'), { sig: pickSig(params), pv, t: Date.now() });
     const q = new URLSearchParams(location.search); if (pv) q.set('pv', pv); else q.delete('pv'); history.replaceState(null, '', location.pathname + '?' + q.toString());
-    bar.remove(); alertBox('These are now the questions. Go back to the Build an assignment tab: its student link (and Assign in Google Classroom) now gives everyone exactly these questions.');
+    bar.remove(); alertBox('These are now the questions. Go back to the Build an assignment tab: its student link (and Assign in Google Classroom) now gives everyone exactly these questions. If this assignment is already posted in Google Classroom, post it again with the new link (the old link still gives the old questions).');
   } }, '✓ Use these questions');
   const copy = el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: async () => { try { await navigator.clipboard.writeText(studentLink()); copy.textContent = 'Copied!'; } catch { msg.textContent = studentLink(); } setTimeout(() => (copy.textContent = 'Copy student link'), 1800); } }, 'Copy student link');
   const box = el('div', { id: 'pickbar', style: 'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:60;max-width:min(680px,94vw);display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-radius:12px;background:#fff;border:2px solid var(--accent);box-shadow:0 6px 24px rgba(0,0,0,.18)' },
-    el('strong', { style: 'flex:1;min-width:200px' }, `You changed ${n} question${n === 1 ? '' : 's'}. Everyone will get the questions you see now.`), use, copy, msg);
+    el('div', { style: 'flex:1;min-width:200px' }, el('strong', {}, `You changed ${n} question${n === 1 ? '' : 's'}.`), ' To give everyone these questions, click Use these questions and post the new student link. ', el('strong', {}, 'An assignment already posted in Google Classroom keeps its old questions'), ' (its link doesn’t change).'), use, copy, msg);
   if (bar) bar.replaceWith(box); else document.body.append(box);
   bar = box;
 }
@@ -33395,7 +33406,7 @@ function builder() {
     store.set(TK('builder:last'), { ...loadItems(mix.split('_').map((x) => x.split('.'))), title: q.get('title') || '', subject: q.get('subject') || Object.keys(SUBJECTS)[0], order: q.get('order') === 'mixed' ? 'mixed' : 'grouped',
       retries: +q.get('retries') || 0, checks: +q.get('checks') || 1, bonusPct: bonusPctOf(q) || 5, attempts: +q.get('attempts') || 1, lockdown: q.get('lock') !== '0', same: q.get('same') === '1', hints: q.get('hints') === '1', more: q.get('more') === '1', desmos: q.get('desmos') === '1', shareWork: q.get('sw') === '1', redo: q.get('redo') === 'missed' ? 'missed' : 'all',
       leaveLimit: q.has('leave') ? +q.get('leave') || 0 : CONFIG.LEAVE_LIMIT || 0, editId: customKeyFor(q), gen: q.get('g') === '2' ? 2 : 1, note, t: Date.now() });
-    if (q.get('same') === '1' && q.get('pv')) store.set(TK('builder:picks'), { sig: pickSig(q), pv: q.get('pv'), t: Date.now() }); // keep the questions picked for that link
+    if (q.get('same') === '1' && (q.get('pv') || !note)) store.set(TK('builder:picks'), { sig: pickSig(q), pv: q.get('pv') || '', t: Date.now() }); // the questions picked for that link (none: its original questions), never ones left over from earlier
     builder(); window.scrollTo(0, 0);
   };
   const loadFromSet = (key) => { // a menu assignment: its questions and settings become a NEW built assignment
