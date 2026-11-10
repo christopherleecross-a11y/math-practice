@@ -457,6 +457,11 @@ const SETS = {
   'act-6-3': { subject: 'act', title: '6.3 Two-Dimensional Shapes', items: [['act6Pyth', 2], ['act6Similar', 2], ['act6Composite', 2], ['act6RectWord', 2], ['act6Circle2D', 2], ['act6CircleEq', 2], ['act6TriAngles', 1], ['act6TriSides', 1], ['act6TriAreaFig', 1], ['act6Special', 1], ['act6Midseg', 1]] },
   'act-6-4': { subject: 'act', title: '6.4 Three-Dimensional Shapes', items: [['act6BoxSA', 2], ['act6Scale3D', 2], ['act6PyramidSA', 3], ['act6Cylinder', 3], ['act6VolRatio', 2], ['act6BoxLeft', 2]] },
   'act-6-5': { subject: 'act', title: '6.5 Trigonometry', items: [['act6RightTrig', 2], ['act6Elevation', 3], ['act6Quadrant', 2], ['act6RefCot', 2], ['act6TrigEq', 1], ['act6LawCos', 2], ['act6Period', 1], ['act6EvenOdd', 1]] },
+  'act-7-1': { subject: 'act', title: '7.1 Probability', items: [['act7Complement', 1], ['act7FreqTable', 1], ['act7Guess', 1], ['act7BothChosen', 1], ['act7Replace', 1], ['act7Draw2', 2], ['act7BarProb', 1], ['act7AndPct', 1], ['act7Coins', 1], ['act7AddItems', 1], ['act7Expected', 1], ['act7Overlap', 2], ['act7TwoWay', 1], ['act7Walk', 1]] },
+  'act-7-2': { subject: 'act', title: '7.2 Sets and Venn Diagrams', items: [['act7SetOps', 4], ['act7Venn3', 3], ['act7Venn2', 3], ['act7Inclusion3', 1], ['act7Subsets', 2], ['act7VennRead', 2]] },
+  'act-7-3': { subject: 'act', title: '7.3 Mean, Median, Mode, and Spread', items: [['act7Needed', 2], ['act7MMM', 3], ['act7StemLeaf', 2], ['act7Weighted', 1], ['act7Combined', 1], ['act7SDCompare', 1], ['act7DistMean', 1], ['act7ModeK', 1], ['act7AvgSpeed', 1], ['act7Skew', 1], ['act7MeanShift', 1]] },
+  'act-7-4': { subject: 'act', title: '7.4 Charts and Graphs', items: [['act7PieCount', 2], ['act7PieOdds', 2], ['act7BarFruit', 2], ['act7BarChange', 2], ['act7Scatter', 2], ['act7Shipping', 2], ['act7BarProb', 1], ['act7Expected', 1]] },
+  'act-7-5': { subject: 'act', title: '7.5 Permutations and Combinations', items: [['act7Outfits', 2], ['act7Plates', 2], ['act7Words', 3], ['act7Digits', 2], ['act7Lock', 2], ['act7Committee', 2], ['act7Concept', 2]] },
   'calc3-11-1': { subject: 'calc3', title: '11.1 Sequences', items: [['c111RatLimit', 2], ['c111RatLimit', 1, 'fr'], ['c111Term', 2], ['c111Term', 1, 'fr'], ['c111Recur', 2], ['c111Recur', 1, 'fr'], ['c111Bank', 2], ['c111Bank', 1, 'fr'], ['c111Formula', 1], ['c111Formula', 2, 'fr'], ['c111Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-11-2': { subject: 'calc3', title: '11.2 Series', items: [['c112Geo', 1], ['c112Geo', 1, 'fr'], ['c112Telescope', 1], ['c112Telescope', 1, 'fr'], ['c112Decimal', 1], ['c112Decimal', 1, 'fr'], ['c112Partial', 1], ['c112Partial', 1, 'fr'], ['c112DivTest', 1], ['c112DivTest', 1, 'fr'], ['c112Combo', 1], ['c112Combo', 1, 'fr'], ['c112Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-12-5': { subject: 'calc3', title: '12.5 Equations of Lines and Planes', items: [['c125LineHit', 1], ['c125LineHit', 1, 'fr'], ['c125Plane3', 1], ['c125Plane3', 1, 'fr'], ['c125Parallel', 1], ['c125Parallel', 1, 'fr'], ['c125LinePlane', 1], ['c125LinePlane', 1, 'fr'], ['c125Angle', 1], ['c125Angle', 1, 'fr'], ['c125Dist', 1], ['c125Dist', 1, 'fr'], ['c125Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
@@ -30135,6 +30140,499 @@ TEMPLATES.act6EvenOdd = (r) => {
     `Which expression is equivalent to ${f}(${MINUS}θ)?`, f === 'cos' ? 'Cosine is even: cos(−θ) = cos θ.' : `${f === 'sin' ? 'Sine' : 'Tangent'} is odd: ${f}(−θ) = −${f} θ.`);
 };
 /* ---------- ACT Prep chapter 6 end ---------- */
+/* ---------- ACT Prep chapter 7 start ---------- */
+/* ---------- ACT Prep chapter 7: Statistics and Probability ---------- */
+const aq7F = (n, d) => { if (n === 0) return '0'; const g = gcd(Math.abs(n), Math.abs(d)); return d / g === 1 ? fmt(n / g) : `${n / g}/${d / g}`; };
+const aq7C = (n, k) => { if (k < 0 || k > n) return 0; let v = 1; for (let i = 1; i <= k; i++) v = (v * (n - k + i)) / i; return Math.round(v); };
+const aq7Fact = (n) => (n <= 1 ? 1 : n * aq7Fact(n - 1));
+const aq7D = (v, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d);
+const aq7Set = (S) => (S.length ? `{${[...S].sort((a, b) => a - b).join(', ')}}` : '∅');
+const aq7Comma = (v) => v.toLocaleString('en-US');
+const aq7Mean = (D) => D.reduce((a, b) => a + b, 0) / D.length;
+const aq7Med = (D) => { const S = [...D].sort((a, b) => a - b), n = S.length; return n % 2 ? S[(n - 1) / 2] : (S[n / 2 - 1] + S[n / 2]) / 2; };
+const aq7Modes = (D) => { const c = {}; D.forEach((x) => { c[x] = (c[x] || 0) + 1; }); const m = Math.max(...Object.values(c)); return m < 2 ? [] : Object.keys(c).filter((k) => c[k] === m).map(Number); };
+const aq7SD = (D) => { const m = aq7Mean(D); return Math.sqrt(D.reduce((a, x) => a + (x - m) ** 2, 0) / D.length); };
+
+// table with columns sized to their text
+const aq7Table = (rows) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, rh = 28; c.clearRect(0, 0, W, H); c.font = '600 14px system-ui, sans-serif';
+  const cw = rows[0].map((_, j) => Math.max(...rows.map((row) => c.measureText(String(row[j])).width)) + 22), tw = cw.reduce((a, b) => a + b, 0), x0 = (W - tw) / 2, y0 = 4;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  rows.forEach((row, i) => { let x = x0; row.forEach((t, j) => { if (i === 0 || j === 0) { c.fillStyle = '#efe9dc'; c.fillRect(x, y0 + i * rh, cw[j], rh); } c.strokeStyle = '#8a867c'; c.lineWidth = 1; c.strokeRect(x, y0 + i * rh, cw[j], rh); c.fillStyle = '#1d1d1b'; c.font = i === 0 || j === 0 ? '600 14px system-ui, sans-serif' : '14px system-ui, sans-serif'; c.fillText(String(t), x + cw[j] / 2, y0 + i * rh + rh / 2); x += cw[j]; }); });
+};
+// pie chart: slices [[label, fraction]]
+const aq7Pie = (slices, title = '', pct = true) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h; c.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2 + (title ? 10 : 0), R = Math.min(W * 0.26, H * 0.36), fills = ['#3d5a80', '#98c1d9', '#e0a96d', '#c9d6a3', '#d9d4c7', '#b56576', '#8d99ae'];
+  if (title) { c.fillStyle = '#1d1d1b'; c.font = '600 14px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillText(title, W / 2, 4); }
+  let a = -Math.PI / 2;
+  slices.forEach(([lab, f], i) => {
+    const b = a + f * 2 * Math.PI, m = (a + b) / 2;
+    c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a, b); c.closePath(); c.fillStyle = fills[i % fills.length]; c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke();
+    c.fillStyle = '#1d1d1b'; c.font = '13px system-ui, sans-serif'; c.textBaseline = 'middle'; c.textAlign = Math.cos(m) > 0.15 ? 'left' : Math.cos(m) < -0.15 ? 'right' : 'center';
+    c.fillText(pct ? `${lab} ${Math.round(f * 100)}%` : lab, cx + (R + 10) * Math.cos(m), cy + (R + 12) * Math.sin(m));
+    a = b;
+  });
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.2; c.beginPath(); c.arc(cx, cy, R, 0, 2 * Math.PI); c.stroke();
+};
+// Venn diagram: two or three sets, numbers in regions
+// two sets: v = { names: [A, B], r: [onlyA, both, onlyB], out }
+// three sets: v = { names: [A, B, C], r: [onlyA, onlyB, onlyC, AB, AC, BC, ABC], out }
+const aq7Venn = (v) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h; c.clearRect(0, 0, W, H);
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.5; c.strokeRect(6, 6, W - 12, H - 12);
+  c.fillStyle = '#1d1d1b'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = 'italic 15px Georgia, serif'; c.fillText(v.U || 'U', 22, 22);
+  const three = v.names.length === 3, R = three ? Math.min(W, H) * 0.24 : Math.min(W * 0.22, H * 0.36);
+  const C = three ? [[W / 2 - R * 0.6, H * 0.4], [W / 2 + R * 0.6, H * 0.4], [W / 2, H * 0.4 + R * 0.95]] : [[W / 2 - R * 0.62, H / 2], [W / 2 + R * 0.62, H / 2]];
+  C.forEach(([x, y]) => { c.beginPath(); c.arc(x, y, R, 0, 2 * Math.PI); c.stroke(); });
+  c.font = '600 14px system-ui, sans-serif';
+  const nl = three ? [[C[0][0] - R * 0.8, C[0][1] - R * 0.95], [C[1][0] + R * 0.8, C[1][1] - R * 0.95], [C[2][0] + R * 1.05, C[2][1] + R * 0.75]] : [[C[0][0] - R * 0.7, C[0][1] - R * 0.95], [C[1][0] + R * 0.7, C[1][1] - R * 0.95]];
+  v.names.forEach((n, i) => c.fillText(n, nl[i][0], nl[i][1]));
+  c.font = '15px Georgia, serif';
+  const P = three
+    ? [[C[0][0] - R * 0.45, C[0][1] - R * 0.15], [C[1][0] + R * 0.45, C[1][1] - R * 0.15], [C[2][0], C[2][1] + R * 0.5], [W / 2, H * 0.4 - R * 0.42], [W / 2 - R * 0.62, H * 0.4 + R * 0.52], [W / 2 + R * 0.62, H * 0.4 + R * 0.52], [W / 2, H * 0.4 + R * 0.3]]
+    : [[C[0][0] - R * 0.4, C[0][1]], [W / 2, H / 2], [C[1][0] + R * 0.4, C[1][1]]];
+  v.r.forEach((t, i) => { if (t !== '' && t != null) c.fillText(String(t), P[i][0], P[i][1]); });
+  if (v.out != null && v.out !== '') c.fillText(String(v.out), W - 34, H - 28);
+};
+
+/* ===== 7.1 Probability ===== */
+TEMPLATES.act7Complement = (r) => {
+  if (r() < 0.5) {
+    const p = pick(r, [5, 8, 10, 12, 15, 20]), q = (100 - p) ** 2 / 100, S = (x) => `${fmt(Math.round(x * 100) / 100)}%`;
+    return aq3Mc(r, S(q), [S(100 - p), S(p * p / 100), S(100 - 2 * p), S(2 * p)].filter((x) => x !== S(q)), () => null, 'Complements',
+      `The probability of a flight being delayed for any length of time due to a mechanical issue is ${p}%. What is the probability that there will NOT be a delay on a round trip (a flight to your destination and a flight back)?`,
+      `P(no delay on one flight) = 1 − 0.${String(p).padStart(2, '0')} = ${fmt((100 - p) / 100)}\nBoth flights: ${fmt((100 - p) / 100)} × ${fmt((100 - p) / 100)} = ${fmt(q / 100)} = ${S(q)}`);
+  }
+  const a = ri(r, 8, 20), b = ri(r, 5, 15), c = ri(r, 10, 25), N = a + b + c, D = (x) => aq7D(x);
+  return aq3Mc(r, D((b + c) / N), [D(a / N), D(b / N), D(c / N), D((a + b) / N)].filter((x) => x !== D((b + c) / N)), (i) => D((b + c) / N + 0.03 * (i + 1)), 'Complements',
+    `You randomly choose a coin from a container having ${a} pennies, ${b} nickels, and ${c} dimes. What is the probability that you do NOT choose a penny? (Round to the nearest hundredth.)`,
+    `There are ${N} coins, and ${b + c} are not pennies: ${b + c}/${N} ≈ ${D((b + c) / N)}  (or 1 − ${a}/${N})`);
+};
+TEMPLATES.act7FreqTable = (r) => {
+  const f = [ri(r, 40, 70), ri(r, 30, 50), ri(r, 20, 40), ri(r, 10, 25), ri(r, 5, 12)], N = f.reduce((a, b) => a + b, 0), k = pick(r, [3, 4]), more = f.slice(k - 1).reduce((a, b) => a + b, 0), D = (x) => aq7D(x);
+  return aq3Mc(r, D(more / N), [D(f.slice(k - 2).reduce((a, b) => a + b, 0) / N), D(f[k - 1] / N), D(1 - more / N)].filter((x) => x !== D(more / N)), (i) => D(more / N + 0.02 * (i + 1)), 'Probability from a table',
+    `A hotel logs the number of nights each guest stays. The distribution table is given below. What is the probability that a guest stays for more than ${k} nights? (Round to the nearest hundredth.)`,
+    `More than ${k} nights means ${k + 1}, ${k + 2}${k + 2 < 6 ? `, or ${k + 3}` : ''} nights: ${f.slice(k - 1).join(' + ')} = ${more}\nTotal guests: ${N}. P = ${more}/${N} ≈ ${D(more / N)}`,
+    { draw: aq7Table([['No. of nights', 'Frequency'], ...f.map((x, i) => [String(i + 2), String(x)])]), size: [300, 190] });
+};
+TEMPLATES.act7Guess = (r) => {
+  const c = pick(r, [4, 5]), n = pick(r, [3, 4, 5]), T = c ** n;
+  return aq3Mc(r, `1/${T}`, [`1/${c * n}`, `${n}/${T}`, `1/${(c - 1) ** n}`, `1/${n ** c}`].filter((x) => x !== `1/${T}`), () => null, 'Independent events',
+    `What is the probability of making a perfect score on a ${n}-question multiple-choice quiz that has ${c} answer choices per question, if you answer each question randomly?`,
+    `Each question: 1/${c}. All ${n} correct: (1/${c})^${n} = 1/${T}`.replace(`^${n}`, aq3Sup(n)));
+};
+TEMPLATES.act7BothChosen = (r) => {
+  if (r() < 0.5) { const n = ri(r, 5, 10), t = aq7C(n, 2);
+    return aq3Mc(r, `1/${t}`, [`1/${n * (n - 1)}`, `1/${n}`, `2/${n}`, `1/${2 * n}`].filter((x) => x !== `1/${t}`), () => null, 'Combinations',
+      `You and a friend are among ${n} people who are chosen at random for an experiment that requires 2 people. What is the probability that both you and your friend are chosen?`,
+      `Number of possible pairs: ${n}C2 = ${t}. Only one pair is you and your friend: 1/${t}`); }
+  const n = ri(r, 10, 16), t = n * (n - 1);
+  return aq3Mc(r, `1/${t}`, [`1/${aq7C(n, 2)}`, `1/${n}`, `1/${n * n}`].filter((x) => x !== `1/${t}`), () => null, 'Permutations',
+    `Janice, Sandra, and ${n - 2} other people are members of a committee. The committee selects a president and a vice president at random from its ${n} members. What is the probability that Janice will be president and Sandra will be vice president?`,
+    `Order matters: there are ${n} × ${n - 1} = ${t} ways to fill the two offices, and only one has Janice president and Sandra vice president: 1/${t}`);
+};
+TEMPLATES.act7Replace = (r) => {
+  const d = pick(r, [4, 5, 6, 8, 10]), k = ri(r, 1, d - 1), y = d - k;
+  return aq3Mc(r, aq7F(y * y, d * d), [aq7F(y, d), aq7F(k * k, d * d), aq7F(2 * y, d * d), aq7F(y * (y - 1), d * (d - 1))].filter((x) => x !== aq7F(y * y, d * d)), (i) => `${y * y + i + 1}/${d * d}`, 'Independent events',
+    `In a survey at an elementary school, it was found that ${k} out of every ${d} students do not like spinach. If two students are chosen at random, and the first student can be chosen again, what is the probability that they both like spinach?`,
+    `P(likes spinach) = ${aq7F(y, d)}. With replacement the picks are independent: ${aq7F(y, d)} × ${aq7F(y, d)} = ${aq7F(y * y, d * d)}`);
+};
+TEMPLATES.act7Draw2 = (r) => {
+  const a = ri(r, 2, 6), b = ri(r, 2, 6), N = a + b, [na, nb] = pick(r, [['green', 'blue'], ['red', 'white'], ['mangoes', 'apples']]), kind = ri(r, 0, 2), tot = aq7C(N, 2);
+  if (kind === 0) { const ans = aq7F(aq7C(a, 2), tot);
+    return aq3Mc(r, ans, [aq7F(a * a, N * N), aq7F(a, N), aq7F(aq7C(a, 2) + aq7C(b, 2), tot), aq7F(a * b, tot)].filter((x) => x !== ans), () => null, 'Dependent events',
+      `A bag contains ${a} ${na} balls and ${b} ${nb} balls. Two balls are picked at random. What is the probability that both are ${na}?`,
+      `${a}C2 ÷ ${N}C2 = ${aq7C(a, 2)}/${tot} = ${ans}\n(or ${a}/${N} × ${a - 1}/${N - 1})`); }
+  if (kind === 1) { const ans = aq7F(a * b, tot);
+    return aq3Mc(r, ans, [aq7F(a * b, N * N), aq7F(a, N), aq7F(a * b, 2 * tot), aq7F(aq7C(a, 2) + aq7C(b, 2), tot)].filter((x) => x !== ans), () => null, 'Dependent events',
+      `There are ${a} ${na} and ${b} ${nb} in a box. If two are chosen at random, what is the probability that one is ${na === 'mangoes' ? 'a mango' : na} and the other is ${nb === 'apples' ? 'an apple' : nb}?`,
+      `Ways to choose one of each: ${a} × ${b} = ${a * b}. Ways to choose any two: ${N}C2 = ${tot}.\nP = ${a * b}/${tot} = ${ans}`); }
+  const n = ri(r, 3, 6), ans = aq7F(1, n * (n - 1));
+  return aq3Mc(r, ans, [aq7F(1, n * n), aq7F(1, n), aq7F(2, n * (n - 1)), aq7F(1, n - 1)].filter((x) => x !== ans), () => null, 'Dependent events',
+    `James has a pouch with ${n} marbles in it, each a different color, including one orange and one blue. If he randomly selects two marbles without replacing them, what is the probability that he selects first the orange and then the blue?`,
+    `P(orange first) = 1/${n}. Then ${n - 1} marbles are left: P(blue second) = 1/${n - 1}.\n1/${n} × 1/${n - 1} = ${ans}`);
+};
+TEMPLATES.act7BarProb = (r) => {
+  const v = [ri(r, 40, 70), ri(r, 40, 70), ri(r, 10, 20), ri(r, 3, 9)], N = v.reduce((a, b) => a + b, 0), [i, j] = pick(r, [[1, 3], [0, 3], [2, 3], [1, 2]]), L = ['O', 'A', 'B', 'AB'], s = v[i] + v[j];
+  return aq3Mc(r, `${s}/${N}`, [`${v[i]}/${N}`, `${v[j]}/${N}`, `${s + 5}/${N}`], () => null, 'Probability from a graph',
+    `The blood types of ${N} people were determined for a study, as shown in the bar graph below. If 1 person from this study is randomly selected, what is the probability that this person has either Type ${L[i]} or Type ${L[j]} blood?`,
+    `Type ${L[i]}: ${v[i]}. Type ${L[j]}: ${v[j]}. ${v[i]} + ${v[j]} = ${s} out of ${N}: ${s}/${N}`,
+    { draw: b9barDraw({ labels: L, vals: v, ylab: 'number of people', xlab: 'blood type', show: true, gap: 22 }), size: [380, 250] });
+};
+TEMPLATES.act7AndPct = (r) => {
+  if (r() < 0.5) { const p = ri(r, 35, 60), q = pick(r, [25, 30, 35, 40, 45]), v = (p * q) / 10000, D = (x) => aq7D(x);
+    return aq3Mc(r, D(v), [D(p / 100 + q / 100 - v), D(((100 - p) * q) / 10000), D(q / 100)].filter((x) => x !== D(v)), (i) => D(v + 0.05 * (i + 1)), 'Multiplying probabilities',
+      `A test group of men and women are given a drug or a placebo. ${p}% of the group are men, and ${q}% of the men are given a placebo. If a person from the group is chosen at random, what is the probability that it will be a man who was given a placebo? (Round to the nearest hundredth.)`,
+      `P(man and placebo) = P(man) × P(placebo | man) = ${fmt(p / 100)} × ${fmt(q / 100)} ≈ ${D(v)}`); }
+  const N = pick(r, [200, 250, 300, 400]), p = pick(r, [40, 45, 55, 60]), q = pick(r, [70, 75, 80, 82, 85]), v = (p * q) / 10000, D = (x) => aq7D(x);
+  return aq3Mc(r, D(v), [D(((100 - p) * q) / 10000), D(q / 100), D(p / 100 + q / 100 - v)].filter((x) => x !== D(v)), (i) => D(v + 0.04 * (i + 1)), 'Multiplying probabilities',
+    `A high school's graduating class has ${N} people. ${p}% of the graduating class are male, and ${q}% of the graduating class will go to a four-year college. If these are independent, what is the probability that a person chosen from the graduating class will be male and attend a four-year college? (Round to the nearest hundredth.)`,
+    `Independent events: ${fmt(p / 100)} × ${fmt(q / 100)} ≈ ${D(v)}`);
+};
+TEMPLATES.act7Coins = (r) => {
+  const n = pick(r, [3, 4]), opts = n === 3 ? [[1, 2], [2], [0], [1]] : [[2], [1, 2], [3, 4], [0, 4]], ks = pick(r, opts), c = ks.reduce((a, k) => a + aq7C(n, k), 0), T = 2 ** n, ans = aq7F(c, T);
+  const words = ks.join(' or '), noun = ks.length === 1 && ks[0] === 1 ? 'head' : 'heads';
+  return aq3Mc(r, ans, [aq7F(ks.length, n + 1), aq7F(c + 1, T), aq7F(ks.length, T), aq7F(T - c, T)].filter((x) => x !== ans), (i) => aq7F(c + 2 + i, T), 'Sample spaces',
+    `Find the probability of getting exactly ${words} ${noun} if a coin is tossed ${n === 3 ? 'three times' : 'four times'}.`,
+    `There are 2${aq3Sup(n)} = ${T} equally likely outcomes. ${ks.map((k) => `${n}C${k} = ${aq7C(n, k)}`).join(', ')} of them have ${ks.join(' or ')} heads: ${c}/${T} = ${ans}`);
+};
+TEMPLATES.act7AddItems = (r) => {
+  if (r() < 0.5) {
+    for (;;) { const n = ri(r, 5, 15), q = ri(r, 5, 20), d = ri(r, 10, 30), [pn, pd] = pick(r, [[3, 4], [2, 3], [4, 5]]), o = n + q, x = (pn * o) / (pd - pn) - d;
+      if (!Number.isInteger(x) || x < 2) continue;
+      return aq3Mc(r, String(x), [String(x + d), String((pn * o) / (pd - pn)), String(Math.max(1, x - pn))], (i) => String(x + 3 + i), 'Probability',
+        `A piggy bank contains ${n} nickels, ${d} dimes, and ${q} quarters. How many dimes need to be added to the piggy bank so that the probability of randomly selecting a dime is ${pn}/${pd}?`,
+        `Let x dimes be added: (${d} + x)/(${d + n + q} + x) = ${pn}/${pd}\n${pd}(${d} + x) = ${pn}(${d + n + q} + x)  →  x = ${x}`); }
+  }
+  const rd = ri(r, 5, 15), bl = ri(r, 3, 10), k = pick(r, [3, 4, 5, 6]), g = (rd + bl) / (k - 1);
+  if (!Number.isInteger(g)) return TEMPLATES.act7AddItems(r);
+  return aq3Mc(r, String(g), [String(rd + bl), String((rd + bl) / k), String(g + 1)].filter((x) => x !== String(g) && !x.includes('.')), (i) => String(g + 2 + i), 'Probability',
+    `The probability of randomly choosing a green marble from a bag containing green, red, and blue marbles is 1/${k}. If there are ${rd} red marbles and ${bl} blue marbles, how many green marbles must be in the bag?`,
+    `g/(g + ${rd + bl}) = 1/${k}  →  ${k}g = g + ${rd + bl}  →  ${k - 1}g = ${rd + bl}  →  g = ${g}`);
+};
+TEMPLATES.act7Expected = (r) => {
+  const sl = pick(r, [[[0.25, 0.25, 0.5]], [[0.5, 0.25, 0.25]], [[0.25, 0.25, 0.25, 0.25]]])[0], vals = sl.map(() => pick(r, [-9, -7, -5, -3, -2, 2, 4, 5, 8, 10])), E = sl.reduce((a, p, i) => a + p * vals[i], 0);
+  const M = (v) => `${v < 0 ? MINUS : ''}$${Math.abs(v).toFixed(2)}`, simple = aq7Mean(vals);
+  return aq3Mc(r, M(E), [M(simple), M(vals.reduce((a, b) => a + b, 0)), M(-E), M(E + 0.5)].filter((x) => x !== M(E)), (i) => M(E + 0.75 * (i + 2)), 'Expected value',
+    'A person spins the wheel shown below and is rewarded the amount indicated by the pointer. What is the expected value of a spin?',
+    `Multiply each amount by the fraction of the wheel it covers and add:\n${sl.map((p, i) => `${fracT(p)}(${M(vals[i])})`).join(' + ')} = ${M(E)}`,
+    { draw: aq7Pie(sl.map((p, i) => [M(vals[i]), p]), '', false), size: [320, 240] });
+};
+TEMPLATES.act7DistCheck = (r) => {
+  const ok = r() < 0.5, P = shuffle(r, [0.05, 0.1, 0.25, 0.6]); if (!ok) P[3] = aq4R(P[3] + pick(r, [0.05, 0.1, -0.05]));
+  const s = aq4R(P.reduce((a, b) => a + b, 0)), ans = ok ? 'Yes' : 'No';
+  return { ...aq3Mc(r, ans, ['Yes', 'No', 'Maybe', 'Not enough information'].filter((x) => x !== ans), () => null, 'Probability distributions',
+    'Determine whether this table represents a probability distribution.',
+    `Every P(x) is between 0 and 1, and the probabilities add to ${fmt(s)}. ${ok ? 'They add to 1, so it is a probability distribution.' : 'They do not add to 1, so it is NOT a probability distribution.'}`,
+    { draw: aq7Table([['x', 'P(x)'], ...P.map((p, i) => [String(i), fmt(p)])]), size: [260, 170] }) };
+};
+TEMPLATES.act7Overlap = (r) => {
+  const kind = ri(r, 0, 2), N = pick(r, [50, 60, 80, 100, 120]), both = ri(r, 5, Math.floor(N / 4)), a = ri(r, both + 5, N - 10), b = N - a + both, D = (x) => aq7D(x);
+  const [X, Y] = pick(r, [['candy bars', 'spinach'], ['apples', 'oranges'], ['Hawaiian pizza', 'pepperoni pizza'], ['cold drinks', 'hot drinks']]);
+  if (b > N - 3) return TEMPLATES.act7Overlap(r);
+  if (kind === 0) return aq3Mc(r, D(both / N), [D(a / N), D(b / N), D((a + b) / N / 2), D((a - both) / N)].filter((x) => x !== D(both / N)), (i) => D(both / N + 0.03 * (i + 1)), 'Overlapping events',
+    `Out of ${N} people who like ${X} or ${Y} or both, ${a} like ${X} and ${b} like ${Y}. If a person is selected at random from the ${N} people surveyed, what is the probability that the person likes both? (Round to the nearest hundredth.)`,
+    `Both = ${a} + ${b} − ${N} = ${both}. P = ${both}/${N} ≈ ${D(both / N)}`);
+  if (kind === 1) return aq3Mc(r, D((a - both) / N), [D(a / N), D(both / N), D((b - both) / N)].filter((x) => x !== D((a - both) / N)), (i) => D((a - both) / N + 0.04 * (i + 1)), 'Overlapping events',
+    `${N} people were surveyed about two choices. ${a} chose ${X}, ${b} chose ${Y}, and ${both} chose both. Everyone chose at least one. What is the probability that a person chosen at random ONLY chose ${X}? (Round to the nearest hundredth.)`,
+    `Only ${X}: ${a} − ${both} = ${a - both}. P = ${a - both}/${N} ≈ ${D((a - both) / N)}`);
+  const nei = ri(r, 2, 8), N2 = a + b - both + nei, onlyY = b - both, ans = aq7F(onlyY, b);
+  return aq3Mc(r, ans, [aq7F(both, b), aq7F(onlyY, N2), aq7F(nei, N2), aq7F(onlyY, a)].filter((x) => x !== ans), () => null, 'Conditional probability',
+    `John asked ${N2} people whether they like ${X} or ${Y}: ${a} like ${X}, ${b} like ${Y}, ${both} like both, and ${nei} like neither. John picked one person at random. Given that the person likes ${Y}, find the probability that they don't like ${X}.`,
+    `Given ${Y}: ${b} people. Of these, ${b} − ${both} = ${onlyY} don't like ${X}: ${onlyY}/${b} = ${ans}`);
+};
+TEMPLATES.act7DieCoin = (r) => {
+  const n = pick(r, [6, 8, 10]), k = ri(r, 1, n), heads = r() < 0.5, ans = aq7F(1, 2 * n);
+  return aq3Mc(r, ans, [aq7F(1, n), '1/2', aq7F(1, n + 2), aq7F(n + 1, 2 * n)].filter((x) => x !== ans), () => null, 'Independent events',
+    `You roll a ${n}-sided die numbered 1 through ${n} and flip a coin at the same time. What is the probability that you roll a ${k} on the die and get ${heads ? 'heads' : 'tails'} on the coin?`,
+    `Independent: 1/${n} × 1/2 = 1/${2 * n}`);
+};
+TEMPLATES.act7NonOfficer = (r) => {
+  const n = ri(r, 12, 24), k = ri(r, 3, 6), off = r() < 0.3, ans = off ? '0' : `1/${n - k}`;
+  return aq3Mc(r, ans, ['0', `1/${n}`, `1/${n - k}`, `1/${k}`, `${k}/${n}`].filter((x) => x !== ans).slice(0, 3), (i) => `1/${n - k + i + 1}`, 'Probability',
+    `A ${n}-member committee has ${k} officers. The committee needs a non-officer to take notes during the meetings and decides to select one of the non-officers at random. If Jhanica is ${off ? 'an officer' : 'a member of the committee but NOT an officer'}, what is the probability that she will be selected to take notes?`,
+    off ? 'Only non-officers can be selected, so the probability is 0.' : `There are ${n} − ${k} = ${n - k} non-officers, and she is one of them: 1/${n - k}`);
+};
+TEMPLATES.act7TwoWay = (r) => {
+  const t = [[ri(r, 5, 20), ri(r, 3, 10), ri(r, 3, 10)], [ri(r, 3, 10), ri(r, 8, 20), ri(r, 8, 20)], [ri(r, 3, 10), ri(r, 3, 10), ri(r, 10, 25)]], R = t.map((x) => x.reduce((a, b) => a + b, 0)), Cc = [0, 1, 2].map((j) => t[0][j] + t[1][j] + t[2][j]), N = R.reduce((a, b) => a + b, 0);
+  const i = ri(r, 0, 2), j = ri(r, 0, 2), rows = ['Undeclared', 'Business', 'Science'], cols = ['Sophomore', 'Junior', 'Senior'], v = (R[i] + Cc[j] - t[i][j]) / N, D = (x) => aq7D(x);
+  return aq3Mc(r, D(v), [D((R[i] + Cc[j]) / N), D(t[i][j] / N), D(R[i] / N), D(Cc[j] / N)].filter((x) => x !== D(v)), (k) => D(v + 0.03 * (k + 1)), 'Two-way tables',
+    `Data were collected on ${N} students regarding their class and major. The data are summarized in the table below. What is the probability of randomly selecting a ${cols[j].toLowerCase()} or a${rows[i] === 'Undeclared' ? 'n' : ''} ${rows[i].toLowerCase()} ${rows[i] === 'Undeclared' ? '' : 'major'} student? (Round to the nearest hundredth.)`.replace('  ', ' ').replace(' student', ' student'),
+    `P(A or B) = P(A) + P(B) − P(A and B) = (${Cc[j]} + ${R[i]} − ${t[i][j]})/${N} = ${R[i] + Cc[j] - t[i][j]}/${N} ≈ ${D(v)}`,
+    { draw: aq7Table([['', ...cols, 'Total'], ...t.map((x, k) => [rows[k], ...x.map(String), String(R[k])]), ['Total', ...Cc.map(String), String(N)]]), size: [440, 160] });
+};
+TEMPLATES.act7Walk = (r) => {
+  const g = pick(r, [18, 27, 36]), b = pick(r, [12, 16, 20]), [gn, gd] = pick(r, [[2, 9], [1, 3], [4, 9]]), [bn, bd] = pick(r, [[1, 4], [3, 4], [1, 2]]), wg = (g * gn) / gd, wb = (b * bn) / bd, ans = aq7F(wb, wg + wb);
+  return aq3Mc(r, ans, [aq7F(wb, g + b), aq7F(wg, wg + wb), aq7F(b, g + b), aq7F(bn * bd, gd * bd)].filter((x) => x !== ans), () => null, 'Conditional probability',
+    `There are ${g} girls and ${b} boys in a class. ${gn}/${gd} of the girls and ${bn}/${bd} of the boys walk to school. One of the students who walks to school is chosen at random. Find the probability that the student is a boy.`,
+    `Girls who walk: ${gn}/${gd} × ${g} = ${wg}. Boys who walk: ${bn}/${bd} × ${b} = ${wb}.\nP(boy | walks) = ${wb}/${wg + wb} = ${ans}`);
+};
+TEMPLATES.act7Concept = (r) => {
+  const Q = pick(r, [
+    ['If A and B are independent events, which of the following statements is correct?', 'P(A | B) = P(A)', ['P(AB) = 0', 'P(AB) = P(A) + P(B)', 'P(A | B) = P(B)'], 'Independent means knowing B happened does not change the probability of A: P(A | B) = P(A).'],
+    ['If A and B are mutually exclusive (disjoint) events, which of the following is correct?', 'P(A and B) = 0', ['P(A and B) = P(A) · P(B)', 'P(A or B) = P(A) · P(B)', 'P(A | B) = P(A)'], 'Disjoint events cannot happen together, so P(A and B) = 0.'],
+    ['Which situation illustrates a combination?', 'Picking 6 balls from a basket of 13 balls', ['Four people lining up to pose for a picture', 'Assembling a jigsaw puzzle', 'Choosing first, second, and third place winners'], 'In a combination, order does not matter. Picking 6 balls is the same no matter what order they are picked.'],
+    ['Which situation illustrates a permutation?', 'Choosing a president, vice president, and secretary', ['Choosing 3 people for a committee', 'Picking 5 cards for a hand', 'Choosing 2 toppings for a pizza'], 'In a permutation, order matters. Each office is a different position.'],
+    ['If P(A) = 0.4 and P(B) = 0.6, and A and B are independent, how do you find P(not A and not B)?', 'P(Ā ∩ B̄) = 0.6 × 0.4 = 0.24', ['P(Ā ∩ B̄) = 1 − 0.4 − 0.6 = 0', 'P(Ā ∪ B̄) = 0.6 + 0.4 = 1', 'P(Ā ∩ B̄) = 0.4 × 0.6 × 2 = 0.48'], 'P(not A) = 0.6 and P(not B) = 0.4. Independent: 0.6 × 0.4 = 0.24.'],
+    ['If A and B are events with P(A) ≠ 0 and P(B | A) = 1, then:', 'A ⊂ B', ['B ⊂ A', 'B = ∅', 'A and B are disjoint'], 'P(B | A) = 1 means whenever A happens, B happens. So every outcome in A is in B: A ⊂ B.'],
+  ]);
+  return aq3Mc(r, Q[1], Q[2], () => null, 'Probability concepts', Q[0], Q[3]);
+};
+
+/* ===== 7.2 Sets and Venn diagrams ===== */
+TEMPLATES.act7SetOps = (r) => {
+  const U = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], mk = (k) => shuffle(r, U).slice(0, k).sort((a, b) => a - b), A = mk(ri(r, 3, 5)), B = mk(ri(r, 3, 5)), C = mk(ri(r, 3, 5));
+  const I = (X, Y) => X.filter((x) => Y.includes(x)), Un = (X, Y) => [...new Set([...X, ...Y])], M = (X, Y) => X.filter((x) => !Y.includes(x));
+  const ops = [['A ∪ (B ∩ C)', () => Un(A, I(B, C)), () => I(Un(A, B), C)], ['A ∩ (B ∪ C)', () => I(A, Un(B, C)), () => Un(I(A, B), C)], ['A − (B ∩ C)', () => M(A, I(B, C)), () => I(M(A, B), C)], ['(A ∩ B) ∪ C', () => Un(I(A, B), C), () => I(A, Un(B, C))], ['A ∩ B', () => I(A, B), () => Un(A, B)], ['(A ∪ B) − C', () => M(Un(A, B), C), () => M(C, Un(A, B))]];
+  const [name, f, g] = pick(r, ops), ans = aq7Set(f());
+  return aq3Mc(r, ans, [aq7Set(g()), aq7Set(I(A, B)), aq7Set(Un(B, C)), aq7Set(A), aq7Set(I(B, C))].filter((x) => x !== ans), (i) => aq7Set([...f(), 11 + i]), 'Set operations',
+    `If A = ${aq7Set(A)}, B = ${aq7Set(B)}, and C = ${aq7Set(C)}, then ${name} is equal to:`,
+    `Work inside the parentheses first.\nA ∩ B = ${aq7Set(I(A, B))},  B ∩ C = ${aq7Set(I(B, C))},  B ∪ C = ${aq7Set(Un(B, C))}\n${name} = ${ans}`);
+};
+TEMPLATES.act7Venn3 = (r) => {
+  const v = Array.from({ length: 7 }, () => ri(r, 1, 12)), out = ri(r, 2, 15), qs = [['A ∩ B ∩ Cᶜ', v[3], 'in A and B but not C'], ['A ∩ C ∩ Bᶜ', v[4], 'in A and C but not B'], ['A ∩ Bᶜ ∩ Cᶜ', v[0], 'in A only'], ['A ∩ B', v[3] + v[6], 'in both A and B (with or without C)'], ['A ∪ B', v[0] + v[1] + v[3] + v[4] + v[5] + v[6], 'in A or B (or both)'], ['(A ∪ B ∪ C)ᶜ', out, 'outside all three circles']];
+  const [nm, ans, why] = pick(r, qs);
+  return aq3Mc(r, String(ans), [String(v[6]), String(v[3] + v[6]), String(v[0]), String(v[4]), String(ans + v[6])].filter((x) => x !== String(ans)), (i) => String(ans + i + 1), 'Venn diagrams',
+    `The Venn diagram below shows the number of elements in each region. Find the number of elements in ${nm}.`,
+    `${nm} means the elements ${why}: ${ans}`, { draw: aq7Venn({ names: ['A', 'B', 'C'], r: v, out }), size: [360, 330] });
+};
+TEMPLATES.act7Venn2 = (r) => {
+  const kind = ri(r, 0, 2), both = ri(r, 4, 20), x = ri(r, 10, 40), y = x > 25 ? x - ri(r, 3, 15) : x + ri(r, 3, 15), out = kind === 0 ? ri(r, 2, 10) : 0, N = x + y + both + out;
+  if (kind === 0) { const ans = `x = ${x}, y = ${y}`;
+    return aq3Mc(r, ans, [`x = ${y}, y = ${x}`, `x = ${x + both}, y = ${y + both}`, `x = ${x - out}, y = ${y - out}`], () => null, 'Venn diagrams',
+      `There are ${N} students in Year 8. ${both} students study French (F) and German (G). ${y + both} students study French, ${x + both} students study German, and ${out} students study neither. Complete the Venn diagram by finding x and y.`,
+      `x = German only = ${x + both} − ${both} = ${x}\ny = French only = ${y + both} − ${both} = ${y}\nCheck: ${x} + ${both} + ${y} + ${out} = ${N}`, { draw: aq7Venn({ names: ['G', 'F'], r: ['x', both, 'y'], out }), size: [340, 240] }); }
+  if (kind === 1) { const [X, Y] = pick(r, [['cold drinks', 'hot drinks'], ['math', 'English'], ['soccer', 'basketball']]);
+    return aq3Mc(r, String(both), [String(N), String(x), String(x + y)], (i) => String(both + i + 1), 'Venn diagrams',
+      `In a group of ${N} people, ${x + both} like ${X} and ${y + both} like ${Y}, and each person likes at least one of the two. How many people like both?`,
+      `Both = ${x + both} + ${y + both} − ${N} = ${both}`); }
+  const ans = N - (x + both);
+  return aq3Mc(r, String(ans + out), [String(x), String(y), String(x + both)].filter((t) => t !== String(ans + out)), (i) => String(ans + i + 3), 'Venn diagrams',
+    `A survey was conducted among ${N + out} people about how they like to travel. The results are shown in the Venn diagram below. How many people don't like to fly in an airplane?`,
+    `People who like planes: ${x} + ${both} = ${x + both}. Everyone else: ${N + out} − ${x + both} = ${ans + out}`, { draw: aq7Venn({ names: ['plane', 'car'], r: [x, both, y], out: out || '' }), size: [340, 240] });
+};
+TEMPLATES.act7Inclusion3 = (r) => {
+  const v = Array.from({ length: 7 }, () => ri(r, 2, 10)), A = v[0] + v[3] + v[4] + v[6], B = v[1] + v[3] + v[5] + v[6], C = v[2] + v[4] + v[5] + v[6], AB = v[3] + v[6], AC = v[4] + v[6], BC = v[5] + v[6], ABC = v[6], U = A + B + C - AB - AC - BC + ABC;
+  return aq3Mc(r, String(U), [String(A + B + C), String(A + B + C - AB - AC - BC), String(U + ABC)], (i) => String(U + 2 + i), 'Inclusion–exclusion',
+    `In a survey, ${A} people read English newspapers, ${B} read Hindi newspapers, and ${C} read regional language newspapers. ${AB} read both English and Hindi, ${BC} read both Hindi and regional, ${AC} read both English and regional, and ${ABC} read all three. Everyone surveyed reads at least one. How many people were surveyed?`,
+    `n(A ∪ B ∪ C) = n(A) + n(B) + n(C) − n(A∩B) − n(B∩C) − n(A∩C) + n(A∩B∩C)\n= ${A} + ${B} + ${C} − ${AB} − ${BC} − ${AC} + ${ABC} = ${U}`);
+};
+TEMPLATES.act7Subsets = (r) => {
+  if (r() < 0.5) { const n = ri(r, 4, 7), X = shuffle(r, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).slice(0, n), k = ri(r, 1, Math.min(3, n - 1)), Xs = X.slice(0, n - k + 1), Ys = [...X.slice(n - k), ...X.slice(0, 0)], T = 2 ** n;
+    const Ya = X.slice(n - k - 1); const Xa = X.slice(0, n - k);
+    return aq3Mc(r, String(T - 1), [String(T), String(n * n), String(2 ** (n - 1)), String(T - 2)], () => null, 'Subsets',
+      `If X = ${aq7Set(Xa)} and Y = ${aq7Set(Ya)}, find the number of proper subsets of X ∪ Y.`,
+      `X ∪ Y = ${aq7Set(X)} has ${n} elements. It has 2${aq3Sup(n)} = ${T} subsets; all but X ∪ Y itself are proper: ${T - 1}`); }
+  const m = ri(r, 2, 3), n = ri(r, 2, 3), e = m * n;
+  return aq3Mc(r, `2${aq3Sup(e)}`, [`2${aq3Sup(m + n)}`, `2${aq3Sup(m)}`, `${m}${aq3Sup(n)}`, `2${aq3Sup(e - 1)}`].filter((x) => x !== `2${aq3Sup(e)}`), (i) => `${3 + i}${aq3Sup(e)}`, 'Relations',
+    `If A has ${m} elements and B has ${n} elements, how many relations are there from A to B?`, `A × B has ${m} × ${n} = ${e} ordered pairs. A relation is any subset of A × B: 2${aq3Sup(e)}`);
+};
+TEMPLATES.act7VennRead = (r) => {
+  const v = Array.from({ length: 7 }, () => ri(r, 3, 35)), out = ri(r, 5, 15), D = v[0] + v[3] + v[4] + v[6], B = v[1] + v[3] + v[5] + v[6], Cc = v[2] + v[4] + v[5] + v[6], N = v.reduce((a, b) => a + b, 0) + out;
+  const qs = [['likes a dog', D], ['likes a bird', B], ['likes a cat', Cc], ['likes a dog or a cat', N - out - v[1]], ['likes a bird or a cat', N - out - v[0]], ['likes none of the three pets', out]];
+  const [q, ans] = pick(r, qs);
+  return aq3Mc(r, String(ans), qs.map((x) => String(x[1])).filter((x) => x !== String(ans)).slice(0, 3), (i) => String(ans + i + 2), 'Venn diagrams',
+    `${N} students were asked if they like a dog (D), a bird (B), or a cat (C) as a pet. The results are shown in the Venn diagram below. How many students ${q.replace('likes', 'like')}?`,
+    `Add every region that is part of “${q}”: ${ans}`, { draw: aq7Venn({ names: ['D', 'B', 'C'], r: v, out }), size: [360, 330] });
+};
+
+/* ===== 7.3 Mean, median, mode, and spread ===== */
+TEMPLATES.act7Needed = (r) => {
+  const n = pick(r, [4, 4, 5]), avg = ri(r, 75, 88), S = Array.from({ length: n }, () => ri(r, avg - 12, avg + 10)), need = avg * (n + 1) - S.reduce((a, b) => a + b, 0);
+  if (need > 100 || need < 50) return TEMPLATES.act7Needed(r);
+  return aq3Mc(r, String(need), [String(avg), String(Math.round(aq7Mean(S))), String(need + 5), String(need - 4)].filter((x) => x !== String(need)), (i) => String(need + 7 + i), 'Mean',
+    `Andrew wants an average of ${avg} for the grading period. There are ${n + 1} equally weighted assignments. If his scores on the first ${n} assignments are ${S.join(', ')}, what must he score on the last assignment?`,
+    `Needed total: ${avg} × ${n + 1} = ${avg * (n + 1)}. So far: ${S.join(' + ')} = ${S.reduce((a, b) => a + b, 0)}.\nLast score: ${avg * (n + 1)} − ${S.reduce((a, b) => a + b, 0)} = ${need}`);
+};
+TEMPLATES.act7MMM = (r) => {
+  const kind = ri(r, 0, 3);
+  for (;;) {
+    const n = pick(r, [6, 7, 8]), D = Array.from({ length: n }, () => ri(r, 1, 30)); if (kind === 1) D[ri(r, 0, n - 1)] = D[0];
+    const m = aq7Mean(D), md = aq7Med(D), mo = aq7Modes(D);
+    if (kind === 0) { if (!Number.isInteger(md * 2)) continue;
+      return aq3Mc(r, fmt(md), [fmt(D[Math.floor(n / 2)]), fmt(aq4R(m)), fmt([...D].sort((a, b) => a - b)[Math.floor(n / 2)])].filter((x) => x !== fmt(md)), (i) => fmt(md + i + 1), 'Median',
+        `Find the median of the following data: ${D.join(', ')}.`, `Order the data: ${[...D].sort((a, b) => a - b).join(', ')}.\n${n % 2 ? 'The middle value' : 'The mean of the two middle values'} is ${fmt(md)}.`); }
+    if (kind === 1) { if (mo.length !== 1 || !Number.isInteger(m)) continue; const v = m + mo[0];
+      return aq3Mc(r, fmt(v), [fmt(m), fmt(mo[0] + md), fmt(m + Math.max(...D))].filter((x) => x !== fmt(v)), (i) => fmt(v + i + 1), 'Mean and mode',
+        `What is the sum of the mean and mode for the set {${D.join(', ')}}?`, `Mean: ${D.reduce((a, b) => a + b, 0)} ÷ ${n} = ${fmt(m)}. Mode: ${mo[0]}. Sum: ${fmt(v)}`); }
+    if (kind === 2) { const v = Math.abs(md - m); if (!Number.isInteger(v * 4) || v === 0) continue;
+      return aq3Mc(r, fmt(v), [fmt(aq4R(m)), fmt(md), fmt(v + 1)].filter((x) => x !== fmt(v)), (i) => fmt(v + 2 + i), 'Mean and median',
+        `Derrick has quiz scores of ${D.join(', ')}. What is the difference between his median score and his mean score?`, `Mean: ${D.reduce((a, b) => a + b, 0)} ÷ ${n} = ${fmt(m)}. Median: ${fmt(md)}. Difference: ${fmt(v)}`); }
+    const E = Array.from({ length: 5 }, () => ri(r, 200, 260) / 10), v = aq7Mean(E) + aq7Med(E), F = (x) => x.toFixed(2);
+    return aq3Mc(r, F(v), [F(aq7Mean(E)), F(2 * aq7Med(E)), F(v + 0.1)], (i) => F(v + 0.3 + 0.2 * i), 'Mean and median',
+      `Jeanette wants an accurate reading on how many miles per gallon her car gets. She does 5 trials and finds that her car gets ${E.map((x) => x.toFixed(1)).join(', ')} miles per gallon. What is the sum of the median and mean of the 5 trials?`,
+      `Mean: ${F(aq7Mean(E))}. Median: ${aq7Med(E).toFixed(1)}. Sum: ${F(v)}`);
+  }
+};
+TEMPLATES.act7StemLeaf = (r) => {
+  const kind = ri(r, 0, 2);
+  for (;;) {
+    const n = pick(r, [9, 11, 13]), D = Array.from({ length: n }, () => ri(r, 52, 98)); if (kind === 1) { D[1] = D[0]; D[2] = D[0]; }
+    const rows = a8stemRows(D), md = aq7Med(D), m = aq7Mean(D), mo = aq7Modes(D), key = `Key: ${Math.floor(D[0] / 10)} | ${D[0] % 10} = ${D[0]}`, sz = { size: [320, 60 + 26 * rows.length + 40] };
+    if (kind === 0) return aq3Mc(r, String(md), [fmt(Math.round(m * 10) / 10), String(D[Math.floor(n / 2)]), String(md + 1)].filter((x) => x !== String(md)), (i) => String(md + 2 + i), 'Stem-and-leaf plots',
+      `The stem-and-leaf plot below shows the grades for a test in a science class. Andrew's score is the median score for the class. What grade did Andrew make on the test?`,
+      `There are ${n} scores, so the median is the ${(n + 1) / 2}th score in order: ${md}`, { draw: a8stemDraw(rows, key), ...sz });
+    if (kind === 1) { if (mo.length !== 1 || !Number.isInteger(m)) continue; const v = m - mo[0];
+      return aq3Mc(r, fmt(Math.abs(v)), [fmt(Math.abs(md - mo[0])), fmt(Math.abs(v) + 2), fmt(Math.abs(m - md))].filter((x) => x !== fmt(Math.abs(v))), (i) => fmt(Math.abs(v) + 3 + i), 'Stem-and-leaf plots',
+        `The stem-and-leaf plot below shows the temperature, in degrees Fahrenheit, taken at various times during a day. What is the difference, in degrees Fahrenheit, between the mean temperature and the mode for that day?`,
+        `Mean: ${D.reduce((a, b) => a + b, 0)} ÷ ${n} = ${m}. Mode: ${mo[0]}. Difference: ${fmt(Math.abs(v))}`, { draw: a8stemDraw(rows, key), ...sz }); }
+    const tgt = Math.round(m), miss = D.length; const D2 = [...D]; const need = tgt * (n + 1) - D.reduce((a, b) => a + b, 0);
+    if (need < 50 || need > 99 || mo.length) continue;
+    return aq3Mc(r, String(need), [String(tgt), String(md), String(need + 4)].filter((x) => x !== String(need)), (i) => String(need + 5 + i), 'Stem-and-leaf plots',
+      `The stem-and-leaf plot below shows ${n} of a student's grades for a grading period. There is one more grade to come, and every grade carries equal weight. What must the last grade be for the average to be ${tgt}?`,
+      `Needed total: ${tgt} × ${n + 1} = ${tgt * (n + 1)}. Sum so far: ${D.reduce((a, b) => a + b, 0)}. Last grade: ${need}`, { draw: a8stemDraw(rows, key), ...sz });
+  }
+};
+TEMPLATES.act7Weighted = (r) => {
+  for (;;) {
+    const x = Array.from({ length: 5 }, () => ri(r, 10, 20)), w = Array.from({ length: 5 }, () => pick(r, [5, 10, 12, 15, 20, 25, 30])), W = w.reduce((a, b) => a + b, 0), S = x.reduce((a, xi, i) => a + xi * w[i], 0), m = S / W;
+    if (!Number.isInteger(m * 10)) continue;
+    return aq3Mc(r, fmt(m), [fmt(aq7Mean(x)), fmt(m + 2), fmt(aq4R(S / 5 / 10))].filter((t) => t !== fmt(m)), (i) => fmt(m - 1 - i), 'Weighted mean',
+      'Compute the weighted mean for the following data.', `Σ(x·w) = ${x.map((xi, i) => `${xi}·${w[i]}`).join(' + ')} = ${S}\nΣw = ${W}\nWeighted mean = ${S} ÷ ${W} = ${fmt(m)}`,
+      { draw: aq7Table([['xᵢ', 'Weight (w)'], ...x.map((xi, i) => [String(xi), String(w[i])])]), size: [260, 200] });
+  }
+};
+TEMPLATES.act7Combined = (r) => {
+  if (r() < 0.5) { const b = ri(r, 1, 3), g = ri(r, 1, 3), mb = ri(r, 70, 82), d = ri(r, 2, 6) * (b + g) / gcd(b + g, 1), mg = mb + d, M = (b * mb + g * mg) / (b + g);
+    if (!Number.isInteger(M) || gcd(b, g) !== 1 || b === g) return TEMPLATES.act7Combined(r);
+    return aq3Mc(r, `${b}:${g}`, [`${g}:${b}`, '1:1', `${b + 1}:${g}`, `${b}:${g + 1}`].filter((x) => x !== `${b}:${g}`), () => null, 'Combined means',
+      `The average test score for all the students in a class is ${M}. The average score of the b boys in the class was ${mb}, while that of the g girls was ${mg}. What is the ratio of b to g?`,
+      `${mb}b + ${mg}g = ${M}(b + g)  →  ${mg - M}g = ${M - mb}b  →  b/g = ${mg - M}/${M - mb} = ${b}/${g}`); }
+  const nb = ri(r, 20, 60), ng = 100 - nb, mb = ri(r, 28, 40), mg = ri(r, 30, 45), M = (nb * mb + ng * mg) / 100;
+  return aq3Mc(r, fmt(M), [fmt((mb + mg) / 2), fmt(aq4R((nb * mg + ng * mb) / 100)), fmt(M + 1.5)].filter((x) => x !== fmt(M)), (i) => fmt(M - 1 - i), 'Combined means',
+    `The mean score of ${nb} boys is ${mb}, and the mean score of ${ng} girls in the same class is ${mg}. What is the mean score of all 100 students?`,
+    `(${nb}(${mb}) + ${ng}(${mg}))/(${nb} + ${ng}) = ${nb * mb + ng * mg}/100 = ${fmt(M)}`);
+};
+TEMPLATES.act7SDCompare = (r) => {
+  const big = r() < 0.7, b = ri(r, 2, 9) * 100, sets = [Array.from({ length: 5 }, () => b), [1, 2, 3, 4, 5].map((k) => ri(r, 2, 6) + k), [0, 1, 2, 3, 4].map((k) => aq4R(b + 0.5 + k / 10)), [ri(r, 300, 305), ri(r, 30, 40), ri(r, 300, 310), ri(r, 30, 40), ri(r, 300, 310)]];
+  const T = sets.map((s) => s.map(fmt).join(', ')), sd = sets.map(aq7SD), want = big ? sd.indexOf(Math.max(...sd)) : sd.indexOf(Math.min(...sd));
+  return aq3Mc(r, T[want], T.filter((_, i) => i !== want), () => null, 'Standard deviation',
+    `Which of the following data sets has the ${big ? 'largest' : 'smallest'} standard deviation?`,
+    big ? `Standard deviation measures spread. ${T[want]} is split between values far apart, so it spreads the most.` : `All the values in ${T[want]} are the same, so its standard deviation is 0.`);
+};
+TEMPLATES.act7DistMean = (r) => {
+  for (;;) {
+    const P = [ri(r, 5, 15), ri(r, 40, 65), ri(r, 10, 30), ri(r, 2, 8)]; P.push(100 - P.reduce((a, b) => a + b, 0)); if (P[4] < 1 || P[4] > 10) continue;
+    const p = P.map((x) => x / 100), m = p.reduce((a, q, i) => a + q * i, 0), sd = Math.sqrt(p.reduce((a, q, i) => a + q * (i - m) ** 2, 0)), T = (a, s) => `mean: ${a.toFixed(2)}; sd: ${s.toFixed(2)}`;
+    return aq3Mc(r, T(m, sd), [T(m, sd * sd), T(2, sd), T(m + 0.07, sd)], () => null, 'Probability distributions',
+      'The random variable x represents the number of credit cards that adults have, with the probabilities shown in the table below. Find the mean and standard deviation.',
+      `Mean: Σx·P(x) = ${p.map((q, i) => `${i}(${fmt(q)})`).join(' + ')} = ${m.toFixed(2)}\nVariance: Σ(x − μ)²·P(x) ≈ ${(sd * sd).toFixed(4)}, so sd ≈ ${sd.toFixed(2)}`,
+      { draw: aq7Table([['x', 'P(x)'], ...p.map((q, i) => [String(i), q.toFixed(2)])]), size: [260, 200] });
+  }
+};
+TEMPLATES.act7AddValue = (r) => {
+  const n = ri(r, 10, 20), m = ri(r, 25, 40), v = ri(r, 10, 30), nm = (n * m + v) / (n + 1), F = (x) => x.toFixed(2);
+  return aq3Mc(r, F(nm), [F((m + v) / 2), F(m), F((n * m + v) / n)].filter((x) => x !== F(nm)), (i) => F(nm + 0.5 * (i + 1)), 'Mean',
+    `A data set has n = ${n} values with a mean of ${m}. If the number ${v} is included as an additional data value, compute the new mean.`,
+    `Sum: ${n} × ${m} = ${n * m}. New sum: ${n * m + v}. New mean: ${n * m + v} ÷ ${n + 1} ≈ ${F(nm)}`);
+};
+TEMPLATES.act7ModeK = (r) => {
+  const mode = ri(r, 4, 9), k = ri(r, 1, 4), a = pick(r, [2, 3]), b = mode - a * k, base = shuffle(r, [3, 8, 6, 1, 10, 6, 9, 13, 2, 11].filter((x) => x !== mode)).slice(0, 7);
+  const cnt = {}; base.forEach((x) => { cnt[x] = (cnt[x] || 0) + 1; }); const D = shuffle(r, [...base, mode, mode]); D.splice(ri(r, 1, D.length - 1), 0, `${a}k ${b < 0 ? MINUS : '+'} ${Math.abs(b)}`);
+  if (Object.values(cnt).some((c) => c >= 2) || b === 0) return TEMPLATES.act7ModeK(r);
+  return aq3Mc(r, String(k), [String(mode), String(k + 1), String(Math.max(0, k - 1) || k + 2)].filter((x) => x !== String(k)), (i) => String(k + 3 + i), 'Mode',
+    `If the mode of the following data is ${mode}, then what is the value of k in the data set ${D.join(', ')}?`,
+    `${mode} appears twice. For ${mode} to be the mode, ${a}k ${b < 0 ? MINUS : '+'} ${Math.abs(b)} must also equal ${mode}: ${a}k = ${mode - b}  →  k = ${k}`);
+};
+TEMPLATES.act7AvgSpeed = (r) => {
+  const t1 = ri(r, 2, 5), s1 = pick(r, [30, 40, 50, 60]), t2 = ri(r, 1, 4), s2 = pick(r, [45, 55, 65, 70]), v = (t1 * s1 + t2 * s2) / (t1 + t2);
+  if (!Number.isInteger(v) || s1 === s2) return TEMPLATES.act7AvgSpeed(r);
+  return aq3Mc(r, `${v} miles per hour`, [`${(s1 + s2) / 2} miles per hour`, `${s1} miles per hour`, `${s2} miles per hour`, `${v + 5} miles per hour`].filter((x) => x !== `${v} miles per hour`), (i) => `${v + 7 + i} miles per hour`, 'Weighted averages',
+    `Miss Smith drives ${t1} hours at an average speed of ${s1} miles per hour. Then she drives ${t2} hours at a speed of ${s2} miles per hour. What is her average speed for the whole trip?`,
+    `Total distance: ${t1}(${s1}) + ${t2}(${s2}) = ${t1 * s1 + t2 * s2} miles. Total time: ${t1 + t2} hours.\nAverage speed: ${t1 * s1 + t2 * s2} ÷ ${t1 + t2} = ${v} mph`);
+};
+TEMPLATES.act7Predict = (r) => {
+  const n = pick(r, [5, 6, 7, 8, 10]), f = ri(r, 1, n - 2), N = n * ri(r, 3, 8), ans = (N * (n - f)) / n;
+  return aq3Mc(r, String(ans), [String((N * f) / n), String(N - f), String(N - n)].filter((x) => x !== String(ans)), (i) => String(ans + 2 + i), 'Predictions',
+    `Jason asked ${n} of his classmates if they passed or failed the most recent test. ${f} of the ${n} said they failed. How many students can Jason predict passed the test if the class has ${N} students?`,
+    `${n - f} of ${n} passed. ${n - f}/${n} × ${N} = ${ans}`);
+};
+TEMPLATES.act7Skew = (r) => {
+  const kind = ri(r, 0, 2), base = [12, 38, 27, 20, 3, 2, 1], vals = kind === 0 ? base : kind === 1 ? [...base].reverse() : [3, 10, 25, 38, 25, 10, 3], ans = ['mean > median', 'mean < median', 'mean ≈ median'][kind];
+  return aq3Mc(r, ans, ['mean > median', 'mean < median', 'mean ≈ median', 'mean = 0'].filter((x) => x !== ans), () => null, 'Shapes of distributions',
+    'The histogram below represents the lifespan of a random sample of a particular type of insect. Identify the relationship between the mean and median.',
+    [`The histogram is skewed right (long tail to the right). The few large values pull the mean up: mean > median.`, `The histogram is skewed left (long tail to the left). The few small values pull the mean down: mean < median.`, 'The histogram is symmetric, so the mean and median are about the same.'][kind],
+    { draw: b9barDraw({ labels: ['0–2', '2–4', '4–6', '6–8', '8–10', '10–12', '12–14'], vals, ylab: 'frequency', xlab: 'days', gap: 0 }), size: [400, 240] });
+};
+TEMPLATES.act7MeanShift = (r) => {
+  const n = pick(r, [4, 5, 6, 8]), [p, q] = pick(r, [[1, 3], [1, 2], [2, 3], [1, 4]]), d = `${p}/${q}`;
+  return aq3Mc(r, `The sum of the ${n} numbers must increase by ${aq7F(n * p, q)}.`, [`The sum of the ${n} numbers must increase by ${d}.`, `The sum of the ${n} numbers must increase by ${aq7F(p, n * q)}.`, `Each of the ${n} numbers must increase by ${aq7F(n * p, q)}.`], () => null, 'Mean',
+    `Suppose the mean of ${n} numbers increases by ${d}. Which of the following must be true?`, `Sum = ${n} × mean. If the mean goes up by ${d}, the sum goes up by ${n} × ${d} = ${aq7F(n * p, q)}.`);
+};
+
+/* ===== 7.4 Charts ===== */
+TEMPLATES.act7PieCount = (r) => {
+  const sm = pick(r, [3, 4, 5]), tx = pick(r, [6, 8, 10]), bus = pick(r, [20, 22, 24, 25]), car = 100 - sm - tx - bus, k = ri(r, 3, 15) * (100 / gcd(100, sm)) / (100 / gcd(100, sm)), N = (100 / gcd(100, sm)) * ri(r, 3, 15), w = (N * sm) / 100, ans = (N * car) / 100;
+  return aq3Mc(r, aq7Comma(ans), [aq7Comma(N), aq7Comma(N - ans), aq7Comma((N * bus) / 100)].filter((x) => x !== aq7Comma(ans)), (i) => aq7Comma(ans + 10 * (i + 1)), 'Circle graphs',
+    `The circle graph below shows the results of a survey of how people get to work each day. If ${w} people who were surveyed walked to work, how many people from the survey drove a car to work?`,
+    `${w} people is ${sm}% of the survey, so the survey had ${w} ÷ ${fmt(sm / 100)} = ${N} people.\nCar: ${car}% of ${N} = ${ans}`,
+    { draw: aq7Pie([['car', car / 100], ['walk', sm / 100], ['bus', bus / 100], ['taxi', tx / 100]], 'How people get to work'), size: [380, 260] });
+};
+TEMPLATES.act7PieOdds = (r) => {
+  const P = [ri(r, 25, 35), ri(r, 10, 20), ri(r, 15, 25), ri(r, 8, 15)]; P.push(100 - P.reduce((a, b) => a + b, 0)); const L = ['comedy', 'action', 'horror', 'other', 'drama'];
+  const i = ri(r, 1, 3), j = 0, g = gcd(P[i], P[j]), ans = `${P[i] / g}:${P[j] / g}`, g2 = gcd(P[i], 100 - P[i]);
+  return aq3Mc(r, ans, [`${P[j] / g}:${P[i] / g}`, `${P[i] / g2}:${(100 - P[i]) / g2}`, `${P[i] / gcd(P[i], 100)}:${100 / gcd(P[i], 100)}`].filter((x) => x !== ans), (k) => `${P[i] / g + k + 1}:${P[j] / g}`, 'Circle graphs',
+    `The circle graph below shows the results of a survey of the movie genre people prefer. What are the odds of a person preferring ${L[i] === 'other' ? 'an “other” movie' : `a${L[i] === 'action' ? 'n' : ''} ${L[i]} movie`} to preferring comedy?`,
+    `Compare the two percents: ${P[i]} : ${P[j]} = ${ans}`, { draw: aq7Pie(L.map((l, k) => [l, P[k] / 100]), 'Movies people prefer'), size: [380, 260] });
+};
+TEMPLATES.act7BarFruit = (r) => {
+  const v = [ri(r, 1, 3), ri(r, 4, 9), ri(r, 3, 7), 0]; v[3] = 30 - v[0] - v[1] - v[2]; const L = ['grapes', 'oranges', 'bananas', 'apples'], [i, j] = pick(r, [[2, 3], [1, 3], [0, 1], [1, 2]]), s = v[i] + v[j], D = (x) => aq7D(x);
+  return aq3Mc(r, D(s / 30), [D(v[i] / 30), D(v[j] / 30), D(1 - s / 30)].filter((x) => x !== D(s / 30)), (k) => D(s / 30 + 0.05 * (k + 1)), 'Probability from a graph',
+    `Thirty people are surveyed to determine their preference for one of 4 fruits. The results are in the bar graph below. What is the probability that a person chosen at random prefers ${L[i]} or ${L[j]} as their preferred fruit? (Round to the nearest hundredth.)`,
+    `${L[i]}: ${v[i]}, ${L[j]}: ${v[j]}. (${v[i]} + ${v[j]})/30 = ${s}/30 ≈ ${D(s / 30)}`, { draw: b9barDraw({ labels: L, vals: v, ylab: 'people', title: 'Preferred fruit', show: true, gap: 22 }), size: [380, 250] });
+};
+TEMPLATES.act7BarChange = (r) => {
+  const yrs = [1996, 1997, 1998, 1999, 2000, 2001], v = yrs.map(() => ri(r, 4, 12)), k = ri(r, 1, 4), up = r() < 0.5;
+  if (v[k] === v[k + 1] || (up ? v[k + 1] < v[k] : v[k + 1] > v[k])) [v[k], v[k + 1]] = up ? [Math.min(v[k], v[k + 1]) || 4, Math.max(v[k], v[k + 1]) + (v[k] === v[k + 1] ? 2 : 0)] : [Math.max(v[k], v[k + 1]) + (v[k] === v[k + 1] ? 2 : 0), Math.min(v[k], v[k + 1])];
+  const ch = (Math.abs(v[k + 1] - v[k]) / v[k]) * 100, P = (x) => `${fmt(Math.round(x * 10) / 10)}%`;
+  return aq3Mc(r, P(ch), [P((Math.abs(v[k + 1] - v[k]) / v[k + 1]) * 100), P(Math.abs(v[k + 1] - v[k]) * 10), P(ch + 5)].filter((x) => x !== P(ch)), (i) => P(ch + 7 + i), 'Reading graphs',
+    `The bar graph below shows the production of Company A, in millions of units. What is the percent ${up ? 'increase' : 'decrease'} in production from ${yrs[k]} to ${yrs[k + 1]}? (Round to the nearest tenth of a percent.)`,
+    `Change: ${v[k + 1]} − ${v[k]} = ${fmt(v[k + 1] - v[k])}. Divide by the starting value: ${Math.abs(v[k + 1] - v[k])}/${v[k]} ≈ ${P(ch)} ${up ? 'increase' : 'decrease'}`,
+    { draw: b9barDraw({ labels: yrs.map(String), vals: v, ylab: 'million units', title: 'Company A production', show: true, gap: 16 }), size: [400, 250] });
+};
+TEMPLATES.act7Scatter = (r) => {
+  const pts = []; const same = ri(r, 2, 5); while (pts.length < same) { const x = ri(r, 1, 9); if (!pts.some((p) => p[0] === x && p[1] === x)) pts.push([x, x]); }
+  while (pts.length < 10) { const x = ri(r, 1, 10), y = ri(r, 1, 10); if (x !== y && !pts.some((p) => p[0] === x && p[1] === y)) pts.push([x, y]); }
+  return aq3Mc(r, String(same), [String(10 - same), String(same + 2), '10', '0'].filter((x) => x !== String(same)).slice(0, 3), (i) => String(same + 3 + i), 'Scatterplots',
+    'Mr. Andy made a scatterplot comparing the number of questions each student missed on the pretest (x) and the posttest (y). Each point is one student. How many of his 10 students missed the same number of questions on both tests?',
+    `Missing the same number means x = y. Count the points on the line y = x: ${same}`,
+    { draw: plotQ({ xr: [0, 11], yr: [0, 11], curves: [], pts: pts.map((p) => ({ p })) }), size: [320, 320] });
+};
+TEMPLATES.act7Shipping = (r) => {
+  const tiers = [[2, 0.75], [5, 0.5], [7, 0.25]], w = ri(r, 3, 20), t = w < 8 ? 0 : w <= 15 ? 1 : 2, [f, p] = tiers[t], M = (x) => `$${x.toFixed(2)}`, cost = f + p * w;
+  const E = (a, b) => `y = ${fmt(b)}x + ${fmt(a)}`, ans = `${E(f, p)}, ${M(cost)}`;
+  return aq3Mc(r, ans, [`${E(p, f)}, ${M(p + f * w)}`, ...tiers.filter((_, i) => i !== t).map(([a, b]) => `${E(a, b)}, ${M(a + b * w)}`)], () => null, 'Reading tables',
+    `The shipping rate at International Parcel Shipping is a fee per package plus a price per ounce, shown in the table below. Which equation and value give the cost of shipping one package that weighs ${w} ounces?`,
+    `${w} ounces is in the “${['Fewer than 8', '8–15', '16 or more'][t]}” row: fee ${M(f)}, ${M(p)} per ounce.\ny = ${fmt(p)}x + ${fmt(f)} = ${fmt(p)}(${w}) + ${fmt(f)} = ${M(cost)}`,
+    { draw: aq7Table([['Weight (oz)', 'Fee', 'Per ounce'], ['Fewer than 8', '$2.00', '$0.75'], ['8–15', '$5.00', '$0.50'], ['16 or more', '$7.00', '$0.25']]), size: [380, 140] });
+};
+
+/* ===== 7.5 Permutations and combinations ===== */
+TEMPLATES.act7Outfits = (r) => {
+  const a = ri(r, 3, 12), b = ri(r, 2, 6), c = ri(r, 1, 4), v = a * b * c;
+  return aq3Mc(r, String(v), [String(a + b + c), String(a * b), String(v * 2)].filter((x) => x !== String(v)), (i) => String(v + a * (i + 1)), 'Counting principle',
+    `Jericho has ${a} shirts, ${b} pairs of jeans, and ${c} pair${c > 1 ? 's' : ''} of sneakers. How many different outfits of one shirt, one pair of jeans, and one pair of sneakers can she make?`, `Multiply the choices: ${a} × ${b} × ${c} = ${v}`);
+};
+TEMPLATES.act7Plates = (r) => {
+  const L = pick(r, [2, 3]), Dg = 7 - L, v = 26 ** L * 10 ** Dg, rep = r() < 0.7, v2 = rep ? v : [...Array(L)].reduce((a, _, i) => a * (26 - i), 1) * [...Array(Dg)].reduce((a, _, i) => a * (10 - i), 1);
+  return aq3Mc(r, aq7Comma(v2), [aq7Comma(rep ? 26 * L * 10 * Dg : v), aq7Comma(26 ** L + 10 ** Dg), aq7Comma(rep ? 26 ** L * 9 ** Dg : 26 ** L * 10 ** Dg * 2)].filter((x) => x !== aq7Comma(v2)), () => null, 'Counting principle',
+    `A license plate has 7 characters: ${L} letters from the alphabet followed by ${Dg} digits from 0 through 9. How many different plates are possible if the letters and digits ${rep ? 'CAN' : 'CANNOT'} be repeated?`,
+    rep ? `26${aq3Sup(L)} × 10${aq3Sup(Dg)} = ${aq7Comma(v)}` : `${[...Array(L)].map((_, i) => 26 - i).join(' × ')} × ${[...Array(Dg)].map((_, i) => 10 - i).join(' × ')} = ${aq7Comma(v2)}`);
+};
+TEMPLATES.act7Words = (r) => {
+  if (r() < 0.5) { const W = pick(r, ['GOOD', 'BOOK', 'LEVEL', 'APPLE', 'TOOTH', 'BANANA', 'SEES']), cnt = {}; [...W].forEach((c) => { cnt[c] = (cnt[c] || 0) + 1; });
+    const den = Object.values(cnt).reduce((a, c) => a * aq7Fact(c), 1), v = aq7Fact(W.length) / den;
+    return aq3Mc(r, String(v), [String(aq7Fact(W.length)), String(v * 2), String(W.length ** 2)].filter((x) => x !== String(v)), (i) => String(v + i + 1), 'Arrangements',
+      `Find the number of different arrangements of the letters in the word ${W}.`, `${W.length}! ÷ (${Object.entries(cnt).filter(([, c]) => c > 1).map(([k, c]) => `${c}! for the ${k}s`).join(', ')}) = ${aq7Fact(W.length)} ÷ ${den} = ${v}`); }
+  const W = pick(r, ['JUDGE', 'MATHS', 'TRIBE', 'PLANE', 'CHAIR', 'FLUTE']), V = [...W].filter((c) => 'AEIOU'.includes(c)).length, n = W.length - V + 1, v = aq7Fact(n) * aq7Fact(V);
+  return aq3Mc(r, String(v), [String(aq7Fact(n)), String(aq7Fact(W.length)), String(aq7Fact(W.length) - v)].filter((x) => x !== String(v)), (i) => String(v + 2 + i), 'Arrangements',
+    `In how many different ways can the letters of the word ${W} be arranged so that the vowels are always together?`,
+    `Glue the ${V} vowels into one block: ${n} items → ${n}! = ${aq7Fact(n)} ways. The vowels can be ordered ${V}! = ${aq7Fact(V)} ways inside the block.\n${aq7Fact(n)} × ${aq7Fact(V)} = ${v}`);
+};
+TEMPLATES.act7Digits = (r) => {
+  const D = shuffle(r, [1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, 5).sort((a, b) => a - b), k = pick(r, [3, 4]), m = pick(r, [2, 3, 5]);
+  let cnt = 0; const go = (used, num, len) => { if (len === k) { if (num % m === 0) cnt++; return; } D.forEach((d, i) => { if (!used[i]) { used[i] = 1; go(used, num * 10 + d, len + 1); used[i] = 0; } }); }; go([], 0, 0);
+  if (cnt === 0) return TEMPLATES.act7Digits(r);
+  const all = aq7Fact(5) / aq7Fact(5 - k);
+  return aq3Mc(r, String(cnt), [String(all), String(Math.round(all / m)), String(cnt * 2)].filter((x) => x !== String(cnt)), (i) => String(cnt + 3 + i), 'Counting',
+    `How many ${k}-digit positive integers divisible by ${m} can be formed using only the digits ${aq7Set(D)} if no digit appears more than once in a number?`,
+    m === 3 ? 'A number is divisible by 3 when its digit sum is. List the digit groups whose sum is a multiple of 3, then count their arrangements: ' + cnt
+      : `Divisible by ${m} depends on the last digit: choose an allowed last digit, then fill the other ${k - 1} places from the remaining digits: ${cnt}`);
+};
+TEMPLATES.act7Lock = (r) => {
+  const k = pick(r, [3, 4, 5]), ds = shuffle(r, [1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, k).sort((a, b) => a - b), v = aq7Fact(k);
+  return aq3Mc(r, String(v), [String(k ** k), String(k * k), String(v / 2), String(10 ** k)].filter((x) => x !== String(v)).slice(0, 3), () => null, 'Permutations',
+    `You secure your bike with a combination lock, but you forgot the ${k}-digit code. You only remember that the code uses each of the digits ${ds.join(', ')} exactly once. How many possible codes are there?`, `Arrange ${k} different digits: ${k}! = ${v}`);
+};
+TEMPLATES.act7Committee = (r) => {
+  const m = ri(r, 5, 8), w = ri(r, 4, 7), s = pick(r, [4, 5]), atl = ri(r, 2, 3); let v = 0; for (let k = atl; k <= s; k++) v += aq7C(m, k) * aq7C(w, s - k);
+  return aq3Mc(r, aq7Comma(v), [aq7Comma(aq7C(m + w, s)), aq7Comma(aq7C(m, atl) * aq7C(w, s - atl)), aq7Comma(aq7C(m, atl) * aq7C(m + w - atl, s - atl))].filter((x) => x !== aq7Comma(v)), (i) => aq7Comma(v + 10 * (i + 1)), 'Combinations',
+    `From a group of ${m} men and ${w} women, ${s} people are to be selected to form a committee so that at least ${atl} men are on the committee. In how many ways can it be done?`,
+    [...Array(s - atl + 1)].map((_, i) => `${atl + i} men: ${m}C${atl + i} · ${w}C${s - atl - i} = ${aq7C(m, atl + i) * aq7C(w, s - atl - i)}`).join('\n') + `\nTotal: ${aq7Comma(v)}`);
+};
+/* ---------- ACT Prep chapter 7 end ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
   { id: 'angleSum',           subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Triangle Sum Theorem', desc: 'Angles written in x — find x or an angle' },
@@ -31921,6 +32419,55 @@ QUESTION_TYPES.push({ id: 'act6TrigEq', subject: 'act', section: '6.5 Trigonomet
 QUESTION_TYPES.push({ id: 'act6LawCos', subject: 'act', section: '6.5 Trigonometry', label: 'Law of sines and cosines', desc: 'Plane takeoff, park fence (#93, 101, 104)' });
 QUESTION_TYPES.push({ id: 'act6Period', subject: 'act', section: '6.5 Trigonometry', label: 'Period from a graph', desc: 'Read the period of a sinusoid (#92, 102)' });
 QUESTION_TYPES.push({ id: 'act6EvenOdd', subject: 'act', section: '6.5 Trigonometry', label: 'Even and odd identities', desc: 'cos(−θ), sin(−θ), tan(−θ) (#91)' });
+QUESTION_TYPES.push({ id: 'act7Complement', subject: 'act', section: '7.1 Probability', label: 'Complements', desc: 'Not delayed on a round trip; not a penny (#1, 2)' });
+QUESTION_TYPES.push({ id: 'act7FreqTable', subject: 'act', section: '7.1 Probability', label: 'Probability from a table', desc: 'Hotel nights distribution (#3)' });
+QUESTION_TYPES.push({ id: 'act7Guess', subject: 'act', section: '7.1 Probability', label: 'Guessing on a quiz', desc: 'Perfect score by guessing (#6, 10)' });
+QUESTION_TYPES.push({ id: 'act7BothChosen', subject: 'act', section: '7.1 Probability', label: 'Chosen together', desc: 'You and a friend chosen; president and vice president (#7, 34)' });
+QUESTION_TYPES.push({ id: 'act7Replace', subject: 'act', section: '7.1 Probability', label: 'With replacement', desc: 'Both like spinach (#8)' });
+QUESTION_TYPES.push({ id: 'act7Draw2', subject: 'act', section: '7.1 Probability', label: 'Without replacement', desc: 'Both green; one of each; orange then blue (#9, 16, 17)' });
+QUESTION_TYPES.push({ id: 'act7BarProb', subject: 'act', section: '7.1 Probability', label: 'Probability from a bar graph', desc: 'Blood types (#11)' });
+QUESTION_TYPES.push({ id: 'act7AndPct', subject: 'act', section: '7.1 Probability', label: 'Multiplying probabilities', desc: 'Men given a placebo; male and college (#13, 26)' });
+QUESTION_TYPES.push({ id: 'act7Coins', subject: 'act', section: '7.1 Probability', label: 'Tossing coins', desc: 'Exactly one or two heads (#15)' });
+QUESTION_TYPES.push({ id: 'act7AddItems', subject: 'act', section: '7.1 Probability', label: 'Finding a missing count', desc: 'Dimes to add; green marbles (#19, 24)' });
+QUESTION_TYPES.push({ id: 'act7Expected', subject: 'act', section: '7.1 Probability', label: 'Expected value', desc: 'Spinner payouts (#20)' });
+QUESTION_TYPES.push({ id: 'act7DistCheck', subject: 'act', section: '7.1 Probability', label: 'Probability distributions', desc: 'Does the table add to 1? (#21)' });
+QUESTION_TYPES.push({ id: 'act7Overlap', subject: 'act', section: '7.1 Probability', label: 'Overlapping events', desc: 'Like both; only one; given one (#22, 27, 31, 35)' });
+QUESTION_TYPES.push({ id: 'act7DieCoin', subject: 'act', section: '7.1 Probability', label: 'Die and coin', desc: 'Independent events (#23)' });
+QUESTION_TYPES.push({ id: 'act7NonOfficer', subject: 'act', section: '7.1 Probability', label: 'Choosing a note-taker', desc: 'Non-officers only (#25)' });
+QUESTION_TYPES.push({ id: 'act7TwoWay', subject: 'act', section: '7.1 Probability', label: 'Two-way tables', desc: 'P(A or B) from a table (#33)' });
+QUESTION_TYPES.push({ id: 'act7Walk', subject: 'act', section: '7.1 Probability', label: 'Conditional probability', desc: 'Students who walk to school (#32)' });
+QUESTION_TYPES.push({ id: 'act7Concept', subject: 'act', section: '7.1 Probability', label: 'Probability concepts', desc: 'Independent, disjoint, combination vs. permutation (#4, 14, 101, 107)' });
+QUESTION_TYPES.push({ id: 'act7SetOps', subject: 'act', section: '7.2 Sets and Venn Diagrams', label: 'Set operations', desc: 'Unions, intersections, differences (#51, 71, 80, 85, 88)' });
+QUESTION_TYPES.push({ id: 'act7Venn3', subject: 'act', section: '7.2 Sets and Venn Diagrams', label: 'Three-set Venn diagrams', desc: 'Count a region (#36)' });
+QUESTION_TYPES.push({ id: 'act7Venn2', subject: 'act', section: '7.2 Sets and Venn Diagrams', label: 'Two-set Venn diagrams', desc: 'Find x and y; both; neither (#69, 73, 86, 95)' });
+QUESTION_TYPES.push({ id: 'act7Inclusion3', subject: 'act', section: '7.2 Sets and Venn Diagrams', label: 'Inclusion–exclusion', desc: 'Newspaper readers (#72, 89)' });
+QUESTION_TYPES.push({ id: 'act7Subsets', subject: 'act', section: '7.2 Sets and Venn Diagrams', label: 'Subsets and relations', desc: 'Proper subsets; relations from A to B (#62, 70)' });
+QUESTION_TYPES.push({ id: 'act7VennRead', subject: 'act', section: '7.2 Sets and Venn Diagrams', label: 'Reading Venn diagrams', desc: 'Pets survey (#92)' });
+QUESTION_TYPES.push({ id: 'act7Needed', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Score needed', desc: 'Score needed for an average (#40, 54, 81)' });
+QUESTION_TYPES.push({ id: 'act7MMM', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Mean, median, and mode', desc: 'Medians, sums, differences (#44, 46, 47, 63, 66, 82)' });
+QUESTION_TYPES.push({ id: 'act7StemLeaf', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Stem-and-leaf plots', desc: 'Median, mean − mode, missing grade (#43, 58, 61, 84)' });
+QUESTION_TYPES.push({ id: 'act7Weighted', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Weighted mean', desc: 'Mean from a weight table (#45, 87)' });
+QUESTION_TYPES.push({ id: 'act7Combined', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Combined means', desc: 'Boys and girls averages (#49, 56)' });
+QUESTION_TYPES.push({ id: 'act7SDCompare', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Comparing standard deviation', desc: 'Largest or smallest spread (#38, 75)' });
+QUESTION_TYPES.push({ id: 'act7DistMean', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Mean of a distribution', desc: 'Mean and sd from P(x) (#50)' });
+QUESTION_TYPES.push({ id: 'act7AddValue', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Adding a value', desc: 'New mean (#68)' });
+QUESTION_TYPES.push({ id: 'act7ModeK', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Mode', desc: 'Find k from the mode (#77)' });
+QUESTION_TYPES.push({ id: 'act7AvgSpeed', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Average speed', desc: 'Weighted by time (#79)' });
+QUESTION_TYPES.push({ id: 'act7Predict', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Predictions', desc: 'Predict from a sample (#60)' });
+QUESTION_TYPES.push({ id: 'act7Skew', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Shape of a histogram', desc: 'Mean vs. median (#93)' });
+QUESTION_TYPES.push({ id: 'act7MeanShift', subject: 'act', section: '7.3 Mean, Median, Mode, and Spread', label: 'Changing the mean', desc: 'How the sum changes (#65)' });
+QUESTION_TYPES.push({ id: 'act7PieCount', subject: 'act', section: '7.4 Charts and Graphs', label: 'Circle graph counts', desc: 'How many drove a car (#99)' });
+QUESTION_TYPES.push({ id: 'act7PieOdds', subject: 'act', section: '7.4 Charts and Graphs', label: 'Odds from a circle graph', desc: 'Movie genres (#28, 97)' });
+QUESTION_TYPES.push({ id: 'act7BarFruit', subject: 'act', section: '7.4 Charts and Graphs', label: 'Probability from a bar graph', desc: 'Preferred fruit (#100)' });
+QUESTION_TYPES.push({ id: 'act7BarChange', subject: 'act', section: '7.4 Charts and Graphs', label: 'Percent change from a graph', desc: 'Production by year (#98)' });
+QUESTION_TYPES.push({ id: 'act7Scatter', subject: 'act', section: '7.4 Charts and Graphs', label: 'Scatterplots', desc: 'Same score on both tests (#94)' });
+QUESTION_TYPES.push({ id: 'act7Shipping', subject: 'act', section: '7.4 Charts and Graphs', label: 'Reading tables', desc: 'Shipping fee equation (#96)' });
+QUESTION_TYPES.push({ id: 'act7Outfits', subject: 'act', section: '7.5 Permutations and Combinations', label: 'Counting principle', desc: 'Outfits (#83, 109)' });
+QUESTION_TYPES.push({ id: 'act7Plates', subject: 'act', section: '7.5 Permutations and Combinations', label: 'License plates', desc: 'Letters and digits (#78)' });
+QUESTION_TYPES.push({ id: 'act7Words', subject: 'act', section: '7.5 Permutations and Combinations', label: 'Arranging letters', desc: 'Repeated letters; vowels together (#102, 110)' });
+QUESTION_TYPES.push({ id: 'act7Digits', subject: 'act', section: '7.5 Permutations and Combinations', label: 'Forming numbers', desc: 'No repeated digits, divisible by a number (#103)' });
+QUESTION_TYPES.push({ id: 'act7Lock', subject: 'act', section: '7.5 Permutations and Combinations', label: 'Lock codes', desc: 'Arrange known digits (#108)' });
+QUESTION_TYPES.push({ id: 'act7Committee', subject: 'act', section: '7.5 Permutations and Combinations', label: 'Committees', desc: 'At least k men (#105)' });
 QUESTION_TYPES.push({ id: 'c111Challenge', subject: 'calc3', section: '11.1 Sequences', label: '★ Challenge: Limit of aₙ₊₁ = √(k + aₙ)', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c112Challenge', subject: 'calc3', section: '11.2 Series', label: '★ Challenge: Split into two geometric series', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c125Challenge', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: '★ Challenge: Distance between skew lines', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
