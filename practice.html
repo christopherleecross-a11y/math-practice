@@ -35048,6 +35048,22 @@ function dashRender() {
   // assignments, most recent first
   const byTitle = {};
   rows.forEach((r) => { const a = (byTitle[r.title] = byTitle[r.title] || { title: r.title, tab: r.tab, set: r.set, last: 0, rows: [] }); a.rows.push(r); if (r.t > a.last) { a.last = r.t; a.set = r.set; } });
+  // assignments nobody has turned in yet still get listed: ones students have started (Progress tab) and ones posted to
+  // Classroom from this Sheet (PracticeResults.gs version 15 sends those)
+  const subjOfSet = (k) => { k = String(k || ''); if (k.startsWith('custom:')) { const id = k.slice(7).split('_')[0].split('.')[0]; const t = QUESTION_TYPES.find((q) => q.id === id); return t ? t.subject : ''; } return SETS[k] ? SETS[k].subject : ''; };
+  const tabOfSubj = {}; all.forEach((r) => { const sj = subjOfSet(r.set); if (sj && !tabOfSubj[sj]) tabOfSubj[sj] = r.tab; });
+  const addEmpty = (title, set, t, period) => {
+    if (!title || !inPer({ period })) return;
+    const tab = tabOfSubj[subjOfSet(set)] || '';
+    if (DASH.subject && tab !== DASH.subject) return;
+    const a = (byTitle[title] = byTitle[title] || { title, tab, set, last: 0, rows: [], periods: new Set() });
+    if (!a.periods) a.periods = new Set();
+    if (period) a.periods.add(period);
+    if (!a.rows.length && t > a.last) a.last = t;
+  };
+  D.progress.forEach((p) => addEmpty(p.title, p.set, p.t, p.period));
+  (D.posted || []).forEach((p) => { const k = String(p.key || ''), i = k.indexOf('|');
+    addEmpty(k.startsWith('custom:') && i > 0 ? k.slice(i + 1) : SETS[k] ? SETS[k].title : p.title, k.startsWith('custom:') && i > 0 ? k.slice(0, i) : k, p.t, p.period); });
   const titles = Object.values(byTitle).sort((a, b) => b.last - a.last);
   if (DASH.title && !byTitle[DASH.title] && !D.progress.some((p) => p.title === DASH.title)) DASH.title = '';
 
@@ -35117,8 +35133,8 @@ function dashOverview(titles) {
     { k: 'tab', t: 'Subject' },
     { k: 'n', t: 'Turned in', desc: true },
     { k: 'wip', t: 'Still working', desc: true },
-    { k: 'avg', t: 'Average', desc: true, show: (a) => pctT(a.avg), bg: (a) => band(a.avg) },
-    { k: 'last', t: 'Last turned in', desc: true, show: (a) => dashDate(a.last) },
+    { k: 'avg', t: 'Average', desc: true, show: (a) => (a.n ? pctT(a.avg) : '—'), bg: (a) => (a.n ? band(a.avg) : '') },
+    { k: 'last', t: 'Last turned in', desc: true, show: (a) => (a.n ? dashDate(a.last) : 'nobody yet') },
   ], titles.map((a) => { const b = bestRows(a.rows); return { ...a, n: b.length, avg: b.reduce((s, r) => s + r.pct, 0) / (b.length || 1), wip: prog.filter((p) => p.title === a.title).length }; })));
   app.append(card);
   card.append(el('p', { class: 'small', style: 'margin-top:10px' }, 'Click an assignment for each student’s score and which questions the class missed. Click a column title to sort.'));
@@ -35130,7 +35146,7 @@ function dashAssignment(a) {
   const wip = D.progress.filter((p) => p.title === a.title && !p.submitted && (!DASH.period || p.period === DASH.period) && !done.has(who(p.period, p.name)));
   const started = new Set([...done, ...wip.map((p) => who(p.period, p.name))]);
   // roster students with nothing at all for this assignment
-  const subjPeriods = new Set([...a.rows.map((r) => r.period), ...wip.map((p) => p.period)]);
+  const subjPeriods = new Set([...a.rows.map((r) => r.period), ...wip.map((p) => p.period), ...(a.periods || [])]);
   const notStarted = D.roster.filter((s) => (DASH.period ? s.period === DASH.period : subjPeriods.has(s.period)) &&
     ![s.full, ...s.aliases.split(',')].some((n) => n.trim() && started.has(who(s.period, n))));
   const avg = best.length ? best.reduce((s, r) => s + r.pct, 0) / best.length : 0;
