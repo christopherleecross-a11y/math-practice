@@ -10875,8 +10875,9 @@ TEMPLATES.g64Complete = (r) => {
   const [X, Y, Z, J, K, L] = pickLetters(r, 6); // J mid XY, K mid YZ, L mid XZ
   const side = { [J + K]: X + Z, [K + L]: X + Y, [J + L]: Y + Z };
   const k = ri(r, 0, 3);
-  let stem, ans, opts, why;
-  if (k === 0) { const m = pick(r, [J + K, K + L, J + L]); stem = `${SEG(m)} ∥ ___`; ans = side[m]; opts = [X + Y, Y + Z, X + Z].map(SEG); why = `${SEG(m)} joins the midpoints of two sides, so it is parallel to the third side, ${SEG(ans)}.`; ans = SEG(ans); }
+  const halves = { [X + Y]: [X + J, J + Y], [Y + Z]: [Y + K, K + Z], [X + Z]: [X + L, L + Z] };
+  let stem, ans, opts, why, alts = [];
+  if (k === 0) { const m = pick(r, [J + K, K + L, J + L]); stem = `${SEG(m)} ∥ ___`; ans = side[m]; alts = halves[ans]; opts = [X + Y, Y + Z, X + Z].map(SEG); why = `${SEG(m)} joins the midpoints of two sides, so it is parallel to the third side, ${SEG(ans)}. (Each half of that side, ${SEG(alts[0])} or ${SEG(alts[1])}, is also parallel to ${SEG(m)}.)`; ans = SEG(ans); }
   else if (k === 1) { const m = pick(r, [X + Z, X + Y, Y + Z]); const ms = Object.keys(side).find((q) => side[q] === m); stem = `${SEG(m)} ∥ ___`; ans = SEG(ms); opts = Object.keys(side).map(SEG); why = `The midsegment that does not touch ${SEG(m)} is parallel to it: ${ans}.`; }
   else if (k === 2) { const half = pick(r, [[J + Y, X + J, K + L], [Y + K, K + Z, J + L], [X + L, L + Z, J + K]]); stem = `${SEG(half[0])} ≅ ___ ≅ ___`; ans = `${SEG(half[1])} ≅ ${SEG(half[2])}`;
     opts = [ans, `${SEG(half[1])} ≅ ${SEG(Object.keys(side).find((q) => q !== half[2]))}`, `${SEG(half[2])} ≅ ${SEG(side[half[2]])}`, `${SEG(half[1])} ≅ ${SEG(side[half[2]])}`]; why = `${half[0][0] === half[1][1] || half[1].includes(half[0][0]) ? '' : ''}Each half of a side is congruent to the other half and to the midsegment parallel to that side (the midsegment is half as long): ${SEG(half[0])} ≅ ${ans}.`; }
@@ -10885,7 +10886,7 @@ TEMPLATES.g64Complete = (r) => {
   const fr = k === 3 ? FR.num(`${stem.split('then ')[1].replace(' = ___', '')} =`, +ans) : k === 2
     ? { fields: [{ kind: 'text', label: '', prefix: '' }, { kind: 'text', label: '≅', prefix: '' }], key: ans.replace(/(.)̅/g, '$1').split(' ≅ '), display: ans,
       check: (v) => { const want = ans.replace(/(.)̅/g, '$1').split(' ≅ ').map((s) => s.split('').sort().join('')); const got = v.map((x) => normLetters(x).split('').sort().join('')); return got.length === 2 && want.every((w) => got.includes(w)) && got[0] !== got[1]; } }
-    : { fields: [{ kind: 'text', label: '', prefix: '' }], key: [ans.replace(/(.)̅/g, '$1')], display: ans, check: (v) => normLetters(v[0]).split('').sort().join('') === ans.replace(/(.)̅/g, '$1').split('').sort().join('') };
+    : { fields: [{ kind: 'text', label: '', prefix: '' }], key: [ans.replace(/(.)̅/g, '$1')], display: ans, check: (v) => [ans.replace(/(.)̅/g, '$1'), ...alts].some((w) => normLetters(v[0]).split('').sort().join('') === w.split('').sort().join('')) };
   return { topic: 'Midsegments: complete the statement', stem: `In △${X}${Y}${Z}, ${J}, ${K}, and ${L} are the midpoints of ${SEG(X + Y)}, ${SEG(Y + Z)}, and ${SEG(X + Z)}. Complete the statement.   ${stem}`,
     ...buildChoices(r, ans, [...new Set(opts)].filter((o) => o !== ans), () => null), fr, draw, size: [400, 280], solution: why };
 };
