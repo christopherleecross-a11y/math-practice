@@ -33758,6 +33758,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
     tries, status: { ...(saved.status || {}), ...Object.fromEntries(Object.keys(carried).map((i) => [i, 'kept'])) }, carry: carried, history: saved.history || {}, flash: {}, ai: (!teacher && saved.ai) || {}, proofShown: {},
     drawings: (!teacher && store.get(key + ':draw')) || {}, drawOn: {}, work: (!teacher && store.get(key + ':work')) || {} };
   if (!teacher) { saveState(); store.set(base + ':meta', meta); }
+  if (!teacher && state.submitted && !state.submitted.confirmed && !PREVIEW) setTimeout(resendIfMissing, 1500);
   render();
   previewVersion();
   startLockdown();
@@ -34653,12 +34654,20 @@ function exportWork(pts) {
   });
 }
 
-async function send(pts) {
+async function send(pts, resend) {
   const sub = state.submitted;
+  if (sendingFor === state.key) return; sendingFor = state.key;
+  try { await sendNow(pts, resend); } finally { sendingFor = null; }
+}
+let sendingFor = null;
+async function sendNow(pts, resend) {
+  const sub = state.submitted;
+  if (!sub.sid) sub.sid = state.key + '@' + sub.at;
+  if (!resend) sub.minutes = Math.round((Date.now() - state.started) / 6000) / 10;
   if (PREVIEW) { sub.saveStatus = 'preview'; return refreshStatus(); }
   if (!CONFIG.SCRIPT_URL) { sub.saveStatus = 'none'; return refreshStatus(); }
   const payload = {
-    rid: state.rid || undefined, token: state.token || undefined,
+    rid: state.rid || undefined, token: state.token || undefined, sid: sub.sid,
     akey: SETS[state.setKey].custom ? state.setKey : undefined, link: SETS[state.setKey].custom ? (location.origin + location.pathname + location.search).replace(/[?&]preview=1\b/, '') : undefined,
     set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, subject: SUBJECTS[SETS[state.setKey].subject] || '', setTitle: SETS[state.setKey].title, period: state.period, name: state.name,
     score: sub.score, total: sub.total, percent: Math.round((100 * sub.score) / sub.total),
@@ -34670,18 +34679,44 @@ async function send(pts) {
       if (q.proofQ) return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${part}${tr}(proof${state.ai[i] && state.ai[i].ai ? ', AI' : ''})`;
       return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${part}${tr}` + (q.mode === 'fr' ? '(' + a.filter((x) => x !== '').join(',').slice(0, 24) + ')' : LETTERS[a]); }).join(' ')
       + (state.unlocks ? ` · locked ${state.unlocks}× for leaving` : ''),
-    minutes: Math.round((Date.now() - state.started) / 6000) / 10, tabAways: state.tabAways,
+    minutes: sub.minutes || 0, tabAways: state.tabAways,
     version: state.version + (state.attempts > 1 ? ` · attempt ${state.attempt} of ${state.attempts}` : ''),
     work: CONFIG.SEND_WORK ? exportWork(pts) : null,
     shareWork: CONFIG.SEND_WORK && setting(state.setKey, 'shareWork') && (state.rid || state.token) ? true : undefined,
   };
-  try {
-    await fetch(CONFIG.SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
-    sub.saveStatus = 'ok';
-  } catch (e) { sub.saveStatus = 'fail'; }
+  // wait for the Sheet to answer "ok" (an error page or a dropped connection used to look like a save); try again a few times
+  sub.saveStatus = 'wait'; refreshStatus();
+  const body = JSON.stringify(payload);
+  for (let k = 0; k < 5; k++) {
+    if (k) { await new Promise((ok) => setTimeout(ok, [0, 3000, 8000, 20000, 45000][k])); if (state.submitted !== sub) return; }
+    try {
+      const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
+      const txt = (await res.text()).trim();
+      if (/^ok\b/.test(txt)) { sub.saveStatus = 'ok'; sub.confirmed = true; break; }
+    } catch (e) { /* offline or the connection dropped: try again */ }
+    sub.saveStatus = k < 4 ? 'retry' : 'fail'; refreshStatus();
+  }
   store.set(state.key, { ...(store.get(state.key) || {}), submitted: sub });
   refreshStatus();
   if (payload.shareWork && sub.saveStatus === 'ok') { sub.workUrl = sub.workUrl || 'wait'; fetchWorkLink(payload, 10); refreshWorkLink(); }
+}
+// A turned-in assignment opened again (on any Chromebook) whose score was never confirmed by the Sheet:
+// ask the Sheet whether the score is there, and send it if it isn't.
+let resendChecked = {};
+async function resendIfMissing() {
+  const sub = state && state.submitted;
+  if (!sub || sub.confirmed || !CONFIG.SCRIPT_URL || resendChecked[state.key] || sendingFor) return;
+  resendChecked[state.key] = 1;
+  const pts = state.qs.map((q, i) => scoreOf(q, state.answers[i]));
+  if (sub.sid) return send(pts, true); // sent by this version of the page: the Sheet skips a copy it already has
+  try {
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'hasResult', rid: state.rid || undefined, token: state.token || undefined, period: state.period, name: state.name,
+        subject: SUBJECTS[SETS[state.setKey].subject] || '', set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, version: state.version + (state.attempts > 1 ? ` · attempt ${state.attempt} of ${state.attempts}` : '') }) });
+    const j = await res.json();
+    if (j && j.ok && j.found) { sub.confirmed = true; store.set(state.key, { ...(store.get(state.key) || {}), submitted: sub }); return; }
+    if (j && j.ok && j.found === false) return send(pts, true);
+  } catch (e) { /* an older script without this check: leave it */ }
 }
 // the work Doc is made and shared after the score is saved; ask for its link a few times
 let workPolling = 0;
@@ -34717,8 +34752,10 @@ function refreshStatus() {
   const s = document.getElementById('saveStatus'); if (!s) return;
   const st = state.submitted.saveStatus;
   s.className = 'status ' + (st === 'ok' ? 'ok' : st === 'fail' ? 'fail' : 'wait');
+  if (st === 'fail') { s.replaceChildren(`Your score hasn’t reached ${CONFIG.TEACHER_NAME} yet. Stay on this page and tap Try again, or show this screen to ${CONFIG.TEACHER_NAME}. `,
+    el('button', { class: 'btn secondary', type: 'button', style: 'margin:6px 0 0;padding:6px 14px', onclick: () => send(state.qs.map((q, i) => scoreOf(q, state.answers[i])), true) }, 'Try again')); return; }
   s.textContent = st === 'ok' ? `Saved — ${CONFIG.TEACHER_NAME} has your score.`
-    : st === 'fail' ? `Your score could not be saved. Show this screen to ${CONFIG.TEACHER_NAME}.`
+    : st === 'retry' ? 'Still sending your score… (the connection was slow; trying again)'
     : st === 'none' ? 'Score not sent (no gradebook connected).' : st === 'preview' ? 'Teacher preview: this score was not sent to your gradebook.' : 'Saving your score…';
   if (st === 'none' || st === 'preview') s.className = 'status wait';
 }
@@ -35144,7 +35181,9 @@ function dashAssignment(a) {
   const D = DASH.data, best = bestRows(a.rows);
   const done = new Set(best.map((r) => who(r.period, r.name)));
   const wip = D.progress.filter((p) => p.title === a.title && !p.submitted && (!DASH.period || p.period === DASH.period) && !done.has(who(p.period, p.name)));
-  const started = new Set([...done, ...wip.map((p) => who(p.period, p.name))]);
+  // turned in on the Chromebook, but the score row never reached the Sheet (it is sent again when the student opens the assignment)
+  const lost = D.progress.filter((p) => p.title === a.title && p.submitted && (!DASH.period || p.period === DASH.period) && !done.has(who(p.period, p.name)));
+  const started = new Set([...done, ...wip.map((p) => who(p.period, p.name)), ...lost.map((p) => who(p.period, p.name))]);
   // roster students with nothing at all for this assignment
   const subjPeriods = new Set([...a.rows.map((r) => r.period), ...wip.map((p) => p.period), ...(a.periods || [])]);
   const notStarted = D.roster.filter((s) => (DASH.period ? s.period === DASH.period : subjPeriods.has(s.period)) &&
@@ -35203,6 +35242,11 @@ function dashAssignment(a) {
       { k: 'answered', t: 'Answered', desc: true, show: (p) => `${p.answered} of ${p.total || '?'}` }, { k: 'correct', t: 'Correct so far', desc: true, sort: (p) => (p.correct == null ? -1 : p.correct), show: (p) => (p.correct == null ? '—' : p.answered ? el('span', {}, el('strong', {}, pctT(p.correct / p.answered)), el('span', { class: 'small' }, ` (${p.correct} of ${p.answered})`)) : '0'), bg: (p) => (p.correct != null && p.answered ? band(p.correct / p.answered) : '') }, { k: 't', t: 'Last saved', desc: true, show: (p) => dashDate(p.t) },
       { k: 'frozen', t: 'Status', sort: (p) => (p.frozen ? 1 : 0), show: (p) => (p.frozen ? el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:6px 14px', onclick: (e) => dashUnlock(p, e.target) }, '🔒 Unlock') : 'working') },
       { k: 'reset', t: '', sort: () => 0, show: (p) => resetBtn(p) }], wip)));
+  if (lost.length) app.append(el('div', { class: 'card', style: 'border:2px solid #c0392b' }, el('strong', {}, 'Turned in, but the score didn’t reach your Sheet'),
+    el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'These students finished, but their score row never arrived (a dropped connection or a busy moment for the Sheet). Have them open the assignment link again on any Chromebook: it checks and sends the score by itself within a few seconds. The score below is the one their Chromebook showed.'),
+    dashTable([{ k: 'name', t: 'Student', sort: byStudent }, { k: 'period', t: 'Period', sort: byStudent },
+      { k: 'subScore', t: 'Score on their Chromebook', desc: true, show: (p) => (p.subScore == null ? '—' : `${fmt(Math.round(100 * p.subScore) / 100)} / ${p.subTotal} (${Math.round((100 * p.subScore) / (p.subTotal || 1))}%)`) },
+      { k: 'subAt', t: 'Turned in', desc: true, show: (p) => (p.subAt ? dashDate(p.subAt) : '') }], lost)));
   if (notStarted.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Not started'),
     el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'From your Roster tab. A student who typed their name differently than the roster (and has no nickname set) may show up here and above.'),
     el('div', { style: 'columns:3 180px;font-size:15px' }, ...notStarted.sort((x, y) => perOrder(x.period) - perOrder(y.period) || lastFirst(x.full).localeCompare(lastFirst(y.full))).map((s) => el('div', {}, `${s.full} `, el('span', { class: 'small' }, s.period))))));
