@@ -446,6 +446,12 @@ const SETS = {
   'act-4-4': { subject: 'act', title: '4.4 Systems of Equations', items: [['act4SysSolve', 3], ['act4SysWord', 3], ['act4RectPA', 1], ['act4LineRel', 2], ['act4QuadMax', 2]] },
   'act-4-5': { subject: 'act', title: '4.5 Roots', items: [['act4CubeRoot', 2], ['act4SqrtDigits', 2], ['act4SquareSide', 4], ['act4RadSimp', 2], ['act4SqrtFormula', 1]] },
   'act-4-6': { subject: 'act', title: '4.6 Logarithmic Equations', items: [['act4LogDef', 3], ['act4LogRules', 3], ['act4LogEval', 3], ['act4LogApply', 2]] },
+  'act-5-1': { subject: 'act', title: '5.1 Series, Sequences, and Consecutive Numbers', items: [['act5Arith', 3], ['act5ArithSum', 2], ['act5Geo', 3], ['act5GeoWord', 2], ['act5Lcm', 1], ['act5Formula', 1]] },
+  'act-5-2': { subject: 'act', title: '5.2 Evaluation of Functions, Domain, and Range', items: [['act5Eval', 3], ['act5Range', 2], ['act5DomainSet', 2], ['act5IVT', 1], ['act5Piecewise', 2], ['act5Vertex', 1]] },
+  'act-5-3': { subject: 'act', title: '5.3 System of Functions', items: [['act5CompVal', 3], ['act5CompExpr', 2], ['act5CompSolve', 2], ['act5Domain', 2], ['act5Asymptote', 1], ['act5CostModel', 1]] },
+  'act-5-4': { subject: 'act', title: '5.4 Slope-Intercept Form', items: [['act5SlopeStd', 4], ['act5SlopePts', 2], ['act5LineEq', 2], ['act5LinModel', 2], ['act5ParallelX', 1]] },
+  'act-5-5': { subject: 'act', title: '5.5 Graphed Functions', items: [['act5Reflect', 2], ['act5Circle', 2], ['act5Shift', 2], ['act5ParabolaSign', 1], ['act5VertexModel', 1], ['act5GraphRead', 1], ['act5MaxCompare', 1]] },
+  'act-5-6': { subject: 'act', title: '5.6 Trigonometric Functions', items: [['act5Amp', 4], ['act5TrigMax', 2], ['act5TrigId', 3], ['act5TrigGraph', 2]] },
   'calc3-11-1': { subject: 'calc3', title: '11.1 Sequences', items: [['c111RatLimit', 2], ['c111RatLimit', 1, 'fr'], ['c111Term', 2], ['c111Term', 1, 'fr'], ['c111Recur', 2], ['c111Recur', 1, 'fr'], ['c111Bank', 2], ['c111Bank', 1, 'fr'], ['c111Formula', 1], ['c111Formula', 2, 'fr'], ['c111Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-11-2': { subject: 'calc3', title: '11.2 Series', items: [['c112Geo', 1], ['c112Geo', 1, 'fr'], ['c112Telescope', 1], ['c112Telescope', 1, 'fr'], ['c112Decimal', 1], ['c112Decimal', 1, 'fr'], ['c112Partial', 1], ['c112Partial', 1, 'fr'], ['c112DivTest', 1], ['c112DivTest', 1, 'fr'], ['c112Combo', 1], ['c112Combo', 1, 'fr'], ['c112Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-12-5': { subject: 'calc3', title: '12.5 Equations of Lines and Planes', items: [['c125LineHit', 1], ['c125LineHit', 1, 'fr'], ['c125Plane3', 1], ['c125Plane3', 1, 'fr'], ['c125Parallel', 1], ['c125Parallel', 1, 'fr'], ['c125LinePlane', 1], ['c125LinePlane', 1, 'fr'], ['c125Angle', 1], ['c125Angle', 1, 'fr'], ['c125Dist', 1], ['c125Dist', 1, 'fr'], ['c125Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
@@ -29370,6 +29376,384 @@ TEMPLATES.act4LogApply = (r) => {
     { draw: b9gridDraw([['x', 'log(x)'], [String(d), fmt(L)], [String(d * 10), fmt(L + 1)], [String(d * 100), fmt(L + 2)]]), size: [300, 124] });
 };
 /* ---------- ACT Prep chapter 4 end ---------- */
+/* ---------- ACT Prep chapter 5 start ---------- */
+/* ---------- ACT Prep chapter 5: Functions (uses aq3…/aq4… helpers) ---------- */
+// a coordinate plane with axes through 0, custom tick labels (e.g. multiples of π), and curves
+const aq5Graph = ({ xr, yr, xt, yt, curves = [], pts = [], labels = [] }) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, m = 24, X = (x) => m + ((x - xr[0]) / (xr[1] - xr[0])) * (W - 2 * m), Y = (y) => H - m - ((y - yr[0]) / (yr[1] - yr[0])) * (H - 2 * m);
+  c.clearRect(0, 0, W, H); c.strokeStyle = '#e4e1d9'; c.lineWidth = 1;
+  xt.forEach(([x]) => { c.beginPath(); c.moveTo(X(x), Y(yr[0])); c.lineTo(X(x), Y(yr[1])); c.stroke(); });
+  yt.forEach(([y]) => { c.beginPath(); c.moveTo(X(xr[0]), Y(y)); c.lineTo(X(xr[1]), Y(y)); c.stroke(); });
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.5; const ax = Math.min(Math.max(0, xr[0]), xr[1]), ay = Math.min(Math.max(0, yr[0]), yr[1]);
+  c.beginPath(); c.moveTo(X(xr[0]), Y(ay)); c.lineTo(X(xr[1]), Y(ay)); c.moveTo(X(ax), Y(yr[0])); c.lineTo(X(ax), Y(yr[1])); c.stroke();
+  c.fillStyle = '#5c5a55'; c.font = '12px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'top';
+  xt.forEach(([x, t]) => { if (t) c.fillText(t, X(x), Y(ay) + 4); });
+  c.textAlign = 'right'; c.textBaseline = 'middle'; yt.forEach(([y, t]) => { if (t) c.fillText(t, X(ax) - 4, Y(y)); });
+  c.save(); c.beginPath(); c.rect(X(xr[0]), Y(yr[1]), X(xr[1]) - X(xr[0]), Y(yr[0]) - Y(yr[1])); c.clip();
+  curves.forEach(({ f, a = xr[0], b = xr[1], color = '#1f5fa8', param }) => {
+    c.strokeStyle = color; c.lineWidth = 2.4; c.beginPath();
+    for (let j = 0; j <= 600; j++) { const P = param ? param(j / 600) : [a + ((b - a) * j) / 600, f(a + ((b - a) * j) / 600)]; j ? c.lineTo(X(P[0]), Y(P[1])) : c.moveTo(X(P[0]), Y(P[1])); }
+    c.stroke();
+  });
+  c.restore();
+  pts.forEach(([x, y, open]) => { c.beginPath(); c.arc(X(x), Y(y), 4.5, 0, 2 * Math.PI); c.fillStyle = open ? '#fff' : '#1f5fa8'; c.fill(); c.strokeStyle = '#1f5fa8'; c.lineWidth = 2; c.stroke(); });
+  c.fillStyle = '#1d1d1b'; c.font = '13px Georgia, serif'; c.textAlign = 'left'; c.textBaseline = 'bottom'; labels.forEach(([x, y, t]) => c.fillText(t, X(x) + 6, Y(y) - 4));
+};
+const aq5Ticks = (lo, hi, step = 1, lab = 1) => { const T = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) T.push([v, v && Math.abs(v / lab - Math.round(v / lab)) < 1e-9 ? fmt(aq4R(v)) : '']); return T; };
+const aq5PiTicks = (lo, hi) => { const T = []; for (let k = Math.ceil(lo / Math.PI); k * Math.PI <= hi + 1e-9; k++) T.push([k * Math.PI, k === 0 ? '' : `${k === 1 ? '' : k === -1 ? MINUS : fmt(k)}π`]); return T; };
+const aq5Std = (A, B, C) => `${aq4Poly([[A, 'x'], [B, 'y']])} = ${fmt(C)}`;
+
+/* ===== 5.1 Series, sequences, and consecutive numbers ===== */
+TEMPLATES.act5Arith = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 0) { const a = ri(r, -12, 12), d = nz(r, -6, 8), n = ri(r, 8, 20), v = a + (n - 1) * d, L = [0, 1, 2, 3].map((i) => fmt(a + i * d)).join(', ');
+    return aq3Mc(r, fmt(v), [fmt(a + n * d), fmt(n * d), fmt(a + (n - 2) * d)], (i) => fmt(v + d * (i + 2)), 'Arithmetic sequences', `Find the ${n}th term of the sequence ${L}, …`,
+      `The common difference is ${fmt(d)}.\naₙ = a₁ + (n − 1)d = ${fmt(a)} + (${n} − 1)(${fmt(d)}) = ${fmt(v)}`); }
+  if (kind === 1) { const d = nz(r, -4, 4), p = ri(r, 2, 5), q = p + ri(r, 4, 12), a = ri(r, -10, 40), ap = a + (p - 1) * d, aq = a + (q - 1) * d, S = (n) => String(n).split('').map((x) => '₀₁₂₃₄₅₆₇₈₉'[+x]).join('');
+    return aq3Mc(r, fmt(a), [fmt(ap - d), fmt(ap + (p - 1) * d), fmt(a + d)].filter((x) => x !== fmt(a)), (i) => fmt(a + 2 * d + i), 'Arithmetic sequences',
+      `In an arithmetic sequence, the value of a${S(p)} is ${fmt(ap)} and the value of a${S(q)} is ${fmt(aq)}. What is the value of the first term of the sequence?`,
+      `d = (${fmt(aq)} − ${ap < 0 ? `(${fmt(ap)})` : fmt(ap)})/(${q} − ${p}) = ${fmt(aq - ap)}/${q - p} = ${fmt(d)}\na₁ = a${S(p)} − ${p - 1}d = ${fmt(ap)} − ${p - 1}(${fmt(d)}) = ${fmt(a)}`); }
+  if (kind === 2) { const a = ri(r, 8, 20), d = ri(r, 2, 4), n = ri(r, 10, 25), v = a + (n - 1) * d;
+    return aq3Mc(r, String(v), [String(a + n * d), String(n * d), String(a + d * (n - 2))], (i) => String(v + i + 1), 'Arithmetic sequences',
+      `A theater has ${n} rows of seats. The first row has ${a} seats, and ${d} seats are added in each row after the first. How many seats are in the ${n}th row?`,
+      `aₙ = ${a} + (${n} − 1)(${d}) = ${a} + ${(n - 1) * d} = ${v}`); }
+  const t = ri(r, 30, 60), d = ri(r, 2, 6), k = ri(r, 4, 9), v = t + (k - 1) * d;
+  return aq3Mc(r, String(v), [String(t + k * d), String(t + (k - 2) * d), String(t + d)], (i) => String(v + i + 1), 'Arithmetic sequences',
+    `Over two weeks, the temperature rose ${d} degrees each day from the previous day. If the temperature was ${t}°F on day one, what was the temperature on day ${k}?`,
+    `Day 1 is the first term, so day ${k} adds ${k - 1} increases: ${t} + ${k - 1}(${d}) = ${v}°F`);
+};
+TEMPLATES.act5ArithSum = (r) => {
+  if (r() < 0.5) { const a = ri(r, -12, 10), d = nz(r, 2, 5), n = pick(r, [8, 10, 12, 15, 20]), S = n * (2 * a + (n - 1) * d) / 2;
+    return aq3Mc(r, fmt(S), [fmt(a + (n - 1) * d), fmt(n * (a + (n - 1) * d)), fmt(S + n * d)], (i) => fmt(S + 5 * (i + 1)), 'Arithmetic series',
+      `The first term in an arithmetic sequence is ${fmt(a)}. The common difference is ${d}. What is the sum of the first ${n} terms of the sequence?`,
+      `Last term: a${n === 10 ? '₁₀' : 'ₙ'} = ${fmt(a)} + ${n - 1}(${d}) = ${fmt(a + (n - 1) * d)}\nSum = n(a₁ + aₙ)/2 = ${n}(${fmt(a)} + ${fmt(a + (n - 1) * d)})/2 = ${fmt(S)}`); }
+  const a = ri(r, 5, 25), d = ri(r, 2, 5), n = pick(r, [6, 8, 10]), a4 = a + 3 * d, last = a + (n - 1) * d, S = n * (a + last) / 2;
+  return aq3Mc(r, String(S), [String(a + last), String(n * last), String(S / 2)].filter((x) => !/\./.test(x)), (i) => String(S + 10 * (i + 1)), 'Arithmetic series',
+    `A finite arithmetic sequence has ${n} terms, with the first term ${a} and the fourth term ${a4}. What is the sum of the sequence?`,
+    `d = (${a4} − ${a})/3 = ${d}. Last term: ${a} + ${n - 1}(${d}) = ${last}\nSum = ${n}(${a} + ${last})/2 = ${S}`);
+};
+TEMPLATES.act5Geo = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 0) { // next term
+    const q = pick(r, [2, 3, 4]), a = pick(r, [2, 3, 5]) * q ** 3, t = [a, a / q, a / q / q, a / q ** 3], nx = a / q ** 4;
+    return aq3Mc(r, fracT(nx), [fracT(-nx), fracT(t[3] - (t[2] - t[3])), fracT(nx * 2)].filter((x) => x !== fracT(nx)), (i) => fracT(nx + i + 1), 'Geometric sequences',
+      `What is the next term in the geometric sequence ${t.slice(0, 3).map(fmt).join(', ')}, ${fracT(t[3])}, …?`, `Each term is the previous term times 1/${q}.\n${fracT(t[3])} × 1/${q} = ${fracT(nx)}`);
+  }
+  if (kind === 1) { const a = nz(r, -5, 8), q = pick(r, [-4, -3, -2, 2, 3]), n = ri(r, 5, 8), v = a * q ** (n - 1);
+    return aq3Mc(r, fmt(v), [fmt(a * q ** n), fmt(-v), fmt(a * q * (n - 1))].filter((x) => x !== fmt(v)), (i) => fmt(v * (i + 2)), 'Geometric sequences',
+      `The first term of a geometric sequence is ${fmt(a)} and the common ratio is ${fmt(q)}. What is the value of the ${['', '', '', '', '', 'fifth', 'sixth', 'seventh', 'eighth'][n]} term?`,
+      `aₙ = a₁ · r${aq3Sup('n')}⁻¹ = ${fmt(a)} · (${fmt(q)})${aq3Sup(n - 1)} = ${fmt(a)} · ${fmt(q ** (n - 1))} = ${fmt(v)}`.replace('ⁿ', 'ⁿ')); }
+  if (kind === 2) { const a = pick(r, [2, 3, 5, 4]), q = pick(r, [2, 3]), v3 = a * q * q, v5 = a * q ** 4;
+    return aq3Mc(r, String(v5), [String(v3 + (v3 - a)), String(v3 * 2), String(a * q ** 5)], (i) => String(v5 + q * (i + 1)), 'Geometric sequences',
+      `If ${a} is the first term and ${v3} is the third term of a geometric sequence, what is the fifth term?`, `r² = ${v3}/${a} = ${q * q}, so r = ${q}.\nFifth term: ${a} · ${q}⁴ = ${v5}`); }
+  const a = pick(r, [2, 3, 5]), q = 2, n = ri(r, 5, 8), last = a * q ** (n - 1), L = [a, a * 2, a * 4].join(', ');
+  return aq3Mc(r, String(n), [String(n - 1), String(n + 1), String(n + 2)], () => null, 'Geometric sequences', `How many terms are in the geometric sequence ${L}, …, ${last}?`,
+    `aₙ = ${a} · 2ⁿ⁻¹ = ${last}, so 2ⁿ⁻¹ = ${last / a} = 2${aq3Sup(n - 1)}. Then n − 1 = ${n - 1} and n = ${n}.`);
+};
+TEMPLATES.act5GeoWord = (r) => {
+  if (r() < 0.5) { const P = pick(r, [100, 50, 200, 500]), q = pick(r, [2, 3]), w = q === 2 ? 'doubles' : 'triples';
+    return aq3Mc(r, `y = ${P}(${q})ˣ`, [`y = ${P}(${q})ˣ⁻¹`, `y = ${q}x + ${P}`, `y = x${q === 2 ? '²' : '³'} + ${P}`], () => null, 'Exponential growth',
+      `A bacteria population ${w} in size every day. The original population was ${P} bacteria. Which equation best represents the population y after x days?`, `Start at ${P} and multiply by ${q} each day: y = ${P}(${q})ˣ. (At x = 0, y = ${P}.)`); }
+  const A = pick(r, [100, 50, 80]), p = pick(r, [10, 20]), n = pick(r, [6, 8]), big = A * (1 + p / 100) ** (n - 1), ans = Math.round(big / 5) * 5;
+  const C = (v) => `${v} cm²`;
+  return aq3Mc(r, C(ans), [C(Math.round(A * (1 + p * (n - 1) / 100) / 5) * 5), C(Math.round(big * 1.4 / 5) * 5), C(Math.round(A * (1 + p / 100) ** n / 5) * 5)].filter((x) => x !== C(ans)), (i) => C(ans + 25 * (i + 1)), 'Exponential growth',
+    `A framing company offers ${n} sizes of picture frames, each one ${p}% greater in area than the previous size. If the smallest size has an area of ${A} square centimeters, what is the approximate area of the largest frame?`,
+    `The sizes form a geometric sequence with ratio ${fmt(1 + p / 100)}. The largest is the ${n}th: ${A}(${fmt(1 + p / 100)})${aq3Sup(n - 1)} ≈ ${fmt(Math.round(big * 10) / 10)} ≈ ${ans} cm²`);
+};
+TEMPLATES.act5Lcm = (r) => {
+  const P = pick(r, [[12, 5], [8, 6], [10, 4], [9, 6], [15, 6], [45, 18], [20, 30], [12, 18]]), [p, q] = P, L = p * q / gcd(p, q);
+  if (p < 20 && r() < 0.5) {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], d = Math.floor(L / 24), h = L % 24, when = `${days[d % 7]} at ${h === 0 ? 'Midnight' : h === 12 ? 'Noon' : h < 12 ? `${h} a.m.` : `${h - 12} p.m.`}`;
+    const W = (hh) => { const dd = Math.floor(hh / 24), x = hh % 24; return `${days[dd % 7]} at ${x === 0 ? 'Midnight' : x === 12 ? 'Noon' : x < 12 ? `${x} a.m.` : `${x - 12} p.m.`}`; };
+    return aq3Mc(r, when, [W(p * q === L ? L + 12 : p * q), W(L + 24), W(L - 12 > 0 ? L - 12 : L + 36)].filter((x) => x !== when), (i) => W(L + 48 + 12 * i), 'Least common multiple',
+      `Two bells ring at different times. One rings every ${p} hours and the other every ${q} hours. Both ring together at midnight on Sunday. When is the next day and time that they will ring together again?`,
+      `They ring together again after the least common multiple of ${p} and ${q}: ${L} hours = ${d} day${d === 1 ? '' : 's'}${h ? ` and ${h} hours` : ''} after midnight Sunday: ${when}.`);
+  }
+  return aq3Mc(r, `${L} minutes`, [`${p * q} minutes`, `${Math.max(p, q)} minutes`, `${L * 2} minutes`].filter((x) => x !== `${L} minutes`), (i) => `${L + 10 * (i + 1)} minutes`, 'Least common multiple',
+    `Two trains make the same loop and return to the station many times a day. Train A returns every ${p} minutes and Train B every ${q} minutes. If they leave the station at the same time, how many minutes will pass before both are at the station at the same time?`,
+    `Find the least common multiple of ${p} and ${q}: multiples of ${Math.max(p, q)} are ${[1, 2, 3, 4].map((k) => k * Math.max(p, q)).join(', ')}, … The first one that ${Math.min(p, q)} divides is ${L}.`);
+};
+TEMPLATES.act5Formula = (r) => {
+  const a = pick(r, [2, 3, 4, 5]), q = pick(r, [2, 3, 4]), neg = r() < 0.6, R = (neg ? -1 : 1) / q, t = [0, 1, 2, 3, 4].map((i) => a * R ** i);
+  const F = (s) => `aₙ = ${s}`, rr = `${neg ? MINUS : ''}1/${q}`;
+  return aq3Mc(r, F(`${a}(${rr})ⁿ⁻¹`), [F(`${a}(${neg ? '' : MINUS}1/${q})ⁿ⁻¹`), F(`${a} + (${rr})ⁿ⁻¹`), F(`${a}(${rr})ⁿ`)], () => null, 'Sequences: general term',
+    `Find a formula for the general term aₙ of the sequence {${t.map(fracT).join(', ')}, …}, assuming the pattern continues.`,
+    `Each term is the one before times ${rr}, so the sequence is geometric with a₁ = ${a} and r = ${rr}: aₙ = ${a}(${rr})ⁿ⁻¹`);
+};
+
+/* ===== 5.2 Evaluation of functions, domain, and range ===== */
+TEMPLATES.act5Eval = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const a = pick(r, [-2, -3, 2]), k = ri(r, 1, 4) * (r() < 0.7 ? -1 : 1), c = ri(r, 1, 5), x = pick(r, [-2, -1, 1, 2]), f = (t) => k * t * t + c, v1 = f(x), v2 = f(v1);
+    return aq3Mc(r, fmt(v2), [fmt(v1), fmt(k * v1 + c), fmt(-v2)].filter((t) => t !== fmt(v2)), (i) => fmt(v2 + i + 1), 'Evaluating functions', `A function is defined as f(x) = ${aq4Poly([[k, 'x²'], [c, '']])}. What is the value of f(f(${fmt(x)}))?`,
+      `f(${fmt(x)}) = ${fmt(k)}(${fmt(x)})² + ${c} = ${fmt(v1)}\nf(${fmt(v1)}) = ${fmt(k)}(${fmt(v1)})² + ${c} = ${fmt(v2)}`); }
+  if (kind === 1) { const p = ri(r, 1, 3), q = ri(r, 1, 6), x = pick(r, [-3, -2, -1, 2, 3]), a = nz(r, -3, 3), f = (t) => a * t ** 3 + p * t * t + q, v = f(x);
+    return aq3Mc(r, fmt(v), [fmt(f(-x)), fmt(a * x * 3 + p * x * 2 + q), fmt(-v)].filter((t) => t !== fmt(v)), (i) => fmt(v + i + 1), 'Evaluating functions',
+      `The function f is defined as f(x) = ${aq4Poly([[a, 'x³'], [p, 'x²'], [q, '']])}. What is f(${fmt(x)})?`, `f(${fmt(x)}) = ${fmt(a)}(${fmt(x)})³ + ${p}(${fmt(x)})² + ${q} = ${fmt(a * x ** 3)} + ${p * x * x} + ${q} = ${fmt(v)}`); }
+  const p = ri(r, 2, 4), q = nz(r, -3, 3), a = ri(r, 2, 6), b = ri(r, 1, 5), v = a * b + p * a + q * b;
+  return aq3Mc(r, fmt(v), [fmt(a * b), fmt(b * a + p * b + q * a), fmt(v + p)].filter((t) => t !== fmt(v)), (i) => fmt(v + i + 2), 'Evaluating functions',
+    `The operation a ⊖ b is defined as ab + ${p}a ${q < 0 ? MINUS : '+'} ${Math.abs(q)}b. What is the value of ${a} ⊖ ${b}?`,
+    `Substitute a = ${a} and b = ${b}: (${a})(${b}) + ${p}(${a}) ${q < 0 ? MINUS : '+'} ${Math.abs(q)}(${b}) = ${a * b} + ${p * a} ${q < 0 ? MINUS : '+'} ${Math.abs(q * b)} = ${fmt(v)}`);
+};
+TEMPLATES.act5Range = (r) => {
+  const A = ri(r, 1, 4), B = ri(r, 2, 5), cosF = r() < 0.5, R = (lo, hi) => `${fmt(lo)} ≤ y ≤ ${fmt(hi)}`, ans = R(A - B, A + B);
+  const f = cosF ? (x) => A - B * Math.cos(x - Math.PI) : (x) => A + B * Math.sin(x);
+  return aq3Mc(r, ans, [R(-B, B), R(-(A + B), A + B), R(A - B, B), R(-A, A + B)].filter((x) => x !== ans), (i) => R(A - B - i - 1, A + B), 'Range of a function',
+    `The graph of y = ${A} ${cosF ? MINUS : '+'} ${B}${cosF ? 'cos(x − π)' : 'sin x'} is shown in the standard (x, y) coordinate plane below. What is the range of y?`,
+    `${cosF ? 'cos' : 'sin'} goes from −1 to 1, so ${B}${cosF ? 'cos(x − π)' : 'sin x'} goes from −${B} to ${B}.\nAdd ${A}: the graph goes from ${fmt(A - B)} to ${A + B}. Range: ${ans}`,
+    { draw: aq5Graph({ xr: [-7, 7], yr: [-(B + 2), A + B + 2], xt: aq5PiTicks(-7, 7), yt: aq5Ticks(-(B + 2), A + B + 2, 1, 1), curves: [{ f }] }), size: [460, 300] });
+};
+TEMPLATES.act5DomainSet = (r) => {
+  if (r() < 0.5) { const lo = -ri(r, 2, 5), hi = ri(r, 3, 6), k = nz(r, -4, 5), S = (a, b) => `{${Array.from({ length: b - a + 1 }, (_, i) => fmt(a + i)).join(', ')}}`;
+    return aq3Mc(r, S(lo + k, hi + k), [S(lo, hi), S(lo + k, hi), S(lo - k, hi - k)].filter((x) => x !== S(lo + k, hi + k)), (i) => S(lo + k, hi + k + i + 1), 'Domain and range',
+      `Given the domain {${Array.from({ length: hi - lo + 1 }, (_, i) => fmt(lo + i)).join(', ')}}, what is the complete range of the function y = ${aq4Lin(1, k)}?`, `Add ${fmt(k)} to every value in the domain: ${S(lo + k, hi + k)}`); }
+  const a = ri(r, 2, 5), b = ri(r, 5, 30), N = ri(r, 15, 30), cnt = Array.from({ length: N }, (_, i) => i + 1).filter((x) => -a * x + b < 0).length;
+  return aq3Mc(r, String(cnt), [String(cnt + 1), String(cnt - 1), String(N - cnt)].filter((x) => x !== String(cnt) && +x >= 0), (i) => String(cnt + i + 2), 'Domain and range',
+    `A function is defined by f(x) = ${MINUS}${a}x + ${b}, and its domain is the set of integers from 1 to ${N} inclusive. For how many values of x is f(x) negative?`,
+    `${MINUS}${a}x + ${b} < 0 when x > ${fracT(b / a)}. The integers from ${Math.floor(b / a) + 1} to ${N} work: ${cnt} values.`);
+};
+TEMPLATES.act5IVT = (r) => {
+  const xs = [-2, -1, 0, 1, 2], z = ri(r, 0, 3), vals = xs.map((x, i) => (i <= z ? -ri(r, 2, 9) : ri(r, 2, 12))), ans = `${fmt(xs[z])} and ${fmt(xs[z + 1])}`;
+  const opts = [0, 1, 2, 3].filter((i) => i !== z).map((i) => `${fmt(xs[i])} and ${fmt(xs[i + 1])}`).slice(0, 2).concat(['f(x) need not have a zero.']);
+  return aq3Mc(r, ans, opts, () => null, 'Zeros of a polynomial',
+    `A polynomial f(x) has the following values: ${xs.map((x, i) => `f(${fmt(x)}) = ${fmt(vals[i])}`).join(';  ')}. Between which 2 consecutive integers must f(x) have a zero?`,
+    `A polynomial is continuous, so it must cross 0 where its value changes sign: f(${fmt(xs[z])}) = ${fmt(vals[z])} is negative and f(${fmt(xs[z + 1])}) = ${fmt(vals[z + 1])} is positive.`);
+};
+TEMPLATES.act5Piecewise = (r) => {
+  if (r() < 0.5) {
+    const a = ri(r, 2, 3), b = ri(r, 2, 6), c = ri(r, 2, 4), d = ri(r, 10, 20), k = pick(r, [30, 45, 60]), E = 12;
+    const f1 = (x) => a * x + b, f2 = (x) => c * x + d, f3 = (x) => x * x - k, M = Math.max(f1(5), f2(7.999), f3(E)), ans = f3(E);
+    if (ans <= f2(8) || ans <= f1(5)) return TEMPLATES.act5Piecewise(r);
+    return aq3Mc(r, String(ans), [String(f1(5)), String(f2(8)), String(f3(8))].filter((x) => x !== String(ans)), (i) => String(ans + i + 2), 'Piecewise functions',
+      `The number of products an assembly line finishes in hour x of the day is f(x) = ${aq4Lin(a, b)} for 0 < x ≤ 5, f(x) = ${aq4Lin(c, d)} for 5 < x < 8, and f(x) = x² ${MINUS} ${k} for 8 ≤ x ≤ 12. What is the maximum number of products produced in any given hour?`,
+      `Each piece increases, so check the right end of each piece: f(5) = ${f1(5)}, f(x) approaches ${f2(8)} near 8, and f(12) = 144 − ${k} = ${ans}.\nThe maximum is ${ans}.`);
+  }
+  const x0 = -ri(r, 6, 9), x1 = ri(r, -2, 1), x2 = ri(r, 3, 5), x3 = ri(r, 7, 9), h = ri(r, 2, 4), lo = -ri(r, 2, 4);
+  const P = [[x0, lo], [x1, h], [x2, h], [x3, lo]], I = (a, b) => `[${fmt(a)}, ${fmt(b)}]`;
+  return aq3Mc(r, I(x1, x2), [I(x0, x1), I(x1, x3), I(x2, x3)], () => null, 'Reading graphs',
+    'Over which of the following intervals is the graph of f constant?', `The graph is flat (y stays ${h}) from x = ${fmt(x1)} to x = ${fmt(x2)}: ${I(x1, x2)}`,
+    { draw: aq5Graph({ xr: [-10, 10], yr: [-5, 6], xt: aq5Ticks(-10, 10, 1, 2), yt: aq5Ticks(-5, 6, 1, 1), curves: [{ param: (t) => { const s = t * 3, i = Math.min(2, Math.floor(s)), u = s - i; return [P[i][0] + (P[i + 1][0] - P[i][0]) * u, P[i][1] + (P[i + 1][1] - P[i][1]) * u]; } }], pts: P, labels: P.map(([x, y]) => [x, y, `(${fmt(x)}, ${fmt(y)})`]) }), size: [460, 300] });
+};
+TEMPLATES.act5Vertex = (r) => {
+  const a = pick(r, [-1, -1, -2, 1]), h = nz(r, -4, 5), b = -2 * a * h, c = ri(r, -6, 6), word = a < 0 ? 'maximum' : 'minimum';
+  return aq3Mc(r, fmt(h), [fmt(-h), fmt(2 * h), fmt(c)].filter((x) => x !== fmt(h)), (i) => fmt(h + i + 1), 'Quadratic functions',
+    `For what value of x does y = ${aq4Q(a, b, c)} have its ${word} value?`, `The vertex is at x = −b/(2a) = −(${fmt(b)})/(2 · ${fmt(a)}) = ${fmt(h)}.`);
+};
+
+/* ===== 5.3 System of functions ===== */
+TEMPLATES.act5CompVal = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const a = ri(r, 2, 9), b = nz(r, -9, 9), c = ri(r, 2, 8), v = a * c + b;
+    return aq3Mc(r, fmt(v), [fmt(a + b), fmt(c), fmt(a * (c + b))].filter((x) => x !== fmt(v)), (i) => fmt(v + i + 1), 'Composition of functions',
+      `For functions f and g defined by f(x) = ${aq4Lin(a, b)} and g(x) = ${c}, what is the value of f(g(x))?`, `g(x) is always ${c}, so f(g(x)) = f(${c}) = ${a}(${c}) ${b < 0 ? MINUS : '+'} ${Math.abs(b)} = ${fmt(v)}`); }
+  if (kind === 1) { const b = ri(r, 1, 5), c = ri(r, 5, 15), a = ri(r, 2, 4), d = ri(r, 5, 18), x = ri(r, 2, 6), g = -(a * x + d), v = g * g + b * g + c;
+    return aq3Mc(r, fmt(v), [fmt(-v), fmt(x * x + b * x + c), fmt(-(a * (x * x + b * x + c) + d))].filter((t) => t !== fmt(v)), (i) => fmt(v + i + 1), 'Composition of functions',
+      `Find (f ∘ g)(${x}), given f(x) = ${aq4Q(1, b, c)} and g(x) = ${MINUS}(${aq4Lin(a, d)}).`, `g(${x}) = −(${a}(${x}) + ${d}) = ${fmt(g)}\nf(${fmt(g)}) = (${fmt(g)})² + ${b}(${fmt(g)}) + ${c} = ${fmt(v)}`); }
+  const p = ri(r, 2, 5), q = nz(r, -9, 9), s = nz(r, -8, 8), t = nz(r, -9, 9), x = ri(r, 2, 6), v = (p - s) * x + (q - t);
+  return aq3Mc(r, fmt(v), [fmt((p + s) * x + q + t), fmt(v + 2 * t), fmt(-v)].filter((u) => u !== fmt(v)), (i) => fmt(v + 5 * (i + 1)), 'Combining functions',
+    `Let f(x) = ${aq4Q(1, p, q)} and g(x) = ${aq4Q(1, s, t)}. Let h(x) = f(x) − g(x). What is h(${x})?`,
+    `h(x) = (${aq4Q(1, p, q)}) − (${aq4Q(1, s, t)}) = ${aq4Lin(p - s, q - t)}\nh(${x}) = ${fmt(p - s)}(${x}) ${q - t < 0 ? MINUS : '+'} ${Math.abs(q - t)} = ${fmt(v)}`);
+};
+TEMPLATES.act5CompExpr = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const c = ri(r, 1, 9), k = nz(r, -7, 7), T = (b, cc) => aq4Q(1, b, cc);
+    return aq3Mc(r, T(2 * k, k * k + c), [T(k, k * k + c), T(2 * k, k + c), T(0, k * k + c)].filter((x) => x !== T(2 * k, k * k + c)), (i) => T(2 * k, k * k + c + i + 1), 'Composition of functions',
+      `Given f(x) = x² + ${c} and g(x) = ${aq4Lin(1, k)}, which expression is f(g(x))?`, `f(g(x)) = (${aq4Lin(1, k)})² + ${c} = ${aq4Q(1, 2 * k, k * k)} + ${c} = ${T(2 * k, k * k + c)}`.replace('+ −', '− ')); }
+  if (kind === 1) { const k = ri(r, 3, 6), n = 3, ans = aq4Lin(1, k * n);
+    return aq3Mc(r, ans, [aq4Lin(1, k * 2), aq4Lin(n, k * n), aq4Lin(1, k * 5)], () => null, 'Composition of functions', `The function f is defined as f(x) = x + ${k}. What is f(f(f(x)))?`, `Each f adds ${k}: x + ${k} + ${k} + ${k} = ${ans}`); }
+  const m = -ri(r, 2, 6), g = (x) => `√(${x})`, a = ri(r, 2, 9);
+  const M = fmt(m);
+  return aq3Mc(r, `√(${M}x + ${a})`, [`${M}√(x + ${a})`, `${M}x√(x + ${a})`, `√(${M}x² + ${a})`], () => null, 'Composition of functions',
+    `Let f(x) = ${M}x and g(x) = √(x + ${a}). Which expression is equal to g(f(x))?`, `Put f(x) in for x in g: g(${M}x) = √(${M}x + ${a})`);
+};
+TEMPLATES.act5CompSolve = (r) => {
+  if (r() < 0.5) { const a = ri(r, 2, 5), c = nz(r, -6, 6), m = -ri(r, 2, 4), b = ri(r, 1, 6); // f(x)=ax+c, g(x)=mx+b → f(g(x)) = a m x + a b + c
+    const B = a * b + c;
+    return aq3Mc(r, String(b), [fmt(B), fmt(B - c), String(b + 1)].filter((x) => x !== String(b)), (i) => String(b + i + 2), 'Composition of functions',
+      `Consider f(x) = ${aq4Lin(a, c)} and g(x) = ${fmt(m)}x + b, where b is a real number. If f(g(x)) = ${aq4Lin(a * m, B)}, then b = ?`,
+      `f(g(x)) = ${a}(${fmt(m)}x + b) ${c < 0 ? MINUS : '+'} ${Math.abs(c)} = ${fmt(a * m)}x + ${a}b ${c < 0 ? MINUS : '+'} ${Math.abs(c)}\nSo ${a}b ${c < 0 ? MINUS : '+'} ${Math.abs(c)} = ${fmt(B)}, and b = ${b}`); }
+  const s = pick(r, [2, 3, 4, 5]), k = nz(r, -4, 4), z1 = s + k, z2 = -s + k, P = (u, v) => `${fmt(Math.min(u, v))} and ${fmt(Math.max(u, v))}`;
+  return aq3Mc(r, P(z2, z1), [P(s, -s), P(-k, s), P(s - k, -s - k)].filter((x) => x !== P(z2, z1)), (i) => P(z2, z1 + i + 1), 'Composition of functions',
+    `Given f(x) = x² − ${s * s} and g(x) = ${aq4Lin(1, -k)}, what are all the values of x for which f(g(x)) = 0?`,
+    `f(g(x)) = 0 means g(x) = ${s} or g(x) = −${s}.\n${aq4Lin(1, -k)} = ${s} → x = ${fmt(z1)};  ${aq4Lin(1, -k)} = −${s} → x = ${fmt(z2)}`);
+};
+TEMPLATES.act5Domain = (r) => {
+  const p = ri(r, 2, 6), q = p + ri(r, 1, 3);
+  if (r() < 0.5) { const s = pick(r, [2, 3, 4, 5]), top = aq4Lin(1, -ri(r, 1, 9));
+    return aq3Mc(r, `${MINUS}${s}`, ['0', String(s * s), String(Math.max(2, s - 2))].filter((x) => x !== `${MINUS}${s}`), () => null, 'Domain',
+      `The domain of f(x) = (${top})/(x² − ${s * s}) is all real numbers EXCEPT ${s} and which other value?`, `The denominator is 0 when x² = ${s * s}: x = ${s} or x = −${s}. So x ≠ −${s}.`); }
+  const I = (a, b) => `(−∞, ${fmt(a)}) ∪ (${fmt(a)}, ${fmt(b)}) ∪ (${fmt(b)}, ∞)`, a = -p, b = q, Bq = aq4Q(1, -(a + b), a * b);
+  return aq3Mc(r, I(a, b), [`(−∞, ${fmt(a)}) ∪ (${fmt(a)}, ∞)`, I(-b, -a), `(−∞, ${fmt(a)}] and [${fmt(b)}, ∞)`], () => null, 'Domain',
+    `Which of the following is the domain of the function f(x) = (x + ${p})/(${Bq})?`, `${Bq} = (x + ${p})(x − ${q}) = 0 when x = −${p} or x = ${q}. Leave those two values out: ${I(a, b)}`);
+};
+TEMPLATES.act5Asymptote = (r) => {
+  const a = ri(r, 1, 5), b = ri(r, 1, 6), kind = ri(r, 0, 2), k = ri(r, 2, 9);
+  if (kind === 0) return aq3Mc(r, `y = ${a}`, ['y = 0', `x = ${b}`, 'x = 0'], () => null, 'Asymptotes',
+    `The function f(x) = (${a === 1 ? '' : a}x² − ${k * k * a})/(x² − ${b === 1 ? '' : b}x) has 2 vertical asymptotes and 1 horizontal asymptote. What is the horizontal asymptote?`, `The top and bottom have the same degree (2), so the horizontal asymptote is the ratio of the leading coefficients: y = ${a}/1 = ${a}.`);
+  if (kind === 1) return aq3Mc(r, 'y = 0', [`y = ${a}`, `x = ${b}`, `y = ${k}`, `x = ${MINUS}${b}`], () => null, 'Asymptotes',
+    `What is the horizontal asymptote of f(x) = (${a === 1 ? '' : a}x + ${k})/(x² − ${b})?`, 'The degree of the top (1) is less than the degree of the bottom (2), so the horizontal asymptote is y = 0.');
+  return aq3Mc(r, `x = ${b}`, [`x = ${MINUS}${b}`, `y = ${a}`, `x = ${k}`, 'y = 0'], () => null, 'Asymptotes',
+    `What is the vertical asymptote of f(x) = (${a === 1 ? '' : a}x + ${k})/(x − ${b})?`, `The denominator is 0 at x = ${b}, and the numerator is not 0 there, so x = ${b} is a vertical asymptote.`);
+};
+TEMPLATES.act5CostModel = (r) => {
+  const n = pick(r, [5, 10, 20]), p1 = pick(r, [50, 60, 25]), p2 = p1 - pick(r, [5, 10]), fix = n * p1 - n * p2, E = (m, b) => `y = ${m}x + ${b}`;
+  return aq3Mc(r, E(p2, fix), [E(p2, p1), E(p1, n * p2), E(p1, n), E(p2, n * p1)], (i) => E(p2, fix + 10 * (i + 1)), 'Piecewise models',
+    `A company charges $${p1} each for the first ${n} parts ordered and then $${p2} for each additional part. Which expression gives the cost y of x parts, where x > ${n}?`,
+    `Cost = ${p1}(${n}) + ${p2}(x − ${n}) = ${n * p1} + ${p2}x − ${n * p2} = ${p2}x + ${fix}`);
+};
+
+/* ===== 5.4 Slope-intercept form ===== */
+TEMPLATES.act5SlopeStd = (r) => {
+  for (;;) {
+    const A = nz(r, -8, 8), B = nz(r, -10, 10), C = nz(r, -15, 15), m = -A / B, kind = ri(r, 0, 2);
+    if (Math.abs(m) === 1 || gcd(Math.abs(A), Math.abs(B)) > 2) continue;
+    const ans = kind === 2 ? -1 / m : m, what = ['What is the slope of the line', 'What is the slope of any line parallel to the line', 'What is the slope of a line perpendicular to the line'][kind];
+    return aq3Mc(r, fracT(ans), [fracT(-ans), fracT(1 / ans), fracT(C / B), fracT(A)].filter((x) => x !== fracT(ans)), (i) => fracT(ans + i + 1), 'Slope from an equation',
+      `${what} ${aq5Std(A, B, C)}?`,
+      `Solve for y: ${aq4Poly([[B, 'y']])} = ${aq4Lin(-A, C)}, so y = ${fracT(m)}x ${C / B < 0 ? MINUS : '+'} ${fracT(Math.abs(C / B))}. The slope is ${fracT(m)}.${kind === 1 ? ' Parallel lines have the same slope.' : kind === 2 ? ` Perpendicular slope: the negative reciprocal, ${fracT(ans)}.` : ''}`);
+  }
+};
+TEMPLATES.act5SlopePts = (r) => {
+  const x1 = ri(r, -6, 6), y1 = ri(r, -6, 8), dx = nz(r, 1, 6) * (r() < 0.8 ? 1 : 0) || 3, dy = nz(r, -9, 9), x2 = x1 + dx, y2 = y1 + dy, m = dy / dx;
+  if (r() < 0.4) { const ans = m > 0 ? 'is positive.' : 'is negative.';
+    return aq3Mc(r, ans, ['is positive.', 'is negative.', 'is zero.', 'is undefined.'].filter((x) => x !== ans), () => null, 'Slope',
+      `A line in the standard (x, y) coordinate plane passes through the points (${fmt(x1)}, ${fmt(y1)}) and (${fmt(x2)}, ${fmt(y2)}). The slope of the line:`, `m = (${fmt(y2)} − ${y1 < 0 ? `(${fmt(y1)})` : fmt(y1)})/(${fmt(x2)} − ${x1 < 0 ? `(${fmt(x1)})` : fmt(x1)}) = ${fracT(m)}, which ${ans.replace('.', '')}`); }
+  return aq3Mc(r, fracT(m), [fracT(-m), fracT(dx / dy), fracT((y1 + y2) / (x1 + x2 || 1))].filter((x) => x !== fracT(m)), (i) => fracT(m + i + 1), 'Slope',
+    `What is the slope of a line in the standard (x, y) coordinate plane that contains the points (${fmt(x1)}, ${fmt(y1)}) and (${fmt(x2)}, ${fmt(y2)})?`,
+    `m = (y₂ − y₁)/(x₂ − x₁) = (${fmt(y2)} − ${y1 < 0 ? `(${fmt(y1)})` : fmt(y1)})/(${fmt(x2)} − ${x1 < 0 ? `(${fmt(x1)})` : fmt(x1)}) = ${fmt(dy)}/${dx} = ${fracT(m)}`);
+};
+TEMPLATES.act5LineEq = (r) => {
+  const b = nz(r, -6, 6), m = nz(r, -4, 4), x2 = nz(r, -5, 5), y2 = b + m * x2, S = (mm, bb) => `y = ${aq4Lin(mm, bb)}`;
+  if (r() < 0.5) { const ans = S(m, b);
+    return aq3Mc(r, ans, [S(b, m), S(-m, b), S(m, -b)].filter((x) => x !== ans), (i) => S(m, b + i + 1), 'Equations of lines',
+      `Find the equation of the line in slope-intercept form that passes through the points (0, ${fmt(b)}) and (${fmt(x2)}, ${fmt(y2)}).`,
+      `Slope: (${fmt(y2)} − ${b < 0 ? `(${fmt(b)})` : fmt(b)})/(${fmt(x2)} − 0) = ${fmt(m)}. The y-intercept is ${fmt(b)} (the point with x = 0).\n${ans}`); }
+  const A = nz(r, -6, 6), Bc = pick(r, [2, 3, 4, 6, 8, 12, 24]), C = nz(r, -12, 12), T = (p, q) => `y = ${aq4Poly([[p, 'x'], [q, '']])}`.replace(/(\d+\/\d+)x/, '$1 x');
+  const mm = -A / Bc, bb = C / Bc, F = (p, q) => `y = ${p ? `${fracT(p) === '1' ? '' : fracT(p) === '−1' ? MINUS : fracT(p)}x` : ''}${q ? ` ${q < 0 ? MINUS : '+'} ${fracT(Math.abs(q))}` : ''}`;
+  if (!mm) return TEMPLATES.act5LineEq(r);
+  return aq3Mc(r, F(mm, bb), [F(-mm, bb), F(mm, -bb), F(A, C)].filter((x) => x !== F(mm, bb)), (i) => F(mm, bb + i + 1), 'Equations of lines',
+    `For the equation ${aq5Std(A, Bc, C)}, which expression gives y in terms of x?`, `${A < 0 ? 'Add' : 'Subtract'} ${aq4Poly([[Math.abs(A), 'x']])}: ${Bc}y = ${aq4Lin(-A, C)}\nDivide by ${Bc}: ${F(mm, bb)}`);
+};
+TEMPLATES.act5LinModel = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const f = pick(r, [15, 20, 25, 30]), p = pick(r, [0.05, 0.1, 0.25, 0.15]);
+    return aq3Mc(r, `c = ${fmt(p)}p + ${f}`, [`c = ${f}p + ${fmt(p)}`, `c = ${fmt(f + p)}p`, `c = ${f}p`], () => null, 'Linear models',
+      `A photo album costs $${f}, and each printed picture costs $${p.toFixed(2)}. Which equation gives the total cost c if p pictures are ordered?`, `Cost = (cost per picture)(pictures) + fixed cost = ${fmt(p)}p + ${f}`); }
+  if (kind === 1) { const V = pick(r, [40, 50, 60, 80]), u = ri(r, 3, 9);
+    return aq3Mc(r, `v = ${MINUS}${u}t + ${V}`, [`v = ${u}t ${MINUS} ${V}`, `v = ${V}t ${MINUS} ${u}`, `v = ${MINUS}${u}t`], () => null, 'Linear models',
+      `A rain barrel starts with ${V} gallons of water, and it is used at a rate of ${u} gallons per minute. Which equation relates the volume v, in gallons, and the time t, in minutes?`, `The volume starts at ${V} and goes down ${u} each minute: v = −${u}t + ${V}`); }
+  const d0 = pick(r, [3, 5, 8]), rate = pick(r, [1.25, 0.75, 1.5, 2]);
+  return aq3Mc(r, `d = ${fmt(rate)}t + ${d0}`, [`d = ${fmt(rate)}t ${MINUS} ${d0}`, `d = ${d0}t + ${fmt(rate)}`, `d = ${fmt(d0 + rate)}t`], () => null, 'Linear models',
+    `A city had ${d0} inches of snow on the ground when another storm hit. Snow fell at a rate of ${fmt(rate)} inches per hour. Which expression relates the depth d, in inches, and the time t, in hours?`, `Start at ${d0} and add ${fmt(rate)} each hour: d = ${fmt(rate)}t + ${d0}`);
+};
+TEMPLATES.act5ParallelX = (r) => {
+  const p = pick(r, [1, 2, 3, -2, -1]), q = pick(r, [1, 2]), m = p / q, x1 = ri(r, -3, 5), y1 = ri(r, -5, 8), dy = p * ri(r, 1, 3) * (q === 2 ? 1 : 1), x2 = x1 + dy * q / p, y2 = y1 + dy;
+  if (!Number.isInteger(x2)) return TEMPLATES.act5ParallelX(r);
+  const A = [ri(r, -3, 0), 0]; A[1] = A[0] * m; const B = [A[0] + q * 2, A[1] + p * 2];
+  return aq3Mc(r, fmt(x2), [fmt(x1 + dy), fmt(x1 - (x2 - x1)), fmt(x2 + 1)].filter((x) => x !== fmt(x2)), (i) => fmt(x2 + i + 2), 'Parallel lines',
+    `The line shown below is parallel to the line through the points (${fmt(x1)}, ${fmt(y1)}) and (x, ${fmt(y2)}). Find the value of x.`,
+    `From the graph, the slope is ${fracT(m)} (through (${fmt(A[0])}, ${fmt(A[1])}) and (${fmt(B[0])}, ${fmt(B[1])})).\n(${fmt(y2)} − ${y1 < 0 ? `(${fmt(y1)})` : fmt(y1)})/(x − ${x1 < 0 ? `(${fmt(x1)})` : fmt(x1)}) = ${fracT(m)}, so x − ${x1 < 0 ? `(${fmt(x1)})` : fmt(x1)} = ${fmt(dy)} ÷ ${fracT(m)} = ${fmt(x2 - x1)} and x = ${fmt(x2)}`,
+    { draw: plotQ({ xr: [-8, 8], yr: [-8, 8], curves: [{ f: (x) => A[1] + m * (x - A[0]) }], pts: [{ p: A, label: `(${fmt(A[0])}, ${fmt(A[1])})` }, { p: B, label: `(${fmt(B[0])}, ${fmt(B[1])})` }] }), size: [360, 360] });
+};
+
+/* ===== 5.5 Graphed functions ===== */
+TEMPLATES.act5Reflect = (r) => {
+  const x = ri(r, -5, 6), y = ri(r, -5, 6), k = nz(r, -5, 6), kind = ri(r, 0, 3), P = (a, b) => `(${fmt(a)}, ${fmt(b)})`;
+  const L = ['the line x = ' + fmt(k), 'the line y = ' + fmt(k), 'the y-axis', 'the x-axis'][kind], ans = [P(2 * k - x, y), P(x, 2 * k - y), P(-x, y), P(x, -y)][kind];
+  return aq3Mc(r, ans, [P(-x, y), P(x, -y), P(x + k, y), P(2 * k - x, -y), P(y, x)].filter((t) => t !== ans), (i) => P(x + i + 1, y), 'Reflections',
+    `Point A${P(x, y)} is reflected across ${L} and labeled B. What are the coordinates of B?`,
+    kind === 0 ? `A is ${fmt(Math.abs(x - k))} units ${x < k ? 'left' : 'right'} of x = ${fmt(k)}, so B is the same distance on the other side: x = ${fmt(2 * k - x)}. The y-coordinate stays ${fmt(y)}.` : kind === 1 ? `A is ${fmt(Math.abs(y - k))} units ${y < k ? 'below' : 'above'} y = ${fmt(k)}, so B is the same distance on the other side: y = ${fmt(2 * k - y)}.` : kind === 2 ? 'Reflecting across the y-axis changes the sign of x.' : 'Reflecting across the x-axis changes the sign of y.',
+    { draw: plotQ({ xr: [-8, 8], yr: [-8, 8], curves: kind === 0 ? [{ param: [(s) => [k, -8 + 16 * s], 0, 1], dash: true }] : kind === 1 ? [{ f: () => k, dash: true }] : [], pts: [{ p: [x, y], label: 'A' }] }), size: [340, 340] });
+};
+TEMPLATES.act5Circle = (r) => {
+  const h = nz(r, -5, 5), k = nz(r, -5, 5), R = ri(r, 2, 5), sg = (v, n) => (v < 0 ? `(${n} + ${-v})` : `(${n} ${MINUS} ${v})`), E = (a, b, rr) => `${sg(a, 'x')}² + ${sg(b, 'y')}² = ${rr}`;
+  if (r() < 0.5) { const dx = nz(r, -4, 4), dy = nz(r, -4, 4), P = (a, b) => `(${fmt(a)}, ${fmt(b)})`, ans = P(h + dx, k + dy);
+    const mv = `${dx > 0 ? 'right' : 'left'} ${Math.abs(dx)} and ${dy > 0 ? 'up' : 'down'} ${Math.abs(dy)}`;
+    return aq3Mc(r, ans, [P(h - dx, k - dy), P(h + dy, k + dx), P(-h + dx, -k + dy)].filter((x) => x !== ans), (i) => P(h + dx + i + 1, k + dy), 'Circles',
+      `A circle with the equation ${E(h, k, R * R)} is graphed in the (x, y) coordinate plane. If the circle is shifted ${mv}, what are the new coordinates of its center?`,
+      `The center is (${fmt(h)}, ${fmt(k)}). Shift: (${fmt(h)} ${dx < 0 ? MINUS : '+'} ${Math.abs(dx)}, ${fmt(k)} ${dy < 0 ? MINUS : '+'} ${Math.abs(dy)}) = ${ans}`); }
+  const ans = E(h, k, R * R);
+  return aq3Mc(r, ans, [E(-h, -k, R * R), E(h, k, R), E(-h, -k, R)].filter((x) => x !== ans), (i) => E(h, k, (R + i + 1) ** 2), 'Circles',
+    'Which of the following equations determines the circle shown in the standard (x, y) coordinate plane below?',
+    `The center is (${fmt(h)}, ${fmt(k)}) and the radius is ${R}: (x − h)² + (y − k)² = r² gives ${ans}`,
+    { draw: plotQ({ xr: [-10, 10], yr: [-10, 10], step: 1, curves: [{ param: [(t) => [h + R * Math.cos(t), k + R * Math.sin(t)], 0, 2 * Math.PI] }], pts: [{ p: [h, k] }] }), size: [380, 380] });
+};
+TEMPLATES.act5Shift = (r) => {
+  const m = nz(r, -5, 5), b = nz(r, -9, 9), d = nz(r, -9, 9), up = d > 0, F = (mm, bb) => `f(x) = ${aq4Lin(mm, bb)}`, ans = F(m, b + d);
+  if (r() < 0.5) return aq3Mc(r, ans, [F(m + d, b), F(m, b - d), F(-m, b + d)].filter((x) => x !== ans), (i) => F(m, b + d + i + 1), 'Transformations',
+    `The function f(x) = ${aq4Lin(m, b)} in the (x, y) coordinate plane is shifted ${up ? 'up' : 'down'} ${Math.abs(d)} units. What is the new equation of the function?`, `Shifting ${up ? 'up' : 'down'} ${Math.abs(d)} ${up ? 'adds' : 'subtracts'} ${Math.abs(d)} to every output: ${ans}`);
+  const h = nz(r, -4, 4), k = ri(r, 0, 3), s = ri(r, 2, 6), G = (hh, kk) => `y = ${hh ? `(x ${hh < 0 ? '+' : MINUS} ${Math.abs(hh)})²` : 'x²'}${kk ? ` ${kk < 0 ? MINUS : '+'} ${Math.abs(kk)}` : ''}`;
+  return aq3Mc(r, G(-h, k + s), [G(h, k + s), G(-h, k - s), G(h + s, k)].filter((x) => x !== G(-h, k + s)), (i) => G(-h, k + s + i + 1), 'Transformations',
+    `The graph of ${G(h, k)} is reflected across the y-axis and then translated ${s} units up. What is the equation of the resulting graph?`,
+    `Reflecting across the y-axis replaces x with −x: (−x ${h < 0 ? '+' : MINUS} ${Math.abs(h)})² = (x ${h < 0 ? MINUS : '+'} ${Math.abs(h)})², so the vertex moves from (${fmt(h)}, ${k}) to (${fmt(-h)}, ${k}).\nThen up ${s}: ${G(-h, k + s)}`);
+};
+TEMPLATES.act5ParabolaSign = (r) => {
+  const up = r() < 0.5, h = nz(r, -4, 4), k = up ? -ri(r, 1, 4) : ri(r, 1, 4), a = up ? 0.5 : -0.5, c = a * h * h + k, f = (x) => a * (x - h) ** 2 + k;
+  if (!c) return TEMPLATES.act5ParabolaSign(r);
+  const S = (aa, cc) => `a ${aa} 0 and c ${cc} 0`, ans = S(up ? '>' : '<', c > 0 ? '>' : '<');
+  return aq3Mc(r, ans, [S('>', '>'), S('<', '<'), S('>', '<'), S('<', '>')].filter((x) => x !== ans), () => null, 'Graphs of quadratics',
+    'The graph of the quadratic function y = ax² + bx + c is shown in the standard (x, y) coordinate plane below. Which statement is true about the constants?',
+    `The parabola opens ${up ? 'up, so a > 0' : 'down, so a < 0'}. The y-intercept is c, and the graph crosses the y-axis ${c > 0 ? 'above' : 'below'} 0, so c ${c > 0 ? '>' : '<'} 0.`,
+    { draw: plotQ({ xr: [-8, 8], yr: [-8, 8], curves: [{ f }], pts: [{ p: [0, c] }] }), size: [360, 360] });
+};
+TEMPLATES.act5VertexModel = (r) => {
+  const H = pick(r, [12, 15, 16, 20]), t = pick(r, [2, 3, 4, 5]), T = 2 * t, a = -H / (t * t), F = (s) => `f(x) = ${s}`;
+  return aq3Mc(r, F(`${MINUS}${fracT(H / (t * t))}(x ${MINUS} ${t})² + ${H}`), [F(`(x ${MINUS} ${t})² + ${H}`), F(`(x ${MINUS} ${H})² + ${t}`), F(`${fracT(H / (t * t))}(x + ${t})² + ${H}`)], () => null, 'Quadratic models',
+    `A ball is thrown into the air at time t = 0 seconds. It reaches its maximum height of ${H} meters at ${t} seconds and hits the ground at ${T} seconds. Which equation best matches this scenario?`,
+    `Vertex form: f(x) = a(x − ${t})² + ${H}. It hits the ground at (${T}, 0): 0 = a(${T - t})² + ${H}, so a = −${H}/${t * t} = ${fracT(a)}. The parabola opens down, as it must.`);
+};
+TEMPLATES.act5GraphRead = (r) => {
+  const P = [[-1, -ri(r, 2, 4)], [2, ri(r, 1, 2)], [4, 0], [6, ri(r, 2, 4)]]; P[2][1] = P[1][1];
+  const fx = (x) => { for (let i = 0; i < 3; i++) if (x <= P[i + 1][0]) return P[i][1] + (P[i + 1][1] - P[i][1]) * (x - P[i][0]) / (P[i + 1][0] - P[i][0]); return P[3][1]; };
+  const x = pick(r, [0, 3, 5, -1, 2]), v = fx(x);
+  if (!Number.isInteger(v)) return TEMPLATES.act5GraphRead(r);
+  return aq3Mc(r, fmt(v), [fmt(x), fmt(v + 1), fmt(-v || 3)].filter((t) => t !== fmt(v)), (i) => fmt(v + i + 2), 'Reading graphs',
+    `The function f(x) is graphed on the (x, y) coordinate plane below. What is the value of f(${fmt(x)})?`, `Find x = ${fmt(x)} on the x-axis and go to the graph: the y-value there is ${fmt(v)}.`,
+    { draw: aq5Graph({ xr: [-3, 7], yr: [-5, 5], xt: aq5Ticks(-3, 7, 1, 1), yt: aq5Ticks(-5, 5, 1, 1), curves: [{ f: fx, a: -1, b: 6 }] }), size: [420, 340] });
+};
+TEMPLATES.act5MaxCompare = (r) => {
+  const a = ri(r, 4, 9), b = a + ri(r, 1, 3), c = ri(r, 2, 6), d = ri(r, 2, a - 1);
+  const F = shuffle(r, [[`y = ${MINUS}3x² + ${a}`, a], [`y = ${MINUS}x² + ${b}`, b], [`y = ${MINUS}|x + ${c}| + ${d}`, d], [`y = ${b - 2}sin x`, b - 2]]), best = F.reduce((u, v) => (v[1] > u[1] ? v : u));
+  return aq3Mc(r, best[0], F.filter((x) => x !== best).map((x) => x[0]), () => null, 'Maximum values', 'The graph of which of the following functions has the largest maximum value?',
+    `Maximums: ${F.map(([e, m]) => `${e} → ${m}`).join(';  ')}.\nThe largest is ${best[1]}, from ${best[0]}.`);
+};
+
+/* ===== 5.6 Trigonometric functions ===== */
+TEMPLATES.act5Amp = (r) => {
+  const kind = ri(r, 0, 3), A = pick(r, [2, 3, 4, 5]), B = pick(r, [2, 3]), D = nz(r, -4, 4);
+  const forms = [[`y = ${A} sin x`, A], [`f(x) = ${A} cos(${B}x + ${ri(r, 1, 5)}) ${D < 0 ? MINUS : '+'} ${Math.abs(D)}`, A], ['y = ¼ sin(x + π)', 0.25], [`g(x) = cos(2π/3 x) + 1`, 1]];
+  const [e, v] = forms[kind];
+  return aq3Mc(r, fracT(v), [fracT(B), fmt(Math.abs(D)), fracT(v * 2), '1', '2'].filter((x) => x !== fracT(v)).slice(0, 3), (i) => fracT(v + i + 3), 'Amplitude',
+    `What is the amplitude of the function ${e}?`, `The amplitude is the absolute value of the number multiplying sin or cos: ${fracT(v)}. Shifts and the number inside the parentheses do not change it.`);
+};
+TEMPLATES.act5TrigMax = (r) => {
+  const A = ri(r, 1, 4), D = ri(r, 1, 4), sinF = r() < 0.5, mx = A + D, f = sinF ? (x) => A * Math.sin(x) + D : (x) => A * Math.cos(x) + D;
+  return aq3Mc(r, String(mx), [String(A), String(D), fmt(D - A), String(2 * A)].filter((x) => x !== String(mx)).slice(0, 3), (i) => String(mx + i + 1), 'Graphs of sine and cosine',
+    `What is the maximum value of the function f(x) = ${A === 1 ? '' : A} ${sinF ? 'sin' : 'cos'}(x) + ${D} as graphed in the (x, y) coordinate plane below?`.replace('=  ', '= '),
+    `${sinF ? 'sin' : 'cos'} x is at most 1, so f(x) is at most ${A}(1) + ${D} = ${mx}. The graph peaks at y = ${mx}.`,
+    { draw: aq5Graph({ xr: [-7, 7], yr: [Math.min(-2, D - A - 1), mx + 2], xt: aq5Ticks(-7, 7, 1, 2), yt: aq5Ticks(Math.min(-2, D - A - 1), mx + 2, 1, 2), curves: [{ f }] }), size: [460, 280] });
+};
+TEMPLATES.act5TrigId = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const [a, b] = shuffle(r, [pick(r, [20, 30, 40]), pick(r, [50, 60, 70])]), plus = r() < 0.5;
+    const stem = plus ? `(sin ${a}°)(cos ${b}°) + (sin ${b}°)(cos ${a}°)` : `(cos ${a}°)(cos ${b}°) − (sin ${a}°)(sin ${b}°)`, ans = plus ? `sin(${a}° + ${b}°)` : `cos(${a}° + ${b}°)`;
+    return aq3Mc(r, ans, [`sin(${a}° − ${b}°)`, `cos(${a}° − ${b}°)`, plus ? `cos(${a}° + ${b}°)` : `sin(${a}° + ${b}°)`], () => null, 'Trigonometric identities',
+      `Which of the following is equal to ${stem}?`, plus ? `Sum formula: sin(A + B) = sin A cos B + cos A sin B. Here that is sin(${a}° + ${b}°).` : `Sum formula: cos(A + B) = cos A cos B − sin A sin B. Here that is cos(${a}° + ${b}°).`); }
+  if (kind === 1) return aq3Mc(r, '2b√(1 − b²)', ['a² − b²', '2b', 'b√(1 − b²)'], () => null, 'Trigonometric identities',
+    'For 0° < a° < 90° and 0 < b < 1, sin a° = b. Which of the following expressions is equivalent to sin(2a°)?', 'sin(2a°) = 2 sin a° cos a°. Since sin a° = b and a° is in the first quadrant, cos a° = √(1 − b²). So sin(2a°) = 2b√(1 − b²).');
+  return aq3Mc(r, '√(sec²θ − 1)', ['sec θ − 1', 'sec²θ − 1', '1 − sec θ'], () => null, 'Trigonometric identities',
+    'Which of the following expressions is equivalent to tan θ if θ is in the first quadrant?', 'Pythagorean identity: tan²θ + 1 = sec²θ, so tan²θ = sec²θ − 1. In the first quadrant tan θ > 0, so tan θ = √(sec²θ − 1).');
+};
+TEMPLATES.act5TrigGraph = (r) => {
+  const A = pick(r, [1, 2, 3]), B = pick(r, [0.5, 1, 2]), cosF = r() < 0.6, fn = cosF ? 'cos' : 'sin', f = (x) => A * (cosF ? Math.cos(B * x) : Math.sin(B * x));
+  const T = (a, b) => `y = ${a === 1 ? '' : a === 0.5 ? '½ ' : `${a} `}${fn}${b === 1 ? ' x' : b === 0.5 ? '(x/2)' : `(${b}x)`}`.replace('y =  ', 'y = ');
+  const ans = T(A, B);
+  return aq3Mc(r, ans, [T(A, B === 1 ? 2 : 1), T(A, B === 0.5 ? 2 : 0.5), T(B === 0.5 ? 2 : B === 2 ? 0.5 : 2, B), T(0.5, B === 0.5 ? 1 : 0.5), T(A + 1, B), T(A === 1 ? 2 : 1, B)].filter((x) => x !== ans), () => null, 'Graphs of sine and cosine',
+    `A ${cosF ? 'cosine' : 'sine'} function is shown in the standard (x, y) coordinate plane below. Which equation represents this function?`,
+    `The graph goes up to ${A} and down to −${A}, so the amplitude is ${A}. One full cycle takes ${B === 1 ? '2π' : B === 2 ? 'π' : '4π'}, so the period is 2π/b = ${B === 1 ? '2π' : B === 2 ? 'π' : '4π'} and b = ${fracT(B)}.\n${ans}`,
+    { draw: aq5Graph({ xr: [-10, 13], yr: [-4, 4], xt: aq5PiTicks(-10, 13), yt: aq5Ticks(-4, 4, 1, 1), curves: [{ f }] }), size: [480, 260] });
+};
+/* ---------- ACT Prep chapter 5 end ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
   { id: 'angleSum',           subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Triangle Sum Theorem', desc: 'Angles written in x — find x or an angle' },
@@ -31084,6 +31468,40 @@ QUESTION_TYPES.push({ id: 'act4LogDef', subject: 'act', section: '4.6 Logarithmi
 QUESTION_TYPES.push({ id: 'act4LogRules', subject: 'act', section: '4.6 Logarithmic Equations', label: 'Properties of logarithms', desc: 'Product, quotient, power rules (#117, 119, 121)' });
 QUESTION_TYPES.push({ id: 'act4LogEval', subject: 'act', section: '4.6 Logarithmic Equations', label: 'Evaluate logarithms', desc: 'Differences of logs; yˣ (#118, 123)' });
 QUESTION_TYPES.push({ id: 'act4LogApply', subject: 'act', section: '4.6 Logarithmic Equations', label: 'Logarithms in context', desc: 'Decibels, a log table (#122, 125)' });
+QUESTION_TYPES.push({ id: 'act5Arith', subject: 'act', section: '5.1 Series, Sequences, and Consecutive Numbers', label: 'Arithmetic sequences', desc: 'nth term, first term from two terms, seats, temperatures (#5, 9, 10, 19)' });
+QUESTION_TYPES.push({ id: 'act5ArithSum', subject: 'act', section: '5.1 Series, Sequences, and Consecutive Numbers', label: 'Arithmetic series', desc: 'Sum of the first n terms; finite sequences (#2, 7, 8)' });
+QUESTION_TYPES.push({ id: 'act5Geo', subject: 'act', section: '5.1 Series, Sequences, and Consecutive Numbers', label: 'Geometric sequences', desc: 'Next term, nth term, from two terms, number of terms (#4, 11, 13, 17, 18, 20)' });
+QUESTION_TYPES.push({ id: 'act5GeoWord', subject: 'act', section: '5.1 Series, Sequences, and Consecutive Numbers', label: 'Exponential growth', desc: 'Doubling populations; growing sizes (#14, 15)' });
+QUESTION_TYPES.push({ id: 'act5Lcm', subject: 'act', section: '5.1 Series, Sequences, and Consecutive Numbers', label: 'When do they line up?', desc: 'Bells and trains: least common multiple (#6, 16)' });
+QUESTION_TYPES.push({ id: 'act5Formula', subject: 'act', section: '5.1 Series, Sequences, and Consecutive Numbers', label: 'General term of a sequence', desc: 'Formula for aₙ from the first terms (#1)' });
+QUESTION_TYPES.push({ id: 'act5Eval', subject: 'act', section: '5.2 Evaluation of Functions, Domain, and Range', label: 'Evaluate functions', desc: 'f(a), f(f(a)), defined operations (#28, 29, 36)' });
+QUESTION_TYPES.push({ id: 'act5Range', subject: 'act', section: '5.2 Evaluation of Functions, Domain, and Range', label: 'Range from a graph', desc: 'Range of a shifted sine or cosine (#22)' });
+QUESTION_TYPES.push({ id: 'act5DomainSet', subject: 'act', section: '5.2 Evaluation of Functions, Domain, and Range', label: 'Domain and range sets', desc: 'Range from a listed domain; counting negative outputs (#31, 35)' });
+QUESTION_TYPES.push({ id: 'act5IVT', subject: 'act', section: '5.2 Evaluation of Functions, Domain, and Range', label: 'Where must there be a zero?', desc: 'Sign changes in a table of values (#26)' });
+QUESTION_TYPES.push({ id: 'act5Piecewise', subject: 'act', section: '5.2 Evaluation of Functions, Domain, and Range', label: 'Piecewise functions and graphs', desc: 'Maximum of a piecewise function; where a graph is constant (#30, 40)' });
+QUESTION_TYPES.push({ id: 'act5Vertex', subject: 'act', section: '5.2 Evaluation of Functions, Domain, and Range', label: 'Maximum or minimum of a quadratic', desc: 'x-value of the vertex (#33)' });
+QUESTION_TYPES.push({ id: 'act5CompVal', subject: 'act', section: '5.3 System of Functions', label: 'Composition: values', desc: 'f(g(x)) with a constant g, (f ∘ g)(a), h = f − g (#48, 50, 52, 54)' });
+QUESTION_TYPES.push({ id: 'act5CompExpr', subject: 'act', section: '5.3 System of Functions', label: 'Composition: expressions', desc: 'f(g(x)), f(f(f(x))), g(f(x)) (#47, 49, 55)' });
+QUESTION_TYPES.push({ id: 'act5CompSolve', subject: 'act', section: '5.3 System of Functions', label: 'Composition: solve', desc: 'Find b; solve f(g(x)) = 0 (#51, 53)' });
+QUESTION_TYPES.push({ id: 'act5Domain', subject: 'act', section: '5.3 System of Functions', label: 'Domain of rational functions', desc: 'Excluded values; interval notation (#44, 45)' });
+QUESTION_TYPES.push({ id: 'act5Asymptote', subject: 'act', section: '5.3 System of Functions', label: 'Asymptotes', desc: 'Horizontal and vertical asymptotes (#41)' });
+QUESTION_TYPES.push({ id: 'act5CostModel', subject: 'act', section: '5.3 System of Functions', label: 'Piecewise cost models', desc: 'First n at one price, the rest at another (#57)' });
+QUESTION_TYPES.push({ id: 'act5SlopeStd', subject: 'act', section: '5.4 Slope-Intercept Form', label: 'Slope from an equation', desc: 'Slope, parallel slope, perpendicular slope from Ax + By = C (#56, 63, 68, 70, 71, 74, 75)' });
+QUESTION_TYPES.push({ id: 'act5SlopePts', subject: 'act', section: '5.4 Slope-Intercept Form', label: 'Slope from two points', desc: 'Value or sign of the slope (#72, 73)' });
+QUESTION_TYPES.push({ id: 'act5LineEq', subject: 'act', section: '5.4 Slope-Intercept Form', label: 'Equations of lines', desc: 'Line through two points; solve for y (#62, 66)' });
+QUESTION_TYPES.push({ id: 'act5LinModel', subject: 'act', section: '5.4 Slope-Intercept Form', label: 'Linear models', desc: 'Cost, rain barrel, snow depth (#37, 64, 67)' });
+QUESTION_TYPES.push({ id: 'act5ParallelX', subject: 'act', section: '5.4 Slope-Intercept Form', label: 'Parallel to a graphed line', desc: 'Find the missing coordinate (#65)' });
+QUESTION_TYPES.push({ id: 'act5Reflect', subject: 'act', section: '5.5 Graphed Functions', label: 'Reflections', desc: 'Reflect a point across a line or an axis (#79)' });
+QUESTION_TYPES.push({ id: 'act5Circle', subject: 'act', section: '5.5 Graphed Functions', label: 'Circles', desc: 'Equation from a graph; shifting the center (#84, 85)' });
+QUESTION_TYPES.push({ id: 'act5Shift', subject: 'act', section: '5.5 Graphed Functions', label: 'Transformations', desc: 'Shifts and reflections of graphs (#89, 92)' });
+QUESTION_TYPES.push({ id: 'act5ParabolaSign', subject: 'act', section: '5.5 Graphed Functions', label: 'Signs of a and c from a parabola', desc: 'Open up or down; y-intercept (#88)' });
+QUESTION_TYPES.push({ id: 'act5VertexModel', subject: 'act', section: '5.5 Graphed Functions', label: 'Quadratic models', desc: 'Vertex form from a maximum and a zero (#93)' });
+QUESTION_TYPES.push({ id: 'act5GraphRead', subject: 'act', section: '5.5 Graphed Functions', label: 'Read a value from a graph', desc: 'f(a) from a graph (#83)' });
+QUESTION_TYPES.push({ id: 'act5MaxCompare', subject: 'act', section: '5.5 Graphed Functions', label: 'Compare maximum values', desc: 'Which function has the largest maximum? (#81)' });
+QUESTION_TYPES.push({ id: 'act5Amp', subject: 'act', section: '5.6 Trigonometric Functions', label: 'Amplitude', desc: 'Amplitude of sine and cosine functions (#96, 99–103)' });
+QUESTION_TYPES.push({ id: 'act5TrigMax', subject: 'act', section: '5.6 Trigonometric Functions', label: 'Maximum of a sine or cosine graph', desc: 'A sin x + D (#94)' });
+QUESTION_TYPES.push({ id: 'act5TrigId', subject: 'act', section: '5.6 Trigonometric Functions', label: 'Trigonometric identities', desc: 'Sum formulas, double angle, tan from sec (#97, 104, 105)' });
+QUESTION_TYPES.push({ id: 'act5TrigGraph', subject: 'act', section: '5.6 Trigonometric Functions', label: 'Equation from a sine or cosine graph', desc: 'Amplitude and period from a graph (#98)' });
 QUESTION_TYPES.push({ id: 'c111Challenge', subject: 'calc3', section: '11.1 Sequences', label: '★ Challenge: Limit of aₙ₊₁ = √(k + aₙ)', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c112Challenge', subject: 'calc3', section: '11.2 Series', label: '★ Challenge: Split into two geometric series', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c125Challenge', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: '★ Challenge: Distance between skew lines', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
