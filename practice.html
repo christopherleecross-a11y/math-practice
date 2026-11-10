@@ -440,6 +440,12 @@ const SETS = {
   'act-3-4': { subject: 'act', title: '3.4 Imaginary and Complex Numbers', items: [['act3CpxDist', 4], ['act3CpxMid', 3], ['act3CpxMod', 4]] },
   'act-3-5': { subject: 'act', title: '3.5 Vectors', items: [['act3VecMag', 4], ['act3VecOps', 2], ['act3Displace', 3], ['act3VecFind', 2]] },
   'act-3-6': { subject: 'act', title: '3.6 Matrices', items: [['act3MatRead', 1], ['act3MatAdd', 2], ['act3MatScalar', 2], ['act3MatMult', 2], ['act3MatDet', 2], ['act3MatRevenue', 2]] },
+  'act-4-1': { subject: 'act', title: '4.1 Scientific Notation', items: [['act4SciConvert', 4], ['act4SciScale', 4], ['act4SciOps', 4]] },
+  'act-4-2': { subject: 'act', title: '4.2 Equations', items: [['act4Linear', 1], ['act4Literal', 1], ['act4PolyOps', 2], ['act4Factor', 1], ['act4Model', 2], ['act4WordSolve', 2], ['act4Evaluate', 1], ['act4ExpEq', 1], ['act4QuadSolve', 2], ['act4Ratio', 1], ['act4Rational', 1]] },
+  'act-4-3': { subject: 'act', title: '4.3 Linear Equations', items: [['act4CompIneq', 2], ['act4BreakEven', 1], ['act4Current', 1], ['act4GraphRate', 2], ['act4LineGraph', 2], ['act4TableLine', 2], ['act4NumLineIneq', 1]] },
+  'act-4-4': { subject: 'act', title: '4.4 Systems of Equations', items: [['act4SysSolve', 3], ['act4SysWord', 3], ['act4RectPA', 1], ['act4LineRel', 2], ['act4QuadMax', 2]] },
+  'act-4-5': { subject: 'act', title: '4.5 Roots', items: [['act4CubeRoot', 2], ['act4SqrtDigits', 2], ['act4SquareSide', 4], ['act4RadSimp', 2], ['act4SqrtFormula', 1]] },
+  'act-4-6': { subject: 'act', title: '4.6 Logarithmic Equations', items: [['act4LogDef', 3], ['act4LogRules', 3], ['act4LogEval', 3], ['act4LogApply', 2]] },
   'calc3-11-1': { subject: 'calc3', title: '11.1 Sequences', items: [['c111RatLimit', 2], ['c111RatLimit', 1, 'fr'], ['c111Term', 2], ['c111Term', 1, 'fr'], ['c111Recur', 2], ['c111Recur', 1, 'fr'], ['c111Bank', 2], ['c111Bank', 1, 'fr'], ['c111Formula', 1], ['c111Formula', 2, 'fr'], ['c111Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-11-2': { subject: 'calc3', title: '11.2 Series', items: [['c112Geo', 1], ['c112Geo', 1, 'fr'], ['c112Telescope', 1], ['c112Telescope', 1, 'fr'], ['c112Decimal', 1], ['c112Decimal', 1, 'fr'], ['c112Partial', 1], ['c112Partial', 1, 'fr'], ['c112DivTest', 1], ['c112DivTest', 1, 'fr'], ['c112Combo', 1], ['c112Combo', 1, 'fr'], ['c112Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-12-5': { subject: 'calc3', title: '12.5 Equations of Lines and Planes', items: [['c125LineHit', 1], ['c125LineHit', 1, 'fr'], ['c125Plane3', 1], ['c125Plane3', 1, 'fr'], ['c125Parallel', 1], ['c125Parallel', 1, 'fr'], ['c125LinePlane', 1], ['c125LinePlane', 1, 'fr'], ['c125Angle', 1], ['c125Angle', 1, 'fr'], ['c125Dist', 1], ['c125Dist', 1, 'fr'], ['c125Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
@@ -28831,6 +28837,538 @@ TEMPLATES.act3MatRevenue = (r) => {
     solution: `Total packages: ${A.flat().join(' + ')} = ${sum}\nEarnings: ${sum} × $${p} = $${sum * p}` };
 };
 /* ---------- ACT Prep chapter 3 end ---------- */
+/* ---------- ACT Prep chapter 4 start ---------- */
+/* ---------- ACT Prep chapter 4: Algebra (uses the chapter 3 helpers aq3…) ---------- */
+const aq4R = (x) => Math.round(x * 1e9) / 1e9;
+const aq4Sci = (m, e) => `${fmt(aq4R(m))} × 10${aq3Sup(e)}`;
+const aq4Norm = (v) => { let e = Math.floor(Math.log10(Math.abs(v)) + 1e-12), m = aq4R(v / 10 ** e); if (Math.abs(m) >= 10) { m = aq4R(m / 10); e++; } return [m, e]; };
+const aq4SciV = (v) => { const [m, e] = aq4Norm(v); return aq4Sci(m, e); };
+const aq4Std = (v) => (Math.abs(v) >= 1 ? aq4R(v).toLocaleString('en-US', { maximumFractionDigits: 10 }) : aq4R(v).toFixed(12).replace(/0+$/, '')); // 2,500,000 or 0.00045
+const aq4Mono = (c, mono, first) => { // one term with its sign: + 3x², − x, 5
+  if (!c) return '';
+  const a = Math.abs(c), body = mono ? (a === 1 ? mono : `${fmt(a)}${mono}`) : fmt(a);
+  return first ? (c < 0 ? MINUS : '') + body : ` ${c < 0 ? MINUS : '+'} ${body}`;
+};
+const aq4Poly = (terms) => { let out = ''; terms.forEach(([c, m]) => { if (c) out += aq4Mono(c, m, !out); }); return out || '0'; };
+const aq4Lin = (a, b, v = 'x') => aq4Poly([[a, v], [b, '']]); // ax + b
+const aq4Q = (a, b, c, v = 'x') => aq4Poly([[a, `${v}²`], [b, v], [c, '']]);
+const aq4Bin = (a, b) => `(${aq4Lin(a, b)})`;
+const aq4Frac = (num, den) => `(${num})/(${den})`;
+
+/* ===== 4.1 Scientific notation ===== */
+TEMPLATES.act4SciConvert = (r) => {
+  const m = pick(r, [ri(r, 11, 99) / 10, ri(r, 101, 999) / 100, ri(r, 2, 9)]), kind = ri(r, 0, 2);
+  if (kind === 2) { // not normalized: 112.1478 × 10⁻² = 1.121478 × 10⁰
+    const sh = pick(r, [1, 2]), e = pick(r, [-5, -4, -3, 3, 4, 5]), big = aq4R(m * 10 ** sh), E = e + sh;
+    return aq3Mc(r, aq4Sci(m, E), [aq4Sci(m, e - sh), aq4Sci(m, e), aq4Sci(aq4R(m * 10), E - 2)].filter((x) => x !== aq4Sci(m, E)), (i) => aq4Sci(m, E + i + 1), 'Scientific notation',
+      `${fmt(big)} × 10${aq3Sup(e)} is equal to which of the following?`,
+      `Move the decimal point ${sh} place${sh > 1 ? 's' : ''} left to get ${fmt(m)} (a number from 1 to 10). That divides by 10${sh > 1 ? aq3Sup(sh) : ''}, so add ${sh} to the exponent: ${e} + ${sh} = ${E}.\nAnswer: ${aq4Sci(m, E)}`);
+  }
+  const small = kind === 1, e = small ? -ri(r, 3, 7) : ri(r, 4, 9), v = m * 10 ** e;
+  const ctx = small ? pick(r, [`A certain plant cell has a measurement of ${aq4Std(v)} meter. Which of the following represents the measurement in scientific notation?`, `A bacterium is ${aq4Std(v)} meters long. Which expression is equivalent to this length in scientific notation?`])
+    : pick(r, [`A tour guide said it took ${aq4Std(v)} rivets to build a tower. Which expression is equivalent to the number of rivets in scientific notation?`, `A city has a population of ${aq4Std(v)}. Which expression is equivalent to this population in scientific notation?`]);
+  return aq3Mc(r, aq4Sci(m, e), [aq4Sci(m, -e), aq4Sci(m, e + 1), aq4Sci(m, e - 1)], (i) => aq4Sci(m, small ? e - i - 2 : e - i - 2), 'Scientific notation', ctx,
+    `Move the decimal point until one nonzero digit is to its left: ${fmt(m)}.\nIt moved ${Math.abs(e)} place${Math.abs(e) > 1 ? 's' : ''} ${small ? 'to the right, so the exponent is negative' : 'to the left, so the exponent is positive'}: ${aq4Sci(m, e)}`);
+};
+TEMPLATES.act4SciScale = (r) => {
+  if (r() < 0.5) {
+    const m = ri(r, 11, 99) / 10, e = pick(r, [-9, -8, -7, -6, 5, 6, 7]), k = pick(r, [2, 3, 4]), up = r() < 0.5, E = up ? e + k : e - k;
+    if (Math.abs(E) > 9) return TEMPLATES.act4SciScale(r);
+    const kk = 10 ** k, thing = up ? `A reaction was expected to take ${aq4Sci(m, e)} seconds. In fact, it lasted ${kk.toLocaleString('en-US')} times longer than expected. How long did the reaction actually last, in seconds?` : `In a circuit, the current is held at ${aq4Sci(m, e)} amperes. A defect causes the current to be ${kk.toLocaleString('en-US')} times smaller. What was the current, in amperes, caused by this defect?`;
+    const ex = [up ? e - k : e + k, e * k, up ? e + k + 1 : e - k - 1, E + 1, E - 1, e].filter((x) => x && Math.abs(x) <= 9 && x !== E);
+    return aq3Mc(r, aq4Sci(m, E), [...new Set(ex)].slice(0, 3).map((x) => aq4Sci(m, x)), () => null, 'Scientific notation', thing,
+      `${kk.toLocaleString('en-US')} = 10${aq3Sup(k)}. ${up ? 'Multiplying' : 'Dividing'} by 10${aq3Sup(k)} ${up ? 'adds' : 'subtracts'} ${k} ${up ? 'to' : 'from'} the exponent: ${fmt(e)} ${up ? '+' : MINUS} ${k} = ${fmt(E)}.\nAnswer: ${aq4Sci(m, E)}`);
+  }
+  const m2 = ri(r, 11, 25) / 10, q = ri(r, 2, 4), m1 = aq4R(m2 * q), e1 = ri(r, 7, 9), e2 = ri(r, 2, 4);
+  if (m1 >= 10) return TEMPLATES.act4SciScale(r);
+  return aq3Mc(r, aq4Sci(q, e1 - e2), [aq4Sci(q, e1 + e2), aq4Sci(q, e1 - e2 + 1), aq4Sci(aq4R(m1 - m2), e1 - e2)].filter((x) => !/[¹-⁹][⁰-⁹]/.test(x)), (i) => aq4Sci(q, e1 - e2 - i - 1), 'Scientific notation',
+    `Element A has a half-life of ${aq4Sci(m1, e1)} years. Element B has a half-life of ${aq4Sci(m2, e2)} years. How many times greater is the half-life of element A than that of element B?`,
+    `Divide: (${fmt(m1)}/${fmt(m2)}) × 10${aq3Sup(e1)}⁻${aq3Sup(e2)} = ${q} × 10${aq3Sup(e1 - e2)}`);
+};
+TEMPLATES.act4SciOps = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) {
+    const a = ri(r, 21, 98) * 10 ** ri(r, 6, 7), b = ri(r, 1, 9) * 10 ** ri(r, 5, 6), s = a + b, [m, e] = aq4Norm(s);
+    return aq3Mc(r, aq4Sci(m, e), [aq4SciV(a + b * 10), aq4Sci(m, e + 1), aq4SciV(a)], (i) => aq4Sci(aq4R(m + (i + 1) / 100), e), 'Scientific notation',
+      `In scientific notation, ${aq4Std(a)} + ${aq4Std(b)} = ?`, `${aq4Std(a)} + ${aq4Std(b)} = ${aq4Std(s)} = ${aq4Sci(m, e)}`);
+  }
+  if (kind === 1) {
+    const sp = ri(r, 31, 99) / 10, k = ri(r, 2, 3), e = ri(r, 2, 3), v = sp * k * 10 ** e, [m, E] = aq4Norm(v);
+    return aq3Mc(r, aq4Sci(m, E), [aq4Sci(aq4R(sp * k), e), aq4Sci(m, E + 1), aq4Sci(m, e * k)].filter((x) => x !== aq4Sci(m, E)), (i) => aq4Sci(m, E - i - 1), 'Scientific notation',
+      `The fastest plane has a cruising speed that is ${k} times the speed of sound. What is the cruising speed of the plane in scientific notation? (speed of sound = ${aq4Sci(sp, e)} meters per second)`,
+      `${k} × ${fmt(sp)} = ${fmt(aq4R(sp * k))}, so the speed is ${fmt(aq4R(sp * k))} × 10${aq3Sup(e)} = ${aq4Sci(m, E)}`);
+  }
+  const a = ri(r, 2, 4), b = ri(r, 2, 4), p = ri(r, 2, 5), q = ri(r, -6, -2), v = a * b, [m, e] = aq4Norm(v * 10 ** (p + q));
+  return aq3Mc(r, aq4Sci(m, e), [aq4Sci(v, p * q), aq4Sci(a + b, p + q), aq4Sci(m, e + 1)].filter((x) => !/[¹-⁹][⁰-⁹]/.test(x) && x !== aq4Sci(m, e)), (i) => aq4Sci(m, e - i - 1), 'Scientific notation',
+    `What is (${aq4Sci(a, p)})(${aq4Sci(b, q)}) in scientific notation?`,
+    `Multiply the numbers and add the exponents: ${a} × ${b} = ${v}, and ${p} + (${fmt(q)}) = ${fmt(p + q)}.\n${v} × 10${aq3Sup(p + q)} = ${aq4Sci(m, e)}`);
+};
+
+/* ===== 4.2 Equations ===== */
+TEMPLATES.act4Linear = (r) => {
+  if (r() < 0.6) {
+    for (;;) {
+      const a = nz(r, -6, 7), c = nz(r, -6, 7), x = nz(r, -9, 9), b = ri(r, -12, 12), d = (a - c) * x + b;
+      if (a === c) continue;
+      return aq3Mc(r, fmt(x), [fmt(-x), fmt((d + b) / (a - c)), fmt((d - b) / (a + c || 1))].filter((v) => !/\./.test(v)), (i) => fmt(x + i + 1), 'Solving linear equations',
+        `Find x when ${aq4Lin(a, b)} = ${aq4Lin(c, d)}.`,
+        `Get the x-terms on one side and the numbers on the other:\n${aq4Lin(a, 0)} ${MINUS} ${c < 0 ? `(${aq4Lin(c, 0)})` : aq4Lin(c, 0)} = ${fmt(d)} ${MINUS} ${b < 0 ? `(${fmt(b)})` : fmt(b)}\n${aq4Lin(a - c, 0)} = ${fmt(d - b)}\nx = ${fmt(x)}`);
+    }
+  }
+  const a = ri(r, 2, 6), b = nz(r, -6, 6), x = nz(r, -8, 8), c = a * (x + b);
+  return aq3Mc(r, fmt(x), [fmt(c / a + b), fmt(c - b), fmt(-x)].filter((v) => !/\./.test(v)), (i) => fmt(x + i + 1), 'Solving linear equations', `Solve for x: ${a}(${aq4Lin(1, b)}) = ${fmt(c)}`,
+    `Divide both sides by ${a}: ${aq4Lin(1, b)} = ${fmt(c / a)}\n${b < 0 ? 'Add' : 'Subtract'} ${Math.abs(b)}: x = ${fmt(x)}`);
+};
+TEMPLATES.act4Literal = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 0) return aq3Mc(r, '2A/h − b₁', ['2A/h + b₁', '2A/(h + b₁)', '2h/(A − b₁)'], () => null, 'Solving for a variable',
+    'The formula for the area of a trapezoid is A = ½h(b₁ + b₂), where b₁ and b₂ are the lengths of the parallel sides and h is the height. Which of the following is an expression for b₂?',
+    'Multiply both sides by 2: 2A = h(b₁ + b₂)\nDivide by h: 2A/h = b₁ + b₂\nSubtract b₁: b₂ = 2A/h − b₁');
+  if (kind === 1) return aq3Mc(r, 'b(d − c)/a', ['b(d − c) − a', 'e(d − c)/b', 'd(b − c)/a'], () => null, 'Solving for a variable', 'If ae/b + c = d, what is e in terms of a, b, c, and d?',
+    'Subtract c: ae/b = d − c\nMultiply by b: ae = b(d − c)\nDivide by a: e = b(d − c)/a');
+  if (kind === 2) {
+    const p = ri(r, 2, 9), q = ri(r, 3, 9), k = q + ri(r, 1, 20), [u, w] = shuffle(r, ['j', 'k', 'm', 'n', 'p', 'w']).slice(0, 2);
+    return aq3Mc(r, `(${p}${u} + ${k})/${q}`, [`(${p}${u} − ${k})/${q}`, `(${p}${u} + ${q})/${k}`, `${p}${u} + ${k} − ${q}`], () => null, 'Solving for a variable', `If ${p}${u} = ${q}${w} − ${k}, then ${w} = ?`,
+      `Add ${k}: ${p}${u} + ${k} = ${q}${w}\nDivide by ${q}: ${w} = (${p}${u} + ${k})/${q}`);
+  }
+  return aq3Mc(r, '(P − 2l)/2', ['P − 2l', '(P − l)/2', 'P/2 − 2l'], () => null, 'Solving for a variable', 'The perimeter of a rectangle is P = 2l + 2w. Which of the following expresses w in terms of P and l?',
+    'Subtract 2l: P − 2l = 2w\nDivide by 2: w = (P − 2l)/2');
+};
+TEMPLATES.act4PolyOps = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { // (x + p)(x² + qx + s)
+    const p = nz(r, -5, 5), q = nz(r, -5, 5), s = nz(r, -9, 9), A = [1, p + q, p * q + s, p * s];
+    const T = (c) => aq4Poly([[c[0], 'x³'], [c[1], 'x²'], [c[2], 'x'], [c[3], '']]);
+    return aq3Mc(r, T(A), [T([1, q - p, s - p * q, p * s]), T([1, p + q, s, p * s]), T([1, p + q, p * q + s, p + s])], (i) => T([1, A[1], A[2] + i + 1, A[3]]), 'Polynomial operations',
+      `Multiply the expressions: (${aq4Lin(1, p)})(${aq4Q(1, q, s)})`,
+      `Multiply x by each term, then ${fmt(p)} by each term:\nx(${aq4Q(1, q, s)}) = ${aq4Poly([[1, 'x³'], [q, 'x²'], [s, 'x']])}\n${fmt(p)}(${aq4Q(1, q, s)}) = ${aq4Poly([[p, 'x²'], [p * q, 'x'], [p * s, '']])}\nCombine like terms: ${T(A)}`);
+  }
+  if (kind === 1) { // −a x(x − b) − c x(x + d)
+    const a = ri(r, 2, 5), b = ri(r, 1, 6), c = ri(r, 2, 5), d = ri(r, 1, 6), A2 = -a - c, A1 = a * b - c * d;
+    const T = (p, q) => aq4Poly([[p, 'x²'], [q, 'x']]);
+    return aq3Mc(r, T(A2, A1), [T(A2, a * b + c * d), T(-a + c, A1), T(A2, -A1)].filter((x) => x !== T(A2, A1)), (i) => T(A2, A1 + i + 1), 'Polynomial operations',
+      `Which expression is equivalent to ${MINUS}${a}x(${aq4Lin(1, -b)}) ${MINUS} ${c}x(${aq4Lin(1, d)})?`,
+      `${MINUS}${a}x(${aq4Lin(1, -b)}) = ${T(-a, a * b)}\n${MINUS}${c}x(${aq4Lin(1, d)}) = ${T(-c, -c * d)}\nAdd: ${T(A2, A1)}`);
+  }
+  // (a x³ + b xy + c) − x(d x² + e y + f)
+  const a = ri(r, 3, 6), b = nz(r, -5, 5), c = nz(r, -9, 9), d = ri(r, 1, a - 1), e = nz(r, -8, 8), f = nz(r, -7, 7);
+  const T = (p, q, s, t) => aq4Poly([[p, 'x³'], [q, 'xy'], [s, 'x'], [t, '']]), ans = T(a - d, b - e, -f, c);
+  return aq3Mc(r, ans, [T(a - d, b + e, -f, c), T(a - d, b - e, 0, c - f), T(a - d, b - e, f, c)].filter((x) => x !== ans), (i) => T(a - d, b - e + i + 1, -f, c), 'Polynomial operations',
+    `Which expression is equivalent to (${aq4Poly([[a, 'x³'], [b, 'xy'], [c, '']])}) ${MINUS} x(${aq4Poly([[d, 'x²'], [e, 'y'], [f, '']])})?`,
+    `Distribute: x(${aq4Poly([[d, 'x²'], [e, 'y'], [f, '']])}) = ${aq4Poly([[d, 'x³'], [e, 'xy'], [f, 'x']])}\nSubtract each term: ${ans}`);
+};
+TEMPLATES.act4Factor = (r) => {
+  const a = pick(r, [1, 1, 2, 3]), p = nz(r, -7, 7), q = nz(r, -7, 7);
+  if (a > 1 && gcd(a, Math.abs(p)) > 1) return TEMPLATES.act4Factor(r);
+  const b = a * q + p, c = p * q, F = (u, v) => `(${aq4Lin(a, u)})(${aq4Lin(1, v)})`;
+  if (!b) return TEMPLATES.act4Factor(r);
+  if (r() < 0.35) {
+    const opts = [`(${aq4Lin(1, q)})`, `(${aq4Lin(1, -q)})`, `(${aq4Lin(a, -p)})`, `(${aq4Lin(1, q + (q > 0 ? 1 : -1))})`];
+    return aq3Mc(r, opts[0], opts.slice(1), (i) => `(${aq4Lin(1, q + (q > 0 ? -(i + 2) : i + 2))})`, 'Factoring', `Which of the following is a factor of ${aq4Q(a, b, c)}?`, `${aq4Q(a, b, c)} = ${F(p, q)}, so ${opts[0]} is a factor.`);
+  }
+  return aq3Mc(r, F(p, q), [F(-p, -q), F(q, p), F(p, -q)].filter((x) => x !== F(p, q)), (i) => F(p + i + 1, q), 'Factoring', `What is the factored form of ${aq4Q(a, b, c)}?`,
+    `Check by multiplying (FOIL): ${F(p, q)} = ${aq4Poly([[a, 'x²'], [a * q, 'x']])}${aq4Mono(p, 'x', false)}${aq4Mono(c, '', false)} = ${aq4Q(a, b, c)}`);
+};
+TEMPLATES.act4Model = (r) => {
+  const kind = ri(r, 0, 6);
+  if (kind === 0) { const k = ri(r, 2, 6); return aq3Mc(r, `l = 2w ${MINUS} ${k}`, [`l = ½w + ${k}`, `l = ${k} ${MINUS} 2w`, `l = w ${MINUS} ${k}`], () => null, 'Writing equations',
+    `A box has a length ${k} inches less than twice its width, in inches. Which of the following equations gives the length l, in inches, in terms of the width, w inches?`, `“Twice its width” is 2w, and “${k} less than” that is 2w − ${k}: l = 2w − ${k}`); }
+  if (kind === 1) { const G = ri(r, 40, 120), n = pick(r, [6, 8, 10, 12]); return aq3Mc(r, `${n}p ≥ ${G}`, [`p ≤ ${G}`, `${n}p ≤ ${G}`, `p/${n} ≥ ${G}`], () => null, 'Writing inequalities',
+    `Xander is having a picnic for ${G} guests. He plans to serve each guest at least one hot dog. If each package contains ${n} hot dogs, which inequality could be used to determine how many packages, p, he needs to buy?`, `p packages hold ${n}p hot dogs, and that must be at least ${G}: ${n}p ≥ ${G}`); }
+  if (kind === 2) { const F = ri(r, 8, 20) * 100, v = pick(r, [1.25, 2.5, 3.75, 0.85]); return aq3Mc(r, `${F} + ${fmt(v)}c`, [`${F}c + ${fmt(v)}`, `${F} ${MINUS} ${fmt(v)}c`, `${F}c`], () => null, 'Writing expressions',
+    `Anna makes souvenir cards (c) with a variable cost of $${v.toFixed(2)} per card. The fixed cost for the use of the machine is $${F}. Which expression models the cost of producing the cards each day?`, `Cost = fixed cost + (cost per card)(number of cards) = ${F} + ${fmt(v)}c`); }
+  if (kind === 3) { const t1 = ri(r, 4, 9), t2 = ri(r, 3, 8), s2 = ri(r, 30, 45) * 10, av = s2 + ri(r, 2, 6) * 5;
+    return aq3Mc(r, `${t1}x + ${t2}(${s2}) = ${t1 + t2}(${av})`, [`${t1}x + ${t2}(${s2}) = 2(${av})`, `x + ${t2}(${s2}) = ${t1 + t2}(${av})`, `x + ${t2}(${s2}) = ${t1}(${av})`], () => null, 'Writing equations',
+      `An airplane flew for ${t1} hours at an airspeed of x miles per hour and for ${t2} more hours at ${s2} mph. If the average airspeed for the entire flight was ${av} mph, which equation could be used to find x?`,
+      `Total distance = ${t1}x + ${t2}(${s2}). It also equals (average speed)(total time) = ${t1 + t2}(${av}).`); }
+  if (kind === 4) { const k = ri(r, 2, 4), n = k + ri(r, 1, 5), m = ri(r, 10, 24);
+    return aq3Mc(r, `${k}(${n} ${MINUS} x) = x/2 + ${m}`, [`${n}(${k} ${MINUS} x) = x/2 ${MINUS} ${m}`, `${k}(${n} ${MINUS} x) = x/2 ${MINUS} ${m}`, `${k}(x ${MINUS} ${n}) = x/2 + ${m}`], () => null, 'Writing equations',
+      `Which equation represents this relationship? An integer, x, is subtracted from ${n}. That difference is then multiplied by ${k}. This product is ${m} more than half the original integer.`,
+      `“x subtracted from ${n}” is ${n} − x. Multiplied by ${k}: ${k}(${n} − x). “${m} more than half the integer” is x/2 + ${m}.`); }
+  if (kind === 5) { const A = ri(r, 15, 20) * 1000, B = ri(r, 10, 14) * 1000, a = ri(r, 10, 14) * 10, b = a + ri(r, 2, 5) * 10, S = (v) => v.toLocaleString('en-US');
+    return aq3Mc(r, `${S(A)} + ${a}d = ${S(B)} + ${b}d`, [`${S(A)} + ${b}d = ${S(B)} + ${a}d`, `(${S(A)} + ${a})d = (${S(B)} + ${b})d`, `(${a} + ${b})d = ${S(A)} ${MINUS} ${S(B)}`], () => null, 'Writing equations',
+      `Factory A has already produced ${S(A)} units and can produce ${a} units per day. Factory B has produced ${S(B)} units but can produce ${b} units per day. If d represents the number of days, which equation could be solved to find when A’s total production equals B’s?`,
+      `Each total is (units so far) + (units per day)(days): A = ${S(A)} + ${a}d and B = ${S(B)} + ${b}d. Set them equal.`); }
+  const k = ri(r, 2, 4), c = ri(r, 20, 90);
+  return aq3Mc(r, `N = ${k}V + ${c}`, [`N = ${k}(V + ${c})`, `N = V + ${k * c}`, `N = (V + ${c})/${k}`], () => null, 'Writing equations',
+    `A beekeeper estimates that the number of bees, N, is ${c} more than ${['', '', 'double', 'triple', 'four times'][k]} the volume of the bee farm, V. Which formula expresses that approximation?`, `${['', '', 'Double', 'Triple', 'Four times'][k]} V is ${k}V, and ${c} more is ${k}V + ${c}.`);
+};
+TEMPLATES.act4WordSolve = (r) => {
+  const kind = ri(r, 0, 4);
+  if (kind === 0) { const y = ri(r, 8, 20), d = ri(r, 20, 32), S = 2 * y + d;
+    return aq3Mc(r, String(y), [String(y + d), String(S - d), String(Math.round(S / 2))].filter((v) => v !== String(y)), (i) => String(y + i + 1), 'Word problems',
+      `How old is Gina if she is ${d} years younger than her father and the sum of their ages is ${S}?`, `Let g = Gina’s age. Her father is g + ${d}.\ng + (g + ${d}) = ${S}\n2g = ${S - d}\ng = ${y}`); }
+  if (kind === 1) { const F = ri(r, 20, 40), k = ri(r, 4, 8), L = pick(r, [45, 55, 65]), over = ri(r, 5, 15), T = F + k * over;
+    return aq3Mc(r, `${L + over} mph`, [`${over} mph`, `${L + over + 3} mph`, `${L + Math.round(T / k)} mph`].filter((v) => v !== `${L + over} mph`), (i) => `${L + over + i + 1} mph`, 'Word problems',
+      `The minimum fine for speeding is $${F}. An additional $${k} is added for each mile per hour over the speed limit. Rachel was fined $${T} in a ${L}-mph zone. How fast was she driving, in mph?`,
+      `${F} + ${k}m = ${T}, so ${k}m = ${T - F} and m = ${over} mph over the limit.\nSpeed: ${L} + ${over} = ${L + over} mph`); }
+  if (kind === 2) { const rate = pick(r, [0.5, 0.7, 0.25, 0.1]), fee = ri(r, 10, 25), m = ri(r, 15, 60), B = aq4R(fee + rate * m);
+    return aq3Mc(r, String(m), [String(Math.round(B / rate)), String(Math.round(fee / rate)), String(m + 10)], (i) => String(m + i + 1), 'Word problems',
+      `Alexa’s phone plan charges $${fmt(rate)} per minute plus a monthly fee of $${fee.toFixed(2)}. She budgets $${B.toFixed(2)} per month. What is the maximum number of minutes she can use each month and stay within her budget?`,
+      `${fee} + ${fmt(rate)}m ≤ ${fmt(B)}\n${fmt(rate)}m ≤ ${fmt(aq4R(B - fee))}\nm ≤ ${m}`); }
+  if (kind === 3) { const p1 = pick(r, [3, 4, 5]), p2 = p1 + pick(r, [1, 2, 3]), a = ri(r, 2, 7), b = ri(r, 2, 7), n = a + b, T = a * p1 + b * p2;
+    return aq3Mc(r, String(a), [String(b), String(n), String(Math.abs(a - b) || a + 2)].filter((v) => v !== String(a)), (i) => String(a + i + 1), 'Word problems',
+      `A store sells packages of blueberries for $${p1} each and packages of strawberries for $${p2} each. Joann bought ${n} packages of fruit for $${T}. How many packages of blueberries did she buy?`,
+      `Let b = blueberry packages; then ${n} − b are strawberries.\n${p1}b + ${p2}(${n} − b) = ${T}\n${p1 * n === 0 ? '' : ''}${p2 * n} − ${p2 - p1}b = ${T}\n${p2 - p1}b = ${p2 * n - T}, so b = ${a}`); }
+  const f = pick(r, [600, 800, 900]), s = pick(r, [150, 200, 300]), t = pick(r, [6, 8, 10, 12]), ans = aq4R(t * s / f);
+  return aq3Mc(r, `${fmt(ans)} hours`, [`${fmt(aq4R(t * f / s))} hours`, `${fmt(aq4R(ans + 1))} hours`, `${fmt(aq4R(t / 2))} hours`].filter((v) => v !== `${fmt(ans)} hours`), (i) => `${fmt(aq4R(ans + 2 + i))} hours`, 'Word problems',
+    `Charise reads ${f} words per minute. Joshua reads ${s} words per minute. Joshua just finished a novel that took him ${t} hours to read. How long, in hours, will it take Charise to read the same book?`,
+    `The book has ${s} × 60 × ${t} words. Charise reads ${f}/${s} = ${fmt(f / s)} times as fast, so she needs ${t} ÷ ${fmt(f / s)} = ${fmt(ans)} hours.`);
+};
+TEMPLATES.act4Evaluate = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const k = nz(r, -4, 5), n = pick(r, [2, 3]), v = (-k) ** n;
+    return aq3Mc(r, fmt(v), [fmt(k ** n), fmt(-k * n), fmt(-(Math.abs(v)) === v ? -v : -v)].filter((x) => x !== fmt(v)), (i) => fmt(v + i + 1), 'Evaluating expressions',
+      `If y = ${aq4Lin(1, k)}, find (x ${MINUS} y)${aq3Sup(n)}.`, `x − y = x − (${aq4Lin(1, k)}) = ${fmt(-k)}\n(${fmt(-k)})${aq3Sup(n)} = ${fmt(v)}`); }
+  if (kind === 1) { const k = pick(r, [-3, -2, 2, 3]), f = (x) => k * x ** 3, v1 = f(1), v2 = f(v1);
+    if (Math.abs(v2) > 1e6) return TEMPLATES.act4Evaluate(r);
+    return aq3Mc(r, fmt(v2), [fmt(v1), fmt(k * v1), fmt(-v2)], (i) => fmt(v2 + i + 1), 'Evaluating functions', `If f(x) = ${k < 0 ? MINUS : ''}${Math.abs(k)}x³, what is the value of f(f(1))?`,
+      `f(1) = ${fmt(k)}(1)³ = ${fmt(v1)}\nf(${fmt(v1)}) = ${fmt(k)}(${fmt(v1)})³ = ${fmt(k)}(${fmt(v1 ** 3)}) = ${fmt(v2)}`); }
+  const a = ri(r, 2, 7), b = ri(r, 1, 9), c = ri(r, 2, 5), d = ri(r, 1, 9), T = (p, q, s) => aq4Poly([[p, 'x²'], [q, 'x'], [s, '']]);
+  return aq3Mc(r, T(a * c, a * d + b * c, b * d), [`(${aq4Lin(a, b)})(${aq4Lin(c, -d)})`, T(a * c, a * d + b * c + 10, b * d), T(a * c, a * d - b * c, b * d)].filter((x) => x !== T(a * c, a * d + b * c, b * d)), (i) => T(a * c, a * d + b * c + i + 1, b * d), 'Evaluating functions',
+    `If y = ${aq4Lin(a, b)} and g = ${aq4Lin(c, d)}, then yg = ?`, `yg = (${aq4Lin(a, b)})(${aq4Lin(c, d)}) = ${a * c}x² + ${a * d}x + ${b * c}x + ${b * d} = ${T(a * c, a * d + b * c, b * d)}`);
+};
+TEMPLATES.act4ExpEq = (r) => {
+  if (r() < 0.6) {
+    for (;;) {
+      const B = pick(r, [[2, 3, 2, '8', '4'], [3, 3, 2, '27', '9'], [5, 3, 2, '125', '25'], [2, 2, 3, '4', '8'], [3, 2, 3, '9', '27'], [2, 4, 3, '16', '8']]), [, m, n, A1, A2] = B, p = ri(r, 1, 6), q = ri(r, 2, 9);
+      const x = (m * p + n * q) / (m + n); if (!Number.isInteger(x)) continue;
+      return aq3Mc(r, fmt(x), [fmt(p + q), fmt((p + q) / 2), fmt(x + 1)].filter((v) => v !== fmt(x) && !/\./.test(v)), (i) => fmt(x + i + 2), 'Exponential equations',
+        `In the real numbers, what is the solution of the equation ${A1}ˣ⁻${aq3Sup(p)} = ${A2}${aq3Sup(q)}⁻ˣ?`,
+        `Write both sides with base ${B[0]}: ${A1} = ${B[0]}${aq3Sup(m)} and ${A2} = ${B[0]}${aq3Sup(n)}.\n${m}(x − ${p}) = ${n}(${q} − x)\n${m}x − ${m * p} = ${n * q} − ${n}x\n${m + n}x = ${m * p + n * q}\nx = ${fmt(x)}`);
+    }
+  }
+  const k = ri(r, 3, 9), N = k + ri(r, 5, 20), s = ri(r, 2, 6), M = s * ri(r, 2, 6), x = N - k, y = M / s;
+  if (N % 10 === 0 || M % 10 === 0) return TEMPLATES.act4ExpEq(r);
+  return aq3Mc(r, String(x + y), [String(N / k + y), String(x + M - s), String(N + M)].filter((v) => v !== String(x + y) && !/\./.test(v)), (i) => String(x + y + i + 2), 'Exponent rules',
+    `If aˣ · a${aq3Sup(k)} = a${aq3Sup(N)} and (a${aq3Sup(s)})ʸ = a${aq3Sup(M)}, what is the value of x + y?`,
+    `Multiply with the same base: add exponents. x + ${k} = ${N}, so x = ${x}.\nPower of a power: multiply exponents. ${s}y = ${M}, so y = ${y}.\nx + y = ${x + y}`);
+};
+TEMPLATES.act4QuadSolve = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 2) { // parabola meets a line
+    const r1 = ri(r, 2, 12), r2 = r1 + ri(r, 3, 20), m = -ri(r, 1, 6), k = ri(r, 150, 300), B = r1 + r2 + m, C = k - r1 * r2;
+    const P = (u, v) => `x = ${fmt(u)}, x = ${fmt(v)}`;
+    return aq3Mc(r, P(r1, r2), [P(r1 + 2, r2 - 2), P(-r1, -r2), P(r1, r2 + 5)], (i) => P(r1, r2 + i + 1), 'Quadratic equations',
+      `The attendances y for two movies are modeled by y = ${aq4Q(-1, B, C)} and y = ${aq4Lin(m, k)}, where x is the number of days since the movies opened. When will the attendance for each movie be the same?`,
+      `Set them equal: ${aq4Q(-1, B, C)} = ${aq4Lin(m, k)}\n0 = ${aq4Q(1, -(B - m), k - C)}\n0 = (x − ${r1})(x − ${r2})\nx = ${r1} or x = ${r2}`);
+  }
+  const a = pick(r, [2, 3, 4, 6, 9, 12]), p = nz(r, -5, 5), q = nz(r, -4, 4);
+  if (gcd(a, Math.abs(p)) > 1 || p === q * a) return TEMPLATES.act4QuadSolve(r);
+  const b = -(a * q + p), c = p * q; // (ax − p)(x − q) = a x² + b x + c
+  if (kind === 0) {
+    const sum = -b / a;
+    return aq3Mc(r, fracT(sum), [fracT(b / a), fracT(c / a), fracT(-c / a)].filter((x) => x !== fracT(sum)), (i) => fracT(sum + i + 1), 'Quadratic equations',
+      `What is the sum of the solutions to the equation ${aq4Q(a, b, c)} = 0?`,
+      `Factor: (${aq4Lin(a, -p)})(${aq4Lin(1, -q)}) = 0, so x = ${fracT(p / a)} or x = ${fmt(q)}.\nSum: ${fracT(p / a)} + ${q < 0 ? `(${fmt(q)})` : fmt(q)} = ${fracT(sum)}  (this always equals −b/a)`);
+  }
+  return aq3Mc(r, fracT(p / a), [fracT(-p / a), fracT(a / p), fracT(-q)].filter((x) => x !== fracT(p / a) && x !== fracT(q)), (i) => fracT(p / a + i + 1), 'Quadratic equations',
+    `Which of the following is a root of ${aq4Q(a, b, 0).replace(/ \+ 0$/, '')} = ${fmt(-c)}?`,
+    `Move everything to one side: ${aq4Q(a, b, c)} = 0\nFactor: (${aq4Lin(a, -p)})(${aq4Lin(1, -q)}) = 0\nx = ${fracT(p / a)} or x = ${fmt(q)}`);
+};
+TEMPLATES.act4Ratio = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 0) { for (;;) { const a = ri(r, 2, 9), b = ri(r, 2, 9), c = ri(r, 2, 9), d = ri(r, 2, 9); if (gcd(a, b) > 1 || gcd(c, d) > 1 || b === c) continue;
+    const g = gcd(a * c, b * d), R = (x, y) => `${x}:${y}`;
+    return aq3Mc(r, R(a * c / g, b * d / g), [R(a, d), R(a * d, b * c), R(a + c, b + d)].filter((x) => x !== R(a * c / g, b * d / g)), (i) => R(a * c / g + i + 1, b * d / g), 'Ratios',
+      `If x:y = ${a}:${b} and y:z = ${c}:${d}, what is the ratio of x:z?`, `x/z = (x/y)(y/z) = (${a}/${b})(${c}/${d}) = ${a * c}/${b * d}${g > 1 ? ` = ${a * c / g}/${b * d / g}` : ''}, so x:z = ${R(a * c / g, b * d / g)}`); } }
+  if (kind === 1) { const n = pick(r, [200, 300, 400, 500]), red = n * pick(r, [0.1, 0.15, 0.2, 0.25]), N = pick(r, [10000, 20000, 25000, 40000]), est = red / n * N;
+    return aq3Mc(r, fmt(est), [fmt(red / n * N * 2), fmt(N / 4), fmt(red * 10)].filter((x) => x !== fmt(est)), (i) => fmt(est + 250 * (i + 1)), 'Proportions',
+      `A sample of ${n} marbles from a jar had ${red} red marbles. A second jar contains ${N.toLocaleString('en-US')} marbles with the same color distribution. What is the best estimate of the number of red marbles in the second jar?`,
+      `Red fraction: ${red}/${n} = ${fmt(red / n)}\n${fmt(red / n)} × ${N.toLocaleString('en-US')} = ${fmt(est)}`); }
+  if (kind === 2) { const p1 = pick(r, [60, 70, 75, 80]), p2 = pick(r, [40, 50, 60]), ans = aq4R((100 - p1) * (100 - p2) / 100);
+    return aq3Mc(r, `${fmt(ans)}%`, [`${100 - p1}%`, `${fmt(aq4R((100 - p1) * p2 / 100))}%`, `${100 - p2}%`].filter((x) => x !== `${fmt(ans)}%`), (i) => `${fmt(ans + i + 2)}%`, 'Percents',
+      `${p1}% of a graduating class had taken at least 6 chemistry courses. Of the remaining class members, ${p2}% had taken 4 or 5 chemistry courses. What percent of the graduating class had taken fewer than 4 chemistry courses?`,
+      `Remaining: ${100 - p1}% of the class. Of those, ${100 - p2}% took fewer than 4.\n${100 - p1}% × ${100 - p2}% = ${fmt(ans)}% of the class`); }
+  const C = pick(r, [20, 30, 40, 50]), up = pick(r, [20, 25, 30, 50]), off = pick(r, [10, 20, 25]), price = C * (1 + up / 100), emp = C * (1 - off / 100);
+  return aq3Mc(r, `$${fmt(emp)}`, [`$${fmt(price * (1 - off / 100))}`, `$${fmt(C)}`, `$${fmt(price - off)}`].filter((x) => x !== `$${fmt(emp)}`), (i) => `$${fmt(emp + i + 1)}`, 'Percents',
+    `A store charges $${fmt(price)} for a pair of shoes. This price is ${up}% more than the store’s cost. At an end-of-year sale, employees can buy the shoes at ${off}% off the store’s cost. How much would an employee pay for a pair?`,
+    `Cost: ${fmt(price)} ÷ ${fmt(1 + up / 100)} = $${fmt(C)}\nEmployee price: ${fmt(C)} × ${fmt(1 - off / 100)} = $${fmt(emp)}`);
+};
+TEMPLATES.act4Rational = (r) => {
+  if (r() < 0.5) {
+    const a = ri(r, 1, 4), b = ri(r, 1, 6), N = aq4Lin(a + 1, a - b);
+    return aq3Mc(r, aq4Frac(N, 'x + 1'), [aq4Frac(aq4Lin(a + 1, a + b), 'x + 1'), aq4Frac(aq4Lin(1, -b), 'x + 1'), aq4Frac(aq4Lin(a + 1, 1), String(a + 1))].filter((x) => x !== aq4Frac(N, 'x + 1')), (i) => aq4Frac(aq4Lin(a + 1, a - b + i + 1), 'x + 1'), 'Rational expressions',
+      `Which fraction is equivalent to ${a} + x/(x + 1) ${MINUS} ${b}/(x + 1)?`,
+      `Write ${a} as ${a}(x + 1)/(x + 1):\n(${aq4Lin(a, a)} + x − ${b})/(x + 1) = (${N})/(x + 1)`);
+  }
+  const d = pick(r, [2, 3]), A = d * ri(r, 2, 6), B = d * nz(r, -6, 6), C = d * ri(r, 1, 5), T = (p, q, s) => aq4Poly([[p, 'x²'], [q, 'x'], [s, '']]);
+  return aq3Mc(r, T(A / d, B / d, C / d), [T(A / d, B / d, C), T(A, B, C), T(A / d, B / d, 0)].filter((x) => x !== T(A / d, B / d, C / d)), (i) => T(A / d, B / d, C / d + i + 1), 'Rational expressions',
+    `Which expression represents (${aq4Poly([[A, 'x³'], [B, 'x²'], [C, 'x']])})/(${d}x) in simplest form?`,
+    `Divide each term by ${d}x: ${A}x³/(${d}x) = ${aq4Poly([[A / d, 'x²']])}, ${fmt(B)}x²/(${d}x) = ${aq4Poly([[B / d, 'x']])}, ${C}x/(${d}x) = ${C / d}\nAnswer: ${T(A / d, B / d, C / d)}`);
+};
+
+// a real-world graph with its own x and y scales (first quadrant), gridlines, labels, and a line or curve
+const aq4Graph = ({ xr, yr, xs, ys, f, a = xr[0], b = xr[1], pts = [], xl = '', yl = '' }) => (cv) => {
+  const c = cv._ctx, W = cv._w, H = cv._h, L = 58, R = 18, T = 16, B = 46, X = (x) => L + ((x - xr[0]) / (xr[1] - xr[0])) * (W - L - R), Y = (y) => H - B - ((y - yr[0]) / (yr[1] - yr[0])) * (H - T - B);
+  c.clearRect(0, 0, W, H); c.lineWidth = 1; c.strokeStyle = '#e4e1d9';
+  for (let x = xr[0]; x <= xr[1] + 1e-9; x += xs) { c.beginPath(); c.moveTo(X(x), Y(yr[0])); c.lineTo(X(x), Y(yr[1])); c.stroke(); }
+  for (let y = yr[0]; y <= yr[1] + 1e-9; y += ys) { c.beginPath(); c.moveTo(X(xr[0]), Y(y)); c.lineTo(X(xr[1]), Y(y)); c.stroke(); }
+  c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(X(xr[0]), Y(yr[1])); c.lineTo(X(xr[0]), Y(yr[0])); c.lineTo(X(xr[1]), Y(yr[0])); c.stroke();
+  c.fillStyle = '#5c5a55'; c.font = '12px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'top';
+  for (let x = xr[0]; x <= xr[1] + 1e-9; x += xs) c.fillText(fmt(aq4R(x)), X(x), Y(yr[0]) + 4);
+  c.textAlign = 'right'; c.textBaseline = 'middle';
+  for (let y = yr[0]; y <= yr[1] + 1e-9; y += ys) c.fillText(fmt(aq4R(y)), X(xr[0]) - 5, Y(y));
+  c.fillStyle = '#1d1d1b'; c.font = 'italic 13px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'bottom'; c.fillText(xl, (X(xr[0]) + X(xr[1])) / 2, H - 2);
+  c.save(); c.translate(13, (Y(yr[0]) + Y(yr[1])) / 2); c.rotate(-Math.PI / 2); c.textBaseline = 'middle'; c.fillText(yl, 0, 0); c.restore();
+  c.save(); c.beginPath(); c.rect(X(xr[0]), Y(yr[1]), X(xr[1]) - X(xr[0]), Y(yr[0]) - Y(yr[1])); c.clip();
+  c.strokeStyle = '#1f5fa8'; c.lineWidth = 2.4; c.beginPath(); for (let j = 0; j <= 200; j++) { const x = a + ((b - a) * j) / 200; j ? c.lineTo(X(x), Y(f(x))) : c.moveTo(X(x), Y(f(x))); } c.stroke(); c.restore();
+  c.fillStyle = '#1f5fa8'; pts.forEach(([x, y]) => { c.beginPath(); c.arc(X(x), Y(y), 4.5, 0, 2 * Math.PI); c.fill(); });
+};
+
+/* ===== 4.3 Linear equations ===== */
+TEMPLATES.act4CompIneq = (r) => {
+  const c = ri(r, 2, 4), b = ri(r, -3, 5), lo = nz(r, -6, -1), hi = lo + ri(r, 2, 8), L = b - c * hi, H = b - c * lo; // L < b − cx < H  ⟺  lo < x < hi
+  const I = (u, v) => `${fmt(u)} < x < ${fmt(v)}`;
+  return aq3Mc(r, I(lo, hi), [I(-hi, -lo), I(L, H), I((L - b) / c, (H - b) / c)].filter((x) => x !== I(lo, hi) && !/\./.test(x)), (i) => I(lo - i - 1, hi), 'Compound inequalities',
+    `Which of the following is the solution of the inequality ${fmt(L)} < ${fmt(b)} ${MINUS} ${c}x < ${fmt(H)}?`,
+    `Subtract ${fmt(b)}: ${fmt(L - b)} < ${MINUS}${c}x < ${fmt(H - b)}\nDivide by ${MINUS}${c} and flip both signs: ${fmt((L - b) / -c)} > x > ${fmt((H - b) / -c)}\nSo ${I(lo, hi)}`);
+};
+TEMPLATES.act4BreakEven = (r) => {
+  const n = ri(r, 2, 8), r1 = pick(r, [1.5, 2, 2.5, 1]), r2 = r1 + pick(r, [1, 1.5, 2]), F2 = ri(r, 15, 30), F1 = aq4R(F2 + (r2 - r1) * n);
+  return aq3Mc(r, String(n), [String(n + 1), String(n - 1), String(Math.round(F1 / r2))].filter((x) => x !== String(n) && +x > 0), (i) => String(n + i + 2), 'Linear equations',
+    `A book club charges a $${fmt(F1)} monthly fee plus $${fmt(r1)} per book read that month. Another club charges a $${F2} monthly fee plus $${fmt(r2)} per book. How many books must be read in a month for the total charges from each club to be equal?`,
+    `${fmt(F1)} + ${fmt(r1)}b = ${F2} + ${fmt(r2)}b\n${fmt(F1 - F2)} = ${fmt(r2 - r1)}b\nb = ${n}`);
+};
+TEMPLATES.act4Current = (r) => {
+  for (;;) {
+    const c = ri(r, 2, 6), t1 = ri(r, 4, 10), t2 = ri(r, 2, t1 - 1), s = c * (t1 + t2) / (t1 - t2);
+    if (!Number.isInteger(s) || s > 60) continue;
+    return aq3Mc(r, `${s} miles/hour`, [`${s + c} miles/hour`, `${s - c} miles/hour`, `${s + 5} miles/hour`], (i) => `${s + i + 2} miles/hour`, 'Linear equations',
+      `A yacht moves on a river that has a current of ${c} miles per hour. The trip upstream takes ${t1} hours, while the return trip takes ${t2} hours. What is the speed of the yacht relative to the water?`,
+      `Upstream speed s − ${c}, downstream speed s + ${c}, and both trips cover the same distance:\n${t1}(s − ${c}) = ${t2}(s + ${c})\n${t1}s − ${t1 * c} = ${t2}s + ${t2 * c}\n${t1 - t2}s = ${(t1 + t2) * c}\ns = ${s} miles/hour`);
+  }
+};
+TEMPLATES.act4GraphRate = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { // soda draining
+    const V = pick(r, [200, 300, 400]), T = pick(r, [50, 100, 200]), k = pick(r, [5, 10]), per = V / T * k;
+    if (!Number.isInteger(per)) return TEMPLATES.act4GraphRate(r);
+    return aq3Mc(r, String(per), [fmt(-per), fmt(V / T), String(per * 2)].filter((x) => x !== String(per)), (i) => String(per + i + 1), 'Rate of change from a graph',
+      `Leonard is drinking a soda. The amount of soda left in the cup (in mL) as a function of time (in seconds) is graphed below. How much soda, in mL, did he drink every ${k} seconds?`,
+      `The line goes from (0, ${V}) to (${T}, 0): slope = −${V}/${T} = −${fmt(V / T)} mL per second.\nHe drinks ${fmt(V / T)} mL each second, so ${fmt(V / T)} × ${k} = ${per} mL every ${k} seconds.`,
+      { draw: aq4Graph({ xr: [0, T * 2], xs: T / 5, yr: [0, V], ys: V / 6 > 50 ? 100 : 50, f: (x) => V - V / T * x, a: 0, b: T, xl: 'time (seconds)', yl: 'soda left (mL)' }), size: [440, 320] });
+  }
+  if (kind === 1) { // earnings line
+    const b = pick(r, [25, 50, 75]), m = pick(r, [5, 7.5, 10, 6]), x = pick(r, [15, 25, 35, 45]), v = aq4R(b + m * x);
+    return aq3Mc(r, `$${v.toFixed(2)}`, [`$${(m * x).toFixed(2)}`, `$${(v + m).toFixed(2)}`, `$${(b + m * (x - 5)).toFixed(2)}`], (i) => `$${(v + 10 * (i + 1)).toFixed(2)}`, 'Reading a linear graph',
+      `The graph below shows earnings (in dollars) over time (in hours). Using the graph, find the earnings after ${x} hours.`,
+      `The line starts at (0, ${b}) and rises ${fmt(m * 10)} every 10 hours, so the slope is ${fmt(m)}.\nEarnings = ${b} + ${fmt(m)}(${x}) = ${fmt(v)}`,
+      { draw: aq4Graph({ xr: [0, 50], xs: 10, yr: [0, Math.ceil((b + m * 50) / 50) * 50], ys: 50, f: (t) => b + m * t, pts: [[0, b], [10, b + m * 10]], xl: 'time (hours)', yl: 'earnings ($)' }), size: [440, 340] });
+  }
+  const g = pick(r, [0.05, 0.04, 0.1, 0.02]), X = 500;
+  return aq3Mc(r, fmt(g), [fmt(g * 10), fmt(1 / g), fmt(g / 2)].filter((x) => x !== fmt(g)), (i) => fmt(aq4R(g + 0.01 * (i + 1))), 'Rate of change from a graph',
+    'The graph below shows the forecasted gasoline use for a vehicle. Which of the following is the closest estimate of the vehicle’s predicted rate of gasoline use in gallons per mile?',
+    `Pick two points on the line: (0, 0) and (${X}, ${fmt(g * X)}).\nRate = ${fmt(g * X)} gallons ÷ ${X} miles = ${fmt(g)} gallons per mile`,
+    { draw: aq4Graph({ xr: [0, 600], xs: 100, yr: [0, Math.ceil(g * 600 / 5) * 5], ys: 5, f: (x) => g * x, pts: [[X, g * X]], xl: 'miles', yl: 'gallons' }), size: [440, 320] });
+};
+TEMPLATES.act4LineGraph = (r) => {
+  for (;;) {
+    const p = nz(r, -3, 3), q = pick(r, [1, 1, 2, 3]), m = p / q, b = nz(r, -4, 4);
+    if (q > 1 && gcd(Math.abs(p), q) > 1) continue;
+    const A = nz(r, -6, 6); if (q === 1 && false) continue;
+    const E = (mm, bb) => `y = ${aq4Poly([[mm, 'x'], [bb, '']]).replace(/(\d+)\/(\d+)x/, '$1/$2 x')}`;
+    const mT = (mm) => fracT(mm);
+    const S = (mm, bb) => { const t = mm === 1 ? 'x' : mm === -1 ? `${MINUS}x` : `${mT(mm)}x`; return `y = ${t}${bb ? ` ${bb < 0 ? MINUS : '+'} ${Math.abs(bb)}` : ''}`; };
+    const ans = S(m, b), pts = [[0, b], [q * (b < 0 ? 1 : -1) || q, b + p * (b < 0 ? 1 : -1)]];
+    return aq3Mc(r, ans, [S(-m, b), S(m, -b), S(m === 0 ? 1 : 1 / m, b)].filter((x) => x !== ans), (i) => S(m, b + i + 1), 'Graphs of lines',
+      'Which of the following is the equation of the line graphed in the standard (x, y) coordinate plane below?',
+      `The y-intercept is ${fmt(b)}. From (0, ${fmt(b)}) to (${fmt(pts[1][0])}, ${fmt(pts[1][1])}) the line rises ${fmt(pts[1][1] - b)} over ${fmt(pts[1][0])}, so the slope is ${mT(m)}.\n${ans}`,
+      { draw: plotQ({ xr: [-7, 7], yr: [-7, 7], curves: [{ f: (x) => m * x + b }], pts: pts.map((pp) => ({ p: pp })) }), size: [360, 360] });
+  }
+};
+TEMPLATES.act4TableLine = (r) => {
+  if (r() < 0.35) {
+    const m = pick(r, [-0.5, -0.25, 0.25, 0.5, 0]), b = ri(r, 2, 9), xs = [0.5, 1, 1.5, 2, 2.5], ans = m < 0 ? 'negative' : m > 0 ? 'positive' : 'constant (zero)';
+    return aq3Mc(r, ans, ['negative', 'positive', 'constant (zero)', 'cannot be determined'].filter((x) => x !== ans), () => null, 'Rate of change',
+      'Examine the data in the table below. The rate of change is best described as:',
+      `As x increases by 0.5, y ${m < 0 ? `decreases by ${fmt(-m * 0.5)}` : m > 0 ? `increases by ${fmt(m * 0.5)}` : 'stays the same'}, so the rate of change is ${ans}.`,
+      { draw: b9gridDraw([['x', ...xs.map(fmt)], ['y', ...xs.map((x) => fmt(aq4R(b + m * x)))]]), size: [420, 70] });
+  }
+  const m = nz(r, -5, 5), b = ri(r, -20, 60), xs = [ri(r, 1, 4)]; for (let i = 0; i < 4; i++) xs.push(xs[i] + ri(r, 1, 4));
+  const E = (mm, bb) => `y = ${aq4Lin(mm, bb)}`;
+  return aq3Mc(r, E(m, b), [E(-m, b), E(m, -b), E(-m, -b)].filter((x) => x !== E(m, b)), (i) => E(m, b + i + 1), 'Linear equations from a table',
+    'Which of the following equations expresses the relationship between x and y in the table below?',
+    `Slope: (${fmt(m * xs[1] + b)} − ${m * xs[0] + b < 0 ? `(${fmt(m * xs[0] + b)})` : fmt(m * xs[0] + b)})/(${xs[1]} − ${xs[0]}) = ${fmt(m)}\nUse (${xs[0]}, ${fmt(m * xs[0] + b)}): ${fmt(m * xs[0] + b)} = ${fmt(m)}(${xs[0]}) + b, so b = ${fmt(b)}\n${E(m, b)}`,
+    { draw: b9gridDraw([['x', ...xs.map(fmt)], ['y', ...xs.map((x) => fmt(m * x + b))]]), size: [420, 70] });
+};
+TEMPLATES.act4NumLineIneq = (r) => {
+  const a = ri(r, -6, 2), b = a + ri(r, 2, 6), ca = r() < 0.5, cb = r() < 0.5, L = ca ? '≤' : '<', R = cb ? '≤' : '<', ans = `${fmt(a)} ${L} x ${R} ${fmt(b)}`;
+  const draw = aq3NL([], -8, 8, 1, 1, [{ a, b }], [[a, ca], [b, cb]]);
+  return aq3Mc(r, ans, [`${fmt(a)} ${ca ? '<' : '≤'} x ${cb ? '<' : '≤'} ${fmt(b)}`, `x ${L} ${fmt(a)} or x ${R === '≤' ? '≥' : '>'} ${fmt(b)}`, `${fmt(-b)} ${L} x ${R} ${fmt(-a)}`].filter((x) => x !== ans), (i) => `${fmt(a - i - 1)} ${L} x ${R} ${fmt(b)}`, 'Inequalities on a number line',
+    'Which inequality best represents the graph below?', `The shading runs from ${fmt(a)} to ${fmt(b)}. A closed dot means the endpoint is included (≤); an open dot means it is not (<).\n${ans}`,
+    { draw, size: [560, 90] });
+};
+
+/* ===== 4.4 Systems of equations ===== */
+TEMPLATES.act4SysSolve = (r) => {
+  for (;;) {
+    const x = nz(r, -6, 6), y = nz(r, -6, 6), a = nz(r, -5, 5), b = nz(r, -7, 7), c = nz(r, -5, 5), d = nz(r, -5, 5);
+    if (a * d - b * c === 0) continue;
+    const e1 = `${aq4Poly([[a, 'x'], [b, 'y']])} = ${fmt(a * x + b * y)}`, e2 = `${aq4Poly([[c, 'x'], [d, 'y']])} = ${fmt(c * x + d * y)}`, P = (u, v) => `(${fmt(u)}, ${fmt(v)})`;
+    const ask = ri(r, 0, 2), sol = `Solve by elimination or substitution:\n${e1}\n${e2}\nx = ${fmt(x)}, y = ${fmt(y)}\nCheck: ${fmt(a)}(${fmt(x)}) + ${fmt(b)}(${fmt(y)}) = ${fmt(a * x + b * y)} ✓`.replace(/\+ −/g, '− ');
+    if (ask === 0) return aq3Mc(r, P(x, y), [P(-x, y), P(x, -y), P(y, x)].filter((v) => v !== P(x, y)), (i) => P(x + i + 1, y), 'Systems of equations', `Find the unique point that solves the equations simultaneously.\n${e1}\n${e2}`, sol);
+    const v = ask === 1 ? x : y;
+    return aq3Mc(r, fmt(v), [fmt(-v), fmt(ask === 1 ? y : x), fmt(v + 2)].filter((t) => t !== fmt(v)), (i) => fmt(v + i + 3), 'Systems of equations', `What is the ${ask === 1 ? 'x' : 'y'} value of the solution of the system of equations below?\n${e1}\n${e2}`, sol);
+  }
+};
+TEMPLATES.act4SysWord = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 0) { const wL = pick(r, [45, 50, 60]), wS = wL - pick(r, [10, 15, 20]), n = ri(r, 80, 150), L = ri(r, 20, n - 20), W = wL * L + wS * (n - L);
+    return aq3Mc(r, String(L), [String(n - L), String(L + 10), String(Math.round(W / (wL + wS)))].filter((x) => x !== String(L)), (i) => String(L + 5 * (i + 1)), 'Systems of equations',
+      `A cargo truck is carrying ${n} boxes, some large and some small. The large boxes weigh ${wL} pounds each and the small boxes weigh ${wS} pounds each. If the boxes weigh ${W.toLocaleString('en-US')} pounds in all, how many large boxes is it carrying?`,
+      `L + S = ${n} and ${wL}L + ${wS}S = ${W}.\nSubstitute S = ${n} − L: ${wL}L + ${wS}(${n} − L) = ${W}\n${wL - wS}L = ${W - wS * n}\nL = ${L}`); }
+  if (kind === 1) { const t = ri(r, 150, 600), k = pick(r, [2, 3, 4]), c = t / (k + 1); if (!Number.isInteger(c)) return TEMPLATES.act4SysWord(r);
+    return aq3Mc(r, String(k * c), [String(c), String(t - c * 2), String(Math.round(t / 2))].filter((x) => x !== String(k * c)), (i) => String(k * c + 10 * (i + 1)), 'Systems of equations',
+      `A hamburger shop sold a combined total of ${t} hamburgers and cheeseburgers. The number of hamburgers sold was ${['', '', 'two', 'three', 'four'][k]} times the number of cheeseburgers sold. How many hamburgers were sold?`,
+      `h + c = ${t} and h = ${k}c.\n${k}c + c = ${t}, so c = ${c} and h = ${k * c}.`); }
+  if (kind === 2) { const nb = ri(r, 80, 300) / 100, bd = ri(r, 150, 400) / 100, a = ri(r, 2, 4), b = a + ri(r, 1, 2), P1 = aq4R(a * nb + bd), P2 = aq4R(b * nb + bd), diff = aq4R(Math.abs(bd - nb));
+    return aq3Mc(r, `$${diff.toFixed(2)}`, [`$${nb.toFixed(2)}`, `$${bd.toFixed(2)}`, `$${aq4R(P2 - P1).toFixed(2)}`].filter((x) => x !== `$${diff.toFixed(2)}`), (i) => `$${(diff + 0.1 * (i + 1)).toFixed(2)}`, 'Systems of equations',
+      `Jane paid $${P1.toFixed(2)} for ${a} notebooks and 1 binder. Lovely paid $${P2.toFixed(2)} for ${b} notebooks and 1 binder of the same kind. What is the difference between the price of a notebook and the price of a binder?`,
+      `Subtract the two purchases: ${b - a} notebook${b - a > 1 ? 's' : ''} cost $${aq4R(P2 - P1).toFixed(2)}, so a notebook is $${nb.toFixed(2)}.\nBinder: ${P1.toFixed(2)} − ${a}(${nb.toFixed(2)}) = $${bd.toFixed(2)}\nDifference: $${diff.toFixed(2)}`); }
+  const pa = pick(r, [8, 10, 12, 15]), ps = pa - pick(r, [3, 4, 5]), A = ri(r, 100, 300), S = ri(r, 100, 300), tot = aq4R(pa * A + ps * S);
+  return aq3Mc(r, `$${pa.toFixed(2)}`, [`$${ps.toFixed(2)}`, `$${(pa + 1).toFixed(2)}`, `$${(pa - 2).toFixed(2)}`], (i) => `$${(pa + 2 + i).toFixed(2)}`, 'Systems of equations',
+    `A concert sold ${A} adult tickets and ${S} student tickets for a total of $${tot.toLocaleString('en-US')}. A student ticket costs $${pa - ps} less than an adult ticket. What is the cost of an adult ticket?`,
+    `Let a = adult price; student = a − ${pa - ps}.\n${A}a + ${S}(a − ${pa - ps}) = ${tot}\n${A + S}a = ${tot + S * (pa - ps)}\na = ${pa}`);
+};
+TEMPLATES.act4RectPA = (r) => {
+  const w = ri(r, 3, 12), l = w + ri(r, 2, 12), P = 2 * (l + w), A = l * w;
+  return aq3Mc(r, String(l), [String(w), String(P / 2), String(l + w)].filter((x) => x !== String(l)), (i) => String(l + i + 1), 'Systems of equations',
+    `Abby wants to buy a small rectangular farm. Find the length of the lot (the longer side) whose perimeter is ${P} m and whose area is ${A} square meters.`,
+    `l + w = ${P / 2} and lw = ${A}.\nTwo numbers that add to ${P / 2} and multiply to ${A}: ${l} and ${w}.\nThe length is ${l} m.`);
+};
+TEMPLATES.act4LineRel = (r) => {
+  const p = nz(r, -4, 4), q = pick(r, [1, 2, 3, 5]), b = nz(r, -6, 6), kind = ri(r, 0, 3), k = pick(r, [2, 3, -2]);
+  // line 1: p x − q y = −q b  (y = p/q x + b) written as A x + B y = C
+  const L = (A, B, C) => `${aq4Poly([[A, 'x'], [B, 'y']])} = ${fmt(C)}`;
+  const l1 = L(-p, q, q * b);
+  let l2, ans;
+  if (kind === 0) { l2 = L(-p * k, q * k, q * (b + 2) * k); ans = 'parallel'; }
+  else if (kind === 1) { l2 = L(q, p, ri(r, -9, 9)); ans = 'perpendicular'; }
+  else if (kind === 2) { l2 = L(-p * k, q * k, q * b * k); ans = 'the same line'; }
+  else { l2 = L(-p + q, q, ri(r, -9, 9)); ans = 'intersecting, but not perpendicular'; if (p * (p - q) === -q * q) return TEMPLATES.act4LineRel(r); }
+  return aq3Mc(r, ans, ['parallel', 'perpendicular', 'the same line', 'intersecting, but not perpendicular'].filter((x) => x !== ans), () => null, 'Systems of equations',
+    `Which statement best describes the lines ${l1} and ${l2}?`,
+    `Solve each for y to compare slopes and intercepts. The first line has slope ${fracT(p / q)} and y-intercept ${fmt(b)}.\n${ans === 'parallel' ? 'The second has the same slope and a different intercept: parallel.' : ans === 'perpendicular' ? `The second has slope ${fracT(-q / p)}, the negative reciprocal: perpendicular.` : ans === 'the same line' ? 'The second equation is the first multiplied by a constant: the same line.' : 'The slopes are different and are not negative reciprocals: the lines intersect but are not perpendicular.'}`);
+};
+TEMPLATES.act4QuadMax = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const a = -ri(r, 1, 4), h = nz(r, -5, 5), k = nz(r, -6, 6), b = -2 * a * h, c = a * h * h + k, P = (u, v) => `(${fmt(u)}, ${fmt(v)})`;
+    return aq3Mc(r, P(h, k), [P(-h, k), P(h, -k), P(-h, -k)], (i) => P(h, k + i + 1), 'Quadratic functions', `Determine the maximum point of y = ${aq4Q(a, b, c)}.`,
+      `x-coordinate of the vertex: −b/(2a) = −(${fmt(b)})/(2 · ${fmt(a)}) = ${fmt(h)}\ny = ${fmt(a)}(${fmt(h)})² + ${fmt(b)}(${fmt(h)}) + ${fmt(c)} = ${fmt(k)}\nThe maximum is at ${P(h, k)}.`.replace(/\+ −/g, '− ')); }
+  if (kind === 1) { const h = nz(r, -5, 5), k = nz(r, -5, 5), R = ri(r, 1, 6), D = -2 * h, E = -2 * k, F = h * h + k * k - R * R;
+    return aq3Mc(r, String(R), [String(R * R), String(Math.abs(F) || R + 2), String(R + 1)].filter((x) => x !== String(R)), (i) => String(R + i + 2), 'Circles',
+      `The equation of a circle is x² + y² ${aq4Poly([[D, 'x'], [E, 'y'], [F, '']]).replace(/^([^−])/, '+ $1').replace(/^−/, '− ')} = 0. Find the radius of the circle.`,
+      `Complete the square: (x ${h < 0 ? '+' : MINUS} ${Math.abs(h)})² + (y ${k < 0 ? '+' : MINUS} ${Math.abs(k)})² = ${h * h} + ${k * k} ${F < 0 ? '+' : MINUS} ${Math.abs(F)} = ${R * R}\nradius = √${R * R} = ${R}`); }
+  const r1 = nz(r, -3, 4), r2 = nz(r, -4, 4), r3 = nz(r, -4, 5); // (x − r1)(x² + px + q)
+  const p = -(r2 + r3), q = r2 * r3, c3 = [1, p - r1, q - r1 * p, -r1 * q];
+  const T = (pp, qq) => aq4Q(1, pp, qq);
+  return aq3Mc(r, T(p, q), [T(-p, q), T(p, -q), T(p + r1, q)].filter((x) => x !== T(p, q)), (i) => T(p, q + i + 1), 'Polynomial division',
+    `Find the other factor of the polynomial ${aq4Poly([[1, 'x³'], [c3[1], 'x²'], [c3[2], 'x'], [c3[3], '']])}, given that one factor is ${aq4Lin(1, -r1)}.`,
+    `Divide by (${aq4Lin(1, -r1)}) (synthetic division with ${fmt(r1)}): the quotient is ${T(p, q)}.\nCheck: (${aq4Lin(1, -r1)})(${T(p, q)}) multiplies back to the original.`);
+};
+
+/* ===== 4.5 Roots ===== */
+TEMPLATES.act4CubeRoot = (r) => {
+  const n = ri(r, 2, 29), neg = r() < 0.6, v = (neg ? -1 : 1) * n ** 3, ans = (neg ? -1 : 1) * n;
+  return aq3Mc(r, fmt(ans), [fmt(-ans), fmt(ans + (neg ? -2 : 2)), fmt(-(ans + (neg ? -2 : 2)))], (i) => fmt(ans + i + 3), 'Roots', `Find the cube root of ${fmt(v)}.`,
+    `${fmt(ans)} × ${fmt(ans)} × ${fmt(ans)} = ${fmt(v)}, so ∛(${fmt(v)}) = ${fmt(ans)}.${neg ? ' (The cube root of a negative number is negative.)' : ''}`);
+};
+TEMPLATES.act4SqrtDigits = (r) => {
+  const d = ri(r, 1, 4), n = d === 1 ? ri(r, 4, 9) : ri(r, 10 ** (d - 1) + 1, 10 ** d - 1), N = n * n;
+  return aq3Mc(r, String(d), ['1', '2', '3', '4'].filter((x) => x !== String(d)), () => null, 'Roots', `Find the number of digits in the square root of ${N.toLocaleString('en-US').replace(/,/g, '')}.`,
+    `Group the digits in pairs from the right: each pair gives one digit of the square root. ${N} has ${String(N).length} digits, which make ${d} group${d > 1 ? 's' : ''}.\n(√${N} = ${n}, which has ${d} digit${d > 1 ? 's' : ''}.)`);
+};
+TEMPLATES.act4SquareSide = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 0) { const s = ri(r, 6, 20), G = s * s;
+    return aq3Mc(r, String(s), [String(G / 2), String(s + 2), String(Math.round(G / 4))].filter((x) => x !== String(s)), (i) => String(s + i + 3), 'Roots',
+      `Ivy is baking a square cake that will be cut into 1-inch square pieces. The cake is enough to serve ${G} guests one piece each. How long, in inches, should each side of the cake be?`, `Area = ${G} square inches, so each side is √${G} = ${s} inches.`); }
+  if (kind === 1) { const s = ri(r, 6, 20), A = s * s, P = 8 * s;
+    return aq3Mc(r, String(P), [String(6 * s), String(12 * s), String(10 * s)], (i) => String(P + 4 * (i + 1)), 'Roots',
+      `A backyard is divided into three square areas, each with an area of ${A} square feet, arranged in an L shape (two squares side by side and one on top of the left square). How much fencing is needed for the outside edge of the whole yard?`,
+      `Each side is √${A} = ${s} ft. The L-shaped outline has 8 sides of length ${s}: 8 × ${s} = ${P} ft.`); }
+  if (kind === 2) { const w = ri(r, 1, 3), T = pick(r, [200, 300, 500, 600, 700]), s = Math.sqrt(T) - 2 * w;
+    return aq3Mc(r, s.toFixed(2), [(Math.sqrt(T) - w).toFixed(2), Math.sqrt(T).toFixed(2), (s - 1).toFixed(2)], (i) => (s + i + 1).toFixed(2), 'Roots',
+      `A square pool is surrounded by a pavement with a uniform width of ${w} foot${w > 1 ? '' : ''}. The combined area of the pool and pavement is ${T} square feet. What is the side length of the pool, to the nearest hundredth of a foot?`,
+      `The outer square has side √${T} ≈ ${Math.sqrt(T).toFixed(2)} ft. The pavement takes ${w} ft on each side: ${Math.sqrt(T).toFixed(2)} − ${2 * w} = ${s.toFixed(2)} ft.`); }
+  const a = ri(r, 1, 3), b = ri(r, 2, 5), s = ri(r, 3, 9), D = (s + a) * (s + b) - s * s;
+  return aq3Mc(r, String(s), [String(s + 1), String(s - 1), String(s + 2)], (i) => String(s + i + 3), 'Roots',
+    `Jane has a square flower garden. She plans to increase the width by ${a} meter${a > 1 ? 's' : ''} and the length by ${b} meters. The new area will be ${D} square meters more than the present area. What is the side length of the original garden?`,
+    `(s + ${a})(s + ${b}) − s² = ${D}\n${a + b}s + ${a * b} = ${D}\ns = ${s} meters`);
+};
+TEMPLATES.act4RadSimp = (r) => {
+  const out = ri(r, 2, 5), inn = pick(r, [2, 3, 5, 6, 7]), a = ri(r, 2, 7), b = ri(r, 1, 6), ax = Math.floor(a / 2), by = Math.floor(b / 2), ia = a % 2, ib = b % 2;
+  const V = (e1, e2) => aq3Mono(1, [['x', e1], ['y', e2]]).replace(/^1$/, '');
+  const S = (co, o1, o2, rad, i1, i2) => `${co === 1 ? '' : co}${V(o1, o2)}√(${rad}${V(i1, i2)})`;
+  const ans = S(out, ax, by, inn, ia, ib);
+  return aq3Mc(r, ans, [S(out, a - 1, b - 1, inn, 1, 1), S(out * out, ax, by, inn, ia, ib), S(out, ax, by, inn * out, ia, ib), S(1, ax, by, inn * out * out, ia, ib)].filter((x) => x !== ans && !/√\(\)/.test(x)), (i) => S(out + i + 1, ax, by, inn, ia, ib), 'Simplifying radicals',
+    `Simplify √(${out * out * inn}${V(a, b)}). Assume x and y are positive.`,
+    `${out * out * inn} = ${out * out} · ${inn}, and ${out * out} is a perfect square.\n${V(a, 0)} = ${ax ? `(${V(ax, 0)})²` : ''}${ia ? ' · x' : ''}${b ? `,  ${V(0, b)} = ${by ? `(${V(0, by)})²` : ''}${ib ? ' · y' : ''}` : ''}\nTake out the perfect squares: ${ans}`);
+};
+TEMPLATES.act4SqrtFormula = (r) => {
+  const k = pick(r, [2, 3, 5]), c = pick(r, [3, 5, 6, 30]), l = ri(r, 20, 90), s = k * Math.sqrt(c * l), ans = s.toFixed(1);
+  return aq3Mc(r, ans, [(k * Math.sqrt(l)).toFixed(1), Math.sqrt(k * c * l).toFixed(1), (k * c * Math.sqrt(l) / 2).toFixed(1)].filter((x) => x !== ans), (i) => (s + i + 2).toFixed(1), 'Square root formulas',
+    `The speed of a car before the brakes were applied can be estimated by the length of its skid marks. The formula s = ${k}√(${c}l) estimates the speed s in miles per hour, where l is the length of the skid marks in feet. Estimate the speed if the skid marks measure ${l} feet.`,
+    `s = ${k}√(${c} × ${l}) = ${k}√${c * l} ≈ ${k} × ${Math.sqrt(c * l).toFixed(3)} ≈ ${ans} mph`);
+};
+
+/* ===== 4.6 Logarithmic equations ===== */
+const AQ4_SUB = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉', '₁₀'];
+TEMPLATES.act4LogDef = (r) => {
+  const kind = ri(r, 0, 2), b = pick(r, [2, 3, 4, 5, 6, 10]), c = ri(r, 2, b > 5 ? 3 : 4), v = b ** c;
+  if (kind === 0) return aq3Mc(r, String(v), [String(b * c), String(c ** b), String(b + c)].filter((x) => x !== String(v)), (i) => String(v + i + 1), 'Logarithms',
+    `If log${AQ4_SUB[b]}x = ${c}, then x = ?`, `log_b x = c means bᶜ = x: ${b}${aq3Sup(c)} = ${v}`);
+  if (kind === 1) return aq3Mc(r, String(b), [String(v / c), String(v / 2), String(b * 2)].filter((x) => x !== String(b) && !/\./.test(x)), (i) => String(b + i + 1), 'Logarithms',
+    `Which of the following is a value of n that satisfies logₙ${v} = ${c}?`, `logₙ ${v} = ${c} means n${aq3Sup(c)} = ${v}, so n = ${b}.`);
+  const sb = AQ4_SUB[b];
+  return aq3Mc(r, String(c), [String(v / b), String(b), String(c + 1)].filter((x) => x !== String(c)), (i) => String(c + i + 2), 'Logarithms', `What is the value of log${sb} ${v}?`,
+    `Ask: ${b} to what power is ${v}? ${b}${aq3Sup(c)} = ${v}, so log${sb} ${v} = ${c}.`);
+};
+TEMPLATES.act4LogRules = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 0) { const n = pick(r, [2, 3]); return aq3Mc(r, `${n}(b + c)`, [`bc`, `${n}bc`, `${n * 2}bc`, `b + c`].slice(0, 3), () => null, 'Properties of logarithms',
+    `If logₐx = b and logₐy = c, then logₐ(xy)${aq3Sup(n)} = ?`, `logₐ(xy)${aq3Sup(n)} = ${n} logₐ(xy) = ${n}(logₐx + logₐy) = ${n}(b + c)`); }
+  if (kind === 1) { const p = ri(r, 1, 4), q = p + ri(r, 2, 5), d = p - q;
+    return aq3Mc(r, fmt(d), [fmt(-d), fracT(p / q), fmt(p + q)], (i) => fmt(d - i - 1), 'Properties of logarithms',
+      `Let b be an integer greater than 1. What is the value of the base-b logarithm of b${aq3Sup(p)}/b${aq3Sup(q)}?`, `b${aq3Sup(p)}/b${aq3Sup(q)} = b${aq3Sup(d)}, and the base-b logarithm of b${aq3Sup(d)} is ${fmt(d)}.`); }
+  if (kind === 2) return aq3Mc(r, 'b − c', ['b/c', 'bc', 'c − b'], () => null, 'Properties of logarithms', 'If logₐx = b and logₐy = c, then logₐ(x/y) = ?', 'Quotient rule: logₐ(x/y) = logₐx − logₐy = b − c');
+  return aq3Mc(r, '2y and 1 are neither multiplied together nor divided.', ['The expression 2y − 1 is not raised to a power.', 'Each term in the expression does not have the same variable.', 'The expression 2y − 1 cannot be factored.'], () => null, 'Properties of logarithms',
+    'The laws of logarithms expand logs of products, quotients, and powers. Why can’t log₃(2y − 1) be expanded or simplified using the laws of logarithms?',
+    'There is no law for the log of a sum or difference. Since 2y and 1 are subtracted (not multiplied or divided), none of the laws apply.');
+};
+TEMPLATES.act4LogEval = (r) => {
+  if (r() < 0.5) {
+    const B = [[2, [4, 8, 16, 32, 64]], [3, [9, 27, 81, 243]], [4, [16, 64, 256]], [5, [25, 125, 625]]];
+    for (;;) {
+      const [b1, L1] = pick(r, B), [b2, L2] = pick(r, B), v1 = pick(r, L1), v2 = pick(r, L2), e = Math.round(Math.log(v1) / Math.log(b1)) - Math.round(Math.log(v2) / Math.log(b2)), b3 = pick(r, [2, 3, 5]);
+      if (e < 1 || e > 4) continue;
+      const S = (n) => ['', '', '₂', '₃', '₄', '₅'][n], x = b3 ** e;
+      return aq3Mc(r, String(x), [String(b3 * e), String(e), String(b3 ** (e + 1))].filter((t) => t !== String(x)), (i) => String(x + i + 1), 'Logarithms',
+        `In the equation log${S(b1)}${v1} − log${S(b2)}${v2} = log${S(b3)}x, what does x equal?`,
+        `log${S(b1)}${v1} = ${Math.round(Math.log(v1) / Math.log(b1))} and log${S(b2)}${v2} = ${Math.round(Math.log(v2) / Math.log(b2))}, so the left side is ${e}.\nlog${S(b3)}x = ${e} means x = ${b3}${aq3Sup(e)} = ${x}`);
+    }
+  }
+  const x = pick(r, [2, 3]), b = pick(r, [2, 3]), y = ri(r, 2, 5), v1 = x ** 4, v2 = b ** y, ans = y ** x;
+  return aq3Mc(r, String(ans), [String(x ** y), String(x * y), String(x + y)].filter((t) => t !== String(ans)), (i) => String(ans + i + 1), 'Logarithms',
+    `If logₓ${v1} = 4 and log${['', '', '₂', '₃'][b]}${v2} = y, then yˣ = ?`,
+    `x⁴ = ${v1}, so x = ${x}. ${b}ʸ = ${v2}, so y = ${y}.\nyˣ = ${y}${aq3Sup(x)} = ${ans}`);
+};
+TEMPLATES.act4LogApply = (r) => {
+  if (r() < 0.5) {
+    const n = ri(r, 2, 6), k = 10 ** n;
+    return aq3Mc(r, String(10 * n), [String(n), k.toLocaleString('en-US'), (10 * k).toLocaleString('en-US')].filter((x) => x !== String(10 * n)), (i) => String(10 * n + 5 * (i + 1)), 'Logarithms in context',
+      `The number of decibels an audio source produces is modeled by d = 10 log(I/K), where I is the intensity and K is a constant. Determine the number of decibels produced by a sound whose intensity is ${k.toLocaleString('en-US')} times the value of K.`,
+      `I/K = ${k.toLocaleString('en-US')} = 10${aq3Sup(n)}, so log(I/K) = ${n}.\nd = 10 × ${n} = ${10 * n}`);
+  }
+  let n = ri(r, 12, 99); if (n % 10 === 0) n++;
+  const base = pick(r, [[3, 0.5], [2, 0.3], [5, 0.7]]), [d, L] = base, ans = aq4R(n + L);
+  return aq3Mc(r, fmt(ans), [fmt(L), fmt(n), fmt(aq4R(n + L + 1))], (i) => fmt(aq4R(n + L + i + 2)), 'Logarithms in context',
+    `The value of log(x) is given in the table below. To the nearest 0.1, what is the value of log(${d} × 10${aq3Sup(n)})?`,
+    `log(${d} × 10${aq3Sup(n)}) = log ${d} + log 10${aq3Sup(n)} = ${fmt(L)} + ${n} = ${fmt(ans)}`,
+    { draw: b9gridDraw([['x', 'log(x)'], [String(d), fmt(L)], [String(d * 10), fmt(L + 1)], [String(d * 100), fmt(L + 2)]]), size: [300, 124] });
+};
+/* ---------- ACT Prep chapter 4 end ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
   { id: 'angleSum',           subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Triangle Sum Theorem', desc: 'Angles written in x — find x or an angle' },
@@ -30510,6 +31048,41 @@ QUESTION_TYPES.push({ id: 'act3MatScalar', subject: 'act', section: '3.6 Matrice
 QUESTION_TYPES.push({ id: 'act3MatMult', subject: 'act', section: '3.6 Matrices', label: 'Multiplying matrices', desc: '2 × 2 times 2 × 2 (#110)' });
 QUESTION_TYPES.push({ id: 'act3MatDet', subject: 'act', section: '3.6 Matrices', label: 'Determinant', desc: 'ad − bc; determinant equal to a multiple of k (#96, 111, 114)' });
 QUESTION_TYPES.push({ id: 'act3MatRevenue', subject: 'act', section: '3.6 Matrices', label: 'Matrices in context', desc: 'Revenue from a row times a column; total earnings (#107, 112, 113)' });
+QUESTION_TYPES.push({ id: 'act4SciConvert', subject: 'act', section: '4.1 Scientific Notation', label: 'Write numbers in scientific notation', desc: 'Large and small numbers; rewrite a non-standard form (#3, 4, 6)' });
+QUESTION_TYPES.push({ id: 'act4SciScale', subject: 'act', section: '4.1 Scientific Notation', label: 'Times larger or smaller', desc: 'Multiply or divide by a power of 10; compare two numbers (#2, 5, 9)' });
+QUESTION_TYPES.push({ id: 'act4SciOps', subject: 'act', section: '4.1 Scientific Notation', label: 'Operations in scientific notation', desc: 'Sums, products, k times a value (#7, 10)' });
+QUESTION_TYPES.push({ id: 'act4Linear', subject: 'act', section: '4.2 Equations', label: 'Solve linear equations', desc: 'ax + b = cx + d, a(x + b) = c (#20, 45, 78)' });
+QUESTION_TYPES.push({ id: 'act4Literal', subject: 'act', section: '4.2 Equations', label: 'Solve for a variable', desc: 'Formulas and literal equations (#18, 61, 70)' });
+QUESTION_TYPES.push({ id: 'act4PolyOps', subject: 'act', section: '4.2 Equations', label: 'Polynomial operations', desc: 'Multiply, distribute, combine like terms (#11, 35, 42)' });
+QUESTION_TYPES.push({ id: 'act4Factor', subject: 'act', section: '4.2 Equations', label: 'Factoring', desc: 'Factored form; which is a factor (#32, 96)' });
+QUESTION_TYPES.push({ id: 'act4Model', subject: 'act', section: '4.2 Equations', label: 'Write an equation or expression', desc: 'Word problems to algebra (#19, 26, 27, 39, 43, 48, 50, 77)' });
+QUESTION_TYPES.push({ id: 'act4WordSolve', subject: 'act', section: '4.2 Equations', label: 'Solve word problems', desc: 'Ages, fines, phone plans, purchases, reading rates (#14, 25, 33, 36, 47)' });
+QUESTION_TYPES.push({ id: 'act4Evaluate', subject: 'act', section: '4.2 Equations', label: 'Evaluate expressions and functions', desc: '(x − y)ⁿ, f(f(1)), products (#16, 17, 34, 58)' });
+QUESTION_TYPES.push({ id: 'act4ExpEq', subject: 'act', section: '4.2 Equations', label: 'Exponential equations', desc: 'Same-base equations; exponent rules (#13, 46)' });
+QUESTION_TYPES.push({ id: 'act4QuadSolve', subject: 'act', section: '4.2 Equations', label: 'Quadratic equations', desc: 'Roots, sum of solutions, where a parabola meets a line (#44, 63, 104, 105)' });
+QUESTION_TYPES.push({ id: 'act4Ratio', subject: 'act', section: '4.2 Equations', label: 'Ratios, proportions, and percents', desc: 'x:z from x:y and y:z; samples; percents (#40, 41, 64, 73)' });
+QUESTION_TYPES.push({ id: 'act4Rational', subject: 'act', section: '4.2 Equations', label: 'Rational expressions', desc: 'Add fractions; divide a polynomial by a monomial (#59, 65)' });
+QUESTION_TYPES.push({ id: 'act4CompIneq', subject: 'act', section: '4.3 Linear Equations', label: 'Compound inequalities', desc: 'Solve a < b − cx < d (#80)' });
+QUESTION_TYPES.push({ id: 'act4BreakEven', subject: 'act', section: '4.3 Linear Equations', label: 'When two plans cost the same', desc: 'Fee plus rate equations (#82)' });
+QUESTION_TYPES.push({ id: 'act4Current', subject: 'act', section: '4.3 Linear Equations', label: 'Upstream and downstream', desc: 'Speed in still water (#81)' });
+QUESTION_TYPES.push({ id: 'act4GraphRate', subject: 'act', section: '4.3 Linear Equations', label: 'Rate from a graph', desc: 'Read a rate or a value from a graphed line (#83, 87, 93)' });
+QUESTION_TYPES.push({ id: 'act4LineGraph', subject: 'act', section: '4.3 Linear Equations', label: 'Equation of a graphed line', desc: 'Slope and y-intercept from a graph (#90)' });
+QUESTION_TYPES.push({ id: 'act4TableLine', subject: 'act', section: '4.3 Linear Equations', label: 'Linear equations from a table', desc: 'Equation from a table; sign of the rate of change (#67, 74, 95)' });
+QUESTION_TYPES.push({ id: 'act4NumLineIneq', subject: 'act', section: '4.3 Linear Equations', label: 'Inequality from a number line', desc: 'Open and closed endpoints (#75)' });
+QUESTION_TYPES.push({ id: 'act4SysSolve', subject: 'act', section: '4.4 Systems of Equations', label: 'Solve a system', desc: 'Find the point, x, or y (#68, 71, 86)' });
+QUESTION_TYPES.push({ id: 'act4SysWord', subject: 'act', section: '4.4 Systems of Equations', label: 'System word problems', desc: 'Boxes, burgers, notebooks, tickets (#30, 85, 89, 97)' });
+QUESTION_TYPES.push({ id: 'act4RectPA', subject: 'act', section: '4.4 Systems of Equations', label: 'Perimeter and area', desc: 'Rectangle dimensions from P and A (#98)' });
+QUESTION_TYPES.push({ id: 'act4LineRel', subject: 'act', section: '4.4 Systems of Equations', label: 'Parallel, perpendicular, or the same line', desc: 'Compare two lines (#54)' });
+QUESTION_TYPES.push({ id: 'act4QuadMax', subject: 'act', section: '4.4 Systems of Equations', label: 'Vertices, circles, and factors', desc: 'Maximum point, circle radius, the other factor (#99, 100, 102)' });
+QUESTION_TYPES.push({ id: 'act4CubeRoot', subject: 'act', section: '4.5 Roots', label: 'Cube roots', desc: 'Cube roots of negative numbers (#108, 110)' });
+QUESTION_TYPES.push({ id: 'act4SqrtDigits', subject: 'act', section: '4.5 Roots', label: 'Digits in a square root', desc: 'Count the digits (#106, 112)' });
+QUESTION_TYPES.push({ id: 'act4SquareSide', subject: 'act', section: '4.5 Roots', label: 'Squares in context', desc: 'Side from area, fencing, pool with a walkway, growing a garden (#109, 111, 113–115)' });
+QUESTION_TYPES.push({ id: 'act4RadSimp', subject: 'act', section: '4.5 Roots', label: 'Simplify radicals', desc: '√ of a monomial (#49)' });
+QUESTION_TYPES.push({ id: 'act4SqrtFormula', subject: 'act', section: '4.5 Roots', label: 'Square root formulas', desc: 'Skid marks and speed (#107)' });
+QUESTION_TYPES.push({ id: 'act4LogDef', subject: 'act', section: '4.6 Logarithmic Equations', label: 'Definition of a logarithm', desc: 'log_b x = c (#116, 120)' });
+QUESTION_TYPES.push({ id: 'act4LogRules', subject: 'act', section: '4.6 Logarithmic Equations', label: 'Properties of logarithms', desc: 'Product, quotient, power rules (#117, 119, 121)' });
+QUESTION_TYPES.push({ id: 'act4LogEval', subject: 'act', section: '4.6 Logarithmic Equations', label: 'Evaluate logarithms', desc: 'Differences of logs; yˣ (#118, 123)' });
+QUESTION_TYPES.push({ id: 'act4LogApply', subject: 'act', section: '4.6 Logarithmic Equations', label: 'Logarithms in context', desc: 'Decibels, a log table (#122, 125)' });
 QUESTION_TYPES.push({ id: 'c111Challenge', subject: 'calc3', section: '11.1 Sequences', label: '★ Challenge: Limit of aₙ₊₁ = √(k + aₙ)', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c112Challenge', subject: 'calc3', section: '11.2 Series', label: '★ Challenge: Split into two geometric series', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c125Challenge', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: '★ Challenge: Distance between skew lines', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
