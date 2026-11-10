@@ -452,6 +452,11 @@ const SETS = {
   'act-5-4': { subject: 'act', title: '5.4 Slope-Intercept Form', items: [['act5SlopeStd', 4], ['act5SlopePts', 2], ['act5LineEq', 2], ['act5LinModel', 2], ['act5ParallelX', 1]] },
   'act-5-5': { subject: 'act', title: '5.5 Graphed Functions', items: [['act5Reflect', 2], ['act5Circle', 2], ['act5Shift', 2], ['act5ParabolaSign', 1], ['act5VertexModel', 1], ['act5GraphRead', 1], ['act5MaxCompare', 1]] },
   'act-5-6': { subject: 'act', title: '5.6 Trigonometric Functions', items: [['act5Amp', 4], ['act5TrigMax', 2], ['act5TrigId', 3], ['act5TrigGraph', 2]] },
+  'act-6-1': { subject: 'act', title: '6.1 Coordinate Geometry', items: [['act6Midpoint', 3], ['act6Equidist', 2], ['act6TriArea', 2], ['act6SysGraph', 2], ['act6CircleTangent', 2], ['act6AreaSlope', 1], ['act6Reflect3', 1]] },
+  'act-6-2': { subject: 'act', title: '6.2 Lines and Angles', items: [['act6AngleExpr', 2], ['act6Transversal', 3], ['act6ExtAngle', 3], ['act6Radians', 2], ['act6ParallelLine', 2], ['act6Section', 2]] },
+  'act-6-3': { subject: 'act', title: '6.3 Two-Dimensional Shapes', items: [['act6Pyth', 2], ['act6Similar', 2], ['act6Composite', 2], ['act6RectWord', 2], ['act6Circle2D', 2], ['act6CircleEq', 2], ['act6TriAngles', 1], ['act6TriSides', 1], ['act6TriAreaFig', 1], ['act6Special', 1], ['act6Midseg', 1]] },
+  'act-6-4': { subject: 'act', title: '6.4 Three-Dimensional Shapes', items: [['act6BoxSA', 2], ['act6Scale3D', 2], ['act6PyramidSA', 3], ['act6Cylinder', 3], ['act6VolRatio', 2], ['act6BoxLeft', 2]] },
+  'act-6-5': { subject: 'act', title: '6.5 Trigonometry', items: [['act6RightTrig', 2], ['act6Elevation', 3], ['act6Quadrant', 2], ['act6RefCot', 2], ['act6TrigEq', 1], ['act6LawCos', 2], ['act6Period', 1], ['act6EvenOdd', 1]] },
   'calc3-11-1': { subject: 'calc3', title: '11.1 Sequences', items: [['c111RatLimit', 2], ['c111RatLimit', 1, 'fr'], ['c111Term', 2], ['c111Term', 1, 'fr'], ['c111Recur', 2], ['c111Recur', 1, 'fr'], ['c111Bank', 2], ['c111Bank', 1, 'fr'], ['c111Formula', 1], ['c111Formula', 2, 'fr'], ['c111Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-11-2': { subject: 'calc3', title: '11.2 Series', items: [['c112Geo', 1], ['c112Geo', 1, 'fr'], ['c112Telescope', 1], ['c112Telescope', 1, 'fr'], ['c112Decimal', 1], ['c112Decimal', 1, 'fr'], ['c112Partial', 1], ['c112Partial', 1, 'fr'], ['c112DivTest', 1], ['c112DivTest', 1, 'fr'], ['c112Combo', 1], ['c112Combo', 1, 'fr'], ['c112Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
   'calc3-12-5': { subject: 'calc3', title: '12.5 Equations of Lines and Planes', items: [['c125LineHit', 1], ['c125LineHit', 1, 'fr'], ['c125Plane3', 1], ['c125Plane3', 1, 'fr'], ['c125Parallel', 1], ['c125Parallel', 1, 'fr'], ['c125LinePlane', 1], ['c125LinePlane', 1, 'fr'], ['c125Angle', 1], ['c125Angle', 1, 'fr'], ['c125Dist', 1], ['c125Dist', 1, 'fr'], ['c125Challenge', 1, 'fr', 'b']], lockdown: false, retries: 2, attempts: 10, desmos: true },
@@ -29754,6 +29759,382 @@ TEMPLATES.act5TrigGraph = (r) => {
     { draw: aq5Graph({ xr: [-10, 13], yr: [-4, 4], xt: aq5PiTicks(-10, 13), yt: aq5Ticks(-4, 4, 1, 1), curves: [{ f }] }), size: [480, 260] });
 };
 /* ---------- ACT Prep chapter 5 end ---------- */
+/* ---------- ACT Prep chapter 6 start ---------- */
+/* ---------- ACT Prep chapter 6: Geometry (uses aq3…/aq4…/aq5… helpers, g7Fig, g8lab) ---------- */
+const aq6P = (x, y) => `(${fracT(x)}, ${fracT(y)})`;
+const aq6Tri = (pts, names, o = {}) => g7Fig([{ pts, names, slab: o.slab || ['', '', ''], alab: o.alab || ['', '', ''], right: o.right || [0, 0, 0], arcs: (o.alab || ['', '', '']).map((a) => (a ? 1 : 0)), ticks: o.ticks || [0, 0, 0] }], o.extra || {});
+const aq6Sq = (x) => (x < 0 ? `(${fmt(x)})` : fmt(x));
+
+/* ===== 6.1 Coordinate geometry ===== */
+TEMPLATES.act6Midpoint = (r) => {
+  const a = ri(r, -9, 9), b = ri(r, -9, 9), c = ri(r, -9, 9), d = ri(r, -9, 9), mx = (a + c) / 2, my = (b + d) / 2;
+  if (a === c || b === d) return TEMPLATES.act6Midpoint(r);
+  return aq3Mc(r, aq6P(mx, my), [aq6P(a + c, b + d), aq6P((c - a) / 2, (d - b) / 2), aq6P(mx, -my), aq6P(-mx, my)], (i) => aq6P(mx + i + 1, my), 'Midpoint',
+    pick(r, [`The midpoint of the line segment joining points (${fmt(a)}, ${fmt(b)}) and (${fmt(c)}, ${fmt(d)}) is:`, `Find the coordinates of the midpoint of the line segment joining A(${fmt(a)}, ${fmt(b)}) and B(${fmt(c)}, ${fmt(d)}).`]),
+    `Average the x-coordinates and the y-coordinates:\n((${fmt(a)} + ${aq6Sq(c)})/2, (${fmt(b)} + ${aq6Sq(d)})/2) = ${aq6P(mx, my)}`);
+};
+TEMPLATES.act6Equidist = (r) => {
+  const [p, q, h] = pick(r, [[3, 4, 5], [0, 5, 5], [5, 12, 13], [6, 8, 10]]), cx = ri(r, -3, 3), cy = ri(r, -3, 3), sg = () => (r() < 0.5 ? -1 : 1);
+  const P = r() < 0.5 ? [cx + sg() * p, cy + sg() * q] : [cx + sg() * q, cy + sg() * p], D = (u) => (u[0] - cx) ** 2 + (u[1] - cy) ** 2, Q = (u) => `(${fmt(u[0])}, ${fmt(u[1])})`;
+  const wr = []; for (let i = 0; wr.length < 3 && i < 200; i++) { const u = [cx + ri(r, -h, h), cy + ri(r, -h, h)]; if (D(u) !== h * h && D(u) && !wr.includes(Q(u))) wr.push(Q(u)); }
+  return aq3Mc(r, Q(P), wr, () => null, 'Distance formula', `Which of the following points is exactly ${h} units from the point (${fmt(cx)}, ${fmt(cy)})?`,
+    `d = √((x − ${aq6Sq(cx)})² + (y − ${aq6Sq(cy)})²). For ${Q(P)}: √(${(P[0] - cx) ** 2} + ${(P[1] - cy) ** 2}) = √${h * h} = ${h}. The other points give different distances.`);
+};
+TEMPLATES.act6TriArea = (r) => {
+  for (;;) {
+    const A = [ri(r, -5, 0), ri(r, 0, 5)], B = [ri(r, 0, 3), ri(r, 1, 5)], C = [ri(r, 2, 5), ri(r, -4, 1)], ar = Math.abs((B[0] - A[0]) * (C[1] - A[1]) - (C[0] - A[0]) * (B[1] - A[1])) / 2;
+    if (ar < 3) continue;
+    const box = [Math.min(A[0], B[0], C[0]), Math.max(A[0], B[0], C[0]), Math.min(A[1], B[1], C[1]), Math.max(A[1], B[1], C[1])];
+    return aq3Mc(r, fmt(ar), [fmt(ar * 2), fmt(ar + 1), fmt(ar - 1.5)].filter((x) => x !== fmt(ar) && +x.replace(MINUS, '-') > 0), (i) => fmt(ar + 2 + i), 'Area from coordinates',
+      `In the (x, y) plane below, the vertices of a triangle are A(${fmt(A[0])}, ${fmt(A[1])}), B(${fmt(B[0])}, ${fmt(B[1])}), and C(${fmt(C[0])}, ${fmt(C[1])}). Find the area of the triangle.`,
+      `Use ½|x₁(y₂ − y₃) + x₂(y₃ − y₁) + x₃(y₁ − y₂)|:\n½|${fmt(A[0])}(${fmt(B[1] - C[1])}) + ${fmt(B[0])}(${fmt(C[1] - A[1])}) + ${fmt(C[0])}(${fmt(A[1] - B[1])})| = ${fmt(ar)}\n(Or draw the box from x = ${fmt(box[0])} to ${fmt(box[1])} and y = ${fmt(box[2])} to ${fmt(box[3])} and subtract the three outside right triangles.)`,
+      { draw: plotQ({ xr: [-6, 6], yr: [-6, 6], curves: [[A, B], [B, C], [C, A]].map(([U, V]) => ({ param: [(t) => [U[0] + (V[0] - U[0]) * t, U[1] + (V[1] - U[1]) * t], 0, 1] })), pts: [{ p: A, label: 'A' }, { p: B, label: 'B' }, { p: C, label: 'C' }] }), size: [340, 340] });
+  }
+};
+TEMPLATES.act6SysGraph = (r) => {
+  for (;;) {
+    const h = ri(r, -1, 3), k = ri(r, 2, 5), x1 = h - pick(r, [2, 4]), x2 = h + pick(r, [0, 2]), f = (x) => k - 0.5 * (x - h) ** 2, y1 = f(x1), y2 = f(x2);
+    if (x1 === x2 || !Number.isInteger(y1) || !Number.isInteger(y2)) continue;
+    const m = (y2 - y1) / (x2 - x1), b = y1 - m * x1;
+    if (!Number.isInteger(m) || Math.abs(m) > 3) continue;
+    const S = (p, q) => `(${fmt(p[0])}, ${fmt(p[1])}) and (${fmt(q[0])}, ${fmt(q[1])})`, ans = S([x1, y1], [x2, y2]);
+    return aq3Mc(r, ans, [S([y1, x1], [y2, x2]), S([x1, -y1], [x2, -y2]), S([0, b], [0, k]), S([h, k], [x2, y2])].filter((x) => x !== ans), () => null, 'Systems from a graph',
+      `The equations y = ${k} − ½(x ${h < 0 ? '+' : MINUS} ${Math.abs(h)})² and y = ${aq4Lin(m, b)} are graphed in the standard (x, y) coordinate plane below. Which of the following is the solution set for the system?`.replace(`(x ${MINUS} 0)`, 'x'),
+      `The solutions are where the graphs cross. Check each point in both equations:\nx = ${fmt(x1)}: parabola y = ${fmt(y1)}, line y = ${fmt(m * x1 + b)}\nx = ${fmt(x2)}: parabola y = ${fmt(y2)}, line y = ${fmt(m * x2 + b)}`,
+      { draw: plotQ({ xr: [-8, 8], yr: [-8, 8], curves: [{ f }, { f: (x) => m * x + b }], pts: [{ p: [x1, y1] }, { p: [x2, y2] }] }), size: [360, 360] });
+  }
+};
+TEMPLATES.act6CircleTangent = (r) => {
+  const R = ri(r, 2, 6), sx = pick(r, [-1, 1]), sy = pick(r, [-1, 1]), h = sx * R, k = sy * R, sg = (v, n) => (v < 0 ? `(${n} + ${-v})` : `(${n} ${MINUS} ${v})`), E = (a, b, rr) => `${sg(a, 'x')}² + ${sg(b, 'y')}² = ${rr}`, ans = E(h, k, R * R);
+  return aq3Mc(r, ans, [E(h, k, R), E(-h, -k, R * R), E(h, -k, R * R), E(-h, k, R * R)].filter((x) => x !== ans), () => null, 'Equations of circles',
+    `A circle in the standard (x, y) coordinate plane is tangent to the x-axis at ${fmt(h)} and to the y-axis at ${fmt(k)}. Which of the following is the equation of the circle?`,
+    `Tangent to the x-axis at x = ${fmt(h)} puts the center straight ${k > 0 ? 'above' : 'below'} that point, and tangent to the y-axis at y = ${fmt(k)} puts it straight ${h > 0 ? 'right' : 'left'} of that point: center (${fmt(h)}, ${fmt(k)}), radius ${R}.\n${ans}`,
+    { draw: plotQ({ xr: [-(2 * R + 2), 2 * R + 2], yr: [-(2 * R + 2), 2 * R + 2], step: R > 3 ? 2 : 1, curves: [{ param: [(t) => [h + R * Math.cos(t), k + R * Math.sin(t)], 0, 2 * Math.PI] }] }), size: [340, 340] });
+};
+TEMPLATES.act6AreaSlope = (r) => {
+  const A = [ri(r, 4, 9), ri(r, 0, 3)], B = [0, ri(r, 4, 8)], C = [ri(r, -4, -1), 0]; C[1] = A[1] + ri(r, -1, 2);
+  const m = (B[1] - A[1]) / (B[0] - A[0]);
+  return aq3Mc(r, fracT(m), [fracT(-m), fracT(-1 / m), '0', fracT(1 / m)].filter((x) => x !== fracT(m)), (i) => fracT(m + i + 1), 'Slope and area',
+    `Triangle ABC has vertices A(${A[0]}, ${A[1]}), B(0, ${B[1]}), and C(${fmt(C[0])}, ${fmt(C[1])}). Point C can be moved along a certain line, with A and B fixed, and the area of △ABC will not change. What is the slope of that line?`,
+    `Keep the base AB fixed. The area stays the same if the height stays the same, so C must move along a line parallel to AB.\nSlope of AB: (${B[1]} − ${A[1]})/(0 − ${A[0]}) = ${fracT(m)}`);
+};
+TEMPLATES.act6Reflect3 = (r) => {
+  const P = [[-ri(r, 1, 3), -ri(r, 1, 3)]]; P.push([P[0][0], P[0][1] - ri(r, 2, 4)], [P[0][0] - ri(r, 2, 4), P[0][1] - ri(r, 2, 4)]);
+  const L = (Q) => Q.map(([x, y]) => `(${fmt(x)}, ${fmt(y)})`).join(', '), ans = L(P.map(([x, y]) => [-x, -y]));
+  return aq3Mc(r, ans, [L(P.map(([x, y]) => [x, -y])), L(P.map(([x, y]) => [-x, y])), L(P.map(([x, y], i) => (i === 1 ? [x, -y] : [-x, -y])))], () => null, 'Transformations',
+    `The vertices of a triangle are ${L(P)}. Which of the following are the vertices of a congruent triangle that lies in Quadrant I?`,
+    `All three points are in Quadrant III. Rotating 180° about the origin (changing the sign of both coordinates) gives a congruent triangle in Quadrant I: ${ans}`);
+};
+
+/* ===== 6.2 Lines and angles ===== */
+TEMPLATES.act6AngleExpr = (r) => {
+  const T = ri(r, 100, 150), k = ri(r, 5, 25), v = T - k;
+  return aq3Mc(r, `${v}° − d`, [`${v}° + d`, `${T + k}° + d`, `d − ${v}°`], () => null, 'Angle addition',
+    `Ray OD is between rays OB and OC. If m∠BOC = ${T}° and m∠DOC = d + ${k}°, which of the following represents the measure of ∠BOD?`,
+    `m∠BOD = m∠BOC − m∠DOC = ${T}° − (d + ${k}°) = ${v}° − d`);
+};
+const aq6Trans = (labels) => (cv) => { // two parallel lines cut by a transversal; angles 1–8 labeled
+  const c = cv._ctx, W = cv._w, H = cv._h; c.clearRect(0, 0, W, H); c.strokeStyle = '#1d1d1b'; c.lineWidth = 2;
+  const y1 = H * 0.32, y2 = H * 0.7, X = (y) => W * 0.62 - (y - y1) * 0.55;
+  [[y1, 'a'], [y2, 'b']].forEach(([y, n]) => { c.beginPath(); c.moveTo(20, y); c.lineTo(W - 20, y); c.stroke(); c.font = 'italic 15px Georgia, serif'; c.fillStyle = '#1d1d1b'; c.fillText(n, W - 16, y - 6); });
+  c.beginPath(); c.moveTo(X(10), 10); c.lineTo(X(H - 10), H - 10); c.stroke(); c.font = 'italic 15px Georgia, serif'; c.fillText('t', X(10) + 8, 20);
+  c.font = '15px Georgia, serif'; c.fillStyle = '#1f5fa8'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  [[y1, 0], [y2, 4]].forEach(([y, o]) => { const x = X(y); [[x - 22, y - 13], [x + 26, y - 13], [x - 26, y + 14], [x + 22, y + 14]].forEach(([px, py], i) => c.fillText(labels[o + i], px, py)); });
+};
+TEMPLATES.act6Transversal = (r) => {
+  const x = pick(r, [112, 115, 118, 120, 122, 125]), names = ['1', '2', '3', '4', '5', '6', '7', '8'], val = (i) => ([0, 3, 4, 7].includes(i) ? x : 180 - x);
+  const i = ri(r, 0, 7); let j; do { j = ri(r, 0, 7); } while (j === i || Math.floor(j / 4) === Math.floor(i / 4) && false);
+  const v = val(j), rel = val(i) === v ? 'congruent' : 'supplementary';
+  return aq3Mc(r, `${v}°`, [`${180 - v}°`, `${Math.abs(90 - v) || 45}°`, `${v === x ? x + 10 : 180 - x + 10}°`].filter((t) => t !== `${v}°`), (k) => `${v + 5 * (k + 3)}°`, 'Parallel lines and transversals',
+    `In the figure below, line a is parallel to line b, and line t is a transversal. If m∠${names[i]} = ${val(i)}°, what is m∠${names[j]}?`,
+    `With parallel lines, every angle is either equal to ∠${names[i]} or supplementary to it. ∠${names[j]} is ${rel} to ∠${names[i]}, so m∠${names[j]} = ${rel === 'congruent' ? `${v}°` : `180° − ${val(i)}° = ${v}°`}.`,
+    { draw: aq6Trans(names), size: [380, 260] });
+};
+TEMPLATES.act6ExtAngle = (r) => {
+  if (r() < 0.5) { const A = pick(r, [20, 30, 40, 50, 70, 80]), base = (180 - A) / 2, ext = 180 - base;
+    return aq3Mc(r, `${fmt(ext)}°`, [`${fmt(base)}°`, `${A}°`, `${180 - A}°`].filter((t) => t !== `${fmt(ext)}°`), (k) => `${fmt(ext + 10 * (k + 1))}°`, 'Exterior angles',
+      `In isosceles triangle ABC, AB = AC and m∠A = ${A}°. Points B, C, and D are collinear, with C between B and D. Find the measure of exterior angle ACD.`,
+      `The base angles are equal: (180° − ${A}°)/2 = ${fmt(base)}°.\nm∠ACD = 180° − ${fmt(base)}° = ${fmt(ext)}°  (or ${A}° + ${fmt(base)}°, the two remote interior angles)`,
+      { draw: (() => { const ht = Math.min(4.5, 2 / Math.tan((A * Math.PI) / 360)); return g7Fig([{ pts: [[0, 0], [4, 0], [2, ht]], names: ['B', 'C', 'A'], slab: ['', '', ''], alab: ['', '', `${A}°`], arcs: [0, 0, 1], right: [0, 0, 0], ticks: [0, 1, 1] }, { pts: [[4, 0], [6, 0]], names: ['', 'D'] }], { texts: [{ p: [4.55, 0.35], t: '?' }] }); })(), size: [380, 260] }); }
+  const a = ri(r, 30, 70), b = ri(r, 30, 70), ext = a + b;
+  return aq3Mc(r, `${ext}°`, [`${180 - ext}°`, `${Math.abs(a - b) || 15}°`, `${180 - a}°`], (k) => `${ext + 5 * (k + 1)}°`, 'Exterior angles',
+    `In △ABC, m∠A = ${a}° and m∠B = ${b}°. Side BC is extended past C to point D. What is m∠ACD?`,
+    `An exterior angle equals the sum of the two remote interior angles: ${a}° + ${b}° = ${ext}°`);
+};
+TEMPLATES.act6Radians = (r) => {
+  const d = pick(r, [30, 45, 60, 90, 120, 135, 150, 210, 225, 240, 270, 300, 315, 330, 405, 450, 540, 630, 720, 810]), g = gcd(d, 180), n = d / g, m = 180 / g;
+  const T = (p, q) => (q === 1 ? `${p === 1 ? '' : p}π` : `${p === 1 ? '' : p}π/${q}`);
+  return aq3Mc(r, T(n, m), [T(m, n), T(d / 90 === Math.floor(d / 90) ? d / 90 : n * 2, d / 90 === Math.floor(d / 90) ? 1 : m), T(n, m * 2), T(n + 1, m)].filter((x) => x !== T(n, m)), () => null, 'Radians',
+    `Convert ${d}° to radians.`, `Multiply by π/180: ${d} · π/180 = ${T(n, m)}`);
+};
+TEMPLATES.act6ParallelLine = (r) => {
+  const A = nz(r, -6, 6), B = nz(r, -6, 6), m = -A / B, b = nz(r, -8, 8), F = (mm, bb) => `y = ${mm === 1 ? '' : mm === -1 ? MINUS : fracT(mm)}x ${bb < 0 ? MINUS : '+'} ${Math.abs(bb)}`;
+  if (Math.abs(A) === Math.abs(B) && r() < 0.5) return TEMPLATES.act6ParallelLine(r);
+  return aq3Mc(r, F(m, b), [F(-m, b), F(-1 / m, b), F(1 / m, b)].filter((x) => x !== F(m, b)), (i) => F(m * (i + 2), b), 'Parallel lines',
+    `Which line is parallel to ${aq5Std(A, B, ri(r, 1, 12))}?`, `Solve for y: the slope is ${fracT(m)}. A parallel line has the same slope and a different intercept: ${F(m, b)}`);
+};
+TEMPLATES.act6Section = (r) => {
+  const R = [ri(r, -6, 2), ri(r, -6, 2)], m = ri(r, 1, 3), n = ri(r, 1, 3), S = [R[0] + (m + n) * ri(r, 1, 3), R[1] + (m + n) * ri(r, -2, 3)];
+  const P = [(n * R[0] + m * S[0]) / (m + n), (n * R[1] + m * S[1]) / (m + n)], Q = (p) => `(${fmt(p[0])}, ${fmt(p[1])})`;
+  return aq3Mc(r, Q(P), [Q([(m * R[0] + n * S[0]) / (m + n), (m * R[1] + n * S[1]) / (m + n)]), Q([(R[0] + S[0]) / 2, (R[1] + S[1]) / 2]), Q([P[0] + 1, P[1]])].filter((x) => x !== Q(P)), (i) => Q([P[0], P[1] + i + 1]), 'Partitioning a segment',
+    `Point P lies on the segment from R${Q(R)} to S${Q(S)} so that RP : PS = ${m} : ${n}. What are the coordinates of P?`,
+    `P is ${m}/${m + n} of the way from R to S:\nx = ${fmt(R[0])} + ${m}/${m + n}(${fmt(S[0] - R[0])}) = ${fmt(P[0])},  y = ${fmt(R[1])} + ${m}/${m + n}(${fmt(S[1] - R[1])}) = ${fmt(P[1])}`);
+};
+
+/* ===== 6.3 Two-dimensional shapes ===== */
+TEMPLATES.act6Pyth = (r) => {
+  const [p, q, h] = pick(r, AQ3_TRIPLES), k = pick(r, [1, 1, 2]), a = p * k, b = q * k, c = h * k;
+  if (r() < 0.5) return aq3Mc(r, `${a + b + c} mi`, [`${a + b} mi`, `${2 * (a + b)} mi`, `${a + b + c + 2} mi`], (i) => `${a + b + c + 4 + i} mi`, 'Pythagorean theorem',
+    `While training for a marathon, Shane runs from home at E to the park at C, then ${a} miles along a road to D, and then ${b} miles straight back home. Road CD is perpendicular to road DE. How far did Shane run?`,
+    `The leg from E to C is the hypotenuse: √(${a}² + ${b}²) = ${c}.\nTotal: ${c} + ${a} + ${b} = ${a + b + c} miles`);
+  const leg = r() < 0.5, ans = leg ? b : c;
+  return aq3Mc(r, String(ans), [String(leg ? c - a : a + b), aq3Rt(leg ? a * a + c * c : Math.abs(b * b - a * a) || 2), String(ans + 2)].filter((x) => x !== String(ans)), (i) => String(ans + i + 3), 'Pythagorean theorem',
+    leg ? `A right triangle has a hypotenuse of ${c} and one leg of ${a}. How long is the other leg?` : `A right triangle has legs of ${a} and ${b}. How long is the hypotenuse?`,
+    leg ? `${a}² + x² = ${c}²  →  x² = ${c * c} − ${a * a} = ${b * b}  →  x = ${b}` : `c² = ${a}² + ${b}² = ${a * a + b * b}, so c = ${c}`);
+};
+TEMPLATES.act6Similar = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const [p, q, s] = pick(r, [[12, 14, 15], [4, 5, 7], [6, 8, 9], [5, 7, 8]]), sh = ri(r, 5, 12), L = Math.round(s * sh / p * 10) / 10;
+    return aq3Mc(r, L.toFixed(1), [(q * sh / p).toFixed(1), (s * p / sh).toFixed(1), (sh + s - p).toFixed(1)].filter((x) => x !== L.toFixed(1)), (i) => (L + i + 1).toFixed(1), 'Similar triangles',
+      `The side lengths of a triangle are in the ratio ${p}:${q}:${s}. A similar triangle has its shortest side ${sh} inches long. To the nearest tenth of an inch, how long is its longest side?`,
+      `Scale factor: ${sh}/${p}. Longest side: ${s} · ${sh}/${p} ≈ ${L.toFixed(1)} inches`); }
+  if (kind === 1) { const k = pick(r, [2, 2.5, 3, 4]), a = ri(r, 3, 6), b = ri(r, 4, 7), c = ri(r, Math.max(a, b) - 1, a + b - 1), P = a + b + c;
+    return aq3Mc(r, String(P), [fmt(P * k), String(P + a), fmt(aq4R(P * k / 2))].filter((x) => x !== String(P)), (i) => String(P + i + 1), 'Similar triangles',
+      `Triangle ABC is similar to triangle KLM. In △ABC, AC = ${a} cm. In △KLM, the corresponding side KM = ${fmt(a * k)} cm, LM = ${fmt(b * k)} cm, and KL = ${fmt(c * k)} cm. What is the perimeter of △ABC?`,
+      `Scale factor from KLM to ABC: ${a}/${fmt(a * k)} = 1/${fmt(k)}.\nPerimeter of KLM = ${fmt(P * k)}, so the perimeter of ABC = ${fmt(P * k)} ÷ ${fmt(k)} = ${P} cm`); }
+  const a = ri(r, 9, 24), c = ri(r, 4, 14), e = ri(r, 2, 8), g = (c * e) / a, gs = fracT(g);
+  return aq3Mc(r, gs, [fracT(a * e / c), fracT(a / (c * e)), fracT(c * a / e)].filter((x) => x !== gs), (i) => fracT(g + i + 1), 'Similar triangles',
+    `△ABC ~ △EFG. Side a = ${a} (opposite A), c = ${c} (opposite C), and e = ${e} (opposite E). What is the length of g (opposite G)?`,
+    `Corresponding sides: a ↔ e and c ↔ g.\ng/c = e/a  →  g = ${c} · ${e}/${a} = ${gs}`);
+};
+TEMPLATES.act6Composite = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const w = pick(r, [8, 10, 12]), h = ri(r, 10, 16), s = pick(r, [2.4, 3, 3.6, 4]), area = w * h + Math.PI * (w / 2) ** 2 / 2 - s * s, ans = Math.round(area);
+    return aq3Mc(r, String(ans), [String(Math.round(w * h + Math.PI * (w / 2) ** 2 - s * s)), String(Math.round(w * h - s * s)), String(Math.round(area + 2 * s * s))].filter((x) => x !== String(ans)), (i) => String(ans + 7 * (i + 1)), 'Composite figures',
+      `A figure is made of a ${w} m by ${h} m rectangle with a semicircle on one ${w} m side (the side is the diameter). A square ${fmt(s)} m on a side is cut out of the rectangle. To the nearest square meter, what is the total area of the figure?`,
+      `Rectangle: ${w} × ${h} = ${w * h}\nSemicircle: ½π(${w / 2})² ≈ ${(Math.PI * (w / 2) ** 2 / 2).toFixed(2)}\nSquare removed: ${fmt(s)}² = ${fmt(aq4R(s * s))}\nTotal ≈ ${area.toFixed(2)} ≈ ${ans} m²`); }
+  if (kind === 1) { const a = ri(r, 6, 10), b = ri(r, 8, 12), w = pick(r, [1, 1.5, 2, 2.5]), A = (a + 2 * w) * (b + 2 * w), ans = A - a * b;
+    return aq3Mc(r, `${fmt(ans)} in²`, [`${fmt(A)} in²`, `${fmt(2 * w * (a + b))} in²`, `${fmt(ans + 4 * w * w)} in²`], (i) => `${fmt(ans + 5 * (i + 1))} in²`, 'Composite figures',
+      `A ${fmt(a + 2 * w)}" × ${fmt(b + 2 * w)}" wooden picture frame holds a ${a}" × ${b}" photo. What is the area of the wood portion of the frame?`,
+      `Outer area − photo area = ${fmt(a + 2 * w)} × ${fmt(b + 2 * w)} − ${a} × ${b} = ${fmt(A)} − ${a * b} = ${fmt(ans)} in²`); }
+  const L = ri(r, 10, 30) * 10, W = ri(r, 4, 9) * 10, p = ri(r, 2, 5), ans = (L + 2 * p) * (W + 2 * p) - L * W;
+  return aq3Mc(r, String(ans), [String(2 * p * (L + W)), String((L + p) * (W + p) - L * W), String(ans + 4 * p * p)], (i) => String(ans + 10 * (i + 1)), 'Composite figures',
+    `A rectangular garden is ${L} meters by ${W} meters. A path ${p} meters wide is built around the outside of the garden. What is the area of the path, in square meters?`,
+    `Garden with path: (${L} + ${2 * p})(${W} + ${2 * p}) = ${(L + 2 * p) * (W + 2 * p)}\nPath: ${(L + 2 * p) * (W + 2 * p)} − ${L * W} = ${ans} m²`);
+};
+TEMPLATES.act6RectWord = (r) => {
+  const kind = ri(r, 0, 4);
+  if (kind === 0) { const w = ri(r, 2, 6), k = ri(r, 2, 4), c = ri(r, 1, 4), l = k * w + c, A = l * w, P = 2 * (l + w);
+    return aq3Mc(r, String(P), [String(l + w), String(A), String(P + 2 * c)], (i) => String(P + i + 1), 'Rectangles',
+      `A rectangle has an area of ${A} cm². Its length is ${c} more than ${['', '', 'twice', 'three times', 'four times'][k]} its width. Find the perimeter of the rectangle.`,
+      `w(${k}w + ${c}) = ${A}  →  ${k}w² + ${c}w − ${A} = 0  →  w = ${w}, so l = ${l}.\nPerimeter = 2(${l} + ${w}) = ${P}`); }
+  if (kind === 1) { const L = ri(r, 8, 20), W = ri(r, 4, 10), n = pick(r, [3, 4, 5]), c = pick(r, [2, 3, 5]), tot = (2 * L + 2 * W + (n - 1) * W) * c;
+    return aq3Mc(r, `$${tot}`, [`$${(2 * L + 2 * W) * c}`, `$${(2 * L + 2 * W + n * W) * c}`, `$${(2 * L + 2 * W + (n - 1) * L) * c}`], (i) => `$${tot + 6 * (i + 1)}`, 'Rectangles',
+      `Sophia wants to fence a ${L} × ${W} meter rectangular field and divide it into ${n} equal parts with fences parallel to the ${W}-meter sides. What is the total cost if fencing is $${c} per meter?`,
+      `Outside: 2(${L}) + 2(${W}) = ${2 * L + 2 * W} m. Dividers: ${n - 1} × ${W} = ${(n - 1) * W} m.\nTotal ${2 * L + 2 * W + (n - 1) * W} m × $${c} = $${tot}`); }
+  if (kind === 2) { const A = pick(r, [24, 30, 36, 40, 48]), h = pick(r, [3, 4, 6, 8]), b = 2 * A / h;
+    return aq3Mc(r, fmt(b), [fmt(A / h), fmt(A * h / 2), fmt(b + 4)], (i) => fmt(b + i + 1), 'Triangles', `If a triangle has an area of ${A} square cm, what is its base if the height is ${h} cm?`, `A = ½bh  →  ${A} = ½(b)(${h})  →  b = ${2 * A}/${h} = ${fmt(b)} cm`); }
+  if (kind === 3) { const s = ri(r, 6, 20);
+    return aq3Mc(r, `${4 * s} units`, [`${2 * s} units`, `${s} units`, `${4 * s + 4} units`], () => null, 'Squares', `The area of a square is ${s * s} square units. What is its perimeter?`, `Side = √${s * s} = ${s}. Perimeter = 4 × ${s} = ${4 * s} units`); }
+  const p = pick(r, [10, 20, 25, 30, 40]), q = pick(r, [5, 10, 15, 20]), ch = Math.round(((1 + p / 100) * (1 + q / 100) - 1) * 1000) / 10;
+  return aq3Mc(r, `${fmt(ch)}%`, [`${p + q}%`, `${p * q / 100}%`, `${fmt(ch + 5)}%`].filter((x) => x !== `${fmt(ch)}%`), (i) => `${fmt(ch + i + 2)}%`, 'Rectangles',
+    `If one side of a rectangle is increased by ${p}% and the other side is increased by ${q}%, by what percent does the area increase?`,
+    `New area = (${fmt(1 + p / 100)})(${fmt(1 + q / 100)}) = ${fmt(aq4R((1 + p / 100) * (1 + q / 100)))} times the old area: an increase of ${fmt(ch)}%`);
+};
+TEMPLATES.act6Circle2D = (r) => {
+  const kind = ri(r, 0, 3);
+  if (kind === 0) { const d = ri(r, 3, 12);
+    return aq3Mc(r, `${d}π`, [`${fmt(d / 2)}π`, `${2 * d}π`, `${d * d / 4}π`].filter((x) => x !== `${d}π`), (i) => `${d + i + 1}π`, 'Circles', `A CD is ${d} inches in diameter. What is the circumference of the CD?`, `C = πd = ${d}π inches`); }
+  if (kind === 1) { const s = pick(r, [8, 10, 12, 14, 16]), A = Math.round(Math.PI * (s / 2) ** 2);
+    return aq3Mc(r, String(A), [String(Math.round(Math.PI * s * s)), String(Math.round(Math.PI * s)), String(s * s)], (i) => String(A + 5 * (i + 1)), 'Circles',
+      `A circle is inscribed in a square with sides ${s} ft. What is the area of the circle to the nearest square foot?`, `The diameter equals the side, so r = ${s / 2}. A = π(${s / 2})² ≈ ${A} ft²`); }
+  if (kind === 2) { const [p, q, h] = pick(r, AQ3_TRIPLES);
+    return aq3Mc(r, `${h}π`, [`${p + q}π`, `${2 * h}π`, `${h * h / 4}π`].filter((x) => x !== `${h}π`), (i) => `${h + i + 1}π`, 'Circles',
+      `A ${p} × ${q} rectangle is inscribed in a circle. What is the circumference of the circle?`, `The diagonal of the rectangle is a diameter: √(${p}² + ${q}²) = ${h}. C = πd = ${h}π`); }
+  const rad = pick(r, [6, 9, 12, 15]), n = pick(r, [10, 20, 25, 30]), ft = Math.round(2 * Math.PI * rad * n / 12);
+  return aq3Mc(r, String(ft), [String(Math.round(Math.PI * rad * n / 12)), String(Math.round(2 * Math.PI * rad * n / 12 * 2)), String(Math.round(2 * Math.PI * rad * n))], (i) => String(ft + 10 * (i + 1)), 'Circles',
+    `You push a wheelbarrow with a single wheel straight across a driveway. The radius of the wheel is ${rad} inches. If the wheel rotates ${n} times, approximately how many feet did you push the wheelbarrow?`,
+    `One rotation = circumference = 2π(${rad}) ≈ ${(2 * Math.PI * rad).toFixed(1)} in.\n${n} rotations ≈ ${(2 * Math.PI * rad * n).toFixed(0)} in ÷ 12 ≈ ${ft} ft`);
+};
+TEMPLATES.act6CircleEq = (r) => {
+  const kind = ri(r, 0, 2), sg = (v, n) => (v < 0 ? `(${n} + ${fracT(-v)})` : `(${n} ${MINUS} ${fracT(v)})`);
+  if (kind === 0) { const a = ri(r, -6, 4), b = ri(r, -5, 5), c = a + ri(r, 2, 7), d = b + ri(r, -6, 6), h = (a + c) / 2, k = (b + d) / 2, R2 = ((c - a) ** 2 + (d - b) ** 2) / 4, E = (x, y, z) => `${sg(x, 'x')}² + ${sg(y, 'y')}² = ${fracT(z)}`;
+    return aq3Mc(r, E(h, k, R2), [E(k, h, R2), E(h, k, R2 * 4), E(-h, -k, R2)].filter((x) => x !== E(h, k, R2)), (i) => E(h, -k - i - 1, R2), 'Equations of circles',
+      `Find the equation of the circle whose diameter has endpoints (${fmt(a)}, ${fmt(b)}) and (${fmt(c)}, ${fmt(d)}).`,
+      `Center = midpoint = ${aq6P(h, k)}. r² = (½ · diameter)² = ((${c - a})² + (${fmt(d - b)})²)/4 = ${fracT(R2)}\n${E(h, k, R2)}`); }
+  if (kind === 1) { const h = nz(r, -6, 6), k = nz(r, -3, 3), R = Math.abs(k) + ri(r, 1, 3), s = R * R - k * k, X = (u) => `${fmt(u)} ± ${aq3Rt(s)}`;
+    return aq3Mc(r, X(h), [X(-h), X(k), `${fmt(h)} ± ${R}`].filter((x) => x !== X(h)), (i) => X(h + i + 1), 'Equations of circles',
+      `Find the x-intercepts of the circle ${sg(h, 'x')}² + ${sg(k, 'y')}² = ${R * R}.`, `Set y = 0: ${sg(h, 'x')}² + ${k * k} = ${R * R}  →  ${sg(h, 'x')}² = ${s}  →  x = ${X(h)}`); }
+  const h = nz(r, -4, 4), k = nz(r, -4, 4), R = ri(r, 2, 6), F = (a, b, c) => `x² + y² ${aq4Poly([[a, 'x'], [b, 'y']]).replace(/^([^−])/, '+ $1').replace(/^−/, '− ')} = ${fmt(c)}`, ans = F(-2 * h, -2 * k, R * R - h * h - k * k);
+  return aq3Mc(r, ans, [F(2 * h, 2 * k, R * R - h * h - k * k), F(-2 * h, -2 * k, R * R), F(-h, -k, R * R)].filter((x) => x !== ans), () => null, 'Equations of circles',
+    `The equation of a circle with center (${fmt(h)}, ${fmt(k)}) and radius ${R} is:`, `${sg(h, 'x')}² + ${sg(k, 'y')}² = ${R * R}\nExpand: x² ${aq4Lin(-2 * h, 0).replace(/^/, '')}… → x² + y² + (${fmt(-2 * h)})x + (${fmt(-2 * k)})y + ${h * h + k * k} = ${R * R}\n${ans}`.replace(/x² [^\n]*… → /, ''));
+};
+TEMPLATES.act6TriAngles = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const A = pick(r, [80, 90, 100, 110]), B = pick(r, [55, 60, 65, 70]), D = pick(r, [70, 75, 80, 85]), C = 360 - A - B - D;
+    return aq3Mc(r, `${C}°`, [`${180 - C}°`, `${C + 10}°`, `${360 - C}°`].filter((x) => x !== `${C}°`), (i) => `${C + 20 * (i + 1)}°`, 'Angles of polygons',
+      `Quadrilateral ABCD has m∠A = ${A}°, m∠B = ${B}°, and m∠D = ${D}°. What is m∠C?`, `The angles of a quadrilateral add to 360°: 360° − ${A}° − ${B}° − ${D}° = ${C}°`); }
+  if (kind === 1) { const t = pick(r, [100, 110, 120, 130, 140]);
+    return aq3Mc(r, `${180 - t}°`, [`${t - 90}°`, `${360 - t}°`, '90°'], () => null, 'Tangents',
+      `If the angle between two radii of a circle is ${t}°, then the angle between the tangents at the ends of the radii is:`, `Each tangent is perpendicular to its radius, so the quadrilateral has two 90° angles: 360° − 90° − 90° − ${t}° = ${180 - t}°`); }
+  const [P, Q, R] = shuffle(r, [90, 60, 30]), s = P + Q, d = P - R, T = (p, q, x) => `∠P = ${p}°, ∠Q = ${q}°, ∠R = ${x}°`;
+  return aq3Mc(r, T(P, Q, R), [T(Q, P, R), T(P, R, Q), T(R, Q, P)].filter((x) => x !== T(P, Q, R)), () => null, 'Triangle angle sum',
+    `In △PQR, the angles at P, Q, and R measure a, b, and c. If a + b = ${s}° and a − c = ${fmt(d)}°, find the angles.`,
+    `c = 180° − ${s}° = ${R}°. Then a = ${R}° + ${aq6Sq(d)}° = ${P}° and b = ${s}° − ${P}° = ${Q}°.`);
+};
+TEMPLATES.act6TriSides = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const a = ri(r, 3, 7), b = ri(r, 2 * a + 1, 3 * a + 2);
+    return aq3Mc(r, String(b), [String(a), String(b - a), String(a + b)], () => null, 'Triangle inequality', `If 2 sides of an isosceles triangle have lengths ${a} and ${b}, then the third side must be:`,
+      `If the third side were ${a}, then ${a} + ${a} = ${2 * a} is not greater than ${b}, so no triangle. The third side must be ${b}.`); }
+  if (kind === 1) { const s = ri(r, 8, 20), p = pick(r, [2, 3]), q = p + 1, k = ri(r, 4, 9), P = s + (p + q) * k, L = Math.max(s, q * k);
+    return aq3Mc(r, String(L), [String(p * k), String(P - s), String(q * k + s)].filter((x) => x !== String(L)), (i) => String(L + i + 2), 'Triangles',
+      `A triangle has one side that is ${s} inches long and a perimeter of ${P} inches. The other two sides have a ratio of ${p}:${q}. What is the length, in inches, of the longest side?`,
+      `The other sides add to ${P} − ${s} = ${P - s}, split ${p}:${q}: ${p * k} and ${q * k}. The longest side is ${L}.`); }
+  const P = 2 * ri(r, 8, 14);
+  const good = []; for (let l = 1; l <= P / 4; l++) good.push(`${P / 2 - l} and ${l}`);
+  const bad = `${P / 2 - 2} and ${4}`, ans = `${P / 2 - 3} and ${5}`;
+  return aq3Mc(r, `${P / 2 - 1} and 3`, shuffle(r, good).slice(0, 3), () => null, 'Rectangles',
+    `Allison has a rectangular garden whose perimeter is ${P} units. Which of the following CANNOT be the dimensions of the rectangle?`,
+    `Length + width must equal ${P}/2 = ${P / 2}. ${P / 2 - 1} + 3 = ${P / 2 + 2}, not ${P / 2}.`);
+};
+TEMPLATES.act6TriAreaFig = (r) => {
+  const h = pick(r, [8, 10, 12]), a = ri(r, 5, 12), b = ri(r, 3, 8), A = (a * h) / 2;
+  const B = [0, 0], C = [a, 0], D = [a + b, 0], Ap = [a + b, h], sc = 6 / Math.max(a + b, h), S = (p) => [p[0] * sc, p[1] * sc];
+  return aq3Mc(r, fmt(A), [fmt((a + b) * h / 2), fmt(b * h / 2), fmt(a * h)].filter((x) => x !== fmt(A)), (i) => fmt(A + i + 2), 'Area of triangles',
+    `In the figure below, B, C, and D are collinear, BC = ${a}, CD = ${b}, AD = ${h}, and AD ⊥ BD. What is the area of △ABC?`,
+    `The height of △ABC from A is AD = ${h} (it is outside the triangle). The base is BC = ${a}.\nArea = ½(${a})(${h}) = ${fmt(A)}`,
+    { draw: g7Fig([{ pts: [S(B), S(D), S(Ap)], names: ['B', 'D', 'A'], slab: ['', String(h), ''], right: [0, 1, 0] }, { pts: [S(C), S(Ap)], names: ['C', ''] }], { texts: [{ p: [S(B)[0] + a * sc / 2, -0.35], t: String(a) }, { p: [S(C)[0] + b * sc / 2, -0.35], t: String(b) }] }), size: [400, 300] });
+};
+TEMPLATES.act6Special = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const s = pick(r, [4, 6, 8, 10, 12]), T = (k) => `${k}√3`;
+    return aq3Mc(r, T(s / 2), [`${s / 2}√2`, T(s), `${s / 2}`], () => null, 'Special right triangles',
+      `A roof is shaped like an equilateral triangle with a side length of ${s} cm. Find the length of the altitude of the triangle.`, `The altitude splits it into two 30°-60°-90° triangles with hypotenuse ${s} and short leg ${s / 2}. Altitude = ${s / 2}√3`); }
+  if (kind === 1) { const top = pick(r, [20, 24, 30, 16]), bot = top + 2 * ri(r, 3, 8);
+    return aq3Mc(r, String((top + bot) / 2), [String(bot - top), String(top + bot), String((top + bot) / 2 + 2)], () => null, 'Trapezoids',
+      `Trapezoid WXYV has bases WX = ${top} and VY = ${bot}. ST is the midsegment. Find ST.`, `The midsegment of a trapezoid is the average of the bases: (${top} + ${bot})/2 = ${(top + bot) / 2}`); }
+  const n = pick(r, [5, 6, 8, 10, 12]), a = 360 / n;
+  return aq3Mc(r, `${a}°`, [`${180 / n}°`, `${360 / (n + 1) === Math.floor(360 / (n + 1)) ? 360 / (n + 1) : a * 2}°`, '90°'].filter((x) => x !== `${a}°`), () => null, 'Rotational symmetry',
+    `A regular star has ${n} identical points. What is the smallest angle it can be rotated so that it appears unmoved?`, `360° ÷ ${n} points = ${a}°`);
+};
+TEMPLATES.act6Midseg = (r) => {
+  const [p, q, h] = pick(r, AQ3_TRIPLES), k = pick(r, [2, 3]), a = p * k, b = q * k, c = h * k;
+  return aq3Mc(r, fmt(c / 2), [fmt(c), fmt(a / 2), fmt(b / 2)].filter((x) => x !== fmt(c / 2)), (i) => fmt(c / 2 + i + 1), 'Midsegments',
+    `In right triangle ABC, the right angle is at C, AC = ${b}, and BC = ${a}. What is the length of the segment joining the midpoints of AC and BC?`,
+    `AB = √(${b}² + ${a}²) = ${c}. The midsegment is half of the third side: ${c}/2 = ${fmt(c / 2)}`);
+};
+
+/* ===== 6.4 Three-dimensional shapes ===== */
+TEMPLATES.act6BoxSA = (r) => {
+  const l = ri(r, 6, 15), w = ri(r, 2, 6), A = 2 * (l + w), B = 2 * l * w;
+  return aq3Mc(r, `${A}x + ${B}`, [`${B}x + ${A}`, `${A}x ${MINUS} ${B}`, `${l + w}x + ${l * w}`], () => null, 'Surface area',
+    `Anna wants to paint the outside of a wooden box that is ${l} inches long, ${w} inches wide, and x inches high. Which expression represents the area she needs to paint?`,
+    `SA = 2(lw + lx + wx) = 2(${l * w} + ${l}x + ${w}x) = ${A}x + ${B}`);
+};
+TEMPLATES.act6Scale3D = (r) => {
+  const W = pick(r, [3, 5, 6, 8, 10]), k = pick(r, [2, 3]);
+  return aq3Mc(r, `${W * k ** 3} pounds`, [`${W * k} pounds`, `${W * k * k} pounds`, `${W * k ** 3 * 2} pounds`], () => null, 'Scaling solids',
+    `A cubical block weighs ${W} pounds. If every side is ${k === 2 ? 'doubled' : 'tripled'}, how much will the new block weigh?`, `Volume (and weight) scale by k³ = ${k}³ = ${k ** 3}: ${W} × ${k ** 3} = ${W * k ** 3} pounds`);
+};
+TEMPLATES.act6PyramidSA = (r) => {
+  const kind = ri(r, 0, 1);
+  if (kind === 0) { const s = pick(r, [8, 10, 12, 16]), l = ri(r, 8, 17), SA = s * s + 2 * s * l;
+    return aq3Mc(r, String(SA), [String(2 * s * l), String(s * s + 4 * s * l), String(s * s + s * l)], (i) => String(SA + 10 * (i + 1)), 'Surface area',
+      `Determine the surface area of a square pyramid with slant height ${l} and base side ${s}.`, `Base: ${s}² = ${s * s}. Four triangles: 4 · ½(${s})(${l}) = ${2 * s * l}.\nTotal: ${SA}`); }
+  const [p, q, hh] = pick(r, [[5, 12, 13], [8, 15, 17], [6, 8, 10], [12, 16, 20], [9, 12, 15]]), s = 2 * q, h = p, l = hh, SA = s * s + 2 * s * l;
+  return aq3Mc(r, String(SA), [String(s * s + 2 * s * h), String(2 * s * l), String(s * s + 4 * s * l)], (i) => String(SA + 10 * (i + 1)), 'Surface area',
+    `The base of a right pyramid is a square with side ${s} cm, and the height of the pyramid is ${h} cm. What is the total surface area of the pyramid?`,
+    `Slant height: √(${h}² + ${q}²) = ${l}. Base: ${s * s}. Four triangles: 4 · ½(${s})(${l}) = ${2 * s * l}.\nTotal: ${SA} cm²`);
+};
+TEMPLATES.act6Cylinder = (r) => {
+  if (r() < 0.5) { const rad = pick(r, [7, 14, 21]), h = ri(r, 2, 6) * 10, V = Math.round((22 / 7) * rad * rad * h);
+    return aq3Mc(r, V.toLocaleString('en-US'), [Math.round((22 / 7) * rad * h * 2).toLocaleString('en-US'), Math.round((22 / 7) * rad * rad * h / 3).toLocaleString('en-US'), (V * 2).toLocaleString('en-US')], (i) => (V + 100 * (i + 1)).toLocaleString('en-US'), 'Volume',
+      `Find the volume of a cylinder if the circumference of its base is ${2 * 22 * rad / 7} cm and its height is ${h} cm. (Use π = 22/7.)`, `2πr = ${2 * 22 * rad / 7}  →  r = ${rad}.\nV = πr²h = (22/7)(${rad})²(${h}) = ${V.toLocaleString('en-US')} cm³`); }
+  const d = pick(r, [10, 20, 30]), h = pick(r, [8, 10, 12, 15]), g = 7.5, V = Math.PI * (d / 2) ** 2 * h * g, S = (v) => `${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} gallons`;
+  return aq3Mc(r, S(V), [S(V / g), S(Math.PI * d * d * h * g), S(Math.PI * (d / 2) * h * g)], () => null, 'Volume',
+    `About 7.5 gallons of water fill 1 cubic foot. How many gallons would a cylindrical tank with diameter ${d} feet and height ${h} feet hold?`, `V = π(${d / 2})²(${h}) ≈ ${(V / g).toFixed(2)} ft³. × 7.5 ≈ ${S(V)}`);
+};
+TEMPLATES.act6VolRatio = (r) => {
+  if (r() < 0.5) { const k = pick(r, [1, 2, 3]);
+    return aq3Mc(r, `1:${3 * k}`, [`1:${k}`, `${3 * k}:1`, `1:${3 * k + 1}`], () => null, 'Volume',
+      `The base of a pyramid has the same area as the base of a cylinder. The height of the cylinder is ${k === 1 ? 'equal to' : `${k} times`} the height of the pyramid. What is the ratio of the volume of the pyramid to the volume of the cylinder?`,
+      `Pyramid: ⅓Bh. Cylinder: B(${k === 1 ? '' : k}h). Ratio: ⅓ : ${k} = 1 : ${3 * k}`); }
+  const hc = pick(r, [4, 5, 2]), hy = pick(r, [3, 1]), rc = pick(r, [7, 2, 3]), ry = pick(r, [3, 1]), Vy = pick(r, [810, 270, 540]), Vc = Vy * (rc * rc * hc) / (3 * ry * ry * hy);
+  if (!Number.isInteger(Vc)) return TEMPLATES.act6VolRatio(r);
+  return aq3Mc(r, `${Vc} cm³`, [`${Vc * 3} cm³`, `${Math.round(Vc * ry / rc)} cm³`, `${Vc + 200} cm³`], (i) => `${Vc + 100 * (i + 3)} cm³`, 'Volume',
+    `The ratio of the heights of a right circular cone and a right circular cylinder is ${hc}:${hy}, and the ratio of the radii of their bases is ${rc}:${ry}. If the volume of the cylinder is ${Vy} cm³, what is the volume of the cone?`,
+    `V_cone/V_cyl = (⅓ r_c² h_c)/(r_y² h_y) = ⅓ · ${rc * rc}/${ry * ry} · ${hc}/${hy} = ${fracT(Vc / Vy)}\nV_cone = ${Vy} × ${fracT(Vc / Vy)} = ${Vc} cm³`);
+};
+TEMPLATES.act6BoxLeft = (r) => {
+  const a = ri(r, 6, 12), b = ri(r, 3, 6), c = ri(r, 3, 6), s = ri(r, 3, 5), V1 = a * b * c, V2 = s ** 3;
+  if (V2 >= V1) return TEMPLATES.act6BoxLeft(r);
+  return aq3Mc(r, `${V1 - V2} cubic units`, [`${V1} cubic units`, `${V1 + V2} cubic units`, `${V1 - V2 + 10} cubic units`], () => null, 'Volume',
+    `A ${a} × ${b} × ${c} box is full of orange juice. The juice is poured into an empty ${s} × ${s} × ${s} cube until the cube is full. How much juice is left over?`, `${a} · ${b} · ${c} − ${s}³ = ${V1} − ${V2} = ${V1 - V2}`);
+};
+
+/* ===== 6.5 Trigonometry ===== */
+TEMPLATES.act6RightTrig = (r) => {
+  const kind = ri(r, 0, 1);
+  if (kind === 0) { const h = ri(r, 2, 9), s = ri(r, 2, 9); if (h === s) return TEMPLATES.act6RightTrig(r);
+    return aq3Mc(r, fracT(h / s), [fracT(s / h), fracT(h / Math.hypot(h, s)) === fracT(h / s) ? '1' : `${h}/${aq3Rt(h * h + s * s)}`, `${s}/${aq3Rt(h * h + s * s)}`], () => null, 'Right triangle trigonometry',
+      `An object ${h} feet tall casts a ${s}-foot shadow when the angle of elevation of the sun is θ. What is tan θ?`, `tan θ = opposite/adjacent = height/shadow = ${h}/${s}`); }
+  const c = ri(r, 3, 9), a = ri(r, 1, c - 1), b2 = c * c - a * a, adj = aq3Rt(b2);
+  return aq3Mc(r, `${adj}/${c}`, [`${a}/${c}`, `${adj}/${a}`, `${c}/${adj}`], () => null, 'Right triangle trigonometry',
+    `In right triangle ABC, the right angle is at C, the hypotenuse AB = ${c}, and BC = ${a}. What is cos A?`, `AC = √(${c}² − ${a}²) = ${adj}. cos A = adjacent/hypotenuse = AC/AB = ${adj}/${c}`);
+};
+TEMPLATES.act6Elevation = (r) => {
+  const kind = ri(r, 0, 2);
+  if (kind === 0) { const d = pick(r, [50, 80, 100, 120]), a = pick(r, [55, 60, 65, 70, 75]), h = d * Math.tan(a * Math.PI / 180), F = (v) => `${v.toFixed(1)} ft`;
+    return aq3Mc(r, F(h), [F(d * Math.sin(a * Math.PI / 180)), F(d / Math.tan(a * Math.PI / 180)), F(d / Math.cos(a * Math.PI / 180))], () => null, 'Angle of elevation',
+      `Jericho walks ${d} feet from the base of a building and looks up to the top. The angle of elevation is ${a}°. How tall is the building?`, `tan ${a}° = h/${d}  →  h = ${d} tan ${a}° ≈ ${h.toFixed(1)} ft`); }
+  if (kind === 1) { const h = pick(r, [100, 150, 200]), a = pick(r, [8, 10, 11, 12, 15]), d = Math.round(h / Math.tan(a * Math.PI / 180));
+    return aq3Mc(r, `${d} ft`, [`${Math.round(h * Math.tan(a * Math.PI / 180))} ft`, `${Math.round(h / Math.sin(a * Math.PI / 180))} ft`, `${Math.round(h * Math.cos(a * Math.PI / 180))} ft`], () => null, 'Angle of depression',
+      `Standing in a lighthouse ${h} feet above the shore, Ben spots a boat at an angle of depression of ${a}°. About how far is the boat from the shore?`, `The angle of depression equals the angle of elevation from the boat. tan ${a}° = ${h}/d  →  d = ${h}/tan ${a}° ≈ ${d} ft`); }
+  const L = pick(r, [0.8, 1.2, 1.5, 2]) * 1000, a = pick(r, [20, 30, 35, 40, 50]), h = L * Math.sin(a * Math.PI / 180), F = (v) => `${v.toFixed(1)} m`;
+  return aq3Mc(r, F(h), [F(L * Math.cos(a * Math.PI / 180)), F(L * Math.tan(a * Math.PI / 180)), F(L / Math.sin(a * Math.PI / 180))], () => null, 'Right triangle trigonometry',
+    `A truck travels ${fmt(L / 1000)} km up a ramp inclined at ${a}° to the horizontal. How high, in meters, is the truck when it stops?`, `sin ${a}° = h/${L}  →  h = ${L} sin ${a}° ≈ ${h.toFixed(1)} m`);
+};
+TEMPLATES.act6Quadrant = (r) => {
+  const [p, q, h] = pick(r, [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25]]), Q = pick(r, [2, 3, 4]), sx = Q === 2 || Q === 3 ? -1 : 1, sy = Q === 2 ? 1 : -1;
+  const sinV = sy * p, cosV = sx * q, tanS = sinV * cosV > 0 ? '> 0' : '< 0', T = (n, d) => `${n < 0 ? MINUS : ''}${Math.abs(n)}/${d}`;
+  return aq3Mc(r, T(cosV, h), [T(-cosV, h), T(sinV, h), T(cosV, p)], () => null, 'Trigonometric ratios by quadrant',
+    `If sin B = ${T(sinV, h)} and tan B ${tanS}, then cos B = ?`,
+    `sin B ${sinV > 0 ? '> 0' : '< 0'} and tan B ${tanS}, so B is in Quadrant ${['', 'I', 'II', 'III', 'IV'][Q]}, where cos is ${cosV > 0 ? 'positive' : 'negative'}.\ncos B = ±√(1 − (${p}/${h})²) = ±${q}/${h}  →  ${T(cosV, h)}`);
+};
+TEMPLATES.act6RefCot = (r) => {
+  const x = nz(r, -9, 9), y = nz(r, -9, 9), f = pick(r, ['cot', 'tan']), v = f === 'cot' ? x / y : y / x;
+  return aq3Mc(r, fracT(v), [fracT(-v), fracT(1 / v), fracT(Math.abs(v))].filter((t) => t !== fracT(v)), (i) => fracT(v + i + 1), 'Trigonometric ratios',
+    `An angle B is in standard position. Its terminal side passes through (${fmt(x)}, ${fmt(y)}). Find ${f} B.`, `${f} B = ${f === 'cot' ? 'x/y' : 'y/x'} = ${f === 'cot' ? `${fmt(x)}/${fmt(y)}` : `${fmt(y)}/${fmt(x)}`} = ${fracT(v)}`);
+};
+TEMPLATES.act6TrigEq = (r) => {
+  const sols = [['1', '0'], ['−1', 'π'], ['0', 'π/2 and 3π/2']], [val, ans] = pick(r, sols), a = ri(r, 2, 5), b = nz(r, -6, 6), v = val === '1' ? 1 : val === '−1' ? -1 : 0, c = a * v + b;
+  return aq3Mc(r, ans, ['0', 'π', 'π/2 and 3π/2', 'π/4', '2π'].filter((x) => x !== ans).slice(0, 3), () => null, 'Trigonometric equations',
+    `Solve ${a} cos θ ${b < 0 ? MINUS : '+'} ${Math.abs(b)} = ${fmt(c)} for 0 ≤ θ < 2π.`, `${a} cos θ = ${fmt(c - b)}  →  cos θ = ${val}  →  θ = ${ans}`);
+};
+TEMPLATES.act6LawCos = (r) => {
+  const kind = ri(r, 0, 1);
+  if (kind === 0) { const a = ri(r, 6, 10) * 100, b = ri(r, 8, 12) * 100, t = pick(r, [10, 15, 20, 25, 30]), d = Math.sqrt(a * a + b * b + 2 * a * b * Math.cos(t * Math.PI / 180)), F = (v) => v.toFixed(2);
+    return aq3Mc(r, F(d), [F(Math.sqrt(a * a + b * b)), F(a + b), F(Math.sqrt(a * a + b * b - 2 * a * b * Math.cos(t * Math.PI / 180)))], () => null, 'Law of cosines',
+      `A plane travels ${a} meters along the runway, then takes off at an angle of ${t}° and travels ${b} meters in a straight line. How far is the plane from its starting point, to 2 decimal places?`,
+      `The angle between the two paths is 180° − ${t}° = ${180 - t}°.\nd² = ${a}² + ${b}² − 2(${a})(${b})cos ${180 - t}° ≈ ${(d * d).toFixed(0)}  →  d ≈ ${F(d)} m`); }
+  const A = ri(r, 40, 55), B = ri(r, 55, 70), C = 180 - A - B, s = ri(r, 30, 50), R = (x) => (s * Math.sin(x * Math.PI / 180)) / Math.sin(C * Math.PI / 180), P = Math.round(s + R(A) + R(B));
+  return aq3Mc(r, `${P} m`, [`${P - 10} m`, `${P + 10} m`, `${3 * s} m`], (i) => `${P + 20 + 10 * i} m`, 'Law of sines',
+    `A triangular park has angles A = ${A}°, B = ${B}°, and C = ${C}°. Side AB (opposite C) is ${s} m. About how much fence is needed to enclose the park?`,
+    `Law of sines: BC = ${s} sin ${A}°/sin ${C}° ≈ ${R(A).toFixed(1)}, AC = ${s} sin ${B}°/sin ${C}° ≈ ${R(B).toFixed(1)}.\nPerimeter ≈ ${s} + ${R(A).toFixed(1)} + ${R(B).toFixed(1)} ≈ ${P} m`);
+};
+TEMPLATES.act6Period = (r) => {
+  const B = pick(r, [0.5, 1, 2]), A = ri(r, 2, 4), D = ri(r, 0, 3), per = B === 1 ? '2π' : B === 2 ? 'π' : '4π';
+  return aq3Mc(r, per, ['2π', 'π', '4π', String(2 * A)].filter((x) => x !== per).slice(0, 3), () => null, 'Period',
+    'What is the period of the sinusoidal graph shown in the standard (x, y) coordinate plane below?', `Find the distance from one peak to the next: ${per}.`,
+    { draw: aq5Graph({ xr: [-13, 13], yr: [D - A - 2, D + A + 2], xt: aq5PiTicks(-13, 13), yt: aq5Ticks(D - A - 2, D + A + 2, 1, 1), curves: [{ f: (x) => A * Math.cos(B * x) + D }] }), size: [480, 280] });
+};
+TEMPLATES.act6EvenOdd = (r) => {
+  const f = pick(r, ['cos', 'sin', 'tan']), ans = f === 'cos' ? 'cos(θ)' : `${MINUS}${f}(θ)`;
+  return aq3Mc(r, ans, [f === 'cos' ? `${MINUS}cos(θ)` : `${f}(θ)`, `${MINUS}sin(${MINUS}θ)`, f === 'cos' ? `${MINUS}sin(θ)` : `cos(θ)`].filter((x) => x !== ans), () => null, 'Trigonometric identities',
+    `Which expression is equivalent to ${f}(${MINUS}θ)?`, f === 'cos' ? 'Cosine is even: cos(−θ) = cos θ.' : `${f === 'sin' ? 'Sine' : 'Tangent'} is odd: ${f}(−θ) = −${f} θ.`);
+};
+/* ---------- ACT Prep chapter 6 end ---------- */
 const QUESTION_TYPES = [
   { id: 'classifyTriangle',   subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Classify triangles', desc: 'Acute/right/obtuse and scalene/isosceles from side lengths' },
   { id: 'angleSum',           subject: 'geometry', section: '5.1 Angles of Triangles', label: 'Triangle Sum Theorem', desc: 'Angles written in x — find x or an angle' },
@@ -31502,6 +31883,44 @@ QUESTION_TYPES.push({ id: 'act5Amp', subject: 'act', section: '5.6 Trigonometric
 QUESTION_TYPES.push({ id: 'act5TrigMax', subject: 'act', section: '5.6 Trigonometric Functions', label: 'Maximum of a sine or cosine graph', desc: 'A sin x + D (#94)' });
 QUESTION_TYPES.push({ id: 'act5TrigId', subject: 'act', section: '5.6 Trigonometric Functions', label: 'Trigonometric identities', desc: 'Sum formulas, double angle, tan from sec (#97, 104, 105)' });
 QUESTION_TYPES.push({ id: 'act5TrigGraph', subject: 'act', section: '5.6 Trigonometric Functions', label: 'Equation from a sine or cosine graph', desc: 'Amplitude and period from a graph (#98)' });
+QUESTION_TYPES.push({ id: 'act6Midpoint', subject: 'act', section: '6.1 Coordinate Geometry', label: 'Midpoint', desc: 'Midpoint of a segment, including fractional answers (#2, 8)' });
+QUESTION_TYPES.push({ id: 'act6Equidist', subject: 'act', section: '6.1 Coordinate Geometry', label: 'Distance formula', desc: 'Which point is a given distance from a center (#3)' });
+QUESTION_TYPES.push({ id: 'act6TriArea', subject: 'act', section: '6.1 Coordinate Geometry', label: 'Area from coordinates', desc: 'Area of a triangle drawn in the coordinate plane (#4)' });
+QUESTION_TYPES.push({ id: 'act6SysGraph', subject: 'act', section: '6.1 Coordinate Geometry', label: 'Systems from a graph', desc: 'Parabola and line intersection points (#1)' });
+QUESTION_TYPES.push({ id: 'act6CircleTangent', subject: 'act', section: '6.1 Coordinate Geometry', label: 'Circles tangent to the axes', desc: 'Equation of a circle tangent to both axes (#6)' });
+QUESTION_TYPES.push({ id: 'act6AreaSlope', subject: 'act', section: '6.1 Coordinate Geometry', label: 'Slope and area', desc: 'Move a vertex parallel to the base to keep area (#7)' });
+QUESTION_TYPES.push({ id: 'act6Reflect3', subject: 'act', section: '6.1 Coordinate Geometry', label: 'Transformations', desc: 'Congruent triangle in Quadrant I (#9)' });
+QUESTION_TYPES.push({ id: 'act6AngleExpr', subject: 'act', section: '6.2 Lines and Angles', label: 'Angle addition', desc: 'Expression for part of an angle (#12)' });
+QUESTION_TYPES.push({ id: 'act6Transversal', subject: 'act', section: '6.2 Lines and Angles', label: 'Parallel lines and transversals', desc: 'Angles formed by a transversal (#11, 14)' });
+QUESTION_TYPES.push({ id: 'act6ExtAngle', subject: 'act', section: '6.2 Lines and Angles', label: 'Exterior angles', desc: 'Exterior angles; isosceles triangles (#13, 25)' });
+QUESTION_TYPES.push({ id: 'act6Radians', subject: 'act', section: '6.2 Lines and Angles', label: 'Radians', desc: 'Degrees to radians (#20)' });
+QUESTION_TYPES.push({ id: 'act6ParallelLine', subject: 'act', section: '6.2 Lines and Angles', label: 'Parallel lines', desc: 'Line parallel to a standard-form line (#18)' });
+QUESTION_TYPES.push({ id: 'act6Section', subject: 'act', section: '6.2 Lines and Angles', label: 'Partitioning a segment', desc: 'Point dividing a segment in a ratio (#19)' });
+QUESTION_TYPES.push({ id: 'act6Pyth', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Pythagorean theorem', desc: 'Missing sides; running route (#36)' });
+QUESTION_TYPES.push({ id: 'act6Similar', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Similar triangles', desc: 'Ratios, perimeters, corresponding sides (#37, 43, 50, 65)' });
+QUESTION_TYPES.push({ id: 'act6Composite', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Composite figures', desc: 'Frames, paths, rectangle + semicircle (#5, 32, 69)' });
+QUESTION_TYPES.push({ id: 'act6RectWord', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Area and perimeter', desc: 'Rectangles, squares, fencing, percent change (#33, 57, 59, 67, 68, 71)' });
+QUESTION_TYPES.push({ id: 'act6Circle2D', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Circles', desc: 'Circumference, inscribed circles, wheels (#28, 42, 66, 70)' });
+QUESTION_TYPES.push({ id: 'act6CircleEq', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Equations of circles', desc: 'From diameter, intercepts, center and radius (#30, 46, 47, 56, 62)' });
+QUESTION_TYPES.push({ id: 'act6TriAngles', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Angles of polygons', desc: 'Quadrilaterals, tangents, angle systems (#45, 52, 54)' });
+QUESTION_TYPES.push({ id: 'act6TriSides', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Triangle sides', desc: 'Triangle inequality, side ratios, rectangle dimensions (#24, 34, 51)' });
+QUESTION_TYPES.push({ id: 'act6TriAreaFig', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Area of triangles', desc: 'Area with an outside height (#35, 39)' });
+QUESTION_TYPES.push({ id: 'act6Special', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Special figures', desc: 'Equilateral altitude, trapezoid midsegment, rotational symmetry (#40, 44, 61)' });
+QUESTION_TYPES.push({ id: 'act6Midseg', subject: 'act', section: '6.3 Two-Dimensional Shapes', label: 'Midsegments', desc: 'Midsegment of a right triangle (#98)' });
+QUESTION_TYPES.push({ id: 'act6BoxSA', subject: 'act', section: '6.4 Three-Dimensional Shapes', label: 'Surface area of a box', desc: 'Expression for a box’s surface area (#77)' });
+QUESTION_TYPES.push({ id: 'act6Scale3D', subject: 'act', section: '6.4 Three-Dimensional Shapes', label: 'Scaling solids', desc: 'Doubling or tripling sides (#79)' });
+QUESTION_TYPES.push({ id: 'act6PyramidSA', subject: 'act', section: '6.4 Three-Dimensional Shapes', label: 'Pyramids', desc: 'Surface area of square pyramids (#80, 86, 88, 89)' });
+QUESTION_TYPES.push({ id: 'act6Cylinder', subject: 'act', section: '6.4 Three-Dimensional Shapes', label: 'Cylinders', desc: 'Volume from circumference; tank gallons (#83, 85)' });
+QUESTION_TYPES.push({ id: 'act6VolRatio', subject: 'act', section: '6.4 Three-Dimensional Shapes', label: 'Volume ratios', desc: 'Pyramid vs. cylinder, cone vs. cylinder (#76, 84, 87)' });
+QUESTION_TYPES.push({ id: 'act6BoxLeft', subject: 'act', section: '6.4 Three-Dimensional Shapes', label: 'Volume', desc: 'Juice left over after filling a cube (#81)' });
+QUESTION_TYPES.push({ id: 'act6RightTrig', subject: 'act', section: '6.5 Trigonometry', label: 'Right triangle trigonometry', desc: 'tan from a shadow, cos from sides (#96, 97)' });
+QUESTION_TYPES.push({ id: 'act6Elevation', subject: 'act', section: '6.5 Trigonometry', label: 'Elevation and depression', desc: 'Buildings, lighthouses, ramps (#64, 90, 94)' });
+QUESTION_TYPES.push({ id: 'act6Quadrant', subject: 'act', section: '6.5 Trigonometry', label: 'Ratios by quadrant', desc: 'Sign of cos from sin and tan (#95, 105)' });
+QUESTION_TYPES.push({ id: 'act6RefCot', subject: 'act', section: '6.5 Trigonometry', label: 'Terminal side ratios', desc: 'tan or cot from a point (#99)' });
+QUESTION_TYPES.push({ id: 'act6TrigEq', subject: 'act', section: '6.5 Trigonometry', label: 'Trigonometric equations', desc: 'Solve a cos θ + b = c (#103)' });
+QUESTION_TYPES.push({ id: 'act6LawCos', subject: 'act', section: '6.5 Trigonometry', label: 'Law of sines and cosines', desc: 'Plane takeoff, park fence (#93, 101, 104)' });
+QUESTION_TYPES.push({ id: 'act6Period', subject: 'act', section: '6.5 Trigonometry', label: 'Period from a graph', desc: 'Read the period of a sinusoid (#92, 102)' });
+QUESTION_TYPES.push({ id: 'act6EvenOdd', subject: 'act', section: '6.5 Trigonometry', label: 'Even and odd identities', desc: 'cos(−θ), sin(−θ), tan(−θ) (#91)' });
 QUESTION_TYPES.push({ id: 'c111Challenge', subject: 'calc3', section: '11.1 Sequences', label: '★ Challenge: Limit of aₙ₊₁ = √(k + aₙ)', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c112Challenge', subject: 'calc3', section: '11.2 Series', label: '★ Challenge: Split into two geometric series', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
 QUESTION_TYPES.push({ id: 'c125Challenge', subject: 'calc3', section: '12.5 Equations of Lines and Planes', label: '★ Challenge: Distance between skew lines', desc: 'Harder, multi-step: made for a bonus question', challenge: true });
