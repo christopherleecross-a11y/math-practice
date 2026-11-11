@@ -36479,15 +36479,23 @@ function inkHit(strokes, x, y, r) {
 const inkId = () => Math.random().toString(36).slice(2, 10);
 // pointer drawing on a canvas: the pen draws, a finger draws until a pen has been used (then fingers are ignored: palm rejection)
 function inkPointer(cv, toUnits, tool, on) {
-  let cur = null, penSeen = false;
+  let cur = null, penSeen = false; const touches = new Map(); let panY = null;
+  const avgY = () => [...touches.values()].reduce((a, b) => a + b, 0) / touches.size;
+  // two fingers scroll the page instead of drawing
+  cv.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch' && tool.on) { touches.set(e.pointerId, e.clientY);
+    if (touches.size >= 2) { if (cur && !cur.erase) on.cancel(cur); cur = null; panY = avgY(); e.preventDefault(); } } }, true);
+  cv.addEventListener('pointermove', (e) => { if (!touches.has(e.pointerId)) return; touches.set(e.pointerId, e.clientY);
+    if (panY != null && touches.size >= 2) { e.preventDefault(); const y = avgY(); on.pan(y - panY); panY = y; } }, true);
+  const lift = (e) => { touches.delete(e.pointerId); if (touches.size < 2) panY = null; };
+  cv.addEventListener('pointerup', lift, true); cv.addEventListener('pointercancel', lift, true);
   cv.addEventListener('pointerdown', (e) => {
-    if (!tool.on) return; if (e.pointerType === 'pen') penSeen = true; if (e.pointerType === 'touch' && penSeen) return;
+    if (!tool.on || panY != null) return; if (e.pointerType === 'pen') penSeen = true; if (e.pointerType === 'touch' && penSeen) return;
     e.preventDefault(); cv.setPointerCapture(e.pointerId); const [x, y] = toUnits(e);
     if (tool.erase) { on.erase(x, y); cur = { erase: true, pid: e.pointerId }; return; }
     cur = { id: inkId(), c: tool.c, w: tool.w, pts: [[x, y]], pid: e.pointerId }; on.start(cur);
   });
   cv.addEventListener('pointermove', (e) => {
-    if (!cur || e.pointerId !== cur.pid) return; e.preventDefault();
+    if (!cur || e.pointerId !== cur.pid || panY != null) return; e.preventDefault();
     const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
     if (cur.erase) { const [x, y] = toUnits(e); on.erase(x, y); return; }
     const add = evs.map(toUnits); cur.pts.push(...add); on.move(cur, add);
@@ -36502,7 +36510,7 @@ function loadScript(src) {
 }
 // a picture of the screen's question (its pictures, text, and colored boxes) for the iPad to draw over
 function inkSnapshot(stage) {
-  const R = stage.getBoundingClientRect(), W = Math.round(R.width), H = Math.round(Math.min(stage.scrollHeight, R.height + 2000));
+  const R = stage.getBoundingClientRect(), W = Math.round(R.width), H = Math.round(Math.min(stage.scrollHeight, 6000));
   const k = Math.min(1, 1100 / W), cv = document.createElement('canvas'); cv.width = Math.round(W * k); cv.height = Math.round(H * k);
   const ctx = cv.getContext('2d'); ctx.scale(k, k); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
   const at = (r) => [r.left - R.left, r.top - R.top, r.width, r.height];
@@ -36527,11 +36535,19 @@ function inkSnapshot(stage) {
 // The TV side: a drawing layer over the screen, its toolbar, and the iPad link.
 function tvInk(stage, api) {
   const cv = el('canvas', { class: 'tv-ink' }), ctx = cv.getContext('2d');
-  const inks = {}, live = {}; let key = '0', dpr = 1;
+  const inks = {}, live = {}, rooms = {}; let key = '0', dpr = 1;
   const tool = { on: false, erase: false, c: INK_COLORS[0], w: 0.004 };
   stage.append(cv);
   const strokes = () => (inks[key] = inks[key] || []);
+  const scroller = () => stage.closest('.tvshow') || document.scrollingElement;
+  const body = stage.querySelector('.tv-body');
+  const roomFit = () => { const r = rooms[key] || 0; stage.style.minHeight = r ? Math.round(body.offsetHeight + r * scroller().clientHeight * 0.85) + 'px' : ''; };
+  const more = () => { rooms[key] = (rooms[key] || 0) + 1; roomFit(); size(); sendSlide(); const sc = scroller(); sc.scrollTo({ top: sc.scrollTop + sc.clientHeight * 0.8, behavior: 'smooth' }); };
+  // keep the iPad's writing in view on the TV
+  const follow = (pts) => { const sc = scroller(), r = cv.getBoundingClientRect(), y = Math.max(...pts.map((p) => p[1])) * r.width + r.top, top = sc.getBoundingClientRect().top + 70;
+    if (y > window.innerHeight - 60) sc.scrollTop += y - window.innerHeight + 160; else if (y < top) sc.scrollTop -= top - y + 100; };
   const size = () => {
+    roomFit();
     const W = stage.clientWidth, H = Math.max(stage.scrollHeight, stage.clientHeight); dpr = window.devicePixelRatio || 1;
     cv.style.width = W + 'px'; cv.style.height = H + 'px'; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); draw();
   };
@@ -36542,6 +36558,8 @@ function tvInk(stage, api) {
     start: (s) => { live[s.id] = s; send({ t: 's0', id: s.id, c: s.c, w: s.w, pts: s.pts }); },
     move: (s, add) => { draw(); send({ t: 's+', id: s.id, pts: add }); },
     end: (s) => { delete live[s.id]; strokes().push({ id: s.id, c: s.c, w: s.w, pts: s.pts }); draw(); send({ t: 's1', id: s.id }); },
+    cancel: (s) => { delete live[s.id]; draw(); send({ t: 'del', ids: [s.id] }); },
+    pan: (dy) => { scroller().scrollTop -= dy; },
     erase: (x, y) => { const ids = inkHit(strokes(), x, y, 0.012); if (ids.length) { inks[key] = strokes().filter((s) => !ids.includes(s.id)); draw(); send({ t: 'del', ids }); } },
   });
   // toolbar
@@ -36549,7 +36567,8 @@ function tvInk(stage, api) {
   const eraseB = el('button', { class: 'btn secondary', type: 'button', title: 'Erase a stroke by touching it', onclick: () => { tool.erase = !tool.erase; paintBar(); } }, 'Eraser');
   const undoB = el('button', { class: 'btn secondary', type: 'button', onclick: () => { const s = strokes().pop(); if (s) { draw(); send({ t: 'del', ids: [s.id] }); } } }, 'Undo');
   const clearB = el('button', { class: 'btn secondary', type: 'button', onclick: () => { inks[key] = []; draw(); send({ t: 'clear' }); } }, 'Clear');
-  const tools = el('span', { class: 'tv-tools' }, ...sw, eraseB, undoB, clearB);
+  const moreB = el('button', { class: 'btn secondary', type: 'button', title: 'Add space below to keep writing (scroll with two fingers)', onclick: () => more() }, '⬇ More room');
+  const tools = el('span', { class: 'tv-tools' }, ...sw, eraseB, undoB, clearB, moreB);
   const drawB = el('button', { class: 'btn secondary', type: 'button', title: 'Write on the screen with your finger, a stylus, or the mouse', onclick: () => { tool.on = !tool.on; tool.erase = false; paintBar(); } }, '✏️ Draw');
   const padB = el('button', { class: 'btn secondary', type: 'button', title: 'Work problems on an iPad from anywhere in the room', onclick: () => padPanel() }, '📱 iPad');
   const paintBar = () => {
@@ -36566,11 +36585,11 @@ function tvInk(stage, api) {
   const onMsg = (m) => {
     if (!m || !m.t) return;
     if (m.t === 's0') { live[m.id] = { id: m.id, c: m.c, w: m.w, pts: m.pts || [] }; draw(); }
-    else if (m.t === 's+') { if (live[m.id]) { live[m.id].pts.push(...m.pts); draw(); } }
+    else if (m.t === 's+') { if (live[m.id]) { live[m.id].pts.push(...m.pts); draw(); if (m.pts.length) follow(m.pts); } }
     else if (m.t === 's1') { const s = live[m.id]; delete live[m.id]; if (s) strokes().push(s); draw(); }
-    else if (m.t === 'del') { inks[key] = strokes().filter((s) => !m.ids.includes(s.id)); draw(); }
+    else if (m.t === 'del') { m.ids.forEach((d) => delete live[d]); inks[key] = strokes().filter((s) => !m.ids.includes(s.id)); draw(); }
     else if (m.t === 'clear') { inks[key] = []; draw(); }
-    else if (m.t === 'cmd') { api.cmd(m.k); }
+    else if (m.t === 'cmd') { if (m.k === 'room') more(); else api.cmd(m.k); }
     else if (m.t === 'hello') { remote.send(slideMsg()); }
   };
   const start = async () => {
@@ -36611,6 +36630,7 @@ function tvInk(stage, api) {
   return {
     bar: [drawB, tools, padB],
     show: (k) => { key = String(k); Object.keys(live).forEach((x) => delete live[x]); requestAnimationFrame(size); sendSlide(); },
+    more,
     clearKey: (k) => { delete inks[String(k)]; },
     resize: () => { size(); sendSlide(); },
     close: () => { stop(); if (panel) panel.remove(); },
@@ -36624,7 +36644,7 @@ function padScreen(code) {
   const st = el('span', { class: 'pad-st' }, 'Connecting…'), count = el('span', { class: 'pad-count' }, '');
   const cv = el('canvas', { class: 'pad-cv' }), ctx = cv.getContext('2d'); const bg = new Image();
   const tool = { on: true, erase: false, c: INK_COLORS[0], w: 0.004 };
-  let conn = null, S = null, strokes = [], live = {}, fit = { k: 1, x: 0, y: 0 }, dpr = 1;
+  let conn = null, S = null, strokes = [], live = {}, fit = { k: 1, x: 0, y: 0 }, dpr = 1, sy = 0, wantBottom = false;
   const send = (m) => { if (conn && conn.open) conn.send(m); };
   const ansB = el('button', { class: 'pbtn', type: 'button', onclick: () => send({ t: 'cmd', k: 'ans' }) }, 'Show answer');
   const sw = INK_COLORS.map((c) => el('button', { type: 'button', class: 'tv-sw', style: `background:${c}`, onclick: () => { tool.c = c; tool.erase = false; paintBar(); } }));
@@ -36635,14 +36655,15 @@ function padScreen(code) {
     el('button', { class: 'pbtn', type: 'button', onclick: () => send({ t: 'cmd', k: 'next' }) }, 'Next →'), ansB,
     el('span', { style: 'flex:1' }), ...sw, eraseB,
     el('button', { class: 'pbtn', type: 'button', onclick: () => { const s = strokes.pop(); if (s) { draw(); send({ t: 'del', ids: [s.id] }); } } }, 'Undo'),
-    el('button', { class: 'pbtn', type: 'button', onclick: () => { strokes = []; draw(); send({ t: 'clear' }); } }, 'Clear'), st);
+    el('button', { class: 'pbtn', type: 'button', onclick: () => { strokes = []; draw(); send({ t: 'clear' }); } }, 'Clear'),
+    el('button', { class: 'pbtn', type: 'button', title: 'Add space below to keep writing (scroll with two fingers)', onclick: () => { wantBottom = true; send({ t: 'cmd', k: 'room' }); } }, '⬇ More room'), st);
   const wrap = el('div', { class: 'pad-wrap' }, cv);
   document.body.append(bar, wrap); paintBar();
   const layout = () => {
     wrap.style.top = bar.offsetHeight + 'px';
     dpr = window.devicePixelRatio || 1; const W = wrap.clientWidth, H = wrap.clientHeight;
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px';
-    if (S) { const k = Math.min(W / S.w, H / S.h); fit = { k, x: (W - S.w * k) / 2, y: 0 }; } draw();
+    if (S) { const k = W / S.w, maxY = Math.max(0, S.h * k - H); if (wantBottom) { sy = maxY; wantBottom = false; } sy = Math.max(0, Math.min(sy, maxY)); fit = { k, x: 0, y: -sy }; } draw();
   };
   const draw = () => {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); if (!S) return;
@@ -36655,16 +36676,19 @@ function padScreen(code) {
     start: (s) => { live[s.id] = s; send({ t: 's0', id: s.id, c: s.c, w: s.w, pts: s.pts }); },
     move: (s, add) => { draw(); send({ t: 's+', id: s.id, pts: add }); },
     end: (s) => { delete live[s.id]; strokes.push({ id: s.id, c: s.c, w: s.w, pts: s.pts }); draw(); send({ t: 's1', id: s.id }); },
+    cancel: (s) => { delete live[s.id]; draw(); send({ t: 'del', ids: [s.id] }); },
+    pan: (dy) => { sy -= dy; layout(); },
     erase: (x, y) => { const ids = inkHit(strokes, x, y, 0.015); if (ids.length) { strokes = strokes.filter((s) => !ids.includes(s.id)); draw(); send({ t: 'del', ids }); } },
   });
   window.addEventListener('resize', layout);
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); sy += e.deltaY; layout(); }, { passive: false });
   const onMsg = (m) => {
     if (!m || !m.t) return;
-    if (m.t === 'slide') { S = m; strokes = m.ink || []; live = {}; count.textContent = `${m.i + 1} of ${m.n}`; ansB.textContent = m.shown ? 'Hide answer' : 'Show answer'; ansB.style.visibility = m.hasAns ? '' : 'hidden'; bg.onload = layout; bg.src = m.img; layout(); }
+    if (m.t === 'slide') { if (!S || S.i !== m.i) sy = 0; S = m; strokes = m.ink || []; live = {}; count.textContent = `${m.i + 1} of ${m.n}`; ansB.textContent = m.shown ? 'Hide answer' : 'Show answer'; ansB.style.visibility = m.hasAns ? '' : 'hidden'; bg.onload = layout; bg.src = m.img; layout(); }
     else if (m.t === 's0') { live[m.id] = { id: m.id, c: m.c, w: m.w, pts: m.pts || [] }; draw(); }
     else if (m.t === 's+') { if (live[m.id]) { live[m.id].pts.push(...m.pts); draw(); } }
     else if (m.t === 's1') { const s = live[m.id]; delete live[m.id]; if (s) strokes.push(s); draw(); }
-    else if (m.t === 'del') { strokes = strokes.filter((s) => !m.ids.includes(s.id)); draw(); }
+    else if (m.t === 'del') { m.ids.forEach((d) => delete live[d]); strokes = strokes.filter((s) => !m.ids.includes(s.id)); draw(); }
     else if (m.t === 'clear') { strokes = []; draw(); }
     else if (m.t === 'busy') st.textContent = 'Another iPad is already connected.';
   };
