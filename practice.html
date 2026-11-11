@@ -195,6 +195,20 @@
   .lp-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   .tvshow { position: fixed; inset: 0; z-index: 9999; background: #fff; color: #1d1d1b; overflow: auto; display: flex; flex-direction: column; }
   .tv-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid #ddd; background: #fafaf7; position: sticky; top: 0; }
+  .tv-stage { position: relative; flex: 1 0 auto; max-width: 1180px; margin: 0 auto; width: 100%; }
+  .tv-ink { position: absolute; left: 0; top: 0; pointer-events: none; touch-action: none; z-index: 2; }
+  .tv-tools { display: inline-flex; gap: 6px; align-items: center; }
+  .tv-sw { width: 30px; height: 30px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px #999; cursor: pointer; padding: 0; margin: 0; }
+  .tv-sw.on { box-shadow: 0 0 0 3px #f0a500; }
+  .tv-padpanel { position: fixed; right: 16px; top: 70px; z-index: 10001; background: #fff; border: 1px solid #ccc; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 12px 16px; max-width: 360px; font-size: 15px; }
+  body.padmode { margin: 0; background: #e9e9e4; overscroll-behavior: none; }
+  .pad-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 10px; background: #fafaf7; border-bottom: 1px solid #ccc; font: 15px system-ui, sans-serif; }
+  .pbtn { font: 600 16px system-ui, sans-serif; padding: 10px 14px; border-radius: 8px; border: 1px solid #1f5fa8; background: #fff; color: #1f5fa8; }
+  .pbtn.on { background: #1f5fa8; color: #fff; }
+  .pad-count { min-width: 60px; text-align: center; color: #555; }
+  .pad-st { color: #a33; cursor: pointer; } .pad-st.ok { color: #2e7d32; }
+  .pad-wrap { position: absolute; left: 0; right: 0; top: 60px; bottom: 0; }
+  .pad-cv { display: block; touch-action: none; }
   .tv-body { padding: 24px 40px 60px; max-width: 1180px; margin: 0 auto; width: 100%; box-sizing: border-box; }
   .tv-label { font: 600 18px system-ui, sans-serif; color: #6b6b66; margin-bottom: 10px; }
   .tv-ch { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 30px; margin-top: 12px; }
@@ -36339,7 +36353,9 @@ function tvShow(list, at) {
   let i = Math.max(0, at), q = null, shown = false;
   const old = document.getElementById('tvShow'); if (old) old.remove();
   const box = el('div', { id: 'tvShow', class: 'tvshow', role: 'dialog', 'aria-label': 'Question on the TV' });
-  const body = el('div', { class: 'tv-body' });
+  const body = el('div', { class: 'tv-body' }), stage = el('div', { class: 'tv-stage' }, body);
+  const ink = tvInk(stage, { info: () => ({ i, n: list.length, label: list[i].label, shown, hasAns: !!(q && (q.fr && (q.fr.display || q.solution) || q.choices)) }),
+    cmd: (k) => { if (k === 'next') nextBtn.click(); else if (k === 'prev') prevBtn.click(); else if (k === 'ans') ansBtn.click(); } });
   let fresh = false; // false = the plan's own question; true = New numbers made one from a question type
   const make = () => {
     const x = list[i]; shown = false;
@@ -36382,12 +36398,13 @@ function tvShow(list, at) {
     origBtn.style.display = list[i].fixed && fresh ? '' : 'none';
     newBtn.style.display = list[i].tpl || list[i].more ? '' : 'none';
     ansBtn.style.display = q.fr && (q.fr.display || q.solution) || q.choices ? '' : 'none'; // a notes screen has no answer
+    ink.show(i + (fresh ? ':new' : ''));
   }
   const ansBtn = el('button', { class: 'btn', type: 'button', onclick: () => { shown = !shown; paint(); } }, 'Show answer');
   const prevBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (i > 0) go(i - 1); } }, '← Back');
   const nextBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (i < list.length - 1) go(i + 1); } }, 'Next →');
   const count = el('span', { class: 'small', style: 'margin:0 4px' });
-  const newBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (list[i].tpl || list[i].more) { fresh = true; make(); } } }, 'New numbers');
+  const newBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { if (list[i].tpl || list[i].more) { fresh = true; ink.clearKey(i + ':new'); make(); } } }, 'New numbers');
   const origBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => { fresh = false; make(); } }, 'Back to the original');
   // countdown timer: shown on its own for bell ringer screens, or with the Timer button on any screen; it keeps running from screen to screen
   const T = { len: Math.max(60, (() => { try { return +localStorage.getItem('tvTimerLen'); } catch { return 0; } })() || 300), left: 0, end: 0, run: false, on: false, id: null };
@@ -36419,7 +36436,7 @@ function tvShow(list, at) {
     tmGo.textContent = T.run ? 'Pause' : T.left > 0 && T.left < T.len ? 'Resume' : 'Start';
     big.className = 'tv-timer' + (T.left === 0 ? ' done' : T.left <= 30 ? ' low' : '') + (!T.run && T.left > 0 && T.left < T.len ? ' paused' : '');
   }
-  const close = () => { clearInterval(T.id); box.remove(); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  const close = () => { clearInterval(T.id); ink.close(); window.removeEventListener('resize', onResize); box.remove(); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
   // keyboard, and a wireless presenter clicker (they send Page Down / Page Up, F5 to start, and . or b for the blank-screen button)
   const keys = (e) => {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
@@ -36430,14 +36447,241 @@ function tvShow(list, at) {
     else if (k === ' ' || k === '.' || k === 'b' || k === 'B' || k === 'Enter') { if (k === 'Enter' && e.target !== document.body) return; e.preventDefault(); ansBtn.click(); }
     else if (k === 'F5') { e.preventDefault(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else box.requestFullscreen().catch(() => {}); }
   };
-  box.append(el('div', { class: 'tv-bar' }, prevBtn, count, nextBtn, el('span', { style: 'flex:1' }), tmBtn, tmBox, ansBtn,
+  let rT = null; const onResize = () => { clearTimeout(rT); rT = setTimeout(() => ink.resize(), 200); }; window.addEventListener('resize', onResize);
+  box.append(el('div', { class: 'tv-bar' }, prevBtn, count, nextBtn, el('span', { style: 'flex:1' }), ...ink.bar, tmBtn, tmBox, ansBtn,
     newBtn,
     origBtn,
     el('button', { class: 'btn secondary', type: 'button', onclick: () => { const f = box.requestFullscreen || box.webkitRequestFullscreen; if (f) f.call(box); } }, 'Full screen'),
-    el('button', { class: 'btn secondary', type: 'button', onclick: close }, 'Close ✕')), body);
+    el('button', { class: 'btn secondary', type: 'button', onclick: close }, 'Close ✕')), stage);
   document.body.append(box); document.addEventListener('keydown', keys);
   T.on = /^bell ringer/i.test(list[i].label || ''); tmPaint();
   make();
+}
+/* ---------- drawing on the TV screens, and an iPad that draws on them from the back of the room ---------- */
+// Strokes are kept per screen in "slide units": x and y are divided by the drawing area's width, so the TV and the iPad
+// (different sizes) put every stroke in the same place.
+const INK_COLORS = ['#1d1d1b', '#1f5fa8', '#c0392b', '#2e7d32'];
+function inkPaint(ctx, strokes, scale, live) {
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  [...strokes, ...(live || [])].forEach((s) => {
+    const p = s.pts; if (!p.length) return;
+    ctx.strokeStyle = s.c; ctx.lineWidth = s.w * scale; ctx.beginPath(); ctx.moveTo(p[0][0] * scale, p[0][1] * scale);
+    if (p.length === 1) ctx.lineTo(p[0][0] * scale + 0.1, p[0][1] * scale);
+    for (let k = 1; k < p.length; k++) ctx.lineTo(p[k][0] * scale, p[k][1] * scale);
+    ctx.stroke();
+  });
+}
+// which strokes pass within r (slide units) of a point: the eraser removes whole strokes
+function inkHit(strokes, x, y, r) {
+  return strokes.filter((s) => s.pts.some((p, k) => { const q = s.pts[k + 1] || p, dx = q[0] - p[0], dy = q[1] - p[1], L = dx * dx + dy * dy;
+    const t = L ? Math.max(0, Math.min(1, ((x - p[0]) * dx + (y - p[1]) * dy) / L)) : 0; return Math.hypot(p[0] + t * dx - x, p[1] + t * dy - y) < r; })).map((s) => s.id);
+}
+const inkId = () => Math.random().toString(36).slice(2, 10);
+// pointer drawing on a canvas: the pen draws, a finger draws until a pen has been used (then fingers are ignored: palm rejection)
+function inkPointer(cv, toUnits, tool, on) {
+  let cur = null, penSeen = false;
+  cv.addEventListener('pointerdown', (e) => {
+    if (!tool.on) return; if (e.pointerType === 'pen') penSeen = true; if (e.pointerType === 'touch' && penSeen) return;
+    e.preventDefault(); cv.setPointerCapture(e.pointerId); const [x, y] = toUnits(e);
+    if (tool.erase) { on.erase(x, y); cur = { erase: true, pid: e.pointerId }; return; }
+    cur = { id: inkId(), c: tool.c, w: tool.w, pts: [[x, y]], pid: e.pointerId }; on.start(cur);
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!cur || e.pointerId !== cur.pid) return; e.preventDefault();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (cur.erase) { const [x, y] = toUnits(e); on.erase(x, y); return; }
+    const add = evs.map(toUnits); cur.pts.push(...add); on.move(cur, add);
+  });
+  const end = (e) => { if (!cur || e.pointerId !== cur.pid) return; if (!cur.erase) on.end(cur); cur = null; };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+}
+const INK_LIB = { peer: 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', qr: 'https://unpkg.com/qrcode-generator@1.4.4/qrcode.js' };
+function loadScript(src) {
+  return new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) { const t = () => (window.Peer && src === INK_LIB.peer) || (window.qrcode && src === INK_LIB.qr) ? ok() : setTimeout(t, 100); return t(); }
+    const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('could not load ' + src)); document.head.append(s); });
+}
+// a picture of the screen's question (its pictures, text, and colored boxes) for the iPad to draw over
+function inkSnapshot(stage) {
+  const R = stage.getBoundingClientRect(), W = Math.round(R.width), H = Math.round(Math.min(stage.scrollHeight, R.height + 2000));
+  const k = Math.min(1, 1100 / W), cv = document.createElement('canvas'); cv.width = Math.round(W * k); cv.height = Math.round(H * k);
+  const ctx = cv.getContext('2d'); ctx.scale(k, k); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  const at = (r) => [r.left - R.left, r.top - R.top, r.width, r.height];
+  stage.querySelectorAll('*').forEach((n) => {
+    if (n.tagName === 'CANVAS' && n.classList.contains('tv-ink')) return;
+    const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden') return;
+    const r = n.getBoundingClientRect(); if (!r.width || !r.height) return; const [x, y, w, h] = at(r);
+    if (cs.backgroundColor && !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor)) { ctx.fillStyle = cs.backgroundColor; ctx.fillRect(x, y, w, h); }
+    if (cs.borderLeftWidth !== '0px' && cs.borderLeftStyle !== 'none') { ctx.fillStyle = cs.borderLeftColor; ctx.fillRect(x, y, parseFloat(cs.borderLeftWidth), h); }
+    if ((n.tagName === 'CANVAS' || n.tagName === 'IMG') && (n.tagName !== 'IMG' || n.complete)) { try { ctx.drawImage(n, x, y, w, h); } catch (e) {} }
+  });
+  const tw = document.createTreeWalker(stage, NodeFilter.SHOW_TEXT);
+  for (let t = tw.nextNode(); t; t = tw.nextNode()) {
+    if (!t.nodeValue.trim()) continue; const p = t.parentElement, cs = getComputedStyle(p); if (cs.display === 'none') continue;
+    const rg = document.createRange(); rg.selectNodeContents(t); const r = rg.getBoundingClientRect(); if (!r.width) continue;
+    ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; ctx.fillStyle = cs.color; ctx.textBaseline = 'middle';
+    ctx.fillText(t.nodeValue.trim(), r.left - R.left, r.top - R.top + r.height / 2);
+  }
+  return { img: cv.toDataURL('image/jpeg', 0.75), w: W, h: H };
+}
+
+// The TV side: a drawing layer over the screen, its toolbar, and the iPad link.
+function tvInk(stage, api) {
+  const cv = el('canvas', { class: 'tv-ink' }), ctx = cv.getContext('2d');
+  const inks = {}, live = {}; let key = '0', dpr = 1;
+  const tool = { on: false, erase: false, c: INK_COLORS[0], w: 0.004 };
+  stage.append(cv);
+  const strokes = () => (inks[key] = inks[key] || []);
+  const size = () => {
+    const W = stage.clientWidth, H = Math.max(stage.scrollHeight, stage.clientHeight); dpr = window.devicePixelRatio || 1;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px'; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); draw();
+  };
+  const draw = () => { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); inkPaint(ctx, strokes(), stage.clientWidth, Object.values(live)); };
+  const toUnits = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, ((e.clientY - r.top) / r.width)]; };
+  const send = (m) => remote && remote.send(m);
+  inkPointer(cv, toUnits, tool, {
+    start: (s) => { live[s.id] = s; send({ t: 's0', id: s.id, c: s.c, w: s.w, pts: s.pts }); },
+    move: (s, add) => { draw(); send({ t: 's+', id: s.id, pts: add }); },
+    end: (s) => { delete live[s.id]; strokes().push({ id: s.id, c: s.c, w: s.w, pts: s.pts }); draw(); send({ t: 's1', id: s.id }); },
+    erase: (x, y) => { const ids = inkHit(strokes(), x, y, 0.012); if (ids.length) { inks[key] = strokes().filter((s) => !ids.includes(s.id)); draw(); send({ t: 'del', ids }); } },
+  });
+  // toolbar
+  const sw = INK_COLORS.map((c) => el('button', { type: 'button', class: 'tv-sw', title: 'Pen color', style: `background:${c}`, onclick: () => { tool.c = c; tool.erase = false; paintBar(); } }));
+  const eraseB = el('button', { class: 'btn secondary', type: 'button', title: 'Erase a stroke by touching it', onclick: () => { tool.erase = !tool.erase; paintBar(); } }, 'Eraser');
+  const undoB = el('button', { class: 'btn secondary', type: 'button', onclick: () => { const s = strokes().pop(); if (s) { draw(); send({ t: 'del', ids: [s.id] }); } } }, 'Undo');
+  const clearB = el('button', { class: 'btn secondary', type: 'button', onclick: () => { inks[key] = []; draw(); send({ t: 'clear' }); } }, 'Clear');
+  const tools = el('span', { class: 'tv-tools' }, ...sw, eraseB, undoB, clearB);
+  const drawB = el('button', { class: 'btn secondary', type: 'button', title: 'Write on the screen with your finger, a stylus, or the mouse', onclick: () => { tool.on = !tool.on; tool.erase = false; paintBar(); } }, '✏️ Draw');
+  const padB = el('button', { class: 'btn secondary', type: 'button', title: 'Work problems on an iPad from anywhere in the room', onclick: () => padPanel() }, '📱 iPad');
+  const paintBar = () => {
+    drawB.textContent = tool.on ? '✏️ Done drawing' : '✏️ Draw'; drawB.className = tool.on ? 'btn' : 'btn secondary';
+    tools.style.display = tool.on ? '' : 'none'; cv.style.pointerEvents = tool.on ? 'auto' : 'none'; cv.style.cursor = tool.on ? (tool.erase ? 'cell' : 'crosshair') : '';
+    sw.forEach((b, j) => b.classList.toggle('on', !tool.erase && tool.c === INK_COLORS[j])); eraseB.className = tool.erase ? 'btn' : 'btn secondary';
+  };
+  paintBar();
+  // ---- the iPad ----
+  let remote = null, peer = null, code = '', snapT = null, panel = null, status = 'off';
+  const slideMsg = () => { const s = inkSnapshot(stage); return { t: 'slide', ...s, ...api.info(), ink: strokes() }; };
+  const sendSlide = () => { clearTimeout(snapT); snapT = setTimeout(() => { if (remote && remote.open) remote.send(slideMsg()); }, 250); };
+  const setStatus = (s) => { status = s; padB.textContent = s === 'on' ? '📱 iPad connected' : '📱 iPad'; padB.className = s === 'on' ? 'btn' : 'btn secondary'; if (panel) panel.refresh(); };
+  const onMsg = (m) => {
+    if (!m || !m.t) return;
+    if (m.t === 's0') { live[m.id] = { id: m.id, c: m.c, w: m.w, pts: m.pts || [] }; draw(); }
+    else if (m.t === 's+') { if (live[m.id]) { live[m.id].pts.push(...m.pts); draw(); } }
+    else if (m.t === 's1') { const s = live[m.id]; delete live[m.id]; if (s) strokes().push(s); draw(); }
+    else if (m.t === 'del') { inks[key] = strokes().filter((s) => !m.ids.includes(s.id)); draw(); }
+    else if (m.t === 'clear') { inks[key] = []; draw(); }
+    else if (m.t === 'cmd') { api.cmd(m.k); }
+    else if (m.t === 'hello') { remote.send(slideMsg()); }
+  };
+  const start = async () => {
+    setStatus('wait'); code = String(Math.floor(100000 + Math.random() * 900000));
+    try { await loadScript(INK_LIB.peer); } catch (e) { setStatus('fail'); return; }
+    peer = new window.Peer('mrcross-tv-' + code, window.INK_PEER_OPTS || {});
+    peer.on('error', () => { if (status !== 'on') setStatus('fail'); });
+    peer.on('open', () => setStatus('ready'));
+    peer.on('connection', (c) => {
+      if (remote && remote.open) { c.on('open', () => { c.send({ t: 'busy' }); setTimeout(() => c.close(), 500); }); return; } // one iPad at a time
+      remote = c; c.on('open', () => { setStatus('on'); c.send(slideMsg()); setTimeout(() => { if (panel && status === 'on') { panel.remove(); panel = null; } }, 2500); });
+      c.on('data', onMsg); c.on('close', () => { remote = null; Object.keys(live).forEach((k) => delete live[k]); draw(); setStatus(peer && !peer.destroyed ? 'ready' : 'off'); });
+    });
+  };
+  const stop = () => { try { remote && remote.close(); } catch (e) {} try { peer && peer.destroy(); } catch (e) {} remote = null; peer = null; setStatus('off'); };
+  function padPanel() {
+    if (panel) { panel.remove(); panel = null; return; }
+    if (!peer || peer.destroyed) start();
+    const inner = el('div', {});
+    panel = el('div', { class: 'tv-padpanel' }, inner);
+    panel.refresh = async () => {
+      const url = location.origin + location.pathname + '?pad=' + code;
+      inner.innerHTML = '';
+      inner.append(el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:12px' }, el('b', {}, 'Draw from an iPad'), el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:4px 10px', onclick: () => { panel.remove(); panel = null; } }, '✕')));
+      if (status === 'wait') inner.append(el('p', {}, 'Getting a code…'));
+      else if (status === 'fail') inner.append(el('p', {}, 'Couldn’t connect. The school network may block it; try again, or use Draw on the TV itself.'), el('button', { class: 'btn', type: 'button', onclick: () => { stop(); start(); } }, 'Try again'));
+      else if (status === 'on') inner.append(el('p', {}, '✓ The iPad is connected. Whatever you draw there shows up here, and it can change screens and show answers.'), el('button', { class: 'btn secondary', type: 'button', onclick: stop }, 'Disconnect the iPad'));
+      else if (status === 'ready') {
+        const q = el('div', { style: 'margin:8px 0' });
+        try { await loadScript(INK_LIB.qr); const g = window.qrcode(0, 'M'); g.addData(url); g.make(); q.innerHTML = g.createSvgTag({ cellSize: 5, margin: 2 }); } catch (e) {}
+        inner.append(el('p', { style: 'margin:6px 0' }, 'On the iPad, point the Camera at this code and tap the link (or open the practice page and add ', el('b', {}, '?pad=' + code), ' to the address).'), q,
+          el('p', { class: 'small', style: 'margin:0' }, 'Code ', el('b', { style: 'font-size:20px;letter-spacing:2px' }, code), ' · only one iPad can connect, and only while this screen is open.'));
+      }
+    };
+    box().append(panel); panel.refresh();
+  }
+  const box = () => stage.closest('.tvshow') || document.body;
+  return {
+    bar: [drawB, tools, padB],
+    show: (k) => { key = String(k); Object.keys(live).forEach((x) => delete live[x]); requestAnimationFrame(size); sendSlide(); },
+    clearKey: (k) => { delete inks[String(k)]; },
+    resize: () => { size(); sendSlide(); },
+    close: () => { stop(); if (panel) panel.remove(); },
+  };
+}
+
+// The iPad side: ?pad=CODE. It shows the TV's screen; drawing goes to the TV as it is drawn.
+function padScreen(code) {
+  document.title = 'iPad · draw on the TV';
+  document.body.innerHTML = ''; document.body.className = 'padmode';
+  const st = el('span', { class: 'pad-st' }, 'Connecting…'), count = el('span', { class: 'pad-count' }, '');
+  const cv = el('canvas', { class: 'pad-cv' }), ctx = cv.getContext('2d'); const bg = new Image();
+  const tool = { on: true, erase: false, c: INK_COLORS[0], w: 0.004 };
+  let conn = null, S = null, strokes = [], live = {}, fit = { k: 1, x: 0, y: 0 }, dpr = 1;
+  const send = (m) => { if (conn && conn.open) conn.send(m); };
+  const ansB = el('button', { class: 'pbtn', type: 'button', onclick: () => send({ t: 'cmd', k: 'ans' }) }, 'Show answer');
+  const sw = INK_COLORS.map((c) => el('button', { type: 'button', class: 'tv-sw', style: `background:${c}`, onclick: () => { tool.c = c; tool.erase = false; paintBar(); } }));
+  const eraseB = el('button', { class: 'pbtn', type: 'button', onclick: () => { tool.erase = !tool.erase; paintBar(); } }, 'Eraser');
+  const paintBar = () => { sw.forEach((b, j) => b.classList.toggle('on', !tool.erase && tool.c === INK_COLORS[j])); eraseB.classList.toggle('on', tool.erase); };
+  const bar = el('div', { class: 'pad-bar' },
+    el('button', { class: 'pbtn', type: 'button', onclick: () => send({ t: 'cmd', k: 'prev' }) }, '← Back'), count,
+    el('button', { class: 'pbtn', type: 'button', onclick: () => send({ t: 'cmd', k: 'next' }) }, 'Next →'), ansB,
+    el('span', { style: 'flex:1' }), ...sw, eraseB,
+    el('button', { class: 'pbtn', type: 'button', onclick: () => { const s = strokes.pop(); if (s) { draw(); send({ t: 'del', ids: [s.id] }); } } }, 'Undo'),
+    el('button', { class: 'pbtn', type: 'button', onclick: () => { strokes = []; draw(); send({ t: 'clear' }); } }, 'Clear'), st);
+  const wrap = el('div', { class: 'pad-wrap' }, cv);
+  document.body.append(bar, wrap); paintBar();
+  const layout = () => {
+    wrap.style.top = bar.offsetHeight + 'px';
+    dpr = window.devicePixelRatio || 1; const W = wrap.clientWidth, H = wrap.clientHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    if (S) { const k = Math.min(W / S.w, H / S.h); fit = { k, x: (W - S.w * k) / 2, y: 0 }; } draw();
+  };
+  const draw = () => {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); if (!S) return;
+    ctx.fillStyle = '#fff'; ctx.fillRect(fit.x, fit.y, S.w * fit.k, S.h * fit.k);
+    if (bg.complete && bg.naturalWidth) ctx.drawImage(bg, fit.x, fit.y, S.w * fit.k, S.h * fit.k);
+    ctx.save(); ctx.translate(fit.x, fit.y); inkPaint(ctx, strokes, S.w * fit.k, Object.values(live)); ctx.restore();
+  };
+  const toUnits = (e) => { const r = cv.getBoundingClientRect(), u = S ? S.w * fit.k : 1; return [(e.clientX - r.left - fit.x) / u, (e.clientY - r.top - fit.y) / u]; };
+  inkPointer(cv, toUnits, tool, {
+    start: (s) => { live[s.id] = s; send({ t: 's0', id: s.id, c: s.c, w: s.w, pts: s.pts }); },
+    move: (s, add) => { draw(); send({ t: 's+', id: s.id, pts: add }); },
+    end: (s) => { delete live[s.id]; strokes.push({ id: s.id, c: s.c, w: s.w, pts: s.pts }); draw(); send({ t: 's1', id: s.id }); },
+    erase: (x, y) => { const ids = inkHit(strokes, x, y, 0.015); if (ids.length) { strokes = strokes.filter((s) => !ids.includes(s.id)); draw(); send({ t: 'del', ids }); } },
+  });
+  window.addEventListener('resize', layout);
+  const onMsg = (m) => {
+    if (!m || !m.t) return;
+    if (m.t === 'slide') { S = m; strokes = m.ink || []; live = {}; count.textContent = `${m.i + 1} of ${m.n}`; ansB.textContent = m.shown ? 'Hide answer' : 'Show answer'; ansB.style.visibility = m.hasAns ? '' : 'hidden'; bg.onload = layout; bg.src = m.img; layout(); }
+    else if (m.t === 's0') { live[m.id] = { id: m.id, c: m.c, w: m.w, pts: m.pts || [] }; draw(); }
+    else if (m.t === 's+') { if (live[m.id]) { live[m.id].pts.push(...m.pts); draw(); } }
+    else if (m.t === 's1') { const s = live[m.id]; delete live[m.id]; if (s) strokes.push(s); draw(); }
+    else if (m.t === 'del') { strokes = strokes.filter((s) => !m.ids.includes(s.id)); draw(); }
+    else if (m.t === 'clear') { strokes = []; draw(); }
+    else if (m.t === 'busy') st.textContent = 'Another iPad is already connected.';
+  };
+  const connect = async () => {
+    st.textContent = 'Connecting…';
+    try { await loadScript(INK_LIB.peer); } catch (e) { st.textContent = 'Couldn’t load the connection (network).'; return; }
+    const me = new window.Peer(window.INK_PEER_OPTS || {});
+    me.on('error', (e) => { st.textContent = /peer-unavailable/.test(e && e.type || '') ? 'No TV with that code. Check the code on the TV (its iPad panel must be open).' : 'Couldn’t connect. Tap to retry.'; });
+    me.on('open', () => {
+      conn = me.connect('mrcross-tv-' + code, { reliable: true });
+      conn.on('open', () => { st.textContent = '● Connected'; st.classList.add('ok'); send({ t: 'hello' }); });
+      conn.on('data', onMsg);
+      conn.on('close', () => { st.textContent = 'Disconnected. Tap to reconnect.'; st.classList.remove('ok'); });
+    });
+  };
+  st.addEventListener('click', () => { if (!conn || !conn.open) connect(); });
+  layout(); connect();
 }
 /* ==== LESSON PLANS END ==== */
 
@@ -37197,6 +37441,7 @@ function copyIntoBuilder(link) {
       el('p', {}, el('code', {}, String(cyrb53(params.get('makehash')))))));
     return;
   }
+  if (params.has('pad')) return padScreen(params.get('pad').replace(/\D/g, ''));
   if (viewOk()) return viewScreen();
   if (params.has('teacher') && teacherSession()) return teacherMenu(); // already unlocked in this tab (coming back from the crossword, for example)
   if (params.has('teacher')) {
