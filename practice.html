@@ -36590,6 +36590,8 @@ function tvInk(stage, api) {
     else if (m.t === 'del') { m.ids.forEach((d) => delete live[d]); inks[key] = strokes().filter((s) => !m.ids.includes(s.id)); draw(); }
     else if (m.t === 'clear') { inks[key] = []; draw(); }
     else if (m.t === 'cmd') { if (m.k === 'room') more(); else api.cmd(m.k); }
+    else if (m.t === 'view') { const sc = scroller(), bar = sc.querySelector('.tv-bar'), top = stage.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
+      sc.scrollTop = Math.max(0, top + m.y * stage.clientWidth - (bar ? bar.offsetHeight : 0)); }
     else if (m.t === 'hello') { remote.send(slideMsg()); }
   };
   const start = async () => {
@@ -36677,11 +36679,12 @@ function padScreen(code) {
     move: (s, add) => { draw(); send({ t: 's+', id: s.id, pts: add }); },
     end: (s) => { delete live[s.id]; strokes.push({ id: s.id, c: s.c, w: s.w, pts: s.pts }); draw(); send({ t: 's1', id: s.id }); },
     cancel: (s) => { delete live[s.id]; draw(); send({ t: 'del', ids: [s.id] }); },
-    pan: (dy) => { sy -= dy; layout(); },
+    pan: (dy) => { sy -= dy; layout(); sendView(); },
     erase: (x, y) => { const ids = inkHit(strokes, x, y, 0.015); if (ids.length) { strokes = strokes.filter((s) => !ids.includes(s.id)); draw(); send({ t: 'del', ids }); } },
   });
   window.addEventListener('resize', layout);
-  cv.addEventListener('wheel', (e) => { e.preventDefault(); sy += e.deltaY; layout(); }, { passive: false });
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); sy += e.deltaY; layout(); sendView(); }, { passive: false });
+  let vT = null; const sendView = () => { if (vT) return; vT = requestAnimationFrame(() => { vT = null; if (S) send({ t: 'view', y: sy / (S.w * fit.k) }); }); };
   const onMsg = (m) => {
     if (!m || !m.t) return;
     if (m.t === 'slide') { if (!S || S.i !== m.i) sy = 0; S = m; strokes = m.ink || []; live = {}; count.textContent = `${m.i + 1} of ${m.n}`; ansB.textContent = m.shown ? 'Hide answer' : 'Show answer'; ansB.style.visibility = m.hasAns ? '' : 'hidden'; bg.onload = layout; bg.src = m.img; layout(); }
