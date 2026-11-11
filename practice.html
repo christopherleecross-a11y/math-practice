@@ -13625,11 +13625,17 @@ TEMPLATES.g71Sum = (r) => {
     ...buildChoices(r, g7deg(s), [n * 180, (n - 1) * 180, (n - 2) * 360, 360].filter((x) => x !== s).map(g7deg), (i) => g7deg(s + 180 * (i + 2))),
     fr: FR.num('Sum:', s, { suffix: '°' }), solution: `(n − 2) · 180° = (${n} − 2) · 180° = ${g7deg(s)}` };
 };
+// the names on the 7.1 polygon-names list (an 11-sided polygon is just an 11-gon there)
+const G71NAME = (k) => (k !== 11 && G7NAMES[k]) || `${k}-gon`;
+const G71NAME_OPTS = ['quadrilateral', 'pentagon', 'hexagon', 'heptagon', 'octagon', 'nonagon', 'decagon', 'dodecagon', 'n-gon (no special name)'];
 TEMPLATES.g71Sides = (r) => {
-  const n = ri(r, 4, 24), s = (n - 2) * 180, T = (k) => `${k} sides${G7NAMES[k] ? ` (${G7NAMES[k]})` : ` (${k}-gon)`}`;
+  const n = ri(r, 4, 24), s = (n - 2) * 180, T = (k) => `${k} sides (${G71NAME(k)})`, nm = G71NAME(n);
+  const pickNm = n === 11 || n > 12 ? 'n-gon (no special name)' : nm;
   return { topic: 'Number of sides from the angle sum', stem: `The sum of the measures of the interior angles of a convex polygon is ${s}°. Find the number of sides, and classify the polygon by the number of sides.`,
     ...buildChoices(r, T(n), [n - 2, n + 2, n - 1, n + 1].filter((k) => k >= 3).map(T), (i) => T(n + 3 + i)),
-    fr: FR.num('Number of sides:', n), solution: `(n − 2) · 180 = ${s}\nn − 2 = ${s / 180}\nn = ${n}: a${/^[aeiou]/.test(g7name(n)) ? 'n' : ''} ${g7name(n)}` };
+    fr: { fields: [{ kind: 'number', label: 'Number of sides:' }, { kind: 'select', label: 'Classify it:', options: G71NAME_OPTS }],
+      check: (v) => numEq(v[0], n) && v[1] === pickNm, score: (v) => (numEq(v[0], n) ? 0.5 : 0) + (v[1] === pickNm ? 0.5 : 0), display: `${n} sides (${nm})`, key: [String(n), pickNm] },
+    solution: `(n − 2) · 180 = ${s}\nn − 2 = ${s / 180}\nn = ${n}: a${/^[aeiou]/.test(nm) ? 'n' : ''} ${nm}` };
 };
 // #9–14, #17–20: interior angles shown, solve for x
 TEMPLATES.g71FindX = (r) => {
