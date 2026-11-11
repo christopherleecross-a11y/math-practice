@@ -36420,7 +36420,16 @@ function tvShow(list, at) {
     big.className = 'tv-timer' + (T.left === 0 ? ' done' : T.left <= 30 ? ' low' : '') + (!T.run && T.left > 0 && T.left < T.len ? ' paused' : '');
   }
   const close = () => { clearInterval(T.id); box.remove(); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
-  const keys = (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowRight') nextBtn.click(); else if (e.key === 'ArrowLeft') prevBtn.click(); else if (e.key === ' ' && e.target === document.body) { e.preventDefault(); ansBtn.click(); } };
+  // keyboard, and a wireless presenter clicker (they send Page Down / Page Up, F5 to start, and . or b for the blank-screen button)
+  const keys = (e) => {
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    const k = e.key;
+    if (k === 'Escape') close();
+    else if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown') { e.preventDefault(); nextBtn.click(); }
+    else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') { e.preventDefault(); prevBtn.click(); }
+    else if (k === ' ' || k === '.' || k === 'b' || k === 'B' || k === 'Enter') { if (k === 'Enter' && e.target !== document.body) return; e.preventDefault(); ansBtn.click(); }
+    else if (k === 'F5') { e.preventDefault(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else box.requestFullscreen().catch(() => {}); }
+  };
   box.append(el('div', { class: 'tv-bar' }, prevBtn, count, nextBtn, el('span', { style: 'flex:1' }), tmBtn, tmBox, ansBtn,
     newBtn,
     origBtn,
