@@ -36547,15 +36547,17 @@ function inkPointer(cv, toUnits, tool, on) {
   let cur = null, penSeen = false; const touches = new Map(); let panY = null;
   const avgY = () => [...touches.values()].reduce((a, b) => a + b, 0) / touches.size;
   // two fingers scroll the page instead of drawing
-  cv.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch' && tool.on) { touches.set(e.pointerId, e.clientY);
+  cv.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch' && tool.on) { if (e.isPrimary) { touches.clear(); panY = null; } touches.set(e.pointerId, e.clientY);
     if (touches.size >= 2) { if (cur && !cur.erase) on.cancel(cur); cur = null; panY = avgY(); e.preventDefault(); } } }, true);
   cv.addEventListener('pointermove', (e) => { if (!touches.has(e.pointerId)) return; touches.set(e.pointerId, e.clientY);
     if (panY != null && touches.size >= 2) { e.preventDefault(); const y = avgY(); on.pan(y - panY); panY = y; } }, true);
   const lift = (e) => { touches.delete(e.pointerId); if (touches.size < 2) panY = null; };
-  cv.addEventListener('pointerup', lift, true); cv.addEventListener('pointercancel', lift, true);
+  // a finger lifted off the edge of the drawing area still counts (a missed lift used to leave drawing stuck in two-finger scroll)
+  window.addEventListener('pointerup', lift, true); window.addEventListener('pointercancel', lift, true);
+  cv.addEventListener('lostpointercapture', (e) => { if (cur && e.pointerId === cur.pid) { if (!cur.erase) on.end(cur); cur = null; } });
   cv.addEventListener('pointerdown', (e) => {
     if (!tool.on || panY != null) return; if (e.pointerType === 'pen') penSeen = true; if (e.pointerType === 'touch' && penSeen) return;
-    e.preventDefault(); cv.setPointerCapture(e.pointerId); const [x, y] = toUnits(e);
+    e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) {} const [x, y] = toUnits(e);
     if (tool.erase) { on.erase(x, y); cur = { erase: true, pid: e.pointerId }; return; }
     cur = { id: inkId(), c: tool.c, w: tool.w, pts: [[x, y]], pid: e.pointerId }; on.start(cur);
   });
@@ -36565,7 +36567,7 @@ function inkPointer(cv, toUnits, tool, on) {
     if (cur.erase) { const [x, y] = toUnits(e); on.erase(x, y); return; }
     const add = evs.map(toUnits); cur.pts.push(...add); on.move(cur, add);
   });
-  const end = (e) => { if (!cur || e.pointerId !== cur.pid) return; if (!cur.erase) on.end(cur); cur = null; };
+  const end = (e) => { lift(e); if (!cur || e.pointerId !== cur.pid) return; if (!cur.erase) on.end(cur); cur = null; };
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
 }
 const INK_LIB = { peer: 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', qr: 'https://unpkg.com/qrcode-generator@1.4.4/qrcode.js' };
@@ -36599,10 +36601,12 @@ function inkSnapshot(stage) {
 
 // The TV side: a drawing layer over the screen, its toolbar, and the iPad link.
 function tvInk(stage, api) {
+  const body0 = () => stage.querySelector('.tv-body') || stage;
   const cv = el('canvas', { class: 'tv-ink' }), ctx = cv.getContext('2d');
   const inks = {}, live = {}, rooms = {}; let key = '0', dpr = 1;
   const tool = { on: false, erase: false, c: INK_COLORS[0], w: 0.004 };
   stage.append(cv);
+  if (window.ResizeObserver) { let rq = 0; new ResizeObserver(() => { cancelAnimationFrame(rq); rq = requestAnimationFrame(() => { const H = Math.max(stage.scrollHeight, stage.clientHeight); if (Math.abs(H - parseFloat(cv.style.height || 0)) > 2 || Math.abs(stage.clientWidth - parseFloat(cv.style.width || 0)) > 2) size(); }); }).observe(body0()); }
   const strokes = () => (inks[key] = inks[key] || []);
   const scroller = () => stage.closest('.tvshow') || document.scrollingElement;
   const body = stage.querySelector('.tv-body');
@@ -36665,7 +36669,8 @@ function tvInk(stage, api) {
     try { await loadScript(INK_LIB.peer); } catch (e) { setStatus('fail'); return; }
     peer = new window.Peer('mrcross-tv-' + code, window.INK_PEER_OPTS || {});
     peer.on('error', () => { if (status !== 'on') setStatus('fail'); });
-    peer.on('open', () => setStatus('ready'));
+    peer.on('open', () => { if (status !== 'on') setStatus('ready'); });
+    peer.on('disconnected', () => { setTimeout(() => { try { if (peer && !peer.destroyed && peer.disconnected) peer.reconnect(); } catch (e) {} }, 1500); });
     peer.on('connection', (c) => {
       if (remote && remote.open) { c.on('open', () => { c.send({ t: 'busy' }); setTimeout(() => c.close(), 500); }); return; } // one iPad at a time
       remote = c; c.on('open', () => { setStatus('on'); c.send(slideMsg()); setTimeout(() => { if (panel && status === 'on') { panel.remove(); panel = null; } }, 2500); });
@@ -36761,19 +36766,23 @@ function padScreen(code) {
     else if (m.t === 'clear') { strokes = []; draw(); }
     else if (m.t === 'busy') st.textContent = 'Another iPad is already connected.';
   };
+  let me = null, retry = null;
   const connect = async () => {
+    clearTimeout(retry); if (conn && conn.open) return;
+    try { me && me.destroy(); } catch (e) {}
     st.textContent = 'Connecting…';
     try { await loadScript(INK_LIB.peer); } catch (e) { st.textContent = 'Couldn’t load the connection (network).'; return; }
-    const me = new window.Peer(window.INK_PEER_OPTS || {});
-    me.on('error', (e) => { st.textContent = /peer-unavailable/.test(e && e.type || '') ? 'No TV with that code. Check the code on the TV (its iPad panel must be open).' : 'Couldn’t connect. Tap to retry.'; });
+    me = new window.Peer(window.INK_PEER_OPTS || {});
+    me.on('error', (e) => { st.classList.remove('ok'); st.textContent = /peer-unavailable/.test(e && e.type || '') ? 'No TV with that code (is that screen still open on the TV?). Trying again…' : 'Couldn’t connect. Trying again…'; retry = setTimeout(connect, 4000); });
     me.on('open', () => {
       conn = me.connect('mrcross-tv-' + code, { reliable: true });
       conn.on('open', () => { st.textContent = '● Connected'; st.classList.add('ok'); send({ t: 'hello' }); });
       conn.on('data', onMsg);
-      conn.on('close', () => { st.textContent = 'Disconnected. Tap to reconnect.'; st.classList.remove('ok'); });
+      conn.on('close', () => { st.textContent = 'Reconnecting…'; st.classList.remove('ok'); retry = setTimeout(connect, 1500); });
     });
   };
   st.addEventListener('click', () => { if (!conn || !conn.open) connect(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (!conn || !conn.open)) connect(); });
   layout(); connect();
 }
 /* ==== LESSON PLANS END ==== */
