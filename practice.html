@@ -36606,8 +36606,9 @@ function tvInk(stage, api) {
   const strokes = () => (inks[key] = inks[key] || []);
   const scroller = () => stage.closest('.tvshow') || document.scrollingElement;
   const body = stage.querySelector('.tv-body');
-  const roomFit = () => { const r = rooms[key] || 0; stage.style.minHeight = r ? Math.round(body.offsetHeight + r * scroller().clientHeight * 0.85) + 'px' : ''; };
-  const more = () => { rooms[key] = (rooms[key] || 0) + 1; roomFit(); size(); sendSlide(); const sc = scroller(); sc.scrollTo({ top: sc.scrollTop + sc.clientHeight * 0.8, behavior: 'smooth' }); };
+  // each More room adds most of a screen below whatever is there now (a short question already fills the screen, so measure first)
+  const roomFit = () => { const r = rooms[key] || 0; stage.style.minHeight = ''; if (r) stage.style.minHeight = Math.round(stage.offsetHeight + r * scroller().clientHeight * 0.85) + 'px'; };
+  const more = () => { rooms[key] = (rooms[key] || 0) + 1; roomFit(); size(); sendSlide(); const sc = scroller(); sc.scrollTop = sc.scrollTop + sc.clientHeight * 0.8; };
   // keep the iPad's writing in view on the TV
   const follow = (pts) => { const sc = scroller(), r = cv.getBoundingClientRect(), y = Math.max(...pts.map((p) => p[1])) * r.width + r.top, top = sc.getBoundingClientRect().top + 70;
     if (y > window.innerHeight - 60) sc.scrollTop += y - window.innerHeight + 160; else if (y < top) sc.scrollTop -= top - y + 100; };
