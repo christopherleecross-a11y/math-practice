@@ -36021,7 +36021,16 @@ async function lpVersion() {
       clearTimeout(tm); const t = await res.text(), m = /version (\d+)/.exec(t);
       if (!m && !res.ok) throw new Error('HTTP ' + res.status);
       LESSON_EDITS.version = m ? +m[1] : 0; LESSON_EDITS.why = ''; break;
-    } catch (e) { LESSON_EDITS.why = e.name === 'AbortError' ? 'no answer in 15 seconds' : String(e.message || e); if (k === 2) return -1; await new Promise((ok) => setTimeout(ok, 1500 * (k + 1))); }
+    } catch (e) {
+      LESSON_EDITS.why = e.name === 'AbortError' ? 'no answer in 15 seconds' : String(e.message || e);
+      if (k === 2) {
+        // can this computer reach Google at all? (an answer it isn't allowed to read means a filter is in the way, not the Sheet)
+        try { await fetch(CONFIG.SCRIPT_URL + (CONFIG.SCRIPT_URL.includes('?') ? '&' : '?') + 'ts=' + Date.now(), { mode: 'no-cors', cache: 'no-store' }); LESSON_EDITS.why += '; the request goes out, but this browser isn’t allowed to read the answer'; }
+        catch (e2) { LESSON_EDITS.why += '; the request can’t get out of this browser at all'; }
+        return -1;
+      }
+      await new Promise((ok) => setTimeout(ok, 1500 * (k + 1)));
+    }
   }
   return LESSON_EDITS.version;
 }
