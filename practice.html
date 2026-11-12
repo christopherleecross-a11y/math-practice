@@ -36013,7 +36013,16 @@ const lpPost = async (body) => { const res = await fetch(CONFIG.SCRIPT_URL, { me
 // the script must be version 8 or newer (older ones would treat the request as a student submission)
 async function lpVersion() {
   if (LESSON_EDITS.version >= 8) return LESSON_EDITS.version; // an older answer is asked again (the script may have just been updated)
-  try { const t = await (await fetch(CONFIG.SCRIPT_URL + (CONFIG.SCRIPT_URL.includes('?') ? '&' : '?') + 'ts=' + Date.now(), { cache: 'no-store' })).text(), m = /version (\d+)/.exec(t); LESSON_EDITS.version = m ? +m[1] : 0; } catch { return -1; }
+  // the Sheet sometimes answers slowly or drops one request (a script waking up, a busy school network): ask up to 3 times
+  for (let k = 0; k < 3; k++) {
+    try {
+      const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 15000);
+      const res = await fetch(CONFIG.SCRIPT_URL + (CONFIG.SCRIPT_URL.includes('?') ? '&' : '?') + 'ts=' + Date.now(), { cache: 'no-store', signal: ctl.signal });
+      clearTimeout(tm); const t = await res.text(), m = /version (\d+)/.exec(t);
+      if (!m && !res.ok) throw new Error('HTTP ' + res.status);
+      LESSON_EDITS.version = m ? +m[1] : 0; LESSON_EDITS.why = ''; break;
+    } catch (e) { LESSON_EDITS.why = e.name === 'AbortError' ? 'no answer in 15 seconds' : String(e.message || e); if (k === 2) return -1; await new Promise((ok) => setTimeout(ok, 1500 * (k + 1))); }
+  }
   return LESSON_EDITS.version;
 }
 async function lessonSync() {
@@ -36021,7 +36030,8 @@ async function lessonSync() {
   if (!dashPw.get()) { LESSON_EDITS.status = 'nopw'; return; }
   const v = await lpVersion(); if (v < 0) { LESSON_EDITS.status = 'offline'; return; } if (v < 8) { LESSON_EDITS.status = 'old'; return; }
   try {
-    const g = await lpPost({ action: 'lessonPlans' });
+    let g;
+    for (let k = 0; ; k++) { try { g = await lpPost({ action: 'lessonPlans' }); break; } catch (e) { LESSON_EDITS.why = String(e.message || e); if (k === 2) throw e; await new Promise((ok) => setTimeout(ok, 1500 * (k + 1))); } }
     if (g.wrong) { dashPw.set(''); LESSON_EDITS.status = 'wrong'; return; }
     if (g.locked) { LESSON_EDITS.status = 'locked'; return; }
     if (g.setup) { LESSON_EDITS.status = 'setup'; return; }
@@ -36042,6 +36052,8 @@ function lessonEditNote(onChange) {
     pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
     box.append(st === 'wrong' ? 'That password didn’t match. ' : 'To edit plans (and see your edits), connect with your dashboard password:', pw, el('button', { class: 'btn secondary', type: 'button', onclick: go }, 'Connect'));
   } else box.append(msg || '');
+  if (st === 'offline' || st === 'error') box.append(' ', el('a', { href: '#', style: 'font-weight:600', onclick: async (e) => { e.preventDefault(); LESSON_EDITS.status = 'idle'; LESSON_EDITS.version = null; onChange(); await lessonSync(); onChange(); } }, 'Try again'),
+    LESSON_EDITS.why ? el('span', { style: 'color:#888' }, ` (${LESSON_EDITS.why})`) : '');
   return box;
 }
 function lessonEdit(key) {
