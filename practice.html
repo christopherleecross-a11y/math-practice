@@ -36063,11 +36063,11 @@ function lessonEditNote(onChange) {
     LESSON_EDITS.why ? el('span', { style: 'color:#888' }, ` (${LESSON_EDITS.why})`) : '');
   return box;
 }
-function lessonEdit(key) {
-  const orig = lessonOf(key), P = JSON.parse(JSON.stringify(orig)), S = lpSet(key), edited = !!LESSON_EDITS.data[key];
+function lessonEdit(key, start, startNote) {
+  const orig = lessonOf(key), P = JSON.parse(JSON.stringify(start || orig)), S = lpSet(key), edited = !!LESSON_EDITS.data[key];
   document.getElementById('title').textContent = 'Edit lesson plan';
   document.body.classList.remove('printing'); app.innerHTML = '';
-  let dirty = false; const touch = () => { dirty = true; };
+  let dirty = !!start; const touch = () => { dirty = true; };
   const ta = (obj, k, rows = 2) => { const t = el('textarea', { class: 'lp-ed', rows: Math.max(rows, String(obj[k] ?? '').split('\n').reduce((n, l) => n + 1 + Math.floor(l.length / 95), 0)) }); t.value = obj[k] ?? ''; t.addEventListener('input', () => { obj[k] = t.value; touch(); }); return t; };
   const inp = (obj, k, style = '') => { const t = el('input', { class: 'lp-ed', style }); t.value = obj[k] ?? ''; t.addEventListener('input', () => { obj[k] = t.value; touch(); }); return t; };
   const lines = (obj, k, rows = 4) => { const t = el('textarea', { class: 'lp-ed', rows: Math.max(rows, (obj[k] || []).reduce((n, l) => n + 1 + Math.floor(l.length / 95), 0) + 1) }); t.value = (obj[k] || []).join('\n'); t.addEventListener('input', () => { obj[k] = t.value.split('\n').map((x) => x.trim()).filter(Boolean); touch(); }); return t; };
@@ -36141,14 +36141,52 @@ function lessonEdit(key) {
     } catch { status.textContent = 'Not saved: couldn’t reach your Practice Results sheet. Try again.'; }
   };
   const cancel = () => { if (!dirty || confirm('Discard your changes?')) lessonScreen(key); };
-  const reset = async () => { if (!confirm('Go back to the original plan? Your edits to this plan will be deleted.')) return; status.textContent = 'Resetting…';
+  const reset = async () => { if (!confirm('Go back to the original plan? (Your edited version is kept under 🕘 Earlier versions.)')) return; status.textContent = 'Resetting…';
     try { const g = await lpPost({ action: 'resetLesson', key }); if (g.ok) { delete LESSON_EDITS.data[key]; lessonScreen(key); return; } status.textContent = `Not reset: ${g.error || 'try again'}`; } catch { status.textContent = 'Couldn’t reach your Practice Results sheet. Try again.'; } };
+  // ---- getting things back ----
+  const panel = el('div', {});
+  const openPanel = (node) => { panel.innerHTML = ''; panel.append(el('div', { class: 'lp-edcard', style: 'background:#f3f7fc;border-color:#9bb8dc' },
+    el('div', { style: 'text-align:right' }, small('Close', () => { panel.innerHTML = ''; })), node)); panel.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+  const when = (t) => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  // 1) earlier saved versions of this plan
+  const versions = async () => {
+    openPanel(el('p', {}, 'Loading your earlier versions…'));
+    let g; try { g = await lpPost({ action: 'lessonHistory', key }); } catch { openPanel(el('p', {}, 'Couldn’t reach your Practice Results sheet. Try again.')); return; }
+    if (!g.ok) { openPanel(el('p', {}, g.error === 'unknown action' ? 'Saved versions need PracticeResults.gs version 18: paste it in, then Deploy > Manage deployments > Edit > New version.' : g.error || 'Couldn’t load them.')); return; }
+    const pick = (data, label) => { if (dirty && !confirm('Replace what’s in the editor with ' + label + '? (Nothing is saved until you click Save.)')) return; lessonEdit(key, data, `Showing ${label}. Click Save to keep it, or Cancel.`); };
+    const rows = (g.list || []).map((x) => { let d = null; try { d = JSON.parse(x.data); } catch {} return d ? el('div', { style: 'display:flex;gap:10px;align-items:center;margin:6px 0' }, el('span', { style: 'min-width:170px' }, when(x.t)),
+      el('span', { class: 'small', style: 'flex:1' }, `${(d.steps || []).length} steps, ${(d.steps || []).reduce((n, st) => n + (st.show || []).length, 0)} TV screens`), small('Restore', () => pick(d, 'your version from ' + when(x.t)))) : ''; });
+    openPanel(el('div', {}, el('b', {}, '🕘 Earlier versions of this plan'),
+      el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'Every time you save (or reset), the version it replaces is kept here: the last 10. Restoring puts it in the editor; Save to keep it.'),
+      ...(rows.length ? rows : [el('p', { class: 'small' }, 'No earlier versions yet. They start with your next save.')]),
+      el('div', { style: 'display:flex;gap:10px;align-items:center;margin:10px 0 0;border-top:1px solid var(--line);padding-top:8px' }, el('span', { style: 'flex:1' }, 'The original plan'), small('Restore', () => pick(LESSONS[key], 'the original plan')))));
+  };
+  // 2) pieces of the original plan that this version no longer has, one at a time
+  const removed = () => {
+    const O = LESSONS[key], out = [], json = (x) => JSON.parse(JSON.stringify(x));
+    const has = (label) => P.steps.some((st) => (st.show || []).some((x) => x.label === label));
+    (O.steps || []).forEach((os, i) => {
+      const mine = P.steps.find((st) => st.name === os.name);
+      if (!mine) { out.push({ what: `Step: ${os.name}`, detail: `${os.time ? os.time + ' · ' : ''}${(os.show || []).length} TV screens`, add: () => P.steps.splice(Math.min(i, P.steps.length), 0, json(os)) }); return; }
+      (os.show || []).forEach((x, j) => { if (!has(x.label)) out.push({ what: `TV screen: ${x.label}`, detail: `in “${os.name}”`, add: () => { mine.show = mine.show || []; mine.show.splice(Math.min(j, mine.show.length), 0, json(x)); } }); });
+      ['teacher', 'students', 'say', 'check'].forEach((f) => { if (os[f] && !mine[f]) out.push({ what: `${{ teacher: 'Teacher', students: 'Students', say: 'Ask', check: 'Check for understanding' }[f]} text`, detail: `in “${os.name}”`, add: () => { mine[f] = os[f]; } }); });
+    });
+    (O.iCan || []).forEach((t) => { if (!(P.iCan || []).includes(t)) out.push({ what: 'I can statement', detail: t, add: () => (P.iCan = [...(P.iCan || []), t]) }); });
+    (O.vocab || []).forEach(([t, d]) => { if (!(P.vocab || []).some(([u]) => u === t)) out.push({ what: `Vocabulary: ${t}`, detail: d, add: () => (P.vocab = [...(P.vocab || []), [t, d]]) }); });
+    openPanel(el('div', {}, el('b', {}, '♻️ Removed from the original'),
+      el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'Parts of the original plan that this version doesn’t have. “Add back” puts one back where it was, without touching your other changes. Save to keep it.'),
+      ...(out.length ? out.map((x) => el('div', { style: 'display:flex;gap:10px;align-items:center;margin:6px 0' }, el('span', { style: 'flex:1' }, el('b', {}, x.what), ' ', el('span', { class: 'small' }, x.detail)),
+        small('Add back', () => { x.add(); lessonEdit(key, P, `Added back: ${x.what}. Click Save to keep it.`); }))) : [el('p', { class: 'small' }, 'Nothing: every step, TV screen, I can statement, and vocabulary word from the original is still here.')])));
+  };
   const bar = el('div', { class: 'lp-edbar' }, el('button', { class: 'btn', type: 'button', onclick: save }, 'Save'), el('button', { class: 'btn secondary', type: 'button', onclick: cancel }, 'Cancel'),
+    el('button', { class: 'btn secondary', type: 'button', onclick: versions }, '🕘 Earlier versions'),
+    LESSONS[key] ? el('button', { class: 'btn secondary', type: 'button', onclick: removed }, '♻️ Removed from the original') : '',
     edited ? el('button', { class: 'btn secondary', type: 'button', style: 'color:#b03a2e', onclick: reset }, 'Reset to original') : '', status);
   app.append(el('div', { class: 'card' }, el('h2', { style: 'margin:0 0 4px' }, `${S.title}`), el('div', { class: 'small' }, 'Change anything below, then Save. The TV screens and the printed plan use your version.'),
+    startNote ? el('div', { class: 'err', style: 'background:#eef4fb;color:#1f5fa8;border-color:#9bb8dc;margin:8px 0' }, startNote) : '',
     h('Note under the title'), inp(P, 'note'), h('Objective'), ta(P, 'objective', 2), h('Students will say (I can…)'), lines(P, 'iCan', 3), h('Vocabulary'), pairs(P, 'vocab', ' — ', 4),
     el('div', { class: 'small' }, 'One per line: word — meaning'), h('Materials'), ta(P, 'materials', 2), h('Builds on'), ta(P, 'prior', 2), h('Before class'), lines(P, 'before', 3),
-    h('Lesson flow'), stepsBox, extra.childNodes.length ? h('Tables, answer keys, and lists') : '', extra), bar);
+    h('Lesson flow'), stepsBox, extra.childNodes.length ? h('Tables, answer keys, and lists') : '', extra, panel), bar);
   window.scrollTo(0, 0);
 }
 // start a fresh assignment in the builder with this section's question types
