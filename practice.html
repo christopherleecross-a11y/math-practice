@@ -36896,8 +36896,19 @@ async function sheetFromPlan(key, which) {
   const byLabel = {}; spec.blocks.forEach((b) => { if (b.prob) byLabel[b.prob] = b; });
   const probOf = (x, space) => ({ ...(byLabel[x.label] || { space }), prob: x.label, stem: (x.fixed || {}).stem || '', fig: (x.fixed || {}).figure || null });
   const exs = all(L).filter((x) => /^Example/.test(x.label) && x.fixed), parts = all(L).filter((x) => /^Partner/.test(x.label) && x.fixed);
+  // a part of the sheet that belongs to a step you removed (a discovery, an activity) is left out with it
+  const nz = (t) => String(t).toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+  const stepFor = (title) => { const t = nz(title), tail = nz(String(title).split(':').slice(1).join(':'));
+    return O.steps.find((st) => { const n = nz(st.name), nt = nz(st.name.split(':').slice(1).join(':')); return t === n || t.includes(n) || n.includes(t) || (tail && nt && (tail.includes(nt) || nt.includes(tail))); })
+      || (/^discovery/.test(t) ? O.steps.find((st) => /^discovery/i.test(st.name)) : null); };
+  const kept = (st) => L.steps.some((x) => x.name === st.name || (st.teacher && x.teacher === st.teacher));
+  let skip = false;
+  const blocks0 = spec.blocks.filter((b) => {
+    if (b.sec) { const t = b.sec.replace(/^Part \d+ · /, ''), st = /^(Notes|Partner|Independent|Exit)/.test(t) ? null : stepFor(t); skip = !!(st && !kept(st)); }
+    return !skip;
+  });
   const out = []; let exAt = -1, partAt = -1;
-  spec.blocks.forEach((b) => {
+  blocks0.forEach((b) => {
     if (b.icans) { if ((L.iCan || []).length) out.push({ icans: L.iCan }); return; }
     if (b.vocab) { if ((L.vocab || []).length) out.push({ vocab: L.vocab.map(([t, d]) => [t, blank(t, d)]) }); return; }
     if (b.notes && b.titles) { if (exAt < 0) exAt = out.length; return; }
@@ -36914,6 +36925,7 @@ async function sheetFromPlan(key, which) {
     out.splice(exAt, 0, ...ins);
   }
   const tickets = spec.tickets.length ? all(L).filter((x) => /^Exit ticket/.test(x.label) && x.fixed).map((x, i) => ({ prob: `${i + 1}.`, stem: x.fixed.stem.replace(/^\d\.\s+/, ''), fig: x.fixed.figure || null, space: 70 })) : [];
+  let part = 0; out.forEach((b, i) => { if (b.sec && /^Part \d+ · /.test(b.sec)) out[i] = { ...b, sec: b.sec.replace(/^Part \d+/, `Part ${++part}`) }; });
   const html = await SHEET_RENDER({ title: spec.title, sec: spec.sec, blocks: out, tickets });
   const body = which === 'exit-tickets' ? html.tickets : html.sheet;
   win.document.open();
