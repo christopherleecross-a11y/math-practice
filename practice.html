@@ -33611,7 +33611,27 @@ async function loadRoster() {
 }
 // the start screen's assignment choice: a menu key, or a built assignment's link (answer key lookup)
 const pickedSet = (sel, key) => { const v = sel ? sel.value : key; return v && v.startsWith('url:') ? registerCustomUrl(v.slice(4)) : v; };
-function startScreen(teacher = false) {
+// An assignment replaced from the website (📤 Assign in Google Classroom > Replace): the old Classroom link sends students to the new one.
+async function startScreen(teacher = false) {
+  const setKey = CUSTOM_KEY || params.get('set');
+  if (!teacher && !PREVIEW && CONFIG.SCRIPT_URL && SETS[setKey] && SETS[setKey].custom) {
+    const ck = TK('moved:' + location.search); let to = null;
+    try { to = sessionStorage.getItem(ck); } catch {}
+    if (to === null) {
+      app.innerHTML = ''; app.append(el('div', { class: 'card' }, el('p', {}, 'Loading your assignment…')));
+      try {
+        const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 5000);
+        const r = await (await fetch(CONFIG.SCRIPT_URL, { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'whereNow', link: location.href }) })).json();
+        clearTimeout(tm); to = r && r.ok && r.link ? r.link : '';
+      } catch (e) { to = ''; }
+      try { sessionStorage.setItem(ck, to); } catch {}
+      app.innerHTML = '';
+    }
+    if (to && to !== location.href) { location.replace(to); return; }
+  }
+  return startScreen0(teacher);
+}
+function startScreen0(teacher = false) {
   if (teacher) teacherNav('key');
   const setKey = CUSTOM_KEY || params.get('set');
   app.innerHTML = '';
@@ -35219,6 +35239,10 @@ function dashAssignment(a) {
       D.roster.length ? tile(String(notStarted.length), 'not started (from your Roster tab)', '#f9e1de') : '',
       tile(best.length ? pctT(avg) : '—', 'class average (best try)', best.length ? band(avg) : undefined),
       tile(med ? med + ' min' : '—', 'typical time')));
+  // a built assignment that's in Classroom: open it in the builder to change it and replace the Classroom post
+  const pz = (D.posted || []).filter((p) => p.title === a.title && /[?&]mix=/.test(p.link || '')).sort((x, y) => y.t - x.t)[0];
+  if (pz) { const u = new URL(location.origin + location.pathname); u.searchParams.set('teacher', '1'); u.searchParams.set('copy', pz.link); u.searchParams.set('replace', pz.key);
+    top.append(el('p', { class: 'small', style: 'margin:10px 0 0' }, el('a', { href: u.toString(), target: '_blank', rel: 'noopener', style: 'font-weight:700' }, '✏️ Edit this assignment and replace it in Classroom'))); }
   app.append(top);
 
   // which questions were missed
@@ -35304,6 +35328,7 @@ function dashStudent(s) {
 function classroomAssignBox(getLink, getTitle, onPosted) {
   const box = el('details', { style: 'margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:8px 12px' });
   const body = el('div', {});
+  if (params.get('replace')) setTimeout(() => { box.open = true; }, 0); // came from the dashboard's ✏️ Edit
   box.append(el('summary', { style: 'cursor:pointer;font-weight:700;color:var(--accent)' }, '📤 Assign in Google Classroom'), body);
   let loaded = false;
   const post = async (obj) => (await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...obj, password: dashPw.get() }) })).json();
@@ -35354,6 +35379,39 @@ function classroomAssignBox(getLink, getTitle, onPosted) {
     const pts = el('input', { type: 'number', value: '100', min: '1', style: 'width:100px' }), due = el('input', { type: 'date', style: 'width:auto' }), tm = el('input', { type: 'time', value: '23:59', style: 'width:auto' });
     const msg = el('p', { class: 'small', style: 'white-space:pre-line;margin:8px 0 0' });
     const go = el('button', { class: 'btn', type: 'button' }, 'Assign');
+    // or: replace an assignment that's already in Classroom (same Classroom posts; its link now opens this version)
+    const repSel = el('select', { style: 'width:auto;max-width:100%' }, el('option', { value: '' }, 'Loading your posted assignments…'));
+    const repGo = el('button', { class: 'btn', type: 'button' }, 'Replace it'), repMsg = el('p', { class: 'small', style: 'white-space:pre-line;margin:8px 0 0' });
+    const replaceBox = el('details', { style: 'margin-top:14px;border-top:1px solid var(--line);padding-top:8px' }, el('summary', { style: 'cursor:pointer;font-weight:700' }, '♻️ Or replace an assignment you already posted'),
+      el('p', { class: 'small', style: 'margin:6px 0' }, 'Students keep the same assignment in Classroom, but its link now opens this version (with the title and points above). Best before anyone starts: a student who already started or turned in the old version gets this new version when they open it again.'),
+      repSel, ' ', repGo, repMsg);
+    let posted = [];
+    const loadPosted = async () => {
+      try { const r = await post({ action: 'postedList' }); if (!r.ok) throw new Error(r.error === 'unknown action' ? 'update' : r.error || 'failed'); posted = r.list || []; }
+      catch (e) { repSel.innerHTML = ''; repSel.append(el('option', { value: '' }, String(e.message) === 'update' ? 'Update PracticeResults.gs to version 17 to use this' : 'Couldn’t load your posted assignments')); return; }
+      repSel.innerHTML = ''; repSel.append(el('option', { value: '' }, posted.length ? 'Choose the assignment to replace…' : 'Nothing posted yet'));
+      posted.forEach((x, i) => repSel.append(el('option', { value: String(i) }, `${x.title} · ${x.periods.join(', ')} · posted ${new Date(x.t).toLocaleDateString()}`)));
+      const want = params.get('replace'); if (want) { const i = posted.findIndex((x) => x.key === want); if (i >= 0) { repSel.value = String(i); replaceBox.open = true; box.open = true; } }
+    };
+    replaceBox.addEventListener('toggle', () => { if (replaceBox.open && !posted.length) loadPosted(); });
+    if (params.get('replace')) { replaceBox.open = true; loadPosted(); }
+    repGo.addEventListener('click', async () => {
+      const x = posted[+repSel.value], link = getLink();
+      repMsg.style.color = '#b03a2e';
+      if (!repSel.value || !x) { repMsg.textContent = 'Choose the assignment to replace.'; return; }
+      if (!link) { repMsg.textContent = 'Pick some questions first.'; return; }
+      if (!title.value.trim()) { repMsg.textContent = 'Give the assignment a title.'; return; }
+      if (!confirm(`Replace “${x.title}” (${x.periods.join(', ')}) with this version?`)) return;
+      repGo.disabled = true; repGo.textContent = 'Replacing…'; repMsg.textContent = '';
+      try {
+        const r = await post({ action: 'replacePosted', oldKey: x.key, link, title: title.value.trim(), points: +pts.value || 100 });
+        if (!r.ok) throw new Error(r.wrong ? 'That dashboard password didn’t match.' : r.error === 'unknown action' ? 'Update your PracticeResults.gs to version 17 to replace assignments.' : r.error || 'failed');
+        repMsg.style.color = r.failed.length ? '#b03a2e' : '#2e7d32';
+        repMsg.textContent = (r.updated.length ? '✓ Replaced in ' + r.updated.join(', ') + '. Its link in Classroom now opens this version.' : '') + (r.failed.length ? '\nProblems:\n' + r.failed.join('\n') : '');
+        posted = []; if (onPosted) onPosted();
+      } catch (e) { repMsg.textContent = String(e.message || e); }
+      repGo.disabled = false; repGo.textContent = 'Replace it';
+    });
     const allLink = el('a', { href: '#', class: 'small', style: 'margin-left:8px;font-weight:400', onclick: (e) => { e.preventDefault(); const on = !pds.every((p) => p.c.checked); pds.forEach((p) => { p.c.checked = on; p.c.dispatchEvent(new Event('change')); }); drawStuds(); } }, 'select all');
     go.addEventListener('click', async () => {
       const link = getLink(), ps = pds.filter((p) => p.c.checked).map((p) => p.x.p);
@@ -35390,7 +35448,7 @@ function classroomAssignBox(getLink, getTitle, onPosted) {
       el('label', {}, 'Who gets it?'), modeSel, studs,
       el('div', { style: 'display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end' },
         el('div', {}, el('label', {}, 'Points'), pts), el('div', {}, el('label', {}, 'Due date (optional, for periods without their own)'), due), el('div', {}, el('label', {}, 'Due time'), tm)),
-      go, msg,
+      go, msg, replaceBox,
       el('p', { class: 'small' }, 'This posts the student link above as an assignment in each checked period’s Google Classroom class. Leave a period’s “Post on” date blank to post it right away, or pick a date and time and Classroom posts it then (it waits in Classroom as a scheduled assignment). Scores go to Classroom automatically when students submit (Classroom keeps each student’s best). To give some students a different version, change the settings above, then assign again with only those students checked.'));
     drawStuds();
   }
