@@ -35924,7 +35924,7 @@ function lessonScreen(preKey) {
       h('Vocabulary'), el('ul', { class: 'lp-ul' }, ...L.vocab.map(([w, d]) => el('li', {}, el('b', {}, w), ' — ', lpMath(d, 16)))),
       L.printables ? h('Print for this lesson') : '',
       L.printables ? el('div', { class: 'lp-print' }, ...L.printables.map((x) => el('div', { class: 'lp-printrow' },
-        el('a', { class: 'btn noprint', href: x.file, target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none;min-width:190px;text-align:center' }, '🖨 ' + x.label),
+        lpPrintBtn(LESSON.key, x, { class: 'btn noprint', style: 'display:inline-block;text-decoration:none;min-width:190px;text-align:center' }, '🖨 ' + x.label),
         el('span', { class: 'small', style: 'flex:1 1 260px;margin:0' }, el('b', { class: 'onlyprint' }, x.label + ': '), x.note)))) : '',
       el('div', { class: 'lp-two' }, el('div', {}, h('Materials'), el('p', {}, L.materials)), el('div', {}, h('Builds on'), el('p', {}, L.prior))),
       L.before ? h('Before class') : '', L.before ? el('ul', { class: 'lp-ul lp-check-list' }, ...L.before.map((x) => el('li', {}, x))) : '',
@@ -35968,7 +35968,7 @@ function lessonScreen(preKey) {
     const head = (p) => el('div', { class: 'lp-cmp-head' }, el('div', { style: 'font-weight:700;font-size:18px' }, `${p.L.minutes}-minute plan`),
       el('div', { class: 'lp-btns noprint', style: 'margin:6px 0 0' },
         el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { LESSON.key = p.k; LESSON.compare = false; setLabel(); draw(); } }, 'Open this plan'),
-        ...(p.L.printables || []).map((x) => el('a', { class: 'btn secondary', href: x.file, target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none;margin:0' }, '🖨 ' + x.label))));
+        ...(p.L.printables || []).map((x) => lpPrintBtn(p.k, x, { class: 'btn secondary', style: 'display:inline-block;text-decoration:none;margin:0' }, '🖨 ' + x.label))));
     out.append(el('div', { class: 'card lp' },
       el('div', { class: 'lp-top' }, el('div', {}, el('h2', { style: 'margin:0' }, SETS[fk].title), el('div', { class: 'small' }, `${SUBJECTS[SETS[fk].subject] || ''} · ${P[0].L.minutes} minutes vs. ${P[1].L.minutes} minutes`)),
         el('div', { class: 'lp-btns noprint', style: 'margin:0' }, el('button', { class: 'btn secondary', type: 'button', onclick: () => { LESSON.compare = false; draw(); } }, '✕ Close the comparison'))),
@@ -36841,6 +36841,92 @@ function padScreen(code) {
   st.addEventListener('click', () => { if (!conn || !conn.open) connect(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (!conn || !conn.open)) connect(); });
   layout(); connect();
+}
+/* ---------- the student sheet, rebuilt in the browser from an edited lesson plan ----------
+   The printed PDFs are made from the original plans (sheets.py writes handouts/<plan>/sheet.json with the layout it used).
+   When you've edited a plan, its 🖨 Student sheet and Exit tickets buttons rebuild the sheet from your version:
+   your I can statements, vocabulary, notes, examples, partner practice, and exit tickets, in the same layout. */
+const SHEET_RENDER = async (spec) => {
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const mathImg = (t, w, px = 17) => String(t).split('\n').filter((l) => l.trim()).map((l) => { const cv = textCanvas(l, w, `${px}px Georgia, "Times New Roman", serif`, Math.round(px * 1.5)); return `<img src="${cv.toDataURL()}" style="width:${w * 0.72}px">`; }).join('');
+  const figImg = (f, scale = 0.5) => { if (!f) return ''; const sz = f.size || [440, 300], cv = makeCanvas(sz[0], sz[1]); cv._stack = false;
+    try { if (f.kind === 'plot' && !f.keep) drawPlot(cv, { xr: f.xr, yr: f.yr, curves: [] }); else lpFigDraw(f)(cv); } catch (e) { return ''; } // graphs print as blank grids for students
+    if (f.kind === 'plot') scale = 0.62;
+    if (['stem', 'box', 'table', 'hist', 'spin', 'dots', 'normal', 'bars'].includes(f.kind)) scale = Math.max(scale * 1.9, 0.68); // data displays must be readable
+    return `<img class="fig" src="${cv.toDataURL()}" style="width:${sz[0] * scale}px">`; };
+  const prob = (b, w = 900) => b.side && b.fig ? `<div class="prob" style="display:flex;gap:10px"><div style="flex:1"><div class="lab">${esc(b.prob)}</div>${b.stem ? mathImg(b.stem, 560) : ''}</div>${figImg(b.fig, b.figScale)}</div><div style="height:${b.space}px"></div>` : `<div class="prob"><div class="lab">${esc(b.prob)}</div>${b.stem ? mathImg(b.stem, w) : ''}${figImg(b.fig, b.figScale || 0.5)}<div style="height:${b.space}px"></div></div>`;
+  const block = (b) => {
+    if (b.icans) return `<div class="icans"><b>I can…</b><ul style="margin:2px 0;padding-left:20px">${b.icans.map((x) => `<li>${esc(x.replace(/^I can /, ''))}</li>`).join('')}</ul></div>`;
+    if (b.vocab) return `<div class="vocab"><div class="vt">Vocabulary <span>· fill in the missing word</span></div>${b.vocab.map(([t, d]) => `<div class="v"><b>${esc(t)}</b> — ${/[\w)²²³ⁿ]\/[\w(√]/.test(d) ? mathImg(d, Math.max(300, 880 - t.length * 10)).replace('<img ', '<img class="vm" ') : esc(d).replace(/_{4,}/g, (m) => `<span class="bl" style="width:${Math.min(m.length * 0.62, 22)}em"></span>`)}</div>`).join('')}</div>`;
+    if (b.sec) return `<div class="sec">${esc(b.sec)}</div>`;
+    if (b.p) return `<p>${b.p}</p>`;
+    if (b.notes) return b.notes.map((n) => `<div class="note">${n}</div>`).join('');
+    if (b.lines) return Array(b.lines).fill('<div class="line"></div>').join('');
+    if (b.box) return `<div class="box" style="height:${b.box}px"></div>`;
+    if (b.boxes) return `<div style="display:grid;grid-template-columns:repeat(${b.boxes},1fr);gap:8px">${Array(b.boxes).fill(`<div class="box" style="height:${b.h}px"></div>`).join('')}</div>`;
+    if (b.plots) return `<div style="display:flex;gap:16px;justify-content:center">${b.plots.map((g) => { const cv = makeCanvas(g.w || 300, g.h || 300); drawPlot(cv, { xr: g.xr, yr: g.yr, curves: [] }); return `<img src="${cv.toDataURL()}" style="width:${(g.w || 300) * 0.72}px">`; }).join('')}</div>`;
+    if (b.tree) return '<div class="tree"><div style="grid-column:2/4"></div></div><div class="tree"><div style="grid-column:2/4"></div></div><div class="tree"><div style="grid-column:1/3"></div><div style="grid-column:3/5"></div></div><div class="tree"><div style="grid-column:2/4"></div></div>';
+    if (b.table) { const t = b.table, w = t.widths; return `<table>${w ? `<colgroup>${w.map((x) => `<col style="width:${x}%">`).join('')}</colgroup>` : ''}<tr>${t.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr>${t.rows.map((r) => `<tr>${r.map((c) => `<td style="height:${t.h}px">${t.math && /[\w)²]\/[\w(]/.test(c) ? mathImg(c, 330) : esc(c)}</td>`).join('')}</tr>`).join('')}</table>`; }
+    if (b.grid) return `<div class="grid">${b.grid.map((x) => prob({ ...x, figScale: 0.42 }, 420)).join('')}</div>`;
+    if (b.prob) return prob(b);
+    return '';
+  };
+  const head = (t, sub, nm = true) => `<div class="hd"><div><b>${esc(t)}</b><div class="nm">${esc(sub)}</div></div>${nm ? '<div class="nm">Name ______________________ &nbsp; Period ____ &nbsp; Date ________</div>' : ''}</div>`;
+  const sheet = head(spec.title, spec.sec + ' · Student sheet') + spec.blocks.map(block).join('');
+  const tickets = spec.tickets.length ? [0, 1].map((k) => `<div class="ticket">${head(spec.title, spec.sec + ' · Exit ticket')}${spec.tickets.map((x) => prob({ ...x, figScale: 0.36, side: true, space: x.fig ? 0 : x.space }, 900)).join('')}</div>`).join('<div class="cut"><span>✂ cut</span></div>') : '';
+  let extra = '';
+  if (spec.extra && spec.extra[0] === 'cards') extra = head(spec.extra[1], spec.extra[2], false) + `<div class="cards">${spec.cards.map((c) => `<div class="card">${mathImg(c, 260, 34)}</div>`).join('')}</div>`;
+  if (spec.extra && spec.extra[0] === 'strips') { const set = [3, 4, 4, 5, 8, 9]; extra = head(spec.extra[1], spec.extra[2], false) + '<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px">' + Array(6).fill(0).map((_, k) => `<div style="margin:4px 0 8px"><div class="nm">Set ${k + 1}</div>${set.map((n) => `<div class="strip" style="width:${n}cm">${n} cm</div>`).join('')}</div>`).join('') + '</div>'; }
+  return { sheet, tickets, extra };
+};
+async function sheetFromPlan(key, which) {
+  const win = window.open('', '_blank'); if (!win) { alert('Allow pop-ups for this site to print the sheet.'); return; }
+  win.document.write('<p style="font:16px system-ui;margin:40px">Building your sheet from your edited plan…</p>');
+  let spec;
+  try { spec = await (await fetch(`handouts/${key}/sheet.json`, { cache: 'no-cache' })).json(); }
+  catch (e) { win.document.body.innerHTML = '<p style="font:16px system-ui;margin:40px">Couldn’t load this sheet’s layout. Printing the original instead…</p>'; win.location.href = `handouts/${key}/${which}.pdf`; return; }
+  const L = lessonOf(key), O = LESSONS[key] || L, all = (P) => P.steps.flatMap((st) => st.show || []);
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const blank = (t, d) => { const r = lpVocabBlank(t, d); return r && r.at >= 0 ? d.slice(0, r.at) + '_'.repeat(Math.max(10, r.ans.length + 3)) + d.slice(r.at + r.ans.length) : '_'.repeat(34); };
+  // the original notes as printed, by title (kept word for word when you didn't change them)
+  const origNotes = {}; spec.blocks.forEach((b) => (b.titles || []).forEach((t, i) => (origNotes[t] = b.notes[i])));
+  const origStem = {}; O.steps.forEach((st) => (st.notes || []).forEach((n) => (origStem[n.t] = n.stem)));
+  const noteHtml = (n) => (origNotes[n.t] && origStem[n.t] === n.stem ? origNotes[n.t] : `<b>${esc(n.t)}:</b> ${esc(n.stem).replace(/_{4,}/g, '_______________')}`);
+  const myNotes = L.steps.flatMap((st) => st.notes || []);
+  const byLabel = {}; spec.blocks.forEach((b) => { if (b.prob) byLabel[b.prob] = b; });
+  const probOf = (x, space) => ({ ...(byLabel[x.label] || { space }), prob: x.label, stem: (x.fixed || {}).stem || '', fig: (x.fixed || {}).figure || null });
+  const exs = all(L).filter((x) => /^Example/.test(x.label) && x.fixed), parts = all(L).filter((x) => /^Partner/.test(x.label) && x.fixed);
+  const out = []; let exAt = -1, partAt = -1;
+  spec.blocks.forEach((b) => {
+    if (b.icans) { if ((L.iCan || []).length) out.push({ icans: L.iCan }); return; }
+    if (b.vocab) { if ((L.vocab || []).length) out.push({ vocab: L.vocab.map(([t, d]) => [t, blank(t, d)]) }); return; }
+    if (b.notes && b.titles) { if (exAt < 0) exAt = out.length; return; }
+    if (b.prob && /^Example/.test(b.prob)) { if (exAt < 0) exAt = out.length; return; }
+    if (b.prob && /^Partner/.test(b.prob)) { if (partAt < 0) partAt = out.length; return; }
+    out.push(b);
+  });
+  if (!(L.vocab || []).length) {} else if (!spec.blocks.some((b) => b.vocab)) { const i = out.findIndex((b) => b.icans); out.splice(i + 1, 0, { vocab: L.vocab.map(([t, d]) => [t, blank(t, d)]) }); if (exAt > i) exAt++; if (partAt > i) partAt++; }
+  if (partAt >= 0) out.splice(partAt, 0, ...parts.map((x) => probOf(x, 130)));
+  if (exAt >= 0) {
+    const ins = [], used = new Set();
+    exs.forEach((x) => { const ns = myNotes.filter((n) => n.before === x.label); ns.forEach((n) => used.add(n)); if (ns.length) ins.push({ notes: ns.map(noteHtml) }); ins.push(probOf(x, 110)); });
+    const rest = myNotes.filter((n) => !used.has(n)); if (rest.length) ins.unshift({ notes: rest.map(noteHtml) });
+    out.splice(exAt, 0, ...ins);
+  }
+  const tickets = spec.tickets.length ? all(L).filter((x) => /^Exit ticket/.test(x.label) && x.fixed).map((x, i) => ({ prob: `${i + 1}.`, stem: x.fixed.stem.replace(/^\d\.\s+/, ''), fig: x.fixed.figure || null, space: 70 })) : [];
+  const html = await SHEET_RENDER({ title: spec.title, sec: spec.sec, blocks: out, tickets });
+  const body = which === 'exit-tickets' ? html.tickets : html.sheet;
+  win.document.open();
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(spec.title)} · ${which === 'exit-tickets' ? 'Exit tickets' : 'Student sheet'} (your edited plan)</title><style>${spec.css}</style></head><body>${body}</body></html>`);
+  win.document.close();
+  const imgs = [...win.document.images]; await Promise.all(imgs.map((im) => (im.complete ? 0 : new Promise((ok) => { im.onload = im.onerror = ok; }))));
+  setTimeout(() => { win.focus(); win.print(); }, 300);
+}
+// a 🖨 button for a printable: an edited plan's student sheet and exit tickets are rebuilt from your version
+function lpPrintBtn(key, x, attrs, label) {
+  const m = /handouts\/([^/]+)\/(student-sheet|exit-tickets)\.pdf$/.exec(x.file || '');
+  if (m && LESSON_EDITS.data[key]) return el('a', { ...attrs, href: x.file, title: 'Built from your edited plan', onclick: (e) => { e.preventDefault(); sheetFromPlan(m[1], m[2]); } }, label + ' ✏️');
+  return el('a', { ...attrs, href: x.file, target: '_blank', rel: 'noopener' }, label);
 }
 /* ==== LESSON PLANS END ==== */
 
