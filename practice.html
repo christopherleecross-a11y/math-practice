@@ -36012,23 +36012,19 @@ const lpSet = (k) => { const L = LESSONS[k]; if (L && L.base && SETS[L.base]) re
 const lpPost = async (body) => { const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...body, password: dashPw.get() }) }); return res.json(); };
 // the script must be version 8 or newer (older ones would treat the request as a student submission)
 async function lpVersion() {
-  if (LESSON_EDITS.version >= 8) return LESSON_EDITS.version; // an older answer is asked again (the script may have just been updated)
+  if (LESSON_EDITS.version >= 8) return LESSON_EDITS.version;
+  if (LESSON_EDITS.getBlocked) return -1; // an older answer is asked again (the script may have just been updated)
   // the Sheet sometimes answers slowly or drops one request (a script waking up, a busy school network): ask up to 3 times
   for (let k = 0; k < 3; k++) {
     try {
       const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 15000);
-      const res = await fetch(CONFIG.SCRIPT_URL + (CONFIG.SCRIPT_URL.includes('?') ? '&' : '?') + 'ts=' + Date.now(), { cache: 'no-store', signal: ctl.signal });
+      const res = await fetch(CONFIG.SCRIPT_URL + (CONFIG.SCRIPT_URL.includes('?') ? '&' : '?') + 'ts=' + Date.now(), { signal: ctl.signal }); // (no cache option: some school filters block the extra header it adds)
       clearTimeout(tm); const t = await res.text(), m = /version (\d+)/.exec(t);
       if (!m && !res.ok) throw new Error('HTTP ' + res.status);
       LESSON_EDITS.version = m ? +m[1] : 0; LESSON_EDITS.why = ''; break;
     } catch (e) {
       LESSON_EDITS.why = e.name === 'AbortError' ? 'no answer in 15 seconds' : String(e.message || e);
-      if (k === 2) {
-        // can this computer reach Google at all? (an answer it isn't allowed to read means a filter is in the way, not the Sheet)
-        try { await fetch(CONFIG.SCRIPT_URL + (CONFIG.SCRIPT_URL.includes('?') ? '&' : '?') + 'ts=' + Date.now(), { mode: 'no-cors', cache: 'no-store' }); LESSON_EDITS.why += '; the request goes out, but this browser isn’t allowed to read the answer'; }
-        catch (e2) { LESSON_EDITS.why += '; the request can’t get out of this browser at all'; }
-        return -1;
-      }
+      if (e.name !== 'AbortError' || k === 2) { LESSON_EDITS.getBlocked = true; return -1; } // blocked (a school filter): don't wait on it again
       await new Promise((ok) => setTimeout(ok, 1500 * (k + 1)));
     }
   }
@@ -36037,7 +36033,9 @@ async function lpVersion() {
 async function lessonSync() {
   if (!CONFIG.SCRIPT_URL) { LESSON_EDITS.status = 'noscript'; return; }
   if (!dashPw.get()) { LESSON_EDITS.status = 'nopw'; return; }
-  const v = await lpVersion(); if (v < 0) { LESSON_EDITS.status = 'offline'; return; } if (v < 8) { LESSON_EDITS.status = 'old'; return; }
+  // the version check is a plain page request, which some school filters won't let the page read; the dashboard's kind of request
+  // still works there, so go ahead without it (every script still in use is newer than version 8)
+  const v = await lpVersion(); if (v >= 0 && v < 8) { LESSON_EDITS.status = 'old'; return; }
   try {
     let g;
     for (let k = 0; ; k++) { try { g = await lpPost({ action: 'lessonPlans' }); break; } catch (e) { LESSON_EDITS.why = String(e.message || e); if (k === 2) throw e; await new Promise((ok) => setTimeout(ok, 1500 * (k + 1))); } }
