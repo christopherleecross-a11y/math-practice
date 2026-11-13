@@ -205,6 +205,7 @@
   .pad-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 10px; background: #fafaf7; border-bottom: 1px solid #ccc; font: 15px system-ui, sans-serif; }
   .pbtn { font: 600 16px system-ui, sans-serif; padding: 10px 14px; border-radius: 8px; border: 1px solid #1f5fa8; background: #fff; color: #1f5fa8; }
   .pbtn.on { background: #1f5fa8; color: #fff; }
+  .pbtn.warn { background: #b03a2e; border-color: #b03a2e; color: #fff; }
   .pad-tm { display: inline-flex; gap: 6px; align-items: center; }
   .pad-tm-time { font: 700 22px system-ui, sans-serif; min-width: 3.4em; text-align: center; font-variant-numeric: tabular-nums; }
   .pad-tm-time.low { color: #b06f00; } .pad-tm-time.done { color: #b03a2e; }
@@ -36887,6 +36888,9 @@ function tvInk(stage, api) {
     else if (m.t === 's1') { const s = live[m.id]; delete live[m.id]; if (s) strokes().push(s); draw(); }
     else if (m.t === 'del') { m.ids.forEach((d) => delete live[d]); inks[key] = strokes().filter((s) => !m.ids.includes(s.id)); draw(); }
     else if (m.t === 'clear') { inks[key] = []; draw(); }
+    else if (m.t === 'clearAll') { // from the iPad: wipe the writing on every screen of this lesson, and the extra room, ready for the next class
+      Object.keys(inks).forEach((k) => delete inks[k]); Object.keys(rooms).forEach((k) => delete rooms[k]); Object.keys(live).forEach((k) => delete live[k]);
+      size(); const sc = scroller(); sc.scrollTop = 0; sendSlide(); }
     else if (m.t === 'cmd') { if (m.k === 'room') more(); else api.cmd(m.k); }
     else if (m.t === 'view') { const sc = scroller(), bar = sc.querySelector('.tv-bar'), top = stage.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
       sc.scrollTop = Math.max(0, top + m.y * stage.clientWidth - (bar ? bar.offsetHeight : 0)); }
@@ -36979,12 +36983,18 @@ function padScreen(code) {
     tmTime.className = 'pad-tm-time' + (t.left === 0 ? ' done' : t.left <= 30 ? ' low' : '');
     tmGo.textContent = t.run ? 'Pause' : t.left > 0 && t.left < t.len ? 'Resume' : 'Start';
   };
+  // Clear all: the writing on every screen of the lesson (tap twice, so it can't happen by accident)
+  let caT = null;
+  const clearAllB = el('button', { class: 'pbtn', type: 'button', title: 'Erase the writing on every screen, ready for the next class', onclick: () => {
+    if (!caT) { clearAllB.textContent = 'Tap again to clear every screen'; clearAllB.classList.add('warn'); caT = setTimeout(() => { caT = null; clearAllB.textContent = 'Clear all'; clearAllB.classList.remove('warn'); }, 3000); return; }
+    clearTimeout(caT); caT = null; clearAllB.textContent = 'Clear all'; clearAllB.classList.remove('warn'); strokes = []; live = {}; sy = 0; draw(); send({ t: 'clearAll' }); } }, 'Clear all');
   const bar = el('div', { class: 'pad-bar' },
     el('button', { class: 'pbtn', type: 'button', onclick: () => send({ t: 'cmd', k: 'prev' }) }, '← Back'), count,
     el('button', { class: 'pbtn', type: 'button', onclick: () => send({ t: 'cmd', k: 'next' }) }, 'Next →'), ansB,
     el('span', { style: 'flex:1' }), ...sw, eraseB,
     el('button', { class: 'pbtn', type: 'button', onclick: () => { const s = strokes.pop(); if (s) { draw(); send({ t: 'del', ids: [s.id] }); } } }, 'Undo'),
     el('button', { class: 'pbtn', type: 'button', onclick: () => { strokes = []; draw(); send({ t: 'clear' }); } }, 'Clear'),
+    clearAllB,
     el('button', { class: 'pbtn', type: 'button', title: 'Add space below to keep writing (scroll with two fingers)', onclick: () => { wantBottom = true; send({ t: 'cmd', k: 'room' }); } }, '⬇ More room'), tmShowB, tmBox, st);
   const wrap = el('div', { class: 'pad-wrap' }, cv);
   document.body.append(bar, wrap); paintBar();
