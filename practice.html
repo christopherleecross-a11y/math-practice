@@ -35963,6 +35963,14 @@ function lpVocabBlank(term, df) {
 }
 function lpWithIcan(L) {
   const steps = L.steps.map((s) => ({ ...s })), bi = Math.max(0, steps.findIndex((s) => /bell ringer/i.test(s.name)));
+  // a vocabulary word whose step was removed in the editor (e.g. the discovery) still gets its slide: at the start of the first later step with examples
+  const covered = new Set(steps.flatMap((s) => (s.vocab || []).map((v) => v.t)));
+  const orphans = (L.vocab || []).map(([t]) => t).filter((t) => !covered.has(t));
+  if (orphans.length) {
+    const hi = steps.findIndex((s, i) => i > bi && (s.show || []).some((x) => !x.moment));
+    const h = hi >= 0 ? hi : bi, first = ((steps[h].show || []).find((x) => !x.moment && x.label !== 'Bell ringer') || {}).label;
+    steps[h] = { ...steps[h], vocab: [...orphans.map((t) => ({ t, before: first || null })), ...(steps[h].vocab || [])] };
+  }
   // vocabulary and notes moments: one TV slide each with the sheet's fill-in blank, right before the example that first uses it
   // (Show answer gives the missing words and the whole statement)
   const putBefore = (s, item, before) => {
