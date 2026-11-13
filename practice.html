@@ -36892,17 +36892,27 @@ function tvInk(stage, api) {
       sc.scrollTop = Math.max(0, top + m.y * stage.clientWidth - (bar ? bar.offsetHeight : 0)); }
     else if (m.t === 'hello') { remote.send(slideMsg()); }
   };
+  // the iPad code stays the same all day on this computer, so the iPad can rejoin by itself after its screen sleeps or the TV screen is reopened
+  const today = new Date().toDateString();
+  const dayCode = () => { try { const d = JSON.parse(localStorage.getItem('tvPadCode') || 'null'); if (d && d.day === today && /^\d{6}$/.test(d.code)) return d.code; } catch (e) {}
+    const c = String(Math.floor(100000 + Math.random() * 900000)); try { localStorage.setItem('tvPadCode', JSON.stringify({ day: today, code: c })); } catch (e) {} return c; };
+  let tries = 0;
   const start = async () => {
-    setStatus('wait'); code = String(Math.floor(100000 + Math.random() * 900000));
+    setStatus('wait'); code = dayCode();
     try { await loadScript(INK_LIB.peer); } catch (e) { setStatus('fail'); return; }
     peer = new window.Peer('mrcross-tv-' + code, window.INK_PEER_OPTS || {});
-    peer.on('error', () => { if (status !== 'on') setStatus('fail'); });
-    peer.on('open', () => { if (status !== 'on') setStatus('ready'); });
+    peer.on('error', (e) => {
+      // the code can still be taken for a few seconds after the TV screen was closed: wait and try again
+      if (e && e.type === 'unavailable-id' && tries++ < 8) { try { peer.destroy(); } catch (x) {} peer = null; setTimeout(() => { if (status !== 'off') start(); }, 2500); return; }
+      if (status !== 'on') setStatus('fail');
+    });
+    peer.on('open', () => { tries = 0; if (status !== 'on') setStatus('ready'); });
     peer.on('disconnected', () => { setTimeout(() => { try { if (peer && !peer.destroyed && peer.disconnected) peer.reconnect(); } catch (e) {} }, 1500); });
     peer.on('connection', (c) => {
-      if (remote && remote.open) { c.on('open', () => { c.send({ t: 'busy' }); setTimeout(() => c.close(), 500); }); return; } // one iPad at a time
-      remote = c; c.on('open', () => { setStatus('on'); c.send(slideMsg()); setTimeout(() => { if (panel && status === 'on') { panel.remove(); panel = null; } }, 2500); });
-      c.on('data', onMsg); c.on('close', () => { remote = null; Object.keys(live).forEach((k) => delete live[k]); draw(); setStatus(peer && !peer.destroyed ? 'ready' : 'off'); });
+      // one iPad at a time: the newest connection wins (after the iPad's screen was off, the old connection may not have noticed it's gone yet)
+      if (remote) { const old = remote; remote = null; try { old.send({ t: 'busy' }); } catch (e) {} setTimeout(() => { try { old.close(); } catch (e) {} }, 300); }
+      remote = c; c.on('open', () => { setStatus('on'); try { localStorage.setItem('tvPadDay', today); } catch (e) {} c.send(slideMsg()); setTimeout(() => { if (panel && status === 'on') { panel.remove(); panel = null; } }, 2500); });
+      c.on('data', (m) => { if (remote === c) onMsg(m); }); c.on('close', () => { if (remote !== c) return; remote = null; Object.keys(live).forEach((k) => delete live[k]); draw(); setStatus(peer && !peer.destroyed ? 'ready' : 'off'); });
     });
   };
   const stop = () => { try { remote && remote.close(); } catch (e) {} try { peer && peer.destroy(); } catch (e) {} remote = null; peer = null; setStatus('off'); };
@@ -36922,12 +36932,14 @@ function tvInk(stage, api) {
         const q = el('div', { style: 'margin:8px 0' });
         try { await loadScript(INK_LIB.qr); const g = window.qrcode(0, 'M'); g.addData(url); g.make(); q.innerHTML = g.createSvgTag({ cellSize: 5, margin: 2 }); } catch (e) {}
         inner.append(el('p', { style: 'margin:6px 0' }, 'On the iPad, point the Camera at this code and tap the link (or open the practice page and add ', el('b', {}, '?pad=' + code), ' to the address).'), q,
-          el('p', { class: 'small', style: 'margin:0' }, 'Code ', el('b', { style: 'font-size:20px;letter-spacing:2px' }, code), ' · only one iPad can connect, and only while this screen is open.'));
+          el('p', { class: 'small', style: 'margin:0' }, 'Code ', el('b', { style: 'font-size:20px;letter-spacing:2px' }, code), ' · one iPad at a time. The code stays the same all day: leave the iPad on this page, and it reconnects by itself when you wake it or open the TV screen again.'));
       }
     };
     box().append(panel); panel.refresh();
   }
   const box = () => stage.closest('.tvshow') || document.body;
+  // an iPad was connected earlier today: be ready for it again without clicking 📱 iPad
+  try { if (localStorage.getItem('tvPadDay') === today) setTimeout(() => { if (!peer) start(); }, 300); } catch (e) {}
   return {
     bar: [drawB, tools, padB],
     show: (k) => { key = String(k); Object.keys(live).forEach((x) => delete live[x]); requestAnimationFrame(size); sendSlide(); },
@@ -37008,26 +37020,36 @@ function padScreen(code) {
     else if (m.t === 's1') { const s = live[m.id]; delete live[m.id]; if (s) strokes.push(s); draw(); }
     else if (m.t === 'del') { m.ids.forEach((d) => delete live[d]); strokes = strokes.filter((s) => !m.ids.includes(s.id)); draw(); }
     else if (m.t === 'clear') { strokes = []; draw(); }
-    else if (m.t === 'busy') st.textContent = 'Another iPad is already connected.';
+    else if (m.t === 'busy') { st.textContent = 'Another device connected to the TV.'; st.classList.remove('ok'); clearTimeout(retry); stopped = true; }
     else if (m.t === 'timer') { const was = tmBox.style.display; tmPaint(m); if (tmBox.style.display !== was) layout(); }
   };
-  let me = null, retry = null;
+  let me = null, retry = null, stopped = false;
   const connect = async () => {
     clearTimeout(retry); if (conn && conn.open) return;
     try { me && me.destroy(); } catch (e) {}
     st.textContent = 'Connecting…';
     try { await loadScript(INK_LIB.peer); } catch (e) { st.textContent = 'Couldn’t load the connection (network).'; return; }
     me = new window.Peer(window.INK_PEER_OPTS || {});
-    me.on('error', (e) => { st.classList.remove('ok'); st.textContent = /peer-unavailable/.test(e && e.type || '') ? 'No TV with that code (is that screen still open on the TV?). Trying again…' : 'Couldn’t connect. Trying again…'; retry = setTimeout(connect, 4000); });
+    me.on('error', (e) => { st.classList.remove('ok'); st.textContent = /peer-unavailable/.test(e && e.type || '') ? 'Waiting for the TV… (open a lesson on the TV screen; this iPad joins by itself)' : 'Couldn’t connect. Trying again…'; retry = setTimeout(connect, 3000); });
     me.on('open', () => {
       conn = me.connect('mrcross-tv-' + code, { reliable: true });
       conn.on('open', () => { st.textContent = '● Connected'; st.classList.add('ok'); send({ t: 'hello' }); });
       conn.on('data', onMsg);
-      conn.on('close', () => { st.textContent = 'Reconnecting…'; st.classList.remove('ok'); retry = setTimeout(connect, 1500); });
+      conn.on('close', () => { if (stopped) return; st.textContent = 'Reconnecting…'; st.classList.remove('ok'); retry = setTimeout(connect, 1500); });
     });
   };
-  st.addEventListener('click', () => { if (!conn || !conn.open) connect(); });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (!conn || !conn.open)) connect(); });
+  st.addEventListener('click', () => { if (!conn || !conn.open) { stopped = false; connect(); } });
+  // after the screen was off: rejoin right away (the same code works all day)
+  let hiddenAt = 0;
+  const wake = () => {
+    if (document.visibilityState !== 'visible') return;
+    // the screen was off for a while: the old connection is probably dead even if it still looks open, so start fresh
+    if (hiddenAt && Date.now() - hiddenAt > 5000 && conn) { const c = conn; conn = null; try { c.close(); } catch (e) {} }
+    hiddenAt = 0;
+    if (!conn || !conn.open) { stopped = false; connect(); }
+  };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') hiddenAt = Date.now(); });
+  document.addEventListener('visibilitychange', wake); window.addEventListener('pageshow', wake); window.addEventListener('focus', wake); window.addEventListener('online', wake);
   layout(); connect();
 }
 /* ---------- the student sheet, rebuilt in the browser from an edited lesson plan ----------
