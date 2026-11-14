@@ -13902,6 +13902,8 @@ TEMPLATES.g71Regular = (r) => {
 /* ---------- parallelogram figures ---------- */
 // a parallelogram named counterclockwise from the lower left
 const g7para = (w = 6, h = 3.4, s = 1.6) => [[0, 0], [w, 0], [w + s, h], [s, h]];
+// a parallelogram drawn to scale: angle A (degrees) at the lower-left vertex, bottom side w, slanted side len
+const g7paraA = (A, w = 6, len = 3.6) => { const t = (A * Math.PI) / 180, d = [len * Math.cos(t), len * Math.sin(t)]; return [[0, 0], [w, 0], [w + d[0], d[1]], d]; };
 const g7center = (P) => VEC.mul(VEC.add(P[0], P[2]), 0.5);
 // intersection of the diagonals of quadrilateral P
 function g7center2(P) {
@@ -13927,18 +13929,19 @@ TEMPLATES.g72Vars = (r) => {
     if (kind === 'angles') {
       const m = pick(r, [1, 2]), c = other - m * ri(r, 5, 40); const y = (other - c) / m; if (!Number.isInteger(y) || c === 0) continue;
       const exprB = g4Lin(m, c, 'y');
+      const Pa = g7paraA(a, P[1][0]);
       return { topic: 'Finding variables in a parallelogram', stem: 'Find the value of each variable in the parallelogram.', ...buildChoices(r, `x = ${x}, y = ${y}`, [`x = ${y}, y = ${x}`, `x = ${x}, y = ${(a - c) / m}`, `x = ${(other - b) / k}, y = ${y}`].filter((c2, i, A) => c2 !== `x = ${x}, y = ${y}` && A.indexOf(c2) === i && !/\./.test(c2)), (i) => `x = ${x + i + 1}, y = ${y}`),
-        fr: frNums([{ label: 'x =', val: x }, { label: 'y =', val: y }], `x = ${x}, y = ${y}`), draw: g7Fig([{ pts: P, names: N, alab: [g7ang(exprA), g7ang(exprB), `${a}°`, ''] }]), size: [400, 280],
+        fr: frNums([{ label: 'x =', val: x }, { label: 'y =', val: y }], `x = ${x}, y = ${y}`), draw: g7Fig([{ pts: Pa, names: N, alab: [g7ang(exprA), g7ang(exprB), `${a}°`, ''] }]), size: [400, 280],
         solution: `Opposite angles are congruent: ${exprA} = ${a}  →  x = ${x}\nConsecutive angles are supplementary: ${exprB} = 180 − ${a} = ${other}  →  y = ${y}` };
     }
     const E1 = g6Eq(r, 2, 9, 4); if (!E1) continue;
     return { topic: 'Finding variables in a parallelogram', stem: 'Find the value of each variable in the parallelogram.', ...buildChoices(r, `x = ${E1.x}, y = ${x}`, [`x = ${x}, y = ${E1.x}`, `x = ${E1.x}, y = ${(other - b) / k}`, `x = ${E1.x + 2}, y = ${x}`].filter((c2, i, A) => c2 !== `x = ${E1.x}, y = ${x}` && A.indexOf(c2) === i && !/\./.test(c2)), (i) => `x = ${E1.x}, y = ${x + i + 1}`),
-      fr: frNums([{ label: 'x =', val: E1.x }, { label: 'y =', val: x }], `x = ${E1.x}, y = ${x}`), draw: g7Fig([{ pts: P, names: N, slab: [E1.L, '', E1.R, ''], alab: [`${other}°`, g7ang(exprA.replace(/x/g, 'y')), '', ''] }]), size: [400, 280],
+      fr: frNums([{ label: 'x =', val: E1.x }, { label: 'y =', val: x }], `x = ${E1.x}, y = ${x}`), draw: g7Fig([{ pts: g7paraA(other, P[1][0]), names: N, slab: [E1.L, '', E1.R, ''], alab: [`${other}°`, g7ang(exprA.replace(/x/g, 'y')), '', ''] }]), size: [400, 280],
       solution: `Opposite sides are congruent: ${E1.L} = ${E1.R}  →  x = ${E1.x}\nConsecutive angles are supplementary: ${exprA.replace(/x/g, 'y')} + ${other} = 180  →  y = ${x}` };
   }
 };
 TEMPLATES.g72Angle = (r) => {
-  const N = pickLetters(r, 4), a = ri(r, 40, 140), P = g7para(6, 3.4, pick(r, [1.6, -1.4])); if (a === 90) return TEMPLATES.g72Angle(r);
+  const N = pickLetters(r, 4), a = ri(r, 40, 140), P = g7paraA(a); if (a === 90) return TEMPLATES.g72Angle(r);
   const t = ri(r, 1, 3), ans = t === 2 ? a : 180 - a;
   return { topic: 'Angles of a parallelogram', stem: `Find m∠${N[t]}.`, ...g6Choices(r, ans, g7deg), fr: FR.num(`m∠${N[t]} =`, ans, { suffix: '°' }),
     draw: g7Fig([{ pts: P, names: N, alab: [`${a}°`, '', '', ''] }]), size: [400, 260],
@@ -13946,8 +13949,11 @@ TEMPLATES.g72Angle = (r) => {
 };
 // #7–14: sides, diagonal halves, angles
 TEMPLATES.g72Diag = (r) => {
-  const N = pickLetters(r, 5), V = N.slice(0, 4), Pn = N[4], P = g7para(6, 3.4, pick(r, [1.5, 1.9])), O = g7center2(P);
-  const s1 = pick(r, [8.2, 7, 9, 12, 13, 15]), s2 = pick(r, [5, 6, 7.5, 8, 11]), h1 = pick(r, [6, 7, 8, 9.5, 10]), h2 = pick(r, [4, 5, 5.5, 6]), ang = ri(r, 95, 130), part = ri(r, 15, 165 - ang);
+  const N = pickLetters(r, 5), V = N.slice(0, 4), Pn = N[4];
+  const s1 = pick(r, [8, 9, 10, 12, 14]), s2 = pick(r, [5, 6, 7, 8].filter((v) => v < s1 - 1)), ang = ri(r, 55, 80); // angle at the lower-left vertex (acute, so the figure leans right like the book)
+  const P = g7paraA(ang, 6, (6 * s2) / s1), O = g7center2(P), k = s1 / 6, r1 = (v) => Math.round(v * 10) / 10; // figure units → real lengths
+  const h1 = r1((VEC.len(VEC.sub(P[2], P[0])) * k) / 2), h2 = r1((VEC.len(VEC.sub(P[3], P[1])) * k) / 2);
+  const u1 = VEC.norm(VEC.sub(P[1], P[3])), u2 = VEC.norm(VEC.sub(P[0], P[3])), part = Math.round((Math.acos(u1[0] * u2[0] + u1[1] * u2[1]) * 180) / Math.PI);
   const qs = [
     [`${V[2]}${V[3]}`, s1, `Opposite sides are congruent: ${V[2]}${V[3]} = ${V[0]}${V[1]} = ${s1}.`],
     [`${V[1]}${V[2]}`, s2, `Opposite sides are congruent: ${V[1]}${V[2]} = ${V[3]}${V[0]} = ${s2}.`],
@@ -13976,11 +13982,11 @@ TEMPLATES.g72Alg = (r) => {
     }
     const x = ri(r, 4, 30), k = pick(r, [1, 2, 3, 4]), b = ri(r, -20, 30), A = k * x + b; if (A < 40 || A > 140 || A === 90) continue;
     if (kind === 'opp') { const E = g6Eq(r, 2, 12, 40); if (!E || E.val > 150 || E.val === 90) continue;
-      return { topic: 'Algebra in parallelograms', stem: 'Find the value of x in the parallelogram.', ...g6Choices(r, E.x), fr: FR.num('x =', E.x), draw: g7Fig([{ pts: P, names: N, alab: [g7ang(E.L), '', g7ang(E.R), ''] }]), size: [400, 260],
+      return { topic: 'Algebra in parallelograms', stem: 'Find the value of x in the parallelogram.', ...g6Choices(r, E.x), fr: FR.num('x =', E.x), draw: g7Fig([{ pts: g7paraA(E.val), names: N, alab: [g7ang(E.L), '', g7ang(E.R), ''] }]), size: [400, 260],
         solution: `Opposite angles of a parallelogram are congruent: ${E.L} = ${E.R}  →  x = ${E.x}` }; }
     const B = 180 - A, m = pick(r, [1, 1, 2]), c = B - m * ri(r, 5, 40), y = (B - c) / m; if (!Number.isInteger(y)) continue;
     return { topic: 'Algebra in parallelograms', stem: 'Find the value of each variable in the parallelogram.', ...buildChoices(r, `x = ${x}, y = ${y}`, [`x = ${y}, y = ${x}`, `x = ${x}, y = ${(A - c) / m}`, `x = ${(B - b) / k}, y = ${y}`].filter((t, i, X) => t !== `x = ${x}, y = ${y}` && X.indexOf(t) === i && !/\./.test(t)), (i) => `x = ${x + 1 + i}, y = ${y}`),
-      fr: frNums([{ label: 'x =', val: x }, { label: 'y =', val: y }], `x = ${x}, y = ${y}`), draw: g7Fig([{ pts: P, names: N, alab: [g7ang(g4Lin(k, b)), g7ang(g4Lin(m, c, 'y')), `${A}°`, ''] }]), size: [400, 260],
+      fr: frNums([{ label: 'x =', val: x }, { label: 'y =', val: y }], `x = ${x}, y = ${y}`), draw: g7Fig([{ pts: g7paraA(A), names: N, alab: [g7ang(g4Lin(k, b)), g7ang(g4Lin(m, c, 'y')), `${A}°`, ''] }]), size: [400, 260],
       solution: `Opposite angles are congruent: ${g4Lin(k, b)} = ${A}  →  x = ${x}\nConsecutive angles are supplementary: ${g4Lin(m, c, 'y')} = 180 − ${A} = ${B}  →  y = ${y}` };
   }
 };
