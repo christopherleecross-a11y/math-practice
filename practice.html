@@ -205,6 +205,16 @@
   .ix-wide .ix-side { flex: 1 1 100%; display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
   .ix-wide .ix-ctl { flex: 1 1 340px; }
   .ix-wide .ix-read { flex: 1 1 340px; margin-top: 0; border-top: 0; }
+  .stu-tag { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .stu-note { border-left: 4px solid #1f5fa8; background: #f7fafd; }
+  .stu-ans { margin-top: 12px; padding: 10px 12px; background: #f5f3ee; border-left: 4px solid #d4a72c; border-radius: 6px; }
+  .vcard { min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 8px; padding: 24px; border: 2px solid #1f5fa8; border-radius: 14px; cursor: pointer; background: #fff; user-select: none; }
+  .vcard.back { background: #eef4fb; } .vterm { font-size: 30px; font-weight: 700; }
+  .mt-grid { display: grid; grid-template-columns: 1fr 1.6fr; gap: 14px; } .mt-col { display: flex; flex-direction: column; gap: 8px; }
+  .mt-item { font: inherit; text-align: left; padding: 10px 12px; border: 1.5px solid #c9c5bb; border-radius: 10px; background: #fff; cursor: pointer; color: #1d1d1b; min-height: 46px; }
+  .mt-item.sel { border-color: #1f5fa8; background: #eef4fb; } .mt-item.ok { border-color: #2e7d4f; background: #e8f3ec; opacity: .75; cursor: default; } .mt-item.no { border-color: #b5482b; background: #f9e1de; }
+  .calctag { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1.5px solid #8a867c; color: #5c5a55; background: #f5f3ee; }
+  .calctag.yes { border-color: #1f5fa8; color: #1f5fa8; background: #eef4fb; }
   .lp-demo { background: #f2eefa; border-left: 4px solid #7b4bb3; padding: 6px 10px; margin: 6px 0; border-radius: 4px; }
   .lp-vocab { background: #eef4fb; border-left: 4px solid #1f5fa8; padding: 6px 10px; margin: 6px 0; border-radius: 4px; }
 .lp-check { background: #f6f4ec; border-left: 3px solid #c9a227; padding: 6px 10px; }
@@ -33544,6 +33554,8 @@ QUESTION_TYPES.push({ id: 'c134Comp', subject: 'calc3', section: '13.4 Motion in
     cl14Trig: ['Trigonometric limits', 'sin θ/θ and (1 − cos θ)/θ'], cl14Squeeze: ['Squeeze Theorem', ''], cl14ExpLog: ['Exponential and logarithmic limits', ''], cAP14: ['AP® Practice: limits', 'Multiple choice'],
     cl15Inf: ['Infinite limits', 'One-sided, vertical asymptotes'], cl15AtInf: ['Limits at infinity', 'Rational functions'], cl15Asym: ['Asymptotes of a rational function', ''], cAP15: ['AP® Practice: asymptotes and limits', 'Multiple choice'],
     cl16Delta: ['Find δ for a given ε', 'Linear functions'] };
+  // AP® Exam style: most questions are no-calculator; these need one (decimal answers, tables of values)
+  const CALC_YES = new Set(['cl11Table', 'ap_e4ExpEq', 'ap_e4LogEq', 'ap_trigSolveApprox', 'ap_e1Eval', 'ap_e5Continuous']);
   Object.keys(SETS).filter((k) => k.startsWith('calc-')).forEach((k) => {
     const S = SETS[k];
     S.items = S.items.map(([id, n, ...rest]) => {
@@ -33551,7 +33563,8 @@ QUESTION_TYPES.push({ id: 'c134Comp', subject: 'calc3', section: '13.4 Motion in
       if (!own && !TEMPLATES[nid] && TEMPLATES[id]) TEMPLATES[nid] = (r) => TEMPLATES[id](r);
       if (!QUESTION_TYPES.some((t) => t.id === nid)) {
         const base = QUESTION_TYPES.find((t) => t.id === id) || {};
-        QUESTION_TYPES.push({ ...base, id: nid, subject: 'apcalc', section: S.title, label: own ? LAB[id][0] : base.label || id, desc: own ? LAB[id][1] : base.desc || '' });
+        const calc = CALC_YES.has(nid) ? 'yes' : 'no', cd = calc === 'yes' ? 'Calculator' : 'No calculator', d0 = own ? LAB[id][1] : base.desc || '';
+        QUESTION_TYPES.push({ ...base, id: nid, subject: 'apcalc', section: S.title, label: own ? LAB[id][0] : base.label || id, desc: d0 ? `${d0} · ${cd}` : cd, calc });
       }
       return [nid, n, ...rest];
     });
@@ -34174,7 +34187,7 @@ function render() {
       app.append(el('div', { class: 'card bonusintro' }, el('div', { style: 'font-size:20px;font-weight:800;color:#8a6d0f' }, `★ Bonus question${nb === 1 ? '' : 's'}`),
         el('p', { style: 'margin:6px 0 0' }, `${nb === 1 ? 'This one is' : 'These are'} extra credit. A wrong or blank answer costs you nothing. Each one you get right adds `, el('strong', {}, `+${fmt(bp)}%`), ' to your percent.'))); }
     const box = el('div', { class: 'q' + (wm ? ' wm' : '') + (q.bonus ? ' bonus' : ''), id: 'q' + i });
-    box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, q.bonus ? el('span', { class: 'bonustag' }, '★ BONUS') : '', q.ap ? el('span', { class: 'aptag', title: 'Like the AP® Practice Problems in the textbook' }, 'AP®') : '', `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic,
+    box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, q.bonus ? el('span', { class: 'bonustag' }, '★ BONUS') : '', q.ap ? el('span', { class: 'aptag', title: 'Like the AP® Practice Problems in the textbook' }, 'AP®') : '', (() => { const ct = q.tpl && QUESTION_TYPES.find((x) => x.id === q.tpl); return ct && ct.calc ? el('span', { class: 'calctag' + (ct.calc === 'yes' ? ' yes' : ''), title: ct.calc === 'yes' ? 'A calculator is allowed on this question' : 'Do this question without a calculator' }, ct.calc === 'yes' ? '🖩 Calculator' : 'No calculator') : ''; })(), `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic,
       PREVIEW && !teacher && !submitted ? el('button', { class: 'btn secondary', type: 'button', title: 'Show another version of this question', style: 'margin:0 0 0 10px;padding:2px 10px;font-size:13px;vertical-align:middle', onclick: () => previewNewQ(i) }, '🔄 New version') : '',
       PREVIEW && !teacher ? el('button', { class: 'btn secondary', type: 'button', title: 'Show this question large, for the TV', style: 'margin:0 0 0 6px;padding:2px 10px;font-size:13px;vertical-align:middle', onclick: () => previewTV(i) }, '📺 TV') : '')));
     if (q.bonus) { const bp = setting(state.setKey, 'bonusPct'); box.append(el('div', { class: 'bonusnote' }, `Extra credit: +${fmt(bp)}% added to your score if correct. Nothing is taken off if it’s wrong.`)); }
@@ -35532,6 +35545,15 @@ function dashOverview(titles) {
   ], titles.map((a) => { const b = bestRows(a.rows); return { ...a, n: b.length, avg: b.reduce((s, r) => s + r.pct, 0) / (b.length || 1), wip: prog.filter((p) => p.title === a.title).length }; })));
   app.append(card);
   card.append(el('p', { class: 'small', style: 'margin-top:10px' }, 'Click an assignment for each student’s score and which questions the class missed. Click a column title to sort.'));
+  const allRows = titles.flatMap((a) => a.rows);
+  if (allRows.length) app.append(dashReteach(allRows, DASH.period ? `${DASH.period} period` : 'your students'));
+  if (DASH.period) {
+    const names = {}; allRows.filter((r) => r.period === DASH.period).forEach((r) => (names[who(r.period, r.name)] = { period: r.period, name: r.name }));
+    D.roster.filter((r) => r.period === DASH.period).forEach((r) => { const kk = who(r.period, r.full); if (!names[kk] && ![r.full, ...String(r.aliases || '').split(',')].some((n) => n.trim() && names[who(r.period, n)])) names[kk] = { period: r.period, name: r.full }; });
+    const list = Object.values(names).sort((x, y) => byStudent(x).localeCompare(byStudent(y)));
+    app.append(el('div', { class: 'card' }, el('strong', {}, '🖨 Progress reports'), el('p', { class: 'small', style: 'margin:4px 0 10px' }, `One page per student in ${DASH.period} period${DASH.subject ? ' for ' + DASH.subject : ''}: average, scores over time, missing work, strong and weak skills, and every assignment. (Change “Show the last” to set the time span.)`),
+      el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: () => printReports(list) }, `Print ${list.length} report${list.length === 1 ? '' : 's'}`)));
+  } else app.append(el('p', { class: 'small', style: 'margin:0 4px 16px' }, 'Tip: pick a period above to print progress reports for the whole class, or click a student for one report.'));
 }
 
 function dashAssignment(a) {
@@ -35597,6 +35619,7 @@ function dashAssignment(a) {
   ], best));
   if (best.some(dashLate)) scard.append(el('p', { class: 'small', style: 'margin-top:10px;color:#b42318' }, 'Red rows: the student first turned it in after the Classroom due date for their period. Hover a red row to see the due date.'));
   app.append(scard);
+  if (best.length) app.append(dashReteach(a.rows, 'on this assignment'));
 
   if (wip.length) app.append(el('div', { class: 'card' }, el('strong', {}, 'Started but not turned in'),
     dashTable([{ k: 'name', t: 'Student', sort: byStudent }, { k: 'period', t: 'Period', sort: byStudent },
@@ -35622,7 +35645,8 @@ function dashStudent(s) {
   const avg = best.length ? best.reduce((a, r) => a + r.pct, 0) / best.length : 0;
   app.append(el('div', { class: 'card' },
     el('p', { style: 'margin:0 0 6px' }, linkBtn('← Back', () => { DASH.student = null; dashRender(); })),
-    el('h2', { style: 'margin:0 0 12px;font-size:20px' }, `${s.name} · ${s.period} period`),
+    el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap' }, el('h2', { style: 'margin:0 0 12px;font-size:20px' }, `${s.name} · ${s.period} period`),
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: () => printReports([s]) }, '🖨 Progress report')),
     el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px' }, tile(String(best.length), 'assignments turned in'),
       tile(best.length ? pctT(avg) : '—', 'average best score', best.length ? band(avg) : undefined), tile(String(prog.length), 'started, not turned in', '#fbf1dc')),
     best.length ? dashTable([
@@ -35637,6 +35661,94 @@ function dashStudent(s) {
       { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn({ ...r, name: s.name, period: s.period }) },
     ], best) : el('p', {}, 'Nothing turned in yet.'),
     prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered${p.correct != null ? `, ${p.correct} correct` : ''}, ${dashDate(p.t)})`).join('; ')) : ''));
+}
+/* ---------- Reteach and progress reports (built from the dashboard data) ---------- */
+// the question type of each question number on an assignment (null when the order differs from student to student)
+function dashTplIds(setCol) {
+  setCol = String(setCol || ''); let items = null;
+  if (setCol.startsWith('custom:')) items = setCol.slice(7).split('_').map((p) => p.split('.')).map(([id, n, m, b]) => [id, +n, m, b]);
+  else if (SETS[setCol] && !SETS[setCol].shuffle) items = SETS[setCol].items;
+  if (!items) return null;
+  const reg = [], bon = [];
+  items.forEach(([id, n, , b]) => { for (let i = 0; i < n; i++) (b === 'b' ? bon : reg).push(id); });
+  return [...reg, ...bon];
+}
+// how each question type went: [{ id, label, subject, n (questions answered), right (points) }], weakest first
+function dashTypeStats(rows) {
+  const st = {};
+  rows.forEach((r) => { const ids = dashTplIds(r.set); if (!ids) return;
+    parseDetail(r.detail).forEach((d) => { const id = ids[d.n - 1]; if (!id || d.bonus || !TEMPLATES[id]) return; const s = (st[id] = st[id] || { id, n: 0, right: 0 }); s.n++; s.right += d.pts; }); });
+  return Object.values(st).map((s) => { const t = QUESTION_TYPES.find((q) => q.id === s.id) || {}; return { ...s, f: s.right / s.n, label: t.label || s.id, section: t.section || '', subject: t.subject || '' }; })
+    .sort((a, b) => a.f - b.f || b.n - a.n);
+}
+// the reteach card: the weakest question types, a review assignment from them, or a warm-up on the TV
+function dashReteach(rows, where) {
+  const best = Object.values(rows.reduce((m, r) => { const k = r.title + '|' + who(r.period, r.name); (m[k] = m[k] || []).push(r); return m; }, {})).map((rs) => bestRows(rs)[0]).filter(Boolean);
+  const stats = dashTypeStats(best).filter((s) => s.n >= 3);
+  const card = el('div', { class: 'card', style: 'border-left:4px solid #c0392b' }, el('strong', {}, '🎯 Reteach'),
+    el('p', { class: 'small', style: 'margin:4px 0 10px' }, `The question types ${where} missed most (each student’s best try; question types answered at least 3 times). Pick the ones to review.`));
+  const weak = stats.filter((s) => s.f < 0.8).slice(0, 8);
+  if (!weak.length) { card.append(el('p', { class: 'small' }, stats.length ? 'Nothing below 80% right now. 👍' : 'Not enough results yet (or the question order is mixed up, so question numbers can’t be matched to question types).')); return card; }
+  const picks = weak.map((s, i) => { const c = el('input', { type: 'checkbox' }); c.checked = i < 3; return c; });
+  const per = el('select', { style: 'width:auto' }, ...[1, 2, 3, 4].map((n) => el('option', { value: n }, `${n} of each`))); per.value = '2';
+  weak.forEach((s, i) => card.append(el('label', { style: 'display:grid;grid-template-columns:24px 1fr 56px;gap:8px;align-items:center;margin:6px 0;cursor:pointer;font-weight:400' }, picks[i],
+    el('span', {}, el('span', { style: 'font-weight:600' }, s.label), el('span', { class: 'small' }, ` · ${s.section}${s.section ? ' · ' : ''}${s.n} answered`)),
+    el('span', { style: `text-align:right;font-weight:700;padding:2px 6px;border-radius:6px;background:${band(s.f)}` }, pctT(s.f)))));
+  const chosen = () => weak.filter((s, i) => picks[i].checked);
+  const build = () => {
+    const c = chosen(); if (!c.length) return alert('Check at least one question type.');
+    const subj = c[0].subject || 'geometry', q = new URLSearchParams();
+    q.set('mix', c.map((s) => `${s.id}.${per.value}`).join('_')); q.set('title', `Reteach: ${c.map((s) => s.label).join(', ')}`.slice(0, 80)); q.set('subject', subj); q.set('retries', '1');
+    if (copyIntoBuilder(location.origin + location.pathname + '?' + q.toString())) { const last = store.get(TK('builder:last')); if (last) { last.note = 'A review assignment from the question types your students missed most. Check the title and settings, then copy the student link or assign it in Classroom.'; store.set(TK('builder:last'), last); } builder(); scrollTo(0, 0); }
+  };
+  const warm = () => { const c = chosen(); if (!c.length) return alert('Check at least one question type.');
+    tvShow(c.flatMap((s, i) => [1, 2].map((k) => ({ label: `Warm-up ${2 * i + k}`, tpl: s.id }))), 0); };
+  card.append(el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px' }, per,
+    el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: build }, '📝 Build a review assignment'),
+    el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: warm }, '📺 Warm-up on the TV')));
+  card.append(el('p', { class: 'small', style: 'margin:8px 0 0' }, 'The warm-up puts two fresh questions of each checked type on the TV (Show answer and New numbers work as usual).'));
+  return card;
+}
+// assignments a student's period has (someone in the period turned it in, or it was posted to the period) that the student hasn't turned in
+function dashMissing(s, mine) {
+  const D = DASH.data, have = new Set(mine.map((r) => r.title)), out = {};
+  D.results.filter((r) => r.period === s.period && (!DASH.subject || r.tab === DASH.subject)).forEach((r) => { if (!have.has(r.title)) out[r.title] = Math.max(out[r.title] || 0, r.t); });
+  (D.posted || []).filter((p) => p.period === s.period).forEach((p) => { const k = String(p.key || ''), i = k.indexOf('|'), title = k.startsWith('custom:') && i > 0 ? k.slice(i + 1) : SETS[k] ? SETS[k].title : p.title;
+    if (title && !have.has(title)) { const tab = (D.results.find((r) => r.title === title) || {}).tab; if (!DASH.subject || !tab || tab === DASH.subject) out[title] = Math.max(out[title] || 0, p.t); } });
+  return Object.entries(out).sort((a, b) => a[1] - b[1]).map(([title, t]) => ({ title, t }));
+}
+// one student's report as HTML (for printing)
+function progressReportHTML(s) {
+  const D = DASH.data, k = who(s.period, s.name), esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const mine = D.results.filter((r) => who(r.period, r.name) === k && (!DASH.subject || r.tab === DASH.subject));
+  const by = {}; mine.forEach((r) => (by[r.title] = by[r.title] || []).push(r));
+  const best = Object.values(by).map((rs) => bestRows(rs)[0]).filter(Boolean).sort((a, b) => a.firstT - b.firstT || a.lastT - b.lastT);
+  const avg = best.length ? best.reduce((a, r) => a + r.pct, 0) / best.length : 0, missing = dashMissing(s, mine), late = best.filter(dashLate).length;
+  const stats = dashTypeStats(best).filter((x) => x.n >= 2), strong = stats.filter((x) => x.f >= 0.85).slice(-4).reverse(), weak = stats.filter((x) => x.f < 0.7).slice(0, 4);
+  const day = (t) => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  // a small line graph of the scores in order
+  const W = 520, H = 110, pts = best.map((r, i) => [best.length > 1 ? 20 + (i * (W - 40)) / (best.length - 1) : W / 2, H - 15 - r.pct * (H - 30)]);
+  const spark = best.length ? `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Scores over time"><line x1="20" x2="${W - 20}" y1="${H - 15 - 0.7 * (H - 30)}" y2="${H - 15 - 0.7 * (H - 30)}" stroke="#ddd" stroke-dasharray="4 4"/><text x="${W - 18}" y="${H - 18 - 0.7 * (H - 30)}" font-size="10" fill="#999">70%</text><text x="0" y="19" font-size="10" fill="#999">100%</text><text x="0" y="${H - 12}" font-size="10" fill="#999">0%</text>`
+    + (pts.length > 1 ? `<polyline fill="none" stroke="#1f5fa8" stroke-width="2.5" points="${pts.map((p) => p.join(',')).join(' ')}"/>` : '') + pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${best[i].pct >= 0.7 ? '#1f5fa8' : '#c0392b'}"/>`).join('') + '</svg>' : '';
+  const rows = best.map((r) => `<tr><td>${esc(r.title)}</td><td>${day(r.firstT || r.lastT)}</td><td style="background:${band(r.pct)};font-weight:700;text-align:right">${pctT(r.pct)}</td><td style="text-align:right">${r.score}/${r.total}</td><td>${dashLate(r) ? 'late' : ''}</td></tr>`).join('');
+  return `<section class="rep"><header><div><h1>${esc(s.name)}</h1><div class="sub">${esc(s.period)} period · ${esc(DASH.subject || 'All subjects')} · ${esc(CONFIG.TEACHER_NAME)}</div></div><div class="sub">Progress report · ${new Date().toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}<br>Last ${DASH.days} days</div></header>
+    <div class="tiles"><div><b>${best.length ? pctT(avg) : '—'}</b>average score</div><div><b>${best.length}</b>assignments turned in</div><div class="${missing.length ? 'warn' : ''}"><b>${missing.length}</b>missing</div><div><b>${late}</b>turned in late</div></div>
+    ${spark ? `<h2>Scores over time</h2>${spark}` : ''}
+    ${missing.length ? `<h2>Missing work</h2><ul>${missing.map((m) => `<li>${esc(m.title)} <span class="sub">(${day(m.t)})</span></li>`).join('')}</ul>` : ''}
+    ${weak.length || strong.length ? `<h2>Skills</h2><div class="two"><div><b>Doing well</b><ul>${strong.map((x) => `<li>${esc(x.label)} (${pctT(x.f)})</li>`).join('') || '<li class="sub">—</li>'}</ul></div><div><b>Needs practice</b><ul>${weak.map((x) => `<li>${esc(x.label)} (${pctT(x.f)})</li>`).join('') || '<li class="sub">—</li>'}</ul></div></div>` : ''}
+    <h2>Assignments</h2>${best.length ? `<table><tr><th>Assignment</th><th>Date</th><th>Best score</th><th>Points</th><th></th></tr>${rows}</table>` : '<p class="sub">Nothing turned in yet.</p>'}
+    <p class="note">Scores are each assignment’s best try. Teacher comments: ______________________________________________</p></section>`;
+}
+function printReports(list) {
+  const w = window.open('', '_blank'); if (!w) return alert('Allow pop-ups for this page to print reports.');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Progress reports</title><style>
+    body{font-family:Inter,Arial,sans-serif;color:#1d1d1b;margin:0;padding:24px} .rep{max-width:760px;margin:0 auto 40px;page-break-after:always} .rep:last-child{page-break-after:auto}
+    header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1f5fa8;padding-bottom:8px;margin-bottom:14px} h1{margin:0;font-size:24px} h2{font-size:15px;margin:18px 0 6px;color:#1f5fa8;text-transform:uppercase;letter-spacing:.5px}
+    .sub{color:#5c5a55;font-size:13px} .tiles{display:flex;gap:10px} .tiles div{flex:1;background:#eef4fb;border-radius:8px;padding:10px;font-size:12px;color:#5c5a55} .tiles b{display:block;font-size:22px;color:#1d1d1b} .tiles .warn{background:#f9e1de}
+    table{width:100%;border-collapse:collapse;font-size:13px} th,td{border-bottom:1px solid #e4e1d9;padding:5px 6px;text-align:left} th{font-size:12px;color:#5c5a55}
+    ul{margin:4px 0;padding-left:20px;font-size:13px} .two{display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px} .note{margin-top:20px;font-size:13px} @media print{body{padding:0}}
+    </style></head><body>${list.map(progressReportHTML).join('')}<script>setTimeout(()=>print(),300)<\/script></body></html>`);
+  w.document.close();
 }
 /* ==== RESULTS DASHBOARD END ==== */
 /* ---------- Assign in Google Classroom, straight from the builder (needs PracticeResults.gs version 10; per-period post times need 11) ---------- */
@@ -36562,6 +36674,8 @@ function lessonScreen(preKey) {
           L.slides ? el('a', { class: 'btn', href: L.slides, target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none' }, '🖥 Open the slides') : '',
           all.length ? el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, 0) }, '📺 Examples and keys on the TV') : '',
           altKey ? el('button', { class: 'btn secondary', type: 'button', onclick: () => { LESSON.compare = true; draw(); } }, `⇆ Compare ${lessonOf(fullKey).minutes} and ${lessonOf(altKey).minutes} minutes`) : '',
+          copyLinkBtn('🔗 Catch-up page', stuLink('catchup', LESSON.key), 'A page for students who missed class: notes, vocabulary, and examples with answers. Copy the link to post in Google Classroom.'),
+          (L.vocab || []).length ? copyLinkBtn('🔗 Vocab review', stuLink('vocab', LESSON.key), 'Flashcards and matching for this lesson’s vocabulary (students can switch to the whole chapter). Copy the link to post in Google Classroom.') : '',
           LESSON_EDITS.status === 'ok' ? el('button', { class: 'btn secondary', type: 'button', onclick: () => lessonEdit(LESSON.key) }, '✏️ Edit this plan') : '',
           LESSON_EDITS.data[LESSON.key] ? el('span', { class: 'small', style: 'align-self:center' }, '(your edited version)') : '')),
       h('Objective'), el('p', {}, L.objective),
@@ -38038,6 +38152,112 @@ function lpDemos(steps, key) {
   return steps;
 }
 
+/* ---------- Student pages from a lesson plan: catch-up (practice.html?catchup=geo-10-4) and vocabulary review (?vocab=geo-10-4) ---------- */
+const stuLink = (kind, key) => { const q = new URLSearchParams(); if (TEACHER_ID) q.set('t', TEACHER_ID); q.set(kind, key); return location.origin + location.pathname + '?' + q.toString(); };
+function copyLinkBtn(text, url, title) {
+  const b = el('button', { class: 'btn secondary', type: 'button', title: title || 'Copy the link to post in Google Classroom' }, text);
+  b.addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); const t = b.textContent; b.textContent = '✓ Link copied'; setTimeout(() => (b.textContent = t), 2000); } catch { prompt('Copy this link:', url); } });
+  return b;
+}
+const stuW = () => Math.max(280, Math.min(760, (app.clientWidth || 760) - 48));
+// text with fractions and roots drawn as math, one block per line
+function stuText(t, px = 19) {
+  const box = el('div', { class: 'stu-text' });
+  String(t || '').split('\n').forEach((ln) => { if (!ln.trim()) { box.append(el('div', { style: 'height:8px' })); return; } const cv = textCanvas(ln, stuW(), `${px}px Georgia, "Times New Roman", serif`, Math.round(px * 1.45)); cv.style.display = 'block'; box.append(cv); });
+  return box;
+}
+function stuFigure(f) {
+  if (!f) return ''; const sz = f.size || [400, 300], cv = makeCanvas(sz[0], sz[1]);
+  try { lpFigDraw(f)(cv); } catch { return ''; }
+  cv.style.maxWidth = Math.min(sz[0], 460) + 'px'; return el('div', { style: 'display:flex;justify-content:center;margin:8px 0' }, cv);
+}
+const stuChapterKeys = (key) => { const base = key.replace(/-30$/, ''), m = /^(.*)-([^-]+)$/.exec(base), pre = m ? m[1] : base;
+  return Object.keys(LESSONS).filter((k) => !LESSONS[k].base && k.startsWith(pre + '-') && /^[^-]+$/.test(k.slice(pre.length + 1))).sort((a, b) => (secOrd(a) - secOrd(b))); };
+const secOrd = (k) => { const m = /(\d+)(?:\.(\d+))?$/.exec((lpSet(k) || {}).title ? lpSet(k).title.split(' ')[0] : k); return m ? +m[1] * 100 + +(m[2] || 0) : 0; };
+function stuHeader(key, what) {
+  const S = lpSet(key) || { title: key }, L = LESSONS[key] || {};
+  document.getElementById('title').textContent = S.title.replace(/ \(30-minute plan\)$/, '');
+  document.getElementById('subtitle').textContent = `${what} · ${SUBJECTS[S.subject] || ''}${CONFIG.TEACHER_NAME ? ' · ' + CONFIG.TEACHER_NAME : ''}`;
+  return L;
+}
+function catchupScreen(key) {
+  if (!LESSONS[key]) { app.append(el('div', { class: 'card' }, 'That lesson wasn’t found.')); return; }
+  const L = stuHeader(key, 'Catch-up page'), steps = lpWithIcan(lessonOf(key), key);
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '900px';
+  app.append(el('div', { class: 'card' }, el('strong', {}, 'Missed class? Start here.'),
+    el('p', { style: 'margin:6px 0 0' }, 'Read each note, then try each example on paper before you click Show answer. When you finish, do the practice assignment in Google Classroom.'),
+    el('div', { style: 'margin-top:10px' }, el('a', { class: 'btn secondary', href: stuLink('vocab', key), style: 'display:inline-block;text-decoration:none' }, '📇 Vocabulary review'))));
+  app.append(el('div', { class: 'card' }, el('h3', { class: 'lp-h', style: 'margin-top:0' }, 'Today’s goal'), el('p', {}, L.objective), el('h3', { class: 'lp-h' }, 'I can …'), el('ul', { class: 'lp-ul' }, ...(L.iCan || []).map((x) => el('li', {}, x))),
+    (L.vocab || []).length ? el('h3', { class: 'lp-h' }, 'Vocabulary') : '', (L.vocab || []).length ? el('ul', { class: 'lp-ul' }, ...L.vocab.map(([t, d]) => el('li', {}, el('b', {}, t), ' — ', lpMath(d, 16)))) : ''));
+  const skip = /^(bell ringer|i can statements|exit ticket)/i;
+  steps.forEach((st) => (st.show || []).forEach((x) => {
+    if (skip.test(x.label)) return;
+    if (x.demo) { if (!IX[x.demo]) return; const d = el('details', { class: 'card stu-ix' }, el('summary', { style: 'cursor:pointer;font-weight:700;color:var(--accent)' }, '🧭 ' + x.label + ' (try it)'));
+      let built = false; d.addEventListener('toggle', () => { if (d.open && !built) { built = true; d.append(ixMount(x.demo, x.opts)); } }); app.append(d); return; }
+    const f = x.fixed || {};
+    if (x.moment) { const isVocab = /^Vocabulary: /.test(x.label);
+      app.append(el('div', { class: 'card stu-note' }, el('div', { class: 'stu-tag' }, isVocab ? '📘 Vocabulary' : '📘 Notes'), el('strong', {}, isVocab ? x.label.replace(/^Vocabulary: /, '') : x.label),
+        stuText(isVocab ? String(f.solution || '').replace(/^[^:]*:\s*/, '') : f.solution || f.stem, 18), stuFigure(f.figure))); return; }
+    if (!f.stem) return;
+    const ans = el('div', { class: 'stu-ans', style: 'display:none' }, el('div', { class: 'stu-tag' }, 'Answer'), stuText(f.choices ? `${LETTERS[f.answer]}. ${f.choices[f.answer]}` : f.display || '', 19), f.solution ? stuText(f.solution, 17) : '');
+    const btn = el('button', { class: 'btn secondary', type: 'button' }, 'Show answer');
+    btn.addEventListener('click', () => { const on = ans.style.display === 'none'; ans.style.display = on ? '' : 'none'; btn.textContent = on ? 'Hide answer' : 'Show answer'; });
+    app.append(el('div', { class: 'card' }, el('div', { class: 'stu-tag' }, x.label + (f.topic ? ' · ' + f.topic : '')), stuText(f.stem), stuFigure(f.figure),
+      f.choices ? el('div', {}, ...f.choices.map((c, j) => stuText(`${LETTERS[j]}.  ${c}`, 18))) : '', btn, ans));
+  }));
+  app.append(el('div', { class: 'card' }, el('strong', {}, 'Done?'), el('p', { style: 'margin:6px 0 0' }, 'Now do the practice assignment for this lesson in Google Classroom. If something didn’t make sense, write down the example number and ask.')));
+}
+function vocabScreen(key) {
+  if (!LESSONS[key]) { app.append(el('div', { class: 'card' }, 'That lesson wasn’t found.')); return; }
+  stuHeader(key, 'Vocabulary review');
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '900px';
+  const chapter = stuChapterKeys(key);
+  const S = { whole: params.get('ch') === '1', mode: 'cards' };
+  const words = () => { const seen = new Set(), out = []; (S.whole ? chapter : [key.replace(/-30$/, '')]).forEach((k) => ((LESSONS[k] || {}).vocab || []).forEach(([t, d]) => { if (!seen.has(t)) { seen.add(t); out.push({ t, d, sec: (lpSet(k) || {}).title || '' }); } })); return out; };
+  const body = el('div', {});
+  const bar = el('div', { class: 'card', style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' });
+  const modeBtns = [['cards', '📇 Flashcards'], ['match', '🧩 Matching']].map(([m, t]) => { const b = el('button', { class: 'btn' + (m === S.mode ? '' : ' secondary'), type: 'button', style: 'margin-top:0' }, t); b.addEventListener('click', () => { S.mode = m; modeBtns.forEach((x, i) => (x.className = 'btn' + (['cards', 'match'][i] === m ? '' : ' secondary'))); draw(); }); return b; });
+  const ck = el('input', { type: 'checkbox' }); ck.checked = S.whole; ck.addEventListener('change', () => { S.whole = ck.checked; draw(); });
+  bar.append(...modeBtns, chapter.length > 1 ? el('label', { style: 'display:flex;gap:6px;align-items:center;margin:0 0 0 auto;font-weight:600;cursor:pointer' }, ck, `Whole chapter (${chapter.length} sections)`) : '');
+  app.append(bar, body);
+  const defView = (d, px = 20) => (/[\/√]/.test(d) ? stuText(d, px) : el('div', { style: `font:${px}px Georgia, "Times New Roman", serif;line-height:1.4` }, d));
+  function cards() {
+    let list = words(), i = 0, flip = false; const r = mulberry32((Date.now() >>> 0) ^ 0x9e37);
+    const face = el('div', { class: 'vcard', role: 'button', tabindex: '0', 'aria-label': 'Flashcard: click to flip' }), count = el('span', { class: 'small' });
+    const show = () => { face.innerHTML = ''; const w = list[i]; if (!w) { face.append('No vocabulary for this lesson.'); return; }
+      face.classList.toggle('back', flip);
+      face.append(el('div', { class: 'stu-tag' }, flip ? 'Definition' : 'Term'), flip ? defView(w.d) : el('div', { class: 'vterm' }, w.t), el('div', { class: 'small', style: 'margin-top:auto' }, S.whole ? w.sec : 'Click (or press Space) to flip'));
+      count.textContent = `${i + 1} of ${list.length}`; };
+    const go = (d) => { i = (i + d + list.length) % list.length; flip = false; show(); };
+    face.addEventListener('click', () => { flip = !flip; show(); }); face.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip = !flip; show(); } if (e.key === 'ArrowRight') go(1); if (e.key === 'ArrowLeft') go(-1); });
+    const nav = el('div', { style: 'display:flex;gap:10px;align-items:center;justify-content:center;margin-top:12px' },
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: () => go(-1) }, '← Back'), count, el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: () => go(1) }, 'Next →'),
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: () => { list = shuffle(r, list.slice()); i = 0; flip = false; show(); } }, '🔀 Shuffle'));
+    show(); return el('div', { class: 'card' }, face, nav);
+  }
+  function match() {
+    const r = mulberry32((Date.now() >>> 0) ^ 0x51ed), all = shuffle(r, words().slice()), card = el('div', { class: 'card' });
+    let round = 0, done = 0, misses = 0;
+    const play = () => {
+      card.innerHTML = ''; const set = all.slice(round * 6, round * 6 + 6); if (!set.length) { round = 0; return play(); }
+      done = 0; misses = 0; let pick = null; const status = el('p', { class: 'small', style: 'margin:0 0 10px' });
+      const upd = () => (status.textContent = done === set.length ? `All matched! ${misses ? misses + ' miss' + (misses === 1 ? '' : 'es') + '.' : 'No misses. 🎉'}` : `Click a term, then its definition. ${done} of ${set.length} matched.`);
+      const L = set.map((w) => el('button', { type: 'button', class: 'mt-item' }, w.t)), R = shuffle(r, set.slice()).map((w) => { const b = el('button', { type: 'button', class: 'mt-item def' }, defView(w.d, 16)); b._w = w; return b; });
+      L.forEach((b, k) => { b._w = set[k]; b.addEventListener('click', () => { if (b.classList.contains('ok')) return; L.forEach((x) => x.classList.remove('sel')); b.classList.add('sel'); pick = b; }); });
+      R.forEach((b) => b.addEventListener('click', () => { if (!pick || b.classList.contains('ok')) return;
+        if (b._w === pick._w) { b.classList.add('ok'); pick.classList.add('ok'); pick.classList.remove('sel'); pick = null; done++; }
+        else { misses++; b.classList.add('no'); setTimeout(() => b.classList.remove('no'), 500); }
+        upd(); }));
+      upd();
+      card.append(status, el('div', { class: 'mt-grid' }, el('div', { class: 'mt-col' }, ...L), el('div', { class: 'mt-col' }, ...R)),
+        el('div', { style: 'margin-top:12px;display:flex;gap:10px' }, el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0', onclick: () => play() }, '↺ Start over'),
+          all.length > 6 ? el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: () => { round = (round + 1) % Math.ceil(all.length / 6); play(); } }, 'Next set →') : ''));
+    };
+    play(); return card;
+  }
+  function draw() { body.innerHTML = ''; body.append(S.mode === 'cards' ? cards() : match()); }
+  draw();
+}
 function tvShow(list, at) {
   let i = Math.max(0, at), q = null, shown = false;
   const old = document.getElementById('tvShow'); if (old) old.remove();
@@ -39332,6 +39552,8 @@ function copyIntoBuilder(link) {
   }
   if (params.has('pad')) return padScreen(params.get('pad').replace(/\D/g, ''));
   if (params.has('demo')) return demoScreen(params.get('demo'));
+  if (params.has('catchup')) return catchupScreen(params.get('catchup'));
+  if (params.has('vocab')) return vocabScreen(params.get('vocab'));
   if (viewOk()) return viewScreen();
   if (params.has('teacher') && teacherSession()) return teacherMenu(); // already unlocked in this tab (coming back from the crossword, for example)
   if (params.has('teacher')) {
