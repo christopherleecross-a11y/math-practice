@@ -178,6 +178,33 @@
   .lp-time { width: 58px; flex: none; font-weight: 700; font-size: 17px; }
   .lp-name { font-weight: 700; font-size: 17px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .lp-tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #e8f0fa; color: #1f5fa8; }
+  .ix-row { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+  .ix-main { flex: 1 1 520px; min-width: 280px; display: flex; justify-content: center; }
+  .ix-side { flex: 0 1 380px; min-width: 260px; font-size: 17px; }
+  .ix-cv { border: 1px solid #e4e1d9; border-radius: 8px; background: #fff; }
+  .ix-hint { font-size: 17px; color: #5c5a55; margin: 0 0 10px; }
+  .ix-h { font-weight: 700; margin: 6px 0; font-size: 17px; }
+  .ix-sl { display: grid; grid-template-columns: 112px 1fr 76px; gap: 8px; align-items: center; font-size: 17px; margin: 8px 0; }
+  .ix-sl input[type=range] { width: 100%; height: 34px; accent-color: #1f5fa8; }
+  .ix-val { font: 20px Georgia, "Times New Roman", serif; }
+  .ix-seg { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+  .ix-seg button { font: inherit; font-size: 16px; padding: 8px 12px; border: 1px solid #c9c5bb; border-radius: 8px; background: #fff; color: #1d1d1b; cursor: pointer; }
+  .ix-seg button.on { background: #1f5fa8; color: #fff; border-color: #1f5fa8; }
+  .ix-ck { display: flex; gap: 8px; align-items: center; font-size: 17px; margin: 7px 0; cursor: pointer; }
+  .ix-ck input { width: 22px; height: 22px; margin: 0; }
+  .ix-btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .ix-b { padding: 8px 12px; font-size: 16px; }
+  .ix-read { margin-top: 10px; border-top: 1px solid #e4e1d9; padding-top: 4px; }
+  .ix-rh { font-weight: 700; color: #5c5a55; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; margin: 12px 0 2px; }
+  .ix-rl { font: 21px Georgia, "Times New Roman", serif; margin: 2px 0; }
+  .ix-note { font-size: 16px; background: #f5f3ee; border-left: 4px solid #8a867c; padding: 6px 10px; margin: 8px 0; border-radius: 4px; }
+  .ix-note.good { border-left-color: #2e7d4f; } .ix-note.bad { border-left-color: #b5482b; }
+  .ix-page .ix-hint { font-size: 16px; }
+  .ix-wide .ix-main { flex-basis: 100%; }
+  .ix-wide .ix-side { flex: 1 1 100%; display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+  .ix-wide .ix-ctl { flex: 1 1 340px; }
+  .ix-wide .ix-read { flex: 1 1 340px; margin-top: 0; border-top: 0; }
+  .lp-demo { background: #f2eefa; border-left: 4px solid #7b4bb3; padding: 6px 10px; margin: 6px 0; border-radius: 4px; }
   .lp-vocab { background: #eef4fb; border-left: 4px solid #1f5fa8; padding: 6px 10px; margin: 6px 0; border-radius: 4px; }
 .lp-check { background: #f6f4ec; border-left: 3px solid #c9a227; padding: 6px 10px; }
   .lp-print { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 4px; }
@@ -36140,7 +36167,7 @@ function lpVocabBlank(term, df) {
   const m = /=\s*(.+?)(?=\s*=|;|, |  | when | where | for |$)/.exec(df);
   return m ? { ans: m[1], at: m.index + m[0].indexOf(m[1], 1) } : null;
 }
-function lpWithIcan(L) {
+function lpWithIcan(L, key) {
   const steps = L.steps.map((s) => ({ ...s })), bi = Math.max(0, steps.findIndex((s) => /bell ringer/i.test(s.name)));
   // a vocabulary word whose step was removed in the editor (e.g. the discovery) still gets its slide: at the start of the first later step with examples
   const covered = new Set(steps.flatMap((s) => (s.vocab || []).map((v) => v.t)));
@@ -36166,6 +36193,7 @@ function lpWithIcan(L) {
     (s.notes || []).forEach((n) => putBefore(s, { moment: 1, label: n.t, fixed: { topic: 'Notes · fill in the blank on your sheet', stem: n.t + '\n \n' + n.stem, display: n.ans.join(';   '), solution: n.full, figure: n.figure } }, n.before));
   });
   if (L.iCan && L.iCan.length && steps.length) steps[bi] = { ...steps[bi], afterIcan: true, show: [...(steps[bi].show || []), { label: 'I can statements', fixed: { topic: 'Today’s lesson', stem: L.iCan.map((x) => '•  ' + x).join('\n \n') } }] };
+  lpDemos(steps, key || L.base);
   return steps;
 }
 function lessonScreen(preKey) {
@@ -36227,7 +36255,7 @@ function lessonScreen(preKey) {
     const h = (t) => el('h3', { class: 'lp-h' }, t);
     const list = (arr) => el('ul', { class: 'lp-ul' }, ...arr.map((x) => el('li', {}, x)));
     // the I can statements go on the TV right after the bell ringer (built from the plan, so an edited plan keeps them up to date)
-    const steps = lpWithIcan(L);
+    const steps = lpWithIcan(L, LESSON.key);
     const all = steps.flatMap((s) => s.show || []);
     out.append(el('div', { class: 'card lp' },
       el('div', { class: 'lp-top' }, el('div', {}, el('h2', { style: 'margin:0' }, S.title), el('div', { class: 'small' }, `${SUBJECTS[S.subject] || ''} · ${L.minutes} minutes · ${CONFIG.TEACHER_NAME}`),
@@ -36257,6 +36285,8 @@ function lessonScreen(preKey) {
           s.say ? el('p', {}, el('b', {}, 'Ask: '), el('i', {}, s.say)) : '',
           s.vocab || s.notes ? el('div', { class: 'lp-vocab' }, el('b', {}, '📘 One at a time: put each slide up when it comes, students fill in the blank on their sheet, then click Show answer.'), el('ul', { class: 'lp-ul', style: 'margin:4px 0 0' },
             ...lpMoments(L, s).map((m) => el('li', {}, m.when, ' ', el('b', {}, m.kind + ': ' + m.t), m.ask ? [' Ask: ', el('i', {}, '“' + m.ask + '”')] : '', ' Blank: ', el('b', {}, m.ans), '.')))) : '',
+          s.demos ? el('div', { class: 'lp-demo' }, el('b', {}, '🧭 Interactive (on the TV, or students open the link on their Chromebooks)'), el('ul', { class: 'lp-ul', style: 'margin:4px 0 0' },
+            ...s.demos.map((d) => el('li', {}, d.before ? `Right before ${d.before}: ` : '', el('b', {}, IX[d.id].title + '. '), d.use, ' ', ixLinkBtn(d.id, d.opts))))) : '',
           el('p', { class: 'lp-check' }, el('b', {}, 'Check for understanding: '), s.check),
           s.show ? el('div', { class: 'lp-btns noprint' }, ...s.show.map((x) => el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, all.indexOf(x)) }, '📺 ' + x.label))) : '',
           ...(s.show || []).filter((x) => /bell ringer/i.test(x.label) && x.fixed && x.fixed.choices).map((x) => ediaPanel(x.fixed)),
@@ -36274,7 +36304,7 @@ function lessonScreen(preKey) {
   }
   // side by side: the full plan's flow on the left, the shorter plan's on the right, step for step; parts left out are grayed
   function compareDraw(fk, ak) {
-    const P = [fk, ak].map((k) => { const L = lessonOf(k), steps = lpWithIcan(L); return { k, L, steps, all: steps.flatMap((s) => s.show || []) }; });
+    const P = [fk, ak].map((k) => { const L = lessonOf(k), steps = lpWithIcan(L, k); return { k, L, steps, all: steps.flatMap((s) => s.show || []) }; });
     const role = (s) => (/bell/i.test(s.name) ? 'bell' : /partner/i.test(s.name) ? 'partner' : /independent/i.test(s.name) || s.practice ? 'indep' : /closure|exit/i.test(s.name) ? 'close' : s.show && s.show.some((x) => /^Example/.test(x.label)) ? 'notes' : 'other:' + s.name);
     const kept = new Set(P[1].all.map((x) => x.fixed && x.fixed.stem));
     const cell = (p, s, side) => !s ? el('div', { class: 'lp-cmp-cell lp-cmp-none' }, el('div', { class: 'small' }, 'Left out of the shorter plan')) : el('div', { class: 'lp-cmp-cell' },
@@ -36853,6 +36883,863 @@ function lpFigDraw(F) {
   if (F.kind === 'plot') return (cv) => drawPlot(cv, { xr: F.xr, yr: F.yr, step: F.step, curves: (F.curves || []).map((c) => (c.v != null ? { param: [(t) => [c.v, t], F.yr[0], F.yr[1]], color: c.color, dash: c.dash } : { f: lpCurve(c.f), color: c.color, dash: c.dash, a: c.a, b: c.b })), pts: F.pts }); // { v: 3 } is the vertical line x = 3
   return (F.kind === 'ang' ? g61AngFig : g61PerpFig)(F.names, F.opts || {});
 }
+/* ---------- Interactives: drag-and-explore demos for the TV (touch) and for Chromebooks (practice.html?demo=…) ---------- */
+const IX = {}; // id -> { title, hint, build(root, opts) }
+const IXF = '"Georgia", "Times New Roman", serif';
+const IXC = { blue: '#1f5fa8', red: '#b5482b', green: '#2e7d4f', orange: '#d27b12', gray: '#8a867c', ink: '#1d1d1b', grid: '#e4e1d9', axis: '#5c5a55', purple: '#7b4bb3' };
+function ixCanvas(w, h) {
+  const cv = document.createElement('canvas'), dpr = Math.max(window.devicePixelRatio || 1, 1.5);
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  cv.className = 'ix-cv'; cv.style.width = '100%'; cv.style.height = 'auto'; cv.style.touchAction = 'none';
+  cv.style.maxWidth = Math.round(Math.min(w * 1.6, Math.max(300, (window.innerHeight - 250) * w / h))) + 'px';
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); cv._w = w; cv._h = h; cv._ctx = ctx;
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  return cv;
+}
+// pointer dragging (mouse, finger, or stylus): pick(x, y) -> a handle or null; move(handle, x, y); x and y are in the canvas's drawing units
+function ixDrag(cv, pick, move, end) {
+  let h = null, id = null;
+  const at = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv._w / r.width, (e.clientY - r.top) * cv._h / r.height]; };
+  cv.addEventListener('pointerdown', (e) => { const [x, y] = at(e); const p = pick(x, y); if (p == null) return; h = p; id = e.pointerId; try { cv.setPointerCapture(id); } catch {} e.preventDefault(); move(h, x, y); });
+  cv.addEventListener('pointermove', (e) => {
+    const [x, y] = at(e);
+    if (h == null || e.pointerId !== id) { if (e.pointerType === 'mouse') cv.style.cursor = pick(x, y) != null ? 'grab' : 'default'; return; }
+    e.preventDefault(); move(h, x, y);
+  });
+  const up = (e) => { if (e.pointerId === id) { h = null; id = null; if (end) end(); } };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+}
+// a coordinate view: X, Y map math -> canvas; ix, iy map back
+function ixView(cv, xr, yr, pad = 26) {
+  const W = cv._w, H = cv._h, sx = (W - 2 * pad) / (xr[1] - xr[0]), sy = (H - 2 * pad) / (yr[1] - yr[0]);
+  return { xr, yr, sx, sy, pad, X: (x) => pad + (x - xr[0]) * sx, Y: (y) => H - pad - (y - yr[0]) * sy, ix: (px) => xr[0] + (px - pad) / sx, iy: (py) => yr[0] + (H - pad - py) / sy };
+}
+// a grid with axes and number labels (piX: the x-axis counts in π, with a tick every piX·π)
+function ixGrid(ctx, V, o = {}) {
+  const st = o.step || 1, lab = o.lab || 2, [x0, x1] = V.xr, [y0, y1] = V.yr;
+  ctx.save(); ctx.lineWidth = 1; ctx.strokeStyle = IXC.grid;
+  const xs = o.piX ? Math.PI * o.piX : st;
+  for (let k = Math.ceil(x0 / xs - 1e-9); k * xs <= x1 + 1e-9; k++) { ctx.beginPath(); ctx.moveTo(V.X(k * xs), V.Y(y0)); ctx.lineTo(V.X(k * xs), V.Y(y1)); ctx.stroke(); }
+  for (let k = Math.ceil(y0 / st - 1e-9); k * st <= y1 + 1e-9; k++) { ctx.beginPath(); ctx.moveTo(V.X(x0), V.Y(k * st)); ctx.lineTo(V.X(x1), V.Y(k * st)); ctx.stroke(); }
+  ctx.strokeStyle = IXC.ink; ctx.lineWidth = 1.6;
+  if (y0 <= 0 && y1 >= 0) { ctx.beginPath(); ctx.moveTo(V.X(x0), V.Y(0)); ctx.lineTo(V.X(x1), V.Y(0)); ctx.stroke(); }
+  if (x0 <= 0 && x1 >= 0) { ctx.beginPath(); ctx.moveTo(V.X(0), V.Y(y0)); ctx.lineTo(V.X(0), V.Y(y1)); ctx.stroke(); }
+  const px = o.px || 13; ctx.fillStyle = IXC.axis; ctx.font = `${px}px ${IXF}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const ya = Math.min(Math.max(V.Y(0), V.Y(y1)), V.Y(y0) - 16) + 3;
+  if (o.piX) { for (let k = Math.ceil(x0 / xs - 1e-9); k * xs <= x1 + 1e-9; k++) if (k) ixLabel(ctx, ixPi(k * o.piX), V.X(k * xs), ya, px, 'center'); }
+  else for (let k = Math.ceil(x0 / lab - 1e-9) * lab; k <= x1 + 1e-9; k += lab) if (Math.abs(k) > 1e-9) ctx.fillText(ixN(k), V.X(k), ya);
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  const xa = Math.min(Math.max(V.X(0), V.X(x0) + 22), V.X(x1)) - 4;
+  for (let k = Math.ceil(y0 / lab - 1e-9) * lab; k <= y1 + 1e-9; k += lab) if (Math.abs(k) > 1e-9) ctx.fillText(ixN(k), xa, V.Y(k));
+  ctx.restore();
+}
+// a curve y = f(x), broken where it jumps (asymptotes) or is undefined
+function ixCurve(ctx, V, f, color, o = {}) {
+  ctx.save(); ctx.beginPath(); ctx.rect(V.X(V.xr[0]), V.Y(V.yr[1]), V.X(V.xr[1]) - V.X(V.xr[0]), V.Y(V.yr[0]) - V.Y(V.yr[1])); ctx.clip();
+  ctx.strokeStyle = color; ctx.lineWidth = o.w || 3; ctx.setLineDash(o.dash ? [8, 7] : []); ctx.lineJoin = 'round'; ctx.beginPath();
+  const a = o.a ?? V.xr[0], b = o.b ?? V.xr[1], N = o.n || 900, span = V.yr[1] - V.yr[0];
+  let pen = false, last = null;
+  for (let j = 0; j <= N; j++) {
+    const x = a + ((b - a) * j) / N, y = f(x);
+    if (!isFinite(y) || Math.abs(y) > 40 * span || (last !== null && Math.abs(y - last) > 2.5 * span)) { pen = false; last = isFinite(y) ? y : null; continue; }
+    if (pen) ctx.lineTo(V.X(x), V.Y(y)); else { ctx.moveTo(V.X(x), V.Y(y)); pen = true; }
+    last = y;
+  }
+  ctx.stroke(); ctx.restore();
+}
+function ixDot(ctx, x, y, color, r = 7, ring = false) {
+  ctx.save(); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill();
+  if (ring) { ctx.strokeStyle = color; ctx.globalAlpha = 0.25; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(x, y, r + 7, 0, 2 * Math.PI); ctx.stroke(); }
+  ctx.restore();
+}
+function ixLine(ctx, p, q, color, w = 2, dash = false) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash ? [7, 6] : []); ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); ctx.restore(); }
+// a full line through two canvas points, clipped to the canvas
+function ixInf(ctx, cv, p, q, color, w = 2, dash = false) {
+  const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1, k = (cv._w + cv._h) * 2 / L;
+  ixLine(ctx, [p[0] - dx * k, p[1] - dy * k], [q[0] + dx * k, q[1] + dy * k], color, w, dash);
+}
+// text on a canvas; fractions and square roots are drawn as math (stacked, full-length bar) in the usual ink color
+const IX_TC = new Map();
+function ixLabel(ctx, text, x, y, px = 18, align = 'left', color = IXC.ink, base = 'top') {
+  text = String(text);
+  if (!/[\/√]/.test(text)) {
+    ctx.save(); ctx.fillStyle = color; ctx.font = `${px}px ${IXF}`; ctx.textAlign = align; ctx.textBaseline = base; ctx.fillText(text, x, y); ctx.restore(); return;
+  }
+  const key = px + '|' + text; let tc = IX_TC.get(key);
+  if (!tc) {
+    const probe = document.createElement('canvas').getContext('2d'); probe.font = `${px}px ${IXF}`;
+    const w = Math.ceil(probe.measureText(text).width * 0.8) + 14; tc = textCanvas(text, w, `${px}px ${IXF}`, Math.round(px * 1.4)); tc._tw = w;
+    if (IX_TC.size > 400) IX_TC.clear(); IX_TC.set(key, tc);
+  }
+  const w = tc._w, h = tc._h, dx = align === 'center' ? -tc._tw * 0.45 : align === 'right' ? -tc._tw * 0.88 : 0, dy = base === 'middle' ? -h / 2 : base === 'bottom' ? -h : -4;
+  ctx.drawImage(tc, x + dx, y + dy, w, h);
+}
+// numbers: integers plain, simple fractions as a/b, else rounded; − for minus
+function ixN(v, d = 2) {
+  if (!isFinite(v)) return 'undefined';
+  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v)).replace('-', '−');
+  const r = +v.toFixed(d); return String(r).replace('-', '−');
+}
+function ixFrac(v, dens = [2, 3, 4, 6, 8]) {
+  if (Math.abs(v - Math.round(v)) < 1e-9) return ixN(v);
+  for (const q of dens) { const p = Math.round(v * q); if (Math.abs(p / q - v) < 1e-9) { const g = gcd(Math.abs(p), q); return (p < 0 ? '−' : '') + Math.abs(p / g) + '/' + q / g; } }
+  return ixN(v);
+}
+// q·π as text: 5π/6, −π/2, 2π (q a multiple of π)
+function ixPi(q) {
+  if (Math.abs(q) < 1e-9) return '0';
+  for (const den of [1, 2, 3, 4, 6, 8, 12]) {
+    const n = Math.round(q * den);
+    if (Math.abs(n / den - q) < 1e-9) { const g = gcd(Math.abs(n), den), N = n / g, D = den / g; const top = (N < 0 ? '−' : '') + (Math.abs(N) === 1 ? '' : Math.abs(N)) + 'π'; return D === 1 ? top : `${top}/${D}`; }
+  }
+  return ixN(q * Math.PI, 3);
+}
+// a signed term for an equation: " + 3", " − 3/2"
+const ixTerm = (v, f = ixFrac) => (Math.abs(v) < 1e-9 ? '' : v > 0 ? ` + ${f(v)}` : ` − ${f(-v)}`);
+// a coefficient in front of something: 1 -> '', −1 -> '−', 1/2 -> '(1/2)'
+const ixCoef = (v) => (Math.abs(v - 1) < 1e-9 ? '' : Math.abs(v + 1) < 1e-9 ? '−' : Number.isInteger(+v.toFixed(9)) ? ixN(v) : (v < 0 ? '−' : '') + '(' + ixFrac(Math.abs(v)) + ')');
+// x − h inside: "x − 3", "x + 2", "x"
+const ixShift = (h, v = 'x') => (Math.abs(h) < 1e-9 ? v : `${v}${ixTerm(-h)}`);
+// controls
+function ixSlider(label, min, max, step, val, show, on) {
+  const out = el('b', { class: 'ix-val' }), r = el('input', { type: 'range', min, max, step, value: val, 'aria-label': label });
+  const upd = () => { out.textContent = ''; const t = show(+r.value); if (/[\/√]/.test(t)) out.append(textCanvas(t, 90, `20px ${IXF}`, 30)); else out.textContent = t; };
+  r.addEventListener('input', () => { upd(); on(+r.value); }); upd();
+  const w = el('label', { class: 'ix-sl' }, el('span', {}, label), r, out);
+  w.set = (v) => { r.value = v; upd(); }; w.get = () => +r.value; return w;
+}
+function ixSeg(opts, cur, on) {
+  const w = el('div', { class: 'ix-seg', role: 'group' });
+  const btns = opts.map(([k, t]) => { const b = el('button', { type: 'button', class: k === cur ? 'on' : '' }, t); b.addEventListener('click', () => { btns.forEach((x) => x.classList.remove('on')); b.classList.add('on'); on(k); }); w.append(b); return b; });
+  w.set = (k) => btns.forEach((b, i) => b.classList.toggle('on', opts[i][0] === k)); return w;
+}
+function ixCheck(label, val, on) { const c = el('input', { type: 'checkbox' }); c.checked = !!val; c.addEventListener('change', () => on(c.checked)); return el('label', { class: 'ix-ck' }, c, el('span', {}, label)); }
+function ixBtn(label, on) { const b = el('button', { type: 'button', class: 'btn secondary ix-b' }, label); b.addEventListener('click', on); return b; }
+// the readout beside the picture: one line per item; math drawn as math
+function ixRead(box, lines) {
+  box.innerHTML = '';
+  const w = Math.max(240, Math.min(420, box.clientWidth || 340));
+  lines.forEach((ln) => {
+    if (ln == null || ln === '') return;
+    if (typeof ln === 'object' && ln.h) { box.append(el('div', { class: 'ix-rh' }, ln.h)); return; }
+    if (typeof ln === 'object' && ln.note) { box.append(el('div', { class: 'ix-note' + (ln.good ? ' good' : ln.bad ? ' bad' : '') }, ln.note)); return; }
+    const t = String(ln); box.append(/[\/√]/.test(t) ? textCanvas(t, w, `21px ${IXF}`, 32) : el('div', { class: 'ix-rl' }, t));
+  });
+}
+// build one interactive into a box: picture on the left, controls and readout on the right
+function ixMount(id, opts = {}) {
+  const D = IX[id]; const root = el('div', { class: 'ix' + (D && D.wide ? ' ix-wide' : '') });
+  if (!D) { root.append(el('p', {}, 'This interactive isn’t available.')); return root; }
+  const main = el('div', { class: 'ix-main' }), side = el('div', { class: 'ix-side' }), ctl = el('div', { class: 'ix-ctl' }), read = el('div', { class: 'ix-read' });
+  side.append(ctl, read);
+  root.append(el('div', { class: 'ix-hint' }, '👆 ' + D.hint), el('div', { class: 'ix-row' }, main, side));
+  try { D.build({ main, ctl, read, side, root }, opts || {}); } catch (e) { console.error(e); root.append(el('p', { class: 'err' }, 'The interactive didn’t load.')); }
+  return root;
+}
+// a link students can open on their Chromebooks
+function ixLink(id, opts = {}) {
+  const q = new URLSearchParams(); q.set('demo', id); Object.entries(opts || {}).forEach(([k, v]) => q.set(k, v));
+  return location.origin + location.pathname + '?' + q.toString();
+}
+function ixLinkBtn(id, opts) {
+  const b = el('button', { type: 'button', class: 'btn secondary', title: 'Copy a link students can open on their Chromebooks (post it in Google Classroom)' }, '🔗 Copy student link');
+  b.addEventListener('click', async () => { const u = ixLink(id, opts); try { await navigator.clipboard.writeText(u); b.textContent = '✓ Copied'; } catch { prompt('Copy this link:', u); } setTimeout(() => (b.textContent = '🔗 Copy student link'), 2200); });
+  return b;
+}
+// practice.html?demo=… : one interactive on its own page (for Chromebooks); ?demo= with no name lists them all
+function demoScreen(id) {
+  const opts = {}; params.forEach((v, k) => { if (k !== 'demo') opts[k] = v; });
+  document.getElementById('title').textContent = IX[id] ? IX[id].title : 'Interactives';
+  document.getElementById('subtitle').textContent = CONFIG.TEACHER_NAME;
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '1240px';
+  if (!IX[id]) {
+    app.append(el('div', { class: 'card' }, el('p', {}, 'Pick one to explore:'), el('ul', { class: 'lp-ul' }, ...Object.entries(IX).map(([k, D]) => el('li', {}, el('a', { href: ixLink(k) }, D.title), ' — ', D.hint)))));
+    return;
+  }
+  app.append(el('div', { class: 'card ix-page' }, ixMount(id, opts)));
+}
+
+// ---- Unit circle: drag the point; sin, cos, tan (and the reciprocals) update; the quadrant's signs and the reference angle show
+const IX_EXACT = { // reference angle -> [sin, cos, tan, csc, sec, cot] (first-quadrant values)
+  0: ['0', '1', '0', 'undefined', '1', 'undefined'], 30: ['1/2', '√3/2', '√3/3', '2', '2√3/3', '√3'], 45: ['√2/2', '√2/2', '1', '√2', '√2', '1'],
+  60: ['√3/2', '1/2', '√3', '2√3/3', '2', '√3/3'], 90: ['1', '0', 'undefined', '1', 'undefined', '0'] };
+IX.unitCircle = {
+  title: 'The unit circle', hint: 'Drag the point around the circle (or use the buttons). Watch the signs change from quadrant to quadrant.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(560, 520), ctx = cv._ctx; main.append(cv);
+    const S = { deg: +o.deg || 30, snap: o.snap !== '0', ref: o.ref !== '0', recip: o.recip === '1', vals: o.vals !== '0' };
+    const cx = 280, cy = 262, R = 200;
+    const P = () => [cx + R * Math.cos(S.deg * Math.PI / 180), cy - R * Math.sin(S.deg * Math.PI / 180)];
+    const exactOK = () => S.deg % 30 === 0 || S.deg % 45 === 0;
+    const quad = () => { const d = ((S.deg % 360) + 360) % 360; return d % 90 === 0 ? 0 : Math.ceil(d / 90); };
+    const refAng = () => { const d = ((S.deg % 360) + 360) % 360; return d <= 90 ? d : d <= 180 ? 180 - d : d <= 270 ? d - 180 : 360 - d; };
+    const vals = () => {
+      const t = S.deg * Math.PI / 180, c = Math.cos(t), s = Math.sin(t), z = (v) => (Math.abs(v) < 1e-12 ? 0 : v);
+      const num = [z(s), z(c), Math.abs(c) < 1e-12 ? NaN : z(s / c), Math.abs(s) < 1e-12 ? NaN : 1 / s, Math.abs(c) < 1e-12 ? NaN : 1 / c, Math.abs(s) < 1e-12 ? NaN : z(c / s)];
+      if (!exactOK()) return num.map((v) => (isFinite(v) ? '≈ ' + ixN(v, 3) : 'undefined'));
+      const base = IX_EXACT[refAng()], sg = [Math.sign(z(s)), Math.sign(z(c)), Math.sign(z(s)) * Math.sign(z(c)), Math.sign(z(s)), Math.sign(z(c)), Math.sign(z(s)) * Math.sign(z(c))];
+      return base.map((v, i) => (v === 'undefined' || v === '0' ? v : (sg[i] < 0 ? '−' : '') + v));
+    };
+    const angText = () => { const r = S.deg / 180; return `${ixN(S.deg)}° = ${S.deg % 15 === 0 ? ixPi(r) : ixN(S.deg * Math.PI / 180, 3)}${S.deg % 15 === 0 ? '' : ' radians'}`; };
+    function draw() {
+      ctx.clearRect(0, 0, cv._w, cv._h);
+      const q = quad(), names = ['', 'I', 'II', 'III', 'IV'], tips = ['', 'All +', 'sin +', 'tan +', 'cos +'];
+      // the current quadrant, shaded
+      if (q) { ctx.save(); ctx.fillStyle = 'rgba(31,95,168,.07)'; const xs = q === 1 || q === 4 ? cx : 0, ys = q <= 2 ? 0 : cy; ctx.fillRect(xs, ys, q === 1 || q === 4 ? cv._w - cx : cx, q <= 2 ? cy : cv._h - cy); ctx.restore(); }
+      [[1, cv._w - 16, 16, 'right'], [2, 16, 16, 'left'], [3, 16, cv._h - 44, 'left'], [4, cv._w - 16, cv._h - 44, 'right']].forEach(([k, x, y, al]) => {
+        ixLabel(ctx, `${names[k]}: ${tips[k]}`, x, y, 18, al, k === q ? IXC.blue : '#b0aca2'); });
+      ixLine(ctx, [20, cy], [cv._w - 20, cy], IXC.ink, 1.6); ixLine(ctx, [cx, 14], [cx, cv._h - 14], IXC.ink, 1.6);
+      ixLabel(ctx, '1', cx + R + 4, cy + 4, 15, 'left', IXC.axis); ixLabel(ctx, '−1', cx - R - 6, cy + 4, 15, 'right', IXC.axis);
+      ixLabel(ctx, '1', cx + 6, cy - R - 18, 15, 'left', IXC.axis); ixLabel(ctx, '−1', cx + 6, cy + R + 2, 15, 'left', IXC.axis);
+      ctx.save(); ctx.strokeStyle = IXC.ink; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke(); ctx.restore();
+      // special angle ticks
+      ctx.save(); ctx.strokeStyle = '#c9c5bb'; ctx.lineWidth = 1.5;
+      for (let d = 0; d < 360; d += 15) if (d % 30 === 0 || d % 45 === 0) { const a = d * Math.PI / 180; ctx.beginPath(); ctx.moveTo(cx + (R - 7) * Math.cos(a), cy - (R - 7) * Math.sin(a)); ctx.lineTo(cx + (R + 7) * Math.cos(a), cy - (R + 7) * Math.sin(a)); ctx.stroke(); }
+      ctx.restore();
+      const [px, py] = P(), t = S.deg * Math.PI / 180;
+      // the angle θ from the positive x-axis
+      ctx.save(); ctx.strokeStyle = IXC.purple; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(cx, cy, 34, 0, -t, t > 0); ctx.stroke(); ctx.restore();
+      ixLabel(ctx, 'θ', cx + 46 * Math.cos(t / 2), cy - 46 * Math.sin(t / 2), 20, 'center', IXC.purple, 'middle');
+      // the reference angle, between the terminal side and the x-axis
+      if (S.ref && quad() > 1) {
+        const d = ((S.deg % 360) + 360) % 360, tt = d * Math.PI / 180;
+        const [s0, s1] = d < 90 ? [0, tt] : d < 180 ? [tt, Math.PI] : d < 270 ? [Math.PI, tt] : [tt, 2 * Math.PI];
+        ctx.save(); ctx.fillStyle = 'rgba(210,123,18,.28)'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, 70, -s0, -s1, true);
+        ctx.closePath(); ctx.fill(); ctx.restore();
+        const mid = (s0 + s1) / 2;
+        ixLabel(ctx, 'θ′', cx + 92 * Math.cos(mid), cy - 92 * Math.sin(mid), 19, 'center', IXC.orange, 'middle');
+      }
+      // cos (along the x-axis) and sin (up or down to the point)
+      ixLine(ctx, [cx, cy], [px, cy], IXC.red, 5); ixLine(ctx, [px, cy], [px, py], IXC.blue, 5);
+      ixLine(ctx, [cx, cy], [px, py], IXC.ink, 2.5);
+      if (S.vals) {
+        if (Math.abs(px - cx) > 30) ixLabel(ctx, 'cos θ', (cx + px) / 2, cy + (py < cy ? 8 : -28), 17, 'center', IXC.red);
+        if (Math.abs(py - cy) > 30) ixLabel(ctx, 'sin θ', px + (px >= cx ? 8 : -8), (cy + py) / 2, 17, px >= cx ? 'left' : 'right', IXC.blue, 'middle');
+      }
+      ixDot(ctx, px, py, IXC.blue, 9, true);
+      if (S.vals) {
+        const v = vals(), lab = exactOK() ? `(${v[1]}, ${v[0]})` : `(${ixN(Math.cos(t), 2)}, ${ixN(Math.sin(t), 2)})`;
+        const right = px >= cx, up = py <= cy;
+        ixLabel(ctx, lab, px + (right ? 16 : -16), py + (up ? -36 : 14), 19, right ? 'left' : 'right');
+      }
+      paintRead();
+    }
+    function paintRead() {
+      const v = vals(), q = quad();
+      const L = [{ h: 'The angle' }, `θ = ${angText()}`, q ? `Quadrant ${['', 'I', 'II', 'III', 'IV'][q]}` : 'On an axis (a quadrantal angle)'];
+      if (S.ref && q) L.push(`Reference angle θ′ = ${ixN(refAng())}°${q === 1 ? ' (in Quadrant I, θ′ = θ)' : ''}`);
+      if (S.vals) {
+        L.push({ h: 'The point (cos θ, sin θ)' });
+        if (S.recip) L.push(`sin θ = ${v[0]}     csc θ = ${v[3]}`, `cos θ = ${v[1]}     sec θ = ${v[4]}`, `tan θ = ${v[2]}     cot θ = ${v[5]}`);
+        else L.push(`sin θ = ${v[0]}`, `cos θ = ${v[1]}`, `tan θ = ${v[2]}`);
+        if (!exactOK()) L.push({ note: 'Snap to a special angle (a multiple of 30° or 45°) to see exact values.' });
+      }
+      ixRead(read, L);
+    }
+    const setDeg = (d) => { S.deg = Math.round(((d % 360) + 360) % 360 * 10) / 10; if (S.snap) S.deg = Math.round(S.deg); draw(); };
+    ixDrag(cv, () => 'P', (h, x, y) => {
+      if (Math.hypot(x - cx, y - cy) < 8) return;
+      let d = Math.atan2(cy - y, x - cx) * 180 / Math.PI; if (d < 0) d += 360;
+      if (S.snap) { const sp = [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330, 360].find((a) => Math.abs(a - d) < 5); if (sp != null) d = sp % 360; }
+      setDeg(d);
+    });
+    ctl.append(el('div', { class: 'ix-btns' }, ixBtn('◀ 15°', () => setDeg(S.deg - 15)), ixBtn('15° ▶', () => setDeg(S.deg + 15)),
+        ixBtn('◀ 1°', () => setDeg(S.deg - 1)), ixBtn('1° ▶', () => setDeg(S.deg + 1))),
+      ixCheck('Snap to special angles', S.snap, (v) => { S.snap = v; draw(); }),
+      ixCheck('Show the reference angle', S.ref, (v) => { S.ref = v; draw(); }),
+      ixCheck('Show the values', S.vals, (v) => { S.vals = v; draw(); }),
+      ixCheck('Show csc, sec, and cot', S.recip, (v) => { S.recip = v; draw(); }));
+    draw();
+  } };
+
+// ---- Wave builder: y = a·f(bx − c) + d, with sliders; for sine and cosine the point on a circle traces the height
+const IX_TRIG = { sin: Math.sin, cos: Math.cos, tan: Math.tan, csc: (t) => 1 / Math.sin(t), sec: (t) => 1 / Math.cos(t), cot: (t) => Math.cos(t) / Math.sin(t) };
+IX.wave = {
+  wide: true, title: 'Graphs of trig functions', hint: 'Move the sliders, or press Play (or drag across the graph) to trace the wave from the circle.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(900, 400), ctx = cv._ctx; main.append(cv);
+    const S = { fn: IX_TRIG[o.fn] ? o.fn : 'sin', a: +(o.a ?? 1), b: +(o.b ?? 1), c4: +(o.c ?? 0), d: +(o.d ?? 0), t: 0.6, play: false, ghost: true, circle: true };
+    const circOK = () => (S.fn === 'sin' || S.fn === 'cos') && S.circle;
+    const yr = [-5, 5];
+    const view = () => { const left = circOK() ? 250 : 10; const V = ixView({ _w: cv._w - left, _h: cv._h }, [-Math.PI, 3 * Math.PI], yr, 24); const X0 = V.X; V.X = (x) => left + X0(x); const ix0 = V.ix; V.ix = (px) => ix0(px - left); V.left = left; return V; };
+    const c = () => S.c4 * Math.PI / 4, f = (x) => S.a * IX_TRIG[S.fn](S.b * x - c()) + S.d;
+    const per = () => (S.fn === 'tan' || S.fn === 'cot' ? Math.PI : 2 * Math.PI) / S.b;
+    const eq = () => {
+      const inner = (S.b === 1 ? 'x' : ixFrac(S.b) + (/\//.test(ixFrac(S.b)) ? '·x' : 'x')) + (S.c4 ? (S.c4 > 0 ? ' − ' : ' + ') + ixPi(Math.abs(S.c4) / 4) : '');
+      const arg = inner === 'x' ? ' x' : `(${inner})`;
+      const a = S.a === 0 ? '0' : ixCoef(S.a);
+      return S.a === 0 ? `y = ${ixFrac(S.d)}` : `y = ${a}${a && a !== '−' ? ' ' : ''}${S.fn}${arg}${ixTerm(S.d)}`;
+    };
+    function draw() {
+      const V = view(); ctx.clearRect(0, 0, cv._w, cv._h);
+      ixGrid(ctx, V, { piX: 0.5, step: 1, lab: 1, px: 15 });
+      const x0 = c() / S.b, P = per();
+      // midline and the parent graph
+      ixLine(ctx, [V.X(V.xr[0]), V.Y(S.d)], [V.X(V.xr[1]), V.Y(S.d)], IXC.green, 2, true);
+      if (S.ghost) ixCurve(ctx, V, (x) => IX_TRIG[S.fn](x), '#b9b4a8', { w: 2, dash: true });
+      if (S.fn === 'sec' || S.fn === 'csc') ixCurve(ctx, V, (x) => S.a * (S.fn === 'sec' ? Math.cos : Math.sin)(S.b * x - c()) + S.d, '#9fb9d8', { w: 2, dash: true });
+      // asymptotes
+      if (S.fn !== 'sin' && S.fn !== 'cos') {
+        const off = S.fn === 'tan' || S.fn === 'sec' ? Math.PI / 2 : 0, step = Math.PI / S.b;
+        for (let k = -40; k <= 40; k++) { const x = (off + c() + k * Math.PI) / S.b; if (x > V.xr[0] && x < V.xr[1]) ixLine(ctx, [V.X(x), V.Y(yr[0])], [V.X(x), V.Y(yr[1])], IXC.red, 1.6, true); }
+        void step;
+      }
+      ixCurve(ctx, V, f, IXC.blue, { w: 3.4, n: 1600 });
+      // one period, marked under the graph
+      if (S.a !== 0) {
+        const yb = Math.max(yr[0] + 0.5, (S.fn === 'sin' || S.fn === 'cos' ? S.d - Math.abs(S.a) : S.d - 3) - 0.7), xa = Math.max(V.xr[0], x0 - (x0 > V.xr[1] - P ? P : 0));
+        if (xa + P <= V.xr[1] + 1e-9) {
+          ctx.save(); ctx.strokeStyle = IXC.orange; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(V.X(xa), V.Y(yb)); ctx.lineTo(V.X(xa + P), V.Y(yb)); ctx.stroke();
+          [xa, xa + P].forEach((x) => { ctx.beginPath(); ctx.moveTo(V.X(x), V.Y(yb) - 8); ctx.lineTo(V.X(x), V.Y(yb) + 8); ctx.stroke(); }); ctx.restore();
+          ixLabel(ctx, 'one period', V.X(xa + P / 2), V.Y(yb) + 6, 15, 'center', IXC.orange);
+        }
+      }
+      // the circle and the tracing point
+      const tx = S.t, ty = f(tx);
+      if (circOK() && S.a !== 0) {
+        const r = Math.abs(S.a) * V.sy, ccx = 125, ccy = V.Y(S.d);
+        let u = S.b * tx - c(); if (S.fn === 'cos') u += Math.PI / 2; if (S.a < 0) u += Math.PI;
+        ctx.save(); ctx.strokeStyle = IXC.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ccx, ccy, r, 0, 2 * Math.PI); ctx.stroke(); ctx.restore();
+        ixLine(ctx, [ccx - r - 10, ccy], [ccx + r + 10, ccy], IXC.green, 1.5, true);
+        const qx = ccx + r * Math.cos(u), qy = ccy - r * Math.sin(u);
+        ixLine(ctx, [ccx, ccy], [qx, qy], IXC.ink, 2.2);
+        ixLine(ctx, [qx, qy], [qx, ccy], IXC.blue, 4);
+        if (isFinite(ty) && ty > yr[0] && ty < yr[1]) ixLine(ctx, [qx, qy], [V.X(tx), V.Y(ty)], IXC.purple, 1.6, true);
+        ixDot(ctx, qx, qy, IXC.purple, 7);
+        ixLabel(ctx, S.fn === 'cos' ? 'height = cosine' : 'height = sine', ccx, Math.min(cv._h - 24, ccy + r + 12), 15, 'center', IXC.axis);
+      }
+      if (isFinite(ty) && ty > yr[0] && ty < yr[1]) { ixLine(ctx, [V.X(tx), V.Y(S.d)], [V.X(tx), V.Y(ty)], IXC.purple, 2); ixDot(ctx, V.X(tx), V.Y(ty), IXC.purple, 8, true); }
+      ixLabel(ctx, 'midline y = ' + ixFrac(S.d), V.X(V.xr[0]) + 6, V.Y(S.d) - 24, 15, 'left', IXC.green);
+      paintRead();
+    }
+    function paintRead() {
+      const P = per(), sh = c() / S.b, wave = S.fn === 'sin' || S.fn === 'cos';
+      const L = [{ h: 'The function' }, eq(), { h: 'What the numbers do' },
+        wave ? `Amplitude = |a| = ${ixFrac(Math.abs(S.a))}` : `a = ${ixFrac(S.a)} (stretch; ${S.fn} has no amplitude)`,
+        `Period = ${wave || S.fn === 'sec' || S.fn === 'csc' ? '2π' : 'π'}/b = ${ixPi(P / Math.PI)}`,
+        `Phase shift = c/b = ${Math.abs(sh) < 1e-9 ? '0 (none)' : (sh > 0 ? 'right ' : 'left ') + ixPi(Math.abs(sh) / Math.PI)}`,
+        `Vertical shift = d = ${S.d === 0 ? '0 (none)' : (S.d > 0 ? 'up ' : 'down ') + ixFrac(Math.abs(S.d))}`];
+      if (wave && S.a) L.push(`Maximum ${ixFrac(S.d + Math.abs(S.a))}, minimum ${ixFrac(S.d - Math.abs(S.a))}`);
+      if (S.a < 0) L.push({ note: 'a is negative: the graph is reflected in the midline.' });
+      if (!wave) L.push({ note: 'Red dashed lines are the vertical asymptotes.' });
+      ixRead(read, L);
+    }
+    const sl = {
+      a: ixSlider('a', -3, 3, 0.5, S.a, ixFrac, (v) => { S.a = v; draw(); }),
+      b: ixSlider('b', 0.5, 4, 0.5, S.b, ixFrac, (v) => { S.b = v; draw(); }),
+      c: ixSlider('c', -8, 8, 1, S.c4, (v) => ixPi(v / 4), (v) => { S.c4 = v; draw(); }),
+      d: ixSlider('d', -2, 2, 0.5, S.d, ixFrac, (v) => { S.d = v; draw(); }) };
+    let raf = 0, last = 0;
+    const tick = (ts) => { if (!S.play || !cv.isConnected) { S.play = false; playB.textContent = '▶ Play'; return; } if (last) S.t += (ts - last) / 1000 * 1.2; last = ts; if (S.t > 3 * Math.PI) S.t = -Math.PI; draw(); raf = requestAnimationFrame(tick); };
+    const playB = ixBtn('▶ Play', () => { S.play = !S.play; playB.textContent = S.play ? '❚❚ Pause' : '▶ Play'; last = 0; if (S.play) raf = requestAnimationFrame(tick); else cancelAnimationFrame(raf); });
+    ctl.append(el('div', { class: 'ix-h' }, 'y = a · f(bx − c) + d'),
+      ixSeg([['sin', 'sin'], ['cos', 'cos'], ['tan', 'tan'], ['csc', 'csc'], ['sec', 'sec'], ['cot', 'cot']], S.fn, (k) => { S.fn = k; draw(); }),
+      sl.a, sl.b, sl.c, sl.d,
+      el('div', { class: 'ix-btns' }, playB, ixBtn('Reset', () => { Object.assign(S, { a: 1, b: 1, c4: 0, d: 0 }); Object.entries(sl).forEach(([k, s]) => s.set(k === 'b' || k === 'a' ? 1 : 0)); draw(); })),
+      ixCheck('Show the parent graph (dashed)', S.ghost, (v) => { S.ghost = v; draw(); }),
+      ixCheck('Show the circle (sine and cosine)', S.circle, (v) => { S.circle = v; draw(); }));
+    ixDrag(cv, (x) => (x > view().left ? 't' : null), (h, x) => { const V = view(); S.t = Math.max(V.xr[0], Math.min(V.xr[1], V.ix(x))); draw(); });
+    draw();
+  } };
+
+// ---- Transformations of functions: y = a·f(b(x − h)) + k with the parent dashed behind
+const IX_PARENTS = {
+  line: { name: 'f(x) = x', f: (x) => x, key: [0, 0], eq: (a, inner, k) => `y = ${ixCoef(a)}${inner === 'x' ? 'x' : '(' + inner + ')'}${ixTerm(k)}` },
+  quad: { name: 'f(x) = x²', f: (x) => x * x, key: [0, 0], eq: (a, inner, k) => `y = ${ixCoef(a)}${inner === 'x' ? 'x²' : '(' + inner + ')²'}${ixTerm(k)}` },
+  abs: { name: 'f(x) = |x|', f: Math.abs, key: [0, 0], eq: (a, inner, k) => `y = ${ixCoef(a)}|${inner}|${ixTerm(k)}` },
+  sqrt: { name: 'f(x) = √x', f: (x) => (x < 0 ? NaN : Math.sqrt(x)), key: [0, 0], eq: (a, inner, k) => `y = ${ixCoef(a)}√(${inner})${ixTerm(k)}` },
+  cube: { name: 'f(x) = x³', f: (x) => x * x * x, key: [0, 0], eq: (a, inner, k) => `y = ${ixCoef(a)}${inner === 'x' ? 'x³' : '(' + inner + ')³'}${ixTerm(k)}` },
+  recip: { name: 'f(x) = 1/x', f: (x) => (Math.abs(x) < 1e-12 ? NaN : 1 / x), key: [1, 1], eq: (a, inner, k) => `y = ${ixN(a) === '1' ? '1' : ixFrac(a)}/(${inner})${ixTerm(k)}` },
+  exp: { name: 'f(x) = 2ˣ', f: (x) => Math.pow(2, x), key: [0, 1], eq: (a, inner, k) => { const up = ixSup(inner); return `y = ${ixCoef(a)}${a !== 1 && a !== -1 ? ' · ' : ''}${up ? '2' + up : '2^(' + inner + ')'}${ixTerm(k)}`; } } };
+// an exponent written with superscript characters (null if it has a character with no superscript)
+function ixSup(t) { const m = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', x: 'ˣ', '−': '⁻', '+': '⁺', '(': '⁽', ')': '⁾', ' ': '' };
+  let o = ''; for (const c of String(t)) { if (!(c in m)) return null; o += m[c]; } return o; }
+IX.transform = {
+  title: 'Transformations of functions', hint: 'Drag the blue point to shift the graph, and use the sliders to stretch and reflect it. The dashed graph is the parent.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(620, 560), ctx = cv._ctx; main.append(cv);
+    const S = { p: IX_PARENTS[o.parent] ? o.parent : 'quad', a: +(o.a ?? 1), b: +(o.b ?? 1), h: +(o.h ?? 0), k: +(o.k ?? 0) };
+    const V = ixView(cv, [-10, 10], [-9, 9], 26);
+    const g = (x) => S.a * IX_PARENTS[S.p].f(S.b * (x - S.h)) + S.k;
+    const keyPt = () => { const [px, py] = IX_PARENTS[S.p].key; return [S.h + px / S.b, S.a * py + S.k]; };
+    const inner = () => { const sh = ixShift(S.h); if (S.b === 1) return sh; const bb = S.b === -1 ? '−' : ixCoef(S.b); return sh === 'x' ? `${bb}x` : `${bb}(${sh})`; };
+    function draw() {
+      ctx.clearRect(0, 0, cv._w, cv._h); ixGrid(ctx, V, { step: 1, lab: 2 });
+      ixCurve(ctx, V, IX_PARENTS[S.p].f, '#a9a49a', { w: 2.4, dash: true });
+      if (S.p === 'recip') { ixLine(ctx, [V.X(S.h), V.Y(V.yr[0])], [V.X(S.h), V.Y(V.yr[1])], IXC.red, 1.6, true); ixLine(ctx, [V.X(V.xr[0]), V.Y(S.k)], [V.X(V.xr[1]), V.Y(S.k)], IXC.red, 1.6, true); }
+      if (S.p === 'exp') ixLine(ctx, [V.X(V.xr[0]), V.Y(S.k)], [V.X(V.xr[1]), V.Y(S.k)], IXC.red, 1.6, true);
+      ixCurve(ctx, V, g, IXC.blue, { w: 3.4, n: 1400 });
+      const [kx, ky] = keyPt(), [px, py] = IX_PARENTS[S.p].key;
+      ixDot(ctx, V.X(px), V.Y(py), '#a9a49a', 5);
+      if (Math.hypot(kx - px, ky - py) > 0.01) ixLine(ctx, [V.X(px), V.Y(py)], [V.X(kx), V.Y(ky)], IXC.purple, 1.6, true);
+      ixDot(ctx, V.X(kx), V.Y(ky), IXC.blue, 9, true);
+      ixLabel(ctx, `(${ixFrac(kx)}, ${ixFrac(ky)})`, V.X(kx) + 14, V.Y(ky) + 8, 17);
+      paintRead();
+    }
+    function paintRead() {
+      const L = [{ h: 'Parent' }, IX_PARENTS[S.p].name, { h: 'The new function' }, IX_PARENTS[S.p].eq(S.a, inner(), S.k), { h: 'What happened' }];
+      if (S.h) L.push(`${S.h > 0 ? 'Right' : 'Left'} ${ixFrac(Math.abs(S.h))}  (h = ${ixFrac(S.h)})`);
+      if (Math.abs(S.a) !== 1) L.push(`Vertical ${Math.abs(S.a) > 1 ? 'stretch' : 'shrink'} by a factor of ${ixFrac(Math.abs(S.a))}`);
+      if (Math.abs(S.b) !== 1) L.push(`Horizontal ${Math.abs(S.b) > 1 ? 'shrink' : 'stretch'} by a factor of ${ixFrac(1 / Math.abs(S.b))}`);
+      if (S.a < 0) L.push('Reflection in the x-axis (a < 0)');
+      if (S.b < 0) L.push('Reflection in the y-axis (b < 0)');
+      if (S.k) L.push(`${S.k > 0 ? 'Up' : 'Down'} ${ixFrac(Math.abs(S.k))}  (k = ${ixFrac(S.k)})`);
+      if (L.length === 5) L.push('Nothing yet: it is the parent function.');
+      L.push({ note: 'Changes inside the function (h and b) act on x, the opposite of what you might expect: x − 3 moves the graph right. Changes outside (a and k) act on y, the way you expect.' });
+      ixRead(read, L);
+    }
+    const sl = { a: ixSlider('a (outside)', -4, 4, 0.5, S.a, ixFrac, (v) => { S.a = v || 0.5; draw(); }), b: ixSlider('b (inside)', -3, 3, 0.5, S.b, ixFrac, (v) => { S.b = v || 0.5; draw(); }),
+      h: ixSlider('h (right/left)', -8, 8, 1, S.h, ixN, (v) => { S.h = v; draw(); }), k: ixSlider('k (up/down)', -8, 8, 1, S.k, ixN, (v) => { S.k = v; draw(); }) };
+    const parents = (o.parents || 'line,quad,abs,sqrt,cube,recip,exp').split(',').filter((p) => IX_PARENTS[p]);
+    ctl.append(el('div', { class: 'ix-h' }, 'y = a · f(b(x − h)) + k'),
+      ixSeg(parents.map((p) => [p, IX_PARENTS[p].name.replace('f(x) = ', '')]), S.p, (p) => { S.p = p; draw(); }), sl.a, sl.b, sl.h, sl.k,
+      el('div', { class: 'ix-btns' }, ixBtn('Reset', () => { Object.assign(S, { a: 1, b: 1, h: 0, k: 0 }); sl.a.set(1); sl.b.set(1); sl.h.set(0); sl.k.set(0); draw(); })));
+    ixDrag(cv, (x, y) => { const [kx, ky] = keyPt(); return Math.hypot(x - V.X(kx), y - V.Y(ky)) < 36 ? 'k' : null; }, (hh, x, y) => {
+      const [px, py] = IX_PARENTS[S.p].key;
+      S.h = Math.max(-8, Math.min(8, Math.round(V.ix(x) - px / S.b))); S.k = Math.max(-8, Math.min(8, Math.round(V.iy(y) - S.a * py))); sl.h.set(S.h); sl.k.set(S.k); draw(); });
+    draw();
+  } };
+
+// ---- Inverse functions: the reflection in y = x, a point and its mirror, and the Horizontal Line Test
+const IX_INV = {
+  lin: { name: 'f(x) = 2x + 1', f: (x) => 2 * x + 1, inv: 'f⁻¹(x) = (x − 1)/2' },
+  cube: { name: 'f(x) = x³', f: (x) => x * x * x, inv: 'f⁻¹(x) = ∛x' },
+  quad: { name: 'f(x) = x²', f: (x) => x * x, inv: null, restrict: { name: 'f(x) = x², x ≥ 0', a: 0, inv: 'f⁻¹(x) = √x' } },
+  sqrt: { name: 'f(x) = √x', f: (x) => (x < 0 ? NaN : Math.sqrt(x)), a: 0, inv: 'f⁻¹(x) = x², x ≥ 0' },
+  wave: { name: 'f(x) = x³ − 3x', f: (x) => x * x * x - 3 * x, inv: null },
+  exp: { name: 'f(x) = 2ˣ', f: (x) => Math.pow(2, x), inv: 'f⁻¹(x) = log₂ x' } };
+IX.inverse = {
+  title: 'Inverse functions', hint: 'Drag the blue point along the graph to see its mirror point. Drag the red line up and down for the Horizontal Line Test.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 600), ctx = cv._ctx; main.append(cv);
+    const S = { fn: IX_INV[o.fn] ? o.fn : 'lin', restrict: false, refl: true, hlt: true, px: 1, ly: 2.5 };
+    const V = ixView(cv, [-8, 8], [-8, 8], 26);
+    const F = () => IX_INV[S.fn], lo = () => (S.restrict && F().restrict ? F().restrict.a : F().a ?? -Infinity);
+    const f = (x) => (x < lo() ? NaN : F().f(x));
+    const hits = (y) => { const out = []; let px = null, pv = null; for (let j = 0; j <= 3200; j++) { const x = -8 + 16 * j / 3200, v = f(x) - y; if (!isFinite(v)) { px = null; continue; }
+      if (Math.abs(v) < 1e-12) { if (!out.length || Math.abs(out[out.length - 1] - x) > 0.05) out.push(x); } else if (px !== null && pv * v < 0) out.push(px - pv * (x - px) / (v - pv)); px = x; pv = v; } return out; };
+    function draw() {
+      ctx.clearRect(0, 0, cv._w, cv._h); ixGrid(ctx, V, { step: 1, lab: 2 });
+      ixLine(ctx, [V.X(-8), V.Y(-8)], [V.X(8), V.Y(8)], IXC.gray, 2, true); ixLabel(ctx, 'y = x', V.X(6.6), V.Y(7.6), 16, 'left', IXC.gray);
+      ixCurve(ctx, V, f, IXC.blue, { w: 3.4, n: 1600 });
+      if (S.refl) { // the reflection: swap every point
+        ctx.save(); ctx.strokeStyle = IXC.orange; ctx.lineWidth = 3; ctx.beginPath(); let pen = false;
+        ctx.rect(V.X(-8), V.Y(8), V.X(8) - V.X(-8), V.Y(-8) - V.Y(8)); ctx.clip(); ctx.beginPath();
+        for (let j = 0; j <= 1600; j++) { const x = -8 + 16 * j / 1600, y = f(x); if (!isFinite(y) || Math.abs(y) > 60) { pen = false; continue; } if (pen) ctx.lineTo(V.X(y), V.Y(x)); else { ctx.moveTo(V.X(y), V.Y(x)); pen = true; } }
+        ctx.stroke(); ctx.restore();
+      }
+      if (S.hlt) {
+        ixLine(ctx, [V.X(-8), V.Y(S.ly)], [V.X(8), V.Y(S.ly)], IXC.red, 2.6);
+        ixDot(ctx, V.X(-7.4), V.Y(S.ly), IXC.red, 9, true);
+        hits(S.ly).forEach((x) => ixDot(ctx, V.X(x), V.Y(S.ly), IXC.red, 7));
+      }
+      const x = S.px, y = f(x);
+      if (isFinite(y) && Math.abs(y) < 8) {
+        ixLine(ctx, [V.X(x), V.Y(y)], [V.X(y), V.Y(x)], IXC.purple, 1.8, true);
+        ixDot(ctx, V.X(x), V.Y(y), IXC.blue, 9, true); ixLabel(ctx, `(${ixN(x, 1)}, ${ixN(y, 1)})`, V.X(x) + 14, V.Y(y) - 30, 17, 'left', IXC.blue);
+        if (S.refl) { ixDot(ctx, V.X(y), V.Y(x), IXC.orange, 8); ixLabel(ctx, `(${ixN(y, 1)}, ${ixN(x, 1)})`, V.X(y) + 14, V.Y(x) + 6, 17, 'left', IXC.orange); }
+      }
+      paintRead();
+    }
+    function paintRead() {
+      const name = S.restrict && F().restrict ? F().restrict.name : F().name, inv = S.restrict && F().restrict ? F().restrict.inv : F().inv, n = hits(S.ly).length;
+      const L = [{ h: 'The function (blue)' }, name, { h: 'Its reflection in y = x (orange)' }, inv || 'not a function, so f has no inverse function'];
+      if (S.hlt) L.push({ h: 'Horizontal Line Test' }, `The red line meets the graph ${n} time${n === 1 ? '' : 's'}.`,
+        inv ? { note: 'Every horizontal line meets it at most once: f is one-to-one and has an inverse function.', good: true } : n > 1 ? { note: 'This line meets it more than once: f fails the test.', bad: true } : { note: 'Keep dragging: find a line that meets the graph more than once.' });
+      L.push({ h: 'A point and its mirror' }, `(a, b) on f  ↔  (b, a) on the reflection`);
+      ixRead(read, L);
+    }
+    const restrictCk = ixCheck('Restrict the domain to x ≥ 0', S.restrict, (v) => { S.restrict = v; if (S.px < 0) S.px = 1; draw(); });
+    const showRestrict = () => { restrictCk.style.display = F().restrict ? '' : 'none'; };
+    const fns = (o.fns || 'lin,cube,quad,sqrt,wave,exp').split(',').filter((k) => IX_INV[k]);
+    ctl.append(ixSeg(fns.map((k) => [k, IX_INV[k].name.replace('f(x) = ', '')]), S.fn, (k) => { S.fn = k; S.restrict = false; restrictCk.querySelector('input').checked = false; S.px = Math.max(lo() === -Infinity ? 1 : lo() + 1, 1); showRestrict(); draw(); }),
+      restrictCk, ixCheck('Show the reflection', S.refl, (v) => { S.refl = v; draw(); }), ixCheck('Horizontal Line Test', S.hlt, (v) => { S.hlt = v; draw(); }));
+    showRestrict();
+    ixDrag(cv, (x, y) => (S.hlt && Math.abs(y - V.Y(S.ly)) < 26 && Math.abs(y - V.Y(f(S.px))) > 6 ? 'line' : 'pt'), (h, x, y) => {
+      if (h === 'line') S.ly = Math.max(-7.5, Math.min(7.5, Math.round(V.iy(y) * 4) / 4)); else { const v = Math.round(V.ix(x) * 4) / 4; if (isFinite(f(v))) S.px = Math.max(-8, Math.min(8, v)); }
+      draw(); });
+    draw();
+  } };
+
+// ---- Systems of linear equations: drag two points on each line
+IX.systems = {
+  title: 'Systems of linear equations', hint: 'Drag the dots to move each line. Where they cross is the solution. Try to make no solution, or infinitely many.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 600), ctx = cv._ctx; main.append(cv);
+    const V = ixView(cv, [-10, 10], [-10, 10], 26);
+    const P = o.preset === 'special' ? [[[0, 1], [2, 5]], [[0, -2], [2, 2]]] : [[[0, 1], [2, 5]], [[0, 4], [3, 1]]];
+    const col = [IXC.blue, IXC.orange];
+    const abc = (L) => { const [[x1, y1], [x2, y2]] = L, a = y2 - y1, b = x1 - x2; return [a, b, a * x1 + b * y1]; };
+    const fr = (n, d) => { if (d < 0) { n = -n; d = -d; } const g = gcd(Math.abs(n), d) || 1; n /= g; d /= g; return d === 1 ? ixN(n) : (n < 0 ? '−' : '') + Math.abs(n) + '/' + d; };
+    const eqOf = (L) => {
+      const [[x1, y1], [x2, y2]] = L;
+      if (x1 === x2) return `x = ${ixN(x1)}`;
+      const dn = x2 - x1, nm = y2 - y1, g0 = gcd(Math.abs(nm), Math.abs(dn)) || 1; let mn = nm / g0, md = dn / g0; if (md < 0) { mn = -mn; md = -md; }
+      const bN = y1 * md - mn * x1; // b = bN/md
+      const m = md === 1 ? (mn === 1 ? '' : mn === -1 ? '−' : ixN(mn)) : (mn < 0 ? '−' : '') + '(' + Math.abs(mn) + '/' + md + ')';
+      const bS = bN === 0 ? '' : bN > 0 ? ' + ' + fr(bN, md) : ' − ' + fr(-bN, md);
+      return mn === 0 ? `y = ${fr(bN, md)}` : `y = ${m}x${bS}`;
+    };
+    const slope = (L) => { const [[x1, y1], [x2, y2]] = L; return x1 === x2 ? 'undefined' : fr(y2 - y1, x2 - x1); };
+    function solve() {
+      const [a1, b1, c1] = abc(P[0]), [a2, b2, c2] = abc(P[1]), det = a1 * b2 - a2 * b1;
+      if (det === 0) return a1 * c2 === a2 * c1 && b1 * c2 === b2 * c1 ? { kind: 'same' } : { kind: 'none' };
+      return { kind: 'one', x: [c1 * b2 - c2 * b1, det], y: [a1 * c2 - a2 * c1, det] };
+    }
+    function draw() {
+      ctx.clearRect(0, 0, cv._w, cv._h); ixGrid(ctx, V, { step: 1, lab: 2 });
+      const s = solve();
+      P.forEach((L, i) => ixInf(ctx, cv, [V.X(L[0][0]), V.Y(L[0][1])], [V.X(L[1][0]), V.Y(L[1][1])], col[i], s.kind === 'same' && i === 1 ? 3 : 3.2, s.kind === 'same' && i === 1));
+      if (s.kind === 'one') {
+        const x = s.x[0] / s.x[1], y = s.y[0] / s.y[1];
+        if (Math.abs(x) <= 10 && Math.abs(y) <= 10) {
+          ixLine(ctx, [V.X(x), V.Y(y)], [V.X(x), V.Y(0)], IXC.green, 1.4, true); ixLine(ctx, [V.X(x), V.Y(y)], [V.X(0), V.Y(y)], IXC.green, 1.4, true);
+          ixDot(ctx, V.X(x), V.Y(y), IXC.green, 8, true); ixLabel(ctx, `(${fr(...s.x)}, ${fr(...s.y)})`, V.X(x) + 14, V.Y(y) + 10, 19, 'left', IXC.green);
+        }
+      }
+      P.forEach((L, i) => L.forEach(([x, y]) => ixDot(ctx, V.X(x), V.Y(y), col[i], 9, true)));
+      const s2 = solve(), L = [{ h: 'Line 1 (blue)' }, eqOf(P[0]), `slope ${slope(P[0])}`, { h: 'Line 2 (orange)' }, eqOf(P[1]), `slope ${slope(P[1])}`, { h: 'Solution' }];
+      if (s2.kind === 'one') L.push(`(${fr(...s2.x)}, ${fr(...s2.y)})`, { note: 'One solution: the lines cross at exactly one point. Check it in both equations.', good: true });
+      else if (s2.kind === 'none') L.push('No solution', { note: 'Same slope, different y-intercepts: parallel lines never meet.', bad: true });
+      else L.push('Infinitely many solutions', { note: 'Same slope and same y-intercept: it is the same line, so every point on it works.', good: true });
+      ixRead(read, L);
+    }
+    let lastHit = null;
+    ixDrag(cv, (x, y) => { let best = null, bd = 34; P.forEach((L, i) => L.forEach((p, j) => { const d = Math.hypot(x - V.X(p[0]), y - V.Y(p[1])); if (d < bd) { bd = d; best = [i, j]; } })); return best; }, (h, x, y) => {
+      const [i, j] = h, nx = Math.max(-10, Math.min(10, Math.round(V.ix(x)))), ny = Math.max(-10, Math.min(10, Math.round(V.iy(y)))), other = P[i][1 - j];
+      if (nx === other[0] && ny === other[1]) return; P[i][j] = [nx, ny]; lastHit = h; draw(); });
+    ctl.append(el('div', { class: 'ix-btns' },
+      ixBtn('One solution', () => { P[0] = [[0, 1], [2, 5]]; P[1] = [[0, 4], [3, 1]]; draw(); }),
+      ixBtn('Parallel', () => { P[0] = [[0, 1], [2, 5]]; P[1] = [[0, -3], [2, 1]]; draw(); }),
+      ixBtn('Same line', () => { P[0] = [[0, 1], [2, 5]]; P[1] = [[-1, -1], [3, 7]]; draw(); })),
+      el('p', { class: 'small' }, 'Each line goes through its two dots. The dots snap to the grid.'));
+    draw();
+  } };
+
+// ---- Quadratics: drag the vertex, change a; vertex, standard, and factored forms together
+IX.quadratic = {
+  title: 'Quadratic functions', hint: 'Drag the vertex and change a. Watch all three forms of the equation, the zeros, and the axis of symmetry change together.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 600), ctx = cv._ctx; main.append(cv);
+    const S = { a: +(o.a ?? 1), h: +(o.h ?? 1), k: +(o.k ?? -4) };
+    const V = ixView(cv, [-10, 10], [-10, 10], 26);
+    const f = (x) => S.a * (x - S.h) ** 2 + S.k;
+    const coefs = () => [S.a, -2 * S.a * S.h, S.a * S.h * S.h + S.k];
+    const poly = (a, b, c) => { let s = `y = ${ixCoef(a)}x²`; if (b) s += (b > 0 ? ' + ' : ' − ') + (Math.abs(b) === 1 ? '' : Number.isInteger(+Math.abs(b).toFixed(9)) ? ixN(Math.abs(b)) : '(' + ixFrac(Math.abs(b)) + ')') + 'x'; return s + ixTerm(c); };
+    const zeros = () => { const q = -S.k / S.a; if (q < -1e-12) return []; if (Math.abs(q) < 1e-12) return [S.h]; const r = Math.sqrt(q); return [S.h - r, S.h + r]; };
+    const isNice = (v) => Math.abs(v * 4 - Math.round(v * 4)) < 1e-9;
+    function draw() {
+      ctx.clearRect(0, 0, cv._w, cv._h); ixGrid(ctx, V, { step: 1, lab: 2 });
+      ixLine(ctx, [V.X(S.h), V.Y(-10)], [V.X(S.h), V.Y(10)], IXC.purple, 1.8, true);
+      ixCurve(ctx, V, f, IXC.blue, { w: 3.4 });
+      const z = zeros(), c = coefs()[2];
+      z.forEach((x) => { ixDot(ctx, V.X(x), V.Y(0), IXC.red, 7); const ty = V.Y(0) + (S.a > 0 ? -34 : 12), t = isNice(x) ? ixFrac(x) : '≈ ' + ixN(x, 2); ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillRect(V.X(x) - 26, ty - 2, 52, 24); ctx.restore(); ixLabel(ctx, t, V.X(x), ty, 17, 'center', IXC.red); });
+      if (Math.abs(c) <= 10) { ixDot(ctx, V.X(0), V.Y(c), IXC.green, 6); }
+      ixDot(ctx, V.X(S.h), V.Y(S.k), IXC.blue, 9, true); ixLabel(ctx, `(${ixN(S.h)}, ${ixN(S.k)})`, V.X(S.h) + 14, V.Y(S.k) + (S.a > 0 ? 8 : -30), 18, 'left', IXC.blue);
+      ixLabel(ctx, `x = ${ixN(S.h)}`, V.X(S.h) + 6, V.Y(9.6), 16, 'left', IXC.purple);
+      const [a, b] = coefs(), disc = b * b - 4 * a * c;
+      const L = [{ h: 'Vertex form' }, `y = ${ixCoef(S.a)}(${ixShift(S.h)})²${ixTerm(S.k)}`.replace('(x)²', 'x²'), { h: 'Standard form' }, poly(a, b, c), { h: 'Factored form' }];
+      if (!z.length) L.push('No real zeros, so it doesn’t factor over the real numbers.');
+      else if (z.every(isNice)) L.push(z.length === 1 ? `y = ${ixCoef(S.a)}(${ixShift(z[0])})²`.replace('(x)²', 'x²') : `y = ${ixCoef(S.a)}(${ixShift(z[0])})(${ixShift(z[1])})`);
+      else L.push(`The zeros x = ${ixN(S.h)} ± √${ixFrac(-S.k / S.a)} are irrational, so it doesn’t factor over the integers.`);
+      L.push({ h: 'Features' }, `Vertex (${ixN(S.h)}, ${ixN(S.k)}); axis of symmetry x = ${ixN(S.h)}`, `Opens ${S.a > 0 ? 'up: minimum' : 'down: maximum'} value ${ixN(S.k)}`,
+        `y-intercept ${ixFrac(c)}`, `Zeros: ${z.length ? z.map((x) => (isNice(x) ? ixFrac(x) : '≈ ' + ixN(x, 2))).join(' and ') : 'none'}`,
+        `Discriminant b² − 4ac = ${ixFrac(disc)}: ${disc > 1e-9 ? 'two real zeros' : disc < -1e-9 ? 'no real zeros' : 'one real zero'}`);
+      ixRead(read, L);
+    }
+    const sa = ixSlider('a', -3, 3, 0.25, S.a, ixFrac, (v) => { S.a = v || 0.25; draw(); });
+    ctl.append(sa, el('p', { class: 'small' }, 'Drag the blue vertex; it snaps to the grid.'),
+      el('div', { class: 'ix-btns' }, ixBtn('Two zeros', () => { Object.assign(S, { a: 1, h: 1, k: -4 }); sa.set(1); draw(); }), ixBtn('One zero', () => { Object.assign(S, { a: 1, h: -2, k: 0 }); sa.set(1); draw(); }), ixBtn('No zeros', () => { Object.assign(S, { a: 1, h: 0, k: 3 }); sa.set(1); draw(); })));
+    ixDrag(cv, (x, y) => (Math.hypot(x - V.X(S.h), y - V.Y(S.k)) < 40 ? 'v' : null), (h, x, y) => { S.h = Math.max(-9, Math.min(9, Math.round(V.ix(x)))); S.k = Math.max(-9, Math.min(9, Math.round(V.iy(y)))); draw(); });
+    draw();
+  } };
+
+// ---- geometry helpers (canvas coordinates; y down)
+const ixV = { sub: (p, q) => [p[0] - q[0], p[1] - q[1]], add: (p, q) => [p[0] + q[0], p[1] + q[1]], mul: (p, k) => [p[0] * k, p[1] * k], dot: (p, q) => p[0] * q[0] + p[1] * q[1],
+  len: (p) => Math.hypot(p[0], p[1]), mid: (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], dist: (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) };
+// the angle at v between rays v→p and v→q, in degrees
+const ixAng = (v, p, q) => { const a = ixV.sub(p, v), b = ixV.sub(q, v); return Math.acos(Math.max(-1, Math.min(1, ixV.dot(a, b) / (ixV.len(a) * ixV.len(b) || 1)))) * 180 / Math.PI; };
+// where lines p1p2 and q1q2 meet (null if parallel)
+const ixMeet = (p1, p2, q1, q2) => { const d = (p1[0] - p2[0]) * (q1[1] - q2[1]) - (p1[1] - p2[1]) * (q1[0] - q2[0]); if (Math.abs(d) < 1e-9) return null;
+  const t = ((p1[0] - q1[0]) * (q1[1] - q2[1]) - (p1[1] - q1[1]) * (q1[0] - q2[0])) / d; return [p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1])]; };
+// an angle mark at v between rays to p and q, with a label
+function ixAngMark(ctx, v, p, q, r, color, label, fill = true) {
+  const a1 = Math.atan2(p[1] - v[1], p[0] - v[0]), a2 = Math.atan2(q[1] - v[1], q[0] - v[0]); let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2.4; if (fill) { ctx.fillStyle = color; ctx.globalAlpha = 0.18; ctx.beginPath(); ctx.moveTo(v[0], v[1]); ctx.arc(v[0], v[1], r, a1, a1 + d, d < 0); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; }
+  ctx.beginPath(); ctx.arc(v[0], v[1], r, a1, a1 + d, d < 0); ctx.stroke(); ctx.restore();
+  if (label) { const m = a1 + d / 2; ixLabel(ctx, label, v[0] + (r + 22) * Math.cos(m), v[1] + (r + 22) * Math.sin(m), 18, 'center', color, 'middle'); }
+}
+function ixRightMark(ctx, v, p, q, color = IXC.ink, z = 12) {
+  const u = ixV.mul(ixV.sub(p, v), 1 / (ixV.dist(p, v) || 1)), w = ixV.mul(ixV.sub(q, v), 1 / (ixV.dist(q, v) || 1));
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(v[0] + u[0] * z, v[1] + u[1] * z); ctx.lineTo(v[0] + (u[0] + w[0]) * z, v[1] + (u[1] + w[1]) * z); ctx.lineTo(v[0] + w[0] * z, v[1] + w[1] * z); ctx.stroke(); ctx.restore();
+}
+function ixName(ctx, p, name, from, color = IXC.ink) { const d = ixV.sub(p, from), L = ixV.len(d) || 1; ixLabel(ctx, name, p[0] + d[0] / L * 22, p[1] + d[1] / L * 22, 22, 'center', color, 'middle'); }
+
+// ---- Angles in circles: points ride on the circle
+IX.circleAngles = {
+  title: 'Angles and arcs in circles', hint: 'Drag the points around the circle. The measures update, and the relationship between the angle and its arc stays true.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 560), ctx = cv._ctx; main.append(cv);
+    const C = [300, 285], R = 210;
+    const MODES = { central: ['A', 'B'], inscribed: ['A', 'B', 'C'], same: ['A', 'B', 'C', 'D'], semi: ['A', 'B', 'C'], quad: ['A', 'B', 'C', 'D'], lines: ['A', 'B', 'C', 'D'] };
+    const START = { central: [20, 120], inscribed: [-20, 60, 230], same: [-20, 60, 200, 250], semi: [180, 0, 70], quad: [10, 100, 170, 260], lines: [150, 20, 100, 260] };
+    const S = { mode: MODES[o.mode] ? o.mode : 'inscribed', deg: {} };
+    const reset = () => { S.deg = {}; MODES[S.mode].forEach((n, i) => (S.deg[n] = START[S.mode][i])); };
+    const pt = (n) => { const a = S.deg[n] * Math.PI / 180; return [C[0] + R * Math.cos(a), C[1] - R * Math.sin(a)]; };
+    const norm = (d) => ((d % 360) + 360) % 360;
+    // the arc from p to q (counterclockwise) in degrees, or the other way if it holds one of 'avoid'
+    const arcAvoid = (p, q, avoid) => { const a = S.deg[p], b = S.deg[q], ccw = norm(b - a); const inside = (n) => { const t = norm(S.deg[n] - a); return t > 0 && t < ccw; };
+      return avoid.some(inside) ? { m: 360 - ccw, from: b, sweep: 360 - ccw } : { m: ccw, from: a, sweep: ccw }; };
+    const drawArc = (arc, color, w = 7) => { ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = 0.55; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); const s = arc.from * Math.PI / 180;
+      ctx.arc(C[0], C[1], R, -s, -(s + arc.sweep * Math.PI / 180), true); ctx.stroke(); ctx.restore();
+      const m = (arc.from + arc.sweep / 2) * Math.PI / 180; ixLabel(ctx, `${Math.round(arc.m)}°`, C[0] + (R + 30) * Math.cos(m), C[1] - (R + 30) * Math.sin(m), 19, 'center', color, 'middle'); };
+    const seg = (p, q, c = IXC.ink, w = 2.6) => ixLine(ctx, p, q, c, w);
+    const r = (v) => Math.round(v);
+    function draw() {
+      ctx.clearRect(0, 0, cv._w, cv._h);
+      if (S.mode === 'semi') { S.deg.A = 180; S.deg.B = 0; }
+      ctx.save(); ctx.strokeStyle = IXC.ink; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(C[0], C[1], R, 0, 2 * Math.PI); ctx.stroke(); ctx.restore();
+      const P = {}; MODES[S.mode].forEach((n) => (P[n] = pt(n)));
+      const L = [];
+      if (S.mode === 'central' || S.mode === 'inscribed') {
+        const avoid = S.mode === 'inscribed' ? ['C'] : [], arc = arcAvoid('A', 'B', avoid);
+        drawArc(arc, IXC.orange);
+        const big = arc.m > 180 + 1e-9;
+        if (S.mode === 'central' || o.central !== '0') { seg(C, P.A, IXC.blue); seg(C, P.B, IXC.blue); if (!big) ixAngMark(ctx, C, P.A, P.B, 38, IXC.blue, `${r(ixAng(C, P.A, P.B))}°`); }
+        if (S.mode === 'inscribed') { seg(P.C, P.A); seg(P.C, P.B); ixAngMark(ctx, P.C, P.A, P.B, 40, IXC.purple, `${r(ixAng(P.C, P.A, P.B))}°`); }
+        ixDot(ctx, C[0], C[1], IXC.ink, 4); ixLabel(ctx, 'P', C[0] - 16, C[1] + 4, 20, 'center');
+        if (S.mode === 'central') L.push({ h: 'Central angle ∠APB' }, `m∠APB = ${r(ixAng(C, P.A, P.B))}°`, `m(arc AB) = ${r(arc.m)}°`, { note: big ? 'This is a major arc (more than 180°): its measure is 360° minus the central angle.' : 'A minor arc has the same measure as its central angle.', good: true });
+        else L.push({ h: 'Inscribed angle ∠ACB' }, `m∠ACB = ${r(ixAng(P.C, P.A, P.B))}°`, `Intercepted arc AB = ${r(arc.m)}°`, `1/2 · ${r(arc.m)}° = ${ixN(arc.m / 2, 1)}°`, { note: 'An inscribed angle is half its intercepted arc (and half the central angle).', good: true });
+      } else if (S.mode === 'same') {
+        const arc = arcAvoid('A', 'B', ['C', 'D']); drawArc(arc, IXC.orange);
+        const sideOK = norm(S.deg.C - S.deg.A) > norm(S.deg.B - S.deg.A) === norm(S.deg.D - S.deg.A) > norm(S.deg.B - S.deg.A);
+        seg(P.C, P.A); seg(P.C, P.B); seg(P.D, P.A, IXC.green); seg(P.D, P.B, IXC.green);
+        ixAngMark(ctx, P.C, P.A, P.B, 36, IXC.purple, `${r(ixAng(P.C, P.A, P.B))}°`); ixAngMark(ctx, P.D, P.A, P.B, 36, IXC.green, `${r(ixAng(P.D, P.A, P.B))}°`);
+        L.push({ h: 'Two inscribed angles' }, `m∠ACB = ${r(ixAng(P.C, P.A, P.B))}°`, `m∠ADB = ${r(ixAng(P.D, P.A, P.B))}°`,
+          sideOK ? { note: 'They intercept the same arc, so they are congruent.', good: true } : { note: 'C and D are on opposite sides of the chord, so they intercept different arcs: the two angles add to 180°.', bad: true });
+      } else if (S.mode === 'semi') {
+        seg(P.A, P.B, IXC.blue, 2); seg(P.C, P.A); seg(P.C, P.B); ixRightMark(ctx, P.C, P.A, P.B, IXC.purple, 16);
+        ixDot(ctx, C[0], C[1], IXC.ink, 4);
+        L.push({ h: 'Angle inscribed in a semicircle' }, `m∠ACB = ${r(ixAng(P.C, P.A, P.B))}°`, { note: 'AB is a diameter, so the intercepted arc is 180° and the angle is always 1/2 · 180° = 90°.', good: true });
+      } else if (S.mode === 'quad') {
+        const order = ['A', 'B', 'C', 'D'].sort((u, v) => norm(S.deg[u]) - norm(S.deg[v]));
+        ctx.save(); ctx.fillStyle = 'rgba(31,95,168,.08)'; ctx.beginPath(); order.forEach((n, i) => (i ? ctx.lineTo(...P[n]) : ctx.moveTo(...P[n]))); ctx.closePath(); ctx.fill(); ctx.restore();
+        order.forEach((n, i) => seg(P[n], P[order[(i + 1) % 4]]));
+        const ang = {}; order.forEach((n, i) => { ang[n] = ixAng(P[n], P[order[(i + 3) % 4]], P[order[(i + 1) % 4]]); ixAngMark(ctx, P[n], P[order[(i + 3) % 4]], P[order[(i + 1) % 4]], 30, i % 2 ? IXC.green : IXC.purple, `${r(ang[n])}°`); });
+        L.push({ h: `Inscribed quadrilateral ${order.join('')}` }, `m∠${order[0]} + m∠${order[2]} = ${r(ang[order[0]])}° + ${r(ang[order[2]])}° = ${r(ang[order[0]] + ang[order[2]])}°`,
+          `m∠${order[1]} + m∠${order[3]} = ${r(ang[order[1]])}° + ${r(ang[order[3]])}° = ${r(ang[order[1]] + ang[order[3]])}°`, { note: 'Opposite angles of an inscribed quadrilateral are supplementary.', good: true });
+      } else { // two lines through A, B and C, D
+        const X = ixMeet(P.A, P.B, P.C, P.D);
+        ixInf(ctx, cv, P.A, P.B, IXC.blue, 2.4); ixInf(ctx, cv, P.C, P.D, IXC.green, 2.4);
+        if (!X || ixV.dist(X, C) > 2000) L.push({ h: 'Two lines' }, { note: 'The lines are parallel (or nearly): they don’t meet. Drag a point.' });
+        else {
+          const inside = ixV.dist(X, C) < R - 1;
+          ixDot(ctx, X[0], X[1], IXC.red, 7); ixLabel(ctx, 'E', X[0] + 12, X[1] - 30, 20, 'left', IXC.red);
+          if (inside) { // ∠AEC and its vertical angle ∠BED
+            const a1 = arcAvoid('A', 'C', ['B', 'D']), a2 = arcAvoid('B', 'D', ['A', 'C']);
+            drawArc(a1, IXC.orange); drawArc(a2, IXC.purple); const m = ixAng(X, P.A, P.C); ixAngMark(ctx, X, P.A, P.C, 30, IXC.red, `${r(m)}°`);
+            L.push({ h: 'Chords meet inside the circle' }, `m∠AEC = ${r(m)}°`, `1/2 (${r(a1.m)}° + ${r(a2.m)}°) = ${ixN((a1.m + a2.m) / 2, 1)}°`, { note: 'Inside: the angle is half the SUM of the two intercepted arcs.', good: true });
+          } else { // secants from E: near and far points on each line
+            const nearAB = ixV.dist(X, P.A) < ixV.dist(X, P.B) ? ['A', 'B'] : ['B', 'A'], nearCD = ixV.dist(X, P.C) < ixV.dist(X, P.D) ? ['C', 'D'] : ['D', 'C'];
+            const far = arcAvoid(nearAB[1], nearCD[1], [nearAB[0], nearCD[0]]), near = arcAvoid(nearAB[0], nearCD[0], [nearAB[1], nearCD[1]]);
+            drawArc(far, IXC.orange); drawArc(near, IXC.purple); const m = ixAng(X, P[nearAB[1]], P[nearCD[1]]);
+            if (ixV.dist(X, C) < 1400) ixAngMark(ctx, X, P[nearAB[1]], P[nearCD[1]], 30, IXC.red, `${r(m)}°`);
+            L.push({ h: 'Secants meet outside the circle' }, `m∠E = ${r(m)}°`, `1/2 (${r(far.m)}° − ${r(near.m)}°) = ${ixN((far.m - near.m) / 2, 1)}°`, { note: 'Outside: the angle is half the DIFFERENCE of the far arc and the near arc.', good: true });
+          }
+        }
+      }
+      MODES[S.mode].forEach((n) => { const fixed = S.mode === 'semi' && n !== 'C'; ixDot(ctx, P[n][0], P[n][1], fixed ? IXC.ink : IXC.blue, fixed ? 6 : 9, !fixed); ixName(ctx, P[n], n, C); });
+      ixRead(read, L);
+    }
+    ixDrag(cv, (x, y) => { let best = null, bd = 40; MODES[S.mode].forEach((n) => { if (S.mode === 'semi' && n !== 'C') return; const p = pt(n), d = Math.hypot(x - p[0], y - p[1]); if (d < bd) { bd = d; best = n; } }); return best; },
+      (n, x, y) => { let d = Math.round(Math.atan2(C[1] - y, x - C[0]) * 180 / Math.PI); const others = MODES[S.mode].filter((m) => m !== n);
+        if (others.some((m) => Math.abs(norm(S.deg[m] - d + 180) - 180) < 4)) return; S.deg[n] = d; draw(); });
+    const modes = (o.modes || 'central,inscribed,same,semi,quad,lines').split(',').filter((m) => MODES[m]);
+    const names = { central: 'Central angle', inscribed: 'Inscribed angle', same: 'Same arc', semi: 'Semicircle', quad: 'Inscribed quadrilateral', lines: 'Chords and secants' };
+    ctl.append(ixSeg(modes.map((m) => [m, names[m]]), S.mode, (m) => { S.mode = m; reset(); draw(); }), el('div', { class: 'ix-btns' }, ixBtn('Reset', () => { reset(); draw(); })));
+    reset(); draw();
+  } };
+
+// ---- Points of concurrency: drag the vertices
+IX.triCenters = {
+  title: 'Points of concurrency', hint: 'Drag the vertices. Watch where each center goes when the triangle is acute, right, or obtuse.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(640, 540), ctx = cv._ctx; main.append(cv);
+    const T = { A: [140, 430], B: [520, 440], C: [300, 110] };
+    const on = new Set((o.show || 'circum,in').split(','));
+    const U = 40; // pixels per unit for lengths
+    const foot = (p, a, b) => { const d = ixV.sub(b, a), t = ixV.dot(ixV.sub(p, a), d) / ixV.dot(d, d); return ixV.add(a, ixV.mul(d, t)); };
+    const where = (p) => { const s = (a, b) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]); const v = [s(T.A, T.B), s(T.B, T.C), s(T.C, T.A)];
+      if (v.some((x) => Math.abs(x) < 300)) return 'on the triangle'; return v.every((x) => x > 0) || v.every((x) => x < 0) ? 'inside' : 'outside'; };
+    function draw() {
+      ctx.clearRect(0, 0, cv._w, cv._h);
+      ctx.save(); ctx.strokeStyle = '#efede7'; ctx.lineWidth = 1; for (let x = 0; x <= cv._w; x += U) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cv._h); ctx.stroke(); } for (let y = 0; y <= cv._h; y += U) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cv._w, y); ctx.stroke(); } ctx.restore();
+      const { A, B, C } = T, angs = { A: ixAng(A, B, C), B: ixAng(B, C, A), C: ixAng(C, A, B) }, big = Math.max(...Object.values(angs));
+      ctx.save(); ctx.fillStyle = 'rgba(31,95,168,.06)'; ctx.beginPath(); ctx.moveTo(...A); ctx.lineTo(...B); ctx.lineTo(...C); ctx.closePath(); ctx.fill(); ctx.restore();
+      const L = [{ h: 'The triangle' }, `m∠A = ${Math.round(angs.A)}°, m∠B = ${Math.round(angs.B)}°, m∠C = ${Math.round(angs.C)}°`,
+        Math.abs(big - 90) < 0.5 ? 'A right triangle' : big > 90 ? 'An obtuse triangle' : 'An acute triangle'];
+      if (on.has('circum')) {
+        const mAB = ixV.mid(A, B), mBC = ixV.mid(B, C), perp = (p, q, m) => [m, ixV.add(m, [-(q[1] - p[1]), q[0] - p[0]])];
+        const [p1, p2] = perp(A, B, mAB), [q1, q2] = perp(B, C, mBC), O = ixMeet(p1, p2, q1, q2), mCA = ixV.mid(C, A), [r1, r2] = perp(C, A, mCA);
+        [[p1, p2], [q1, q2], [r1, r2]].forEach(([p, q]) => ixInf(ctx, cv, p, q, IXC.red, 1.6, true));
+        [[A, B, mAB], [B, C, mBC], [C, A, mCA]].forEach(([p, q, m]) => { ixRightMark(ctx, m, q, ixV.add(m, [-(q[1] - p[1]), q[0] - p[0]]), IXC.red, 10); });
+        if (O) { const rr = ixV.dist(O, A); ctx.save(); ctx.strokeStyle = IXC.red; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(O[0], O[1], rr, 0, 2 * Math.PI); ctx.stroke(); ctx.restore();
+          ixDot(ctx, O[0], O[1], IXC.red, 7); ixLabel(ctx, 'circumcenter', O[0] + 10, O[1] + 8, 15, 'left', IXC.red);
+          L.push({ h: 'Circumcenter (red): perpendicular bisectors' }, `It is ${where(O)}.`, `Distance to each vertex: ${ixN(ixV.dist(O, A) / U, 1)}, ${ixN(ixV.dist(O, B) / U, 1)}, ${ixN(ixV.dist(O, C) / U, 1)}`); }
+      }
+      if (on.has('in')) {
+        const a = ixV.dist(B, C), b = ixV.dist(C, A), c = ixV.dist(A, B), s = a + b + c, I = [(a * A[0] + b * B[0] + c * C[0]) / s, (a * A[1] + b * B[1] + c * C[1]) / s];
+        [A, B, C].forEach((v) => ixLine(ctx, v, I, IXC.green, 1.6, true));
+        const ft = [foot(I, A, B), foot(I, B, C), foot(I, C, A)], rr = ixV.dist(I, ft[0]);
+        ctx.save(); ctx.strokeStyle = IXC.green; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(I[0], I[1], rr, 0, 2 * Math.PI); ctx.stroke(); ctx.restore();
+        ft.forEach((f) => ixLine(ctx, I, f, IXC.green, 1.4));
+        ixDot(ctx, I[0], I[1], IXC.green, 7); ixLabel(ctx, 'incenter', I[0] + 10, I[1] - 26, 15, 'left', IXC.green);
+        L.push({ h: 'Incenter (green): angle bisectors' }, `It is always inside.`, `Distance to each side: ${ixN(rr / U, 1)} (the same for all three)`);
+      }
+      if (on.has('centroid')) {
+        const mids = [ixV.mid(B, C), ixV.mid(C, A), ixV.mid(A, B)], G = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3];
+        [A, B, C].forEach((v, i) => { ixLine(ctx, v, mids[i], IXC.purple, 2); ixDot(ctx, mids[i][0], mids[i][1], IXC.purple, 4); });
+        ixDot(ctx, G[0], G[1], IXC.purple, 7); ixLabel(ctx, 'centroid', G[0] + 10, G[1] + 6, 15, 'left', IXC.purple);
+        const AG = ixV.dist(A, G) / U, GD = ixV.dist(G, mids[0]) / U;
+        L.push({ h: 'Centroid (purple): medians' }, 'It is always inside.', `From A: AG = ${ixN(AG, 1)}, GD = ${ixN(GD, 1)} (AG is 2/3 of the median)`);
+      }
+      if (on.has('ortho')) {
+        const H = ixMeet(A, foot(A, B, C), B, foot(B, C, A));
+        [[A, B, C], [B, C, A], [C, A, B]].forEach(([v, p, q]) => { const f = foot(v, p, q); ixLine(ctx, v, f, IXC.orange, 2); ixRightMark(ctx, f, v, p, IXC.orange, 10);
+          const t = ixV.dot(ixV.sub(f, p), ixV.sub(q, p)) / ixV.dot(ixV.sub(q, p), ixV.sub(q, p)); if (t < 0) ixLine(ctx, f, p, IXC.orange, 1.4, true); if (t > 1) ixLine(ctx, f, q, IXC.orange, 1.4, true);
+          if (H) ixLine(ctx, v, H, IXC.orange, 1.2, true); });
+        if (H) { ixDot(ctx, H[0], H[1], IXC.orange, 7); ixLabel(ctx, 'orthocenter', H[0] + 10, H[1] - 26, 15, 'left', IXC.orange); L.push({ h: 'Orthocenter (orange): altitudes' }, `It is ${where(H)}.`); }
+      }
+      ctx.save(); ctx.strokeStyle = IXC.ink; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(...A); ctx.lineTo(...B); ctx.lineTo(...C); ctx.closePath(); ctx.stroke(); ctx.restore();
+      const G0 = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3];
+      ['A', 'B', 'C'].forEach((n) => { ixDot(ctx, T[n][0], T[n][1], IXC.blue, 9, true); ixName(ctx, T[n], n, G0, IXC.blue); });
+      if (on.size) L.push({ note: 'Drag C until the triangle is obtuse: the circumcenter and the orthocenter move outside; the incenter and the centroid never do.' });
+      ixRead(read, L);
+    }
+    ixDrag(cv, (x, y) => { let best = null, bd = 42; Object.entries(T).forEach(([n, p]) => { const d = Math.hypot(x - p[0], y - p[1]); if (d < bd) { bd = d; best = n; } }); return best; },
+      (n, x, y) => { const p = [Math.max(14, Math.min(cv._w - 14, x)), Math.max(14, Math.min(cv._h - 14, y))]; const o2 = Object.entries(T).filter(([m]) => m !== n).map(([, q]) => q);
+        const area = Math.abs((o2[0][0] - p[0]) * (o2[1][1] - p[1]) - (o2[1][0] - p[0]) * (o2[0][1] - p[1])); if (area < 3000) return; T[n] = p; draw(); });
+    const ck = (k, t) => ixCheck(t, on.has(k), (v) => { if (v) on.add(k); else on.delete(k); draw(); });
+    ctl.append(ck('circum', 'Circumcenter (perpendicular bisectors)'), ck('in', 'Incenter (angle bisectors)'), ck('centroid', 'Centroid (medians)'), ck('ortho', 'Orthocenter (altitudes)'),
+      el('div', { class: 'ix-btns' }, ixBtn('Acute', () => { Object.assign(T, { A: [140, 430], B: [520, 440], C: [300, 110] }); draw(); }), ixBtn('Right', () => { Object.assign(T, { A: [160, 440], B: [480, 440], C: [160, 160] }); draw(); }), ixBtn('Obtuse', () => { Object.assign(T, { A: [100, 420], B: [560, 420], C: [200, 300] }); draw(); })));
+    draw();
+  } };
+
+// ---- Transformations in the coordinate plane: translate, reflect, rotate, dilate a triangle
+IX.geoTransform = {
+  title: 'Transformations', hint: 'Drag the vertices of triangle ABC (they snap to the grid). Pick a transformation and watch the image A′B′C′.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 600), ctx = cv._ctx; main.append(cv);
+    const V = ixView(cv, [-10, 10], [-10, 10], 26);
+    const S = { mode: ['translate', 'reflect', 'rotate', 'dilate'].includes(o.mode) ? o.mode : 'translate', P: { A: [1, 1], B: [4, 2], C: [2, 5] }, a: 3, b: -4, line: 'y', rot: 90, ctr: [0, 0], k: 2 };
+    if (S.mode === 'dilate') S.k = 2;
+    const img = ([x, y]) => {
+      if (S.mode === 'translate') return [x + S.a, y + S.b];
+      if (S.mode === 'reflect') return { x: [x, -y], y: [-x, y], yx: [y, x], ynx: [-y, -x] }[S.line];
+      const [cx, cy] = S.ctr, dx = x - cx, dy = y - cy;
+      if (S.mode === 'rotate') { const t = S.rot * Math.PI / 180, c = Math.round(Math.cos(t) * 1e9) / 1e9, s = Math.round(Math.sin(t) * 1e9) / 1e9; return [cx + dx * c - dy * s, cy + dx * s + dy * c]; }
+      return [cx + S.k * dx, cy + S.k * dy];
+    };
+    const rule = () => {
+      if (S.mode === 'translate') return `(x, y) → (${ixShift(-S.a)}, ${ixShift(-S.b, 'y')})`;
+      if (S.mode === 'reflect') return { x: '(x, y) → (x, −y)', y: '(x, y) → (−x, y)', yx: '(x, y) → (y, x)', ynx: '(x, y) → (−y, −x)' }[S.line];
+      const org = !S.ctr[0] && !S.ctr[1];
+      if (S.mode === 'rotate') return org ? { 90: '(x, y) → (−y, x)', 180: '(x, y) → (−x, −y)', 270: '(x, y) → (y, −x)' }[S.rot] : `about (${S.ctr.join(', ')}), not the origin`;
+      return org ? `(x, y) → (${ixCoef(S.k)}x, ${ixCoef(S.k)}y)`.replace(/\(\(/g, '(') : `about (${S.ctr.join(', ')}), not the origin`;
+    };
+    const tri = (pts, color, fill, dash) => { ctx.save(); ctx.fillStyle = fill; ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.setLineDash(dash ? [8, 6] : []); ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(V.X(p[0]), V.Y(p[1])) : ctx.moveTo(V.X(p[0]), V.Y(p[1])))); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); };
+    function draw() {
+      ctx.clearRect(0, 0, cv._w, cv._h); ixGrid(ctx, V, { step: 1, lab: 2 });
+      const names = ['A', 'B', 'C'], pre = names.map((n) => S.P[n]), im = pre.map(img), cen = [(pre[0][0] + pre[1][0] + pre[2][0]) / 3, (pre[0][1] + pre[1][1] + pre[2][1]) / 3];
+      if (S.mode === 'reflect') { const L2 = { x: [[-10, 0], [10, 0]], y: [[0, -10], [0, 10]], yx: [[-10, -10], [10, 10]], ynx: [[-10, 10], [10, -10]] }[S.line]; ixLine(ctx, [V.X(L2[0][0]), V.Y(L2[0][1])], [V.X(L2[1][0]), V.Y(L2[1][1])], IXC.purple, 3.4); }
+      pre.forEach((p, i) => { const q = im[i];
+        if (S.mode === 'translate' || S.mode === 'reflect') ixLine(ctx, [V.X(p[0]), V.Y(p[1])], [V.X(q[0]), V.Y(q[1])], IXC.purple, 1.6, true);
+        else if (S.mode === 'rotate') { ixLine(ctx, [V.X(S.ctr[0]), V.Y(S.ctr[1])], [V.X(p[0]), V.Y(p[1])], '#9fb9d8', 1.4, true); ixLine(ctx, [V.X(S.ctr[0]), V.Y(S.ctr[1])], [V.X(q[0]), V.Y(q[1])], '#f0b37a', 1.4, true); }
+        else ixInf(ctx, cv, [V.X(S.ctr[0]), V.Y(S.ctr[1])], [V.X(p[0]), V.Y(p[1])], '#cfc9bd', 1.2, true); });
+      if (S.mode === 'rotate') ixAngMark(ctx, [V.X(S.ctr[0]), V.Y(S.ctr[1])], [V.X(pre[0][0]), V.Y(pre[0][1])], [V.X(im[0][0]), V.Y(im[0][1])], 34, IXC.purple, S.rot === 180 ? '' : `${S.rot}°`, false);
+      tri(pre, IXC.blue, 'rgba(31,95,168,.12)'); tri(im, IXC.orange, 'rgba(210,123,18,.14)');
+      const cim = img(cen);
+      pre.forEach((p, i) => { ixDot(ctx, V.X(p[0]), V.Y(p[1]), IXC.blue, 8, true); ixName(ctx, [V.X(p[0]), V.Y(p[1])], names[i], [V.X(cen[0]), V.Y(cen[1])], IXC.blue); });
+      im.forEach((p, i) => { ixDot(ctx, V.X(p[0]), V.Y(p[1]), IXC.orange, 6); ixName(ctx, [V.X(p[0]), V.Y(p[1])], names[i] + '′', [V.X(cim[0]), V.Y(cim[1])], IXC.orange); });
+      if (S.mode === 'rotate' || S.mode === 'dilate') { ixDot(ctx, V.X(S.ctr[0]), V.Y(S.ctr[1]), IXC.purple, 9, true); ixLabel(ctx, 'center', V.X(S.ctr[0]) + 12, V.Y(S.ctr[1]) + 6, 15, 'left', IXC.purple); }
+      if (S.mode === 'translate') { const p = pre[0], q = im[0]; ixDot(ctx, V.X(q[0]), V.Y(q[1]), IXC.orange, 9, true); void p; }
+      const c = (p) => `(${ixFrac(p[0])}, ${ixFrac(p[1])})`;
+      const L = [{ h: { translate: `Translation by ⟨${ixN(S.a)}, ${ixN(S.b)}⟩`, reflect: 'Reflection', rotate: `Rotation ${S.rot}° counterclockwise`, dilate: `Dilation, scale factor ${ixFrac(S.k)}` }[S.mode] }, rule(), { h: 'Coordinates' },
+        ...names.map((n, i) => `${n}${c(pre[i])}  →  ${n}′${c(im[i])}`)];
+      const side = (p, q) => ixV.dist(p, q);
+      if (S.mode === 'dilate') L.push({ h: 'Side lengths' }, `AB = ${ixN(side(pre[0], pre[1]), 2)}, A′B′ = ${ixN(side(im[0], im[1]), 2)}`, { note: `Each side is multiplied by |k| = ${ixFrac(Math.abs(S.k))}: the image is ${Math.abs(S.k) > 1 ? 'an enlargement' : Math.abs(S.k) < 1 ? 'a reduction' : 'the same size'} and similar to ABC.${S.k < 0 ? ' A negative k puts it on the other side of the center.' : ''}`, good: true });
+      else L.push({ note: 'A rigid motion: the image is congruent to ABC (same side lengths and angles).', good: true });
+      ixRead(read, L);
+    }
+    const panes = {};
+    const sa = ixSlider('a (right/left)', -10, 10, 1, S.a, ixN, (v) => { S.a = v; draw(); }), sb = ixSlider('b (up/down)', -10, 10, 1, S.b, ixN, (v) => { S.b = v; draw(); });
+    panes.translate = el('div', {}, sa, sb, el('p', { class: 'small' }, 'Or drag A′.'));
+    panes.reflect = el('div', {}, el('div', { class: 'ix-h' }, 'Line of reflection'), ixSeg([['x', 'x-axis'], ['y', 'y-axis'], ['yx', 'y = x'], ['ynx', 'y = −x']], S.line, (k) => { S.line = k; draw(); }));
+    panes.rotate = el('div', {}, el('div', { class: 'ix-h' }, 'Angle (counterclockwise)'), ixSeg([[90, '90°'], [180, '180°'], [270, '270°']], S.rot, (k) => { S.rot = +k; draw(); }), el('p', { class: 'small' }, 'Drag the purple center of rotation.'));
+    const sk = ixSlider('k', -3, 3, 0.25, S.k, ixFrac, (v) => { S.k = v || 0.25; draw(); });
+    panes.dilate = el('div', {}, sk, el('p', { class: 'small' }, 'Drag the purple center of dilation.'));
+    const showPane = () => Object.entries(panes).forEach(([k, p]) => (p.style.display = k === S.mode ? '' : 'none'));
+    const modes = (o.modes || 'translate,reflect,rotate,dilate').split(',');
+    ctl.append(ixSeg([['translate', 'Translate'], ['reflect', 'Reflect'], ['rotate', 'Rotate'], ['dilate', 'Dilate']].filter(([k]) => modes.includes(k)), S.mode, (k) => { S.mode = k; showPane(); draw(); }), ...Object.values(panes));
+    showPane();
+    ixDrag(cv, (x, y) => {
+      if ((S.mode === 'rotate' || S.mode === 'dilate') && Math.hypot(x - V.X(S.ctr[0]), y - V.Y(S.ctr[1])) < 30) return 'ctr';
+      let best = null, bd = 34; Object.entries(S.P).forEach(([n, p]) => { const d = Math.hypot(x - V.X(p[0]), y - V.Y(p[1])); if (d < bd) { bd = d; best = n; } });
+      if (!best && S.mode === 'translate') { const q = img(S.P.A); if (Math.hypot(x - V.X(q[0]), y - V.Y(q[1])) < 34) return 'img'; }
+      return best; },
+    (h, x, y) => { const p = [Math.max(-10, Math.min(10, Math.round(V.ix(x)))), Math.max(-10, Math.min(10, Math.round(V.iy(y))))];
+      if (h === 'ctr') S.ctr = p; else if (h === 'img') { S.a = p[0] - S.P.A[0]; S.b = p[1] - S.P.A[1]; sa.set(S.a); sb.set(S.b); } else S.P[h] = p; draw(); });
+    draw();
+  } };
+
+// which lessons get which interactive, right before which example, and what to do with it
+const LP_DEMOS = {
+  'precalc-1-2': [['unitCircle', 'Example 1', { recip: '1' }, 'Drag the point to π/6, π/4, and π/3 and read the coordinates. Ask: “What do you notice about sin π/6 and cos π/3?” Then drag into Quadrant II: which values change sign?']],
+  'precalc-1-3': [['unitCircle', 'Example 2', { ref: '0' }, 'Drag to 30°, 45°, and 60°. The red and blue segments are the legs of a special right triangle with hypotenuse 1, so the coordinates are the special-angle values.']],
+  'precalc-1-4': [['unitCircle', 'Example 1', {}, 'Drag slowly through all four quadrants; students call out which of sin, cos, and tan are positive before you let go. Then show the reference angles for 150°, 210°, and 330°.']],
+  'precalc-1-5': [['wave', 'Example 1', { fn: 'sin' }, 'Press Play so students see the circle trace the sine wave. Then move one slider at a time (a, b, c, d). Have students predict what will happen before you move each one.']],
+  'precalc-1-6': [['wave', 'Example 1', { fn: 'tan' }, 'Start on tan: where are the asymptotes, and why (cos x = 0 there)? Then switch to csc and sec to show the dashed sine or cosine graph they come from.']],
+  'precalc-p-8': [['transform', 'Example 1', { parents: 'quad,abs,sqrt,cube,recip' }, 'Pick a parent and change one slider at a time. Before you move h, ask: “Which way will x − 3 move it?” Point out that changes inside go the opposite way.']],
+  'precalc-p-10': [['inverse', 'Example 2', { fns: 'lin,cube,quad,sqrt,wave' }, 'Drag the point to show (a, b) ↔ (b, a). Then switch to x² and drag the red line until it fails the Horizontal Line Test; check “Restrict the domain” to fix it.']],
+  'alg1-3-7': [['transform', 'Example 1', { parent: 'line', parents: 'line' }, 'Start with f(x) = x. Change a (steeper, flatter, flipped), then h and k, one at a time. Ask what each one does before you move it.']],
+  'alg1-3-8': [['transform', 'Example 1', { parent: 'abs', parents: 'abs' }, 'Drag the vertex to shift the V, then change a: bigger is narrower, between 0 and 1 is wider, negative flips it.']],
+  'alg1-5-1': [['systems', 'Example 1', {}, 'Drag a dot so the crossing point moves. Read the solution, then check it in both equations.']],
+  'alg1-5-4': [['systems', 'Example 1', { preset: 'special' }, 'Use the Parallel and Same line buttons, then have a student drag the lines to make each case. Compare the slopes and y-intercepts.']],
+  'alg2-1-2': [['transform', 'Example 1', { parents: 'line,quad,abs,sqrt,cube' }, 'Show each parent, then one transformation at a time. Ask students to name the transformation before you move a slider.']],
+  'alg2-1-3': [['transform', 'Example 1', { parent: 'abs', parents: 'line,abs' }, 'Change one slider at a time and read the new equation together.']],
+  'alg2-2-1': [['transform', 'Example 1', { parent: 'quad', parents: 'quad' }, 'Drag the vertex, then change a. Ask: “Where does the vertex go when we write (x − 2)²?”']],
+  'alg2-2-2': [['quadratic', 'Example 1', {}, 'Drag the vertex and change a: the axis of symmetry, the zeros, and all three forms change together.']],
+  'alg2-3-3': [['quadratic', 'Example 1', {}, 'Use the Two zeros, One zero, and No zeros buttons: the solutions of the equation are where the graph meets the x-axis.']],
+  'alg2-4-7': [['transform', 'Example 1', { parent: 'cube', parents: 'cube' }, 'Shift and stretch y = x³ one slider at a time.']],
+  'alg2-5-3': [['transform', 'Example 1', { parent: 'sqrt', parents: 'sqrt' }, 'Drag the starting point of y = √x, then change a and b. Watch how the domain changes with h.']],
+  'alg2-5-7': [['inverse', 'Example 1', { fns: 'lin,cube,quad,sqrt' }, 'Drag the point to show (a, b) ↔ (b, a). Then switch to x² and use the red line for the Horizontal Line Test.']],
+  'alg2-6-3': [['inverse', 'Example 3', { fn: 'exp', fns: 'exp' }, 'Reflect y = 2ˣ in y = x to get y = log₂ x. Drag the point: (3, 8) on 2ˣ becomes (8, 3) on the log.']],
+  'alg2-6-4': [['transform', 'Example 1', { parent: 'exp', parents: 'exp' }, 'Shift and stretch y = 2ˣ. Watch the asymptote move with k.']],
+  'geo-4-1': [['geoTransform', 'Example 1', { mode: 'translate', modes: 'translate' }, 'Drag A′ or the sliders and read the rule (x, y) → (x + a, y + b).']],
+  'geo-4-2': [['geoTransform', 'Example 1', { mode: 'reflect', modes: 'reflect' }, 'Switch lines of reflection and ask students to predict the rule before you click.']],
+  'geo-4-3': [['geoTransform', 'Example 1', { mode: 'rotate', modes: 'rotate' }, 'Rotate 90°, 180°, and 270° about the origin and read the rules. Then drag the center away from the origin.']],
+  'geo-4-4': [['geoTransform', 'Example 1', {}, 'Do two transformations in a row (write down the first image’s coordinates). The image is always congruent.']],
+  'geo-4-5': [['geoTransform', 'Example 1', { mode: 'dilate', modes: 'dilate' }, 'Change k: bigger than 1 enlarges, between 0 and 1 reduces. Compare the side lengths, then drag the center.']],
+  'geo-6-2': [['triCenters', 'Example 1', { show: 'circum,in' }, 'Drag C until the triangle is obtuse: the circumcenter leaves the triangle, but the incenter never does. Use the Right button to put the circumcenter on the hypotenuse.']],
+  'geo-6-3': [['triCenters', 'Example 1', { show: 'centroid,ortho' }, 'Drag the vertices: the centroid stays inside and is 2/3 of the way down each median; the orthocenter leaves an obtuse triangle.']],
+  'geo-10-2': [['circleAngles', 'Example 1', { mode: 'central', modes: 'central' }, 'Drag A and B: the minor arc matches the central angle. Drag past 180° to make a major arc.']],
+  'geo-10-4': [['circleAngles', 'Example 1', { mode: 'inscribed', modes: 'inscribed,same,semi,quad' }, 'Drag C around the circle: the inscribed angle stays half the arc. Then try Same arc, Semicircle, and Inscribed quadrilateral.']],
+  'geo-10-5': [['circleAngles', 'Example 1', { mode: 'lines', modes: 'lines,inscribed' }, 'Drag the points so E moves inside, then outside the circle. Inside: half the sum of the arcs. Outside: half the difference.']] };
+// the interactive slides of a plan (its own or its 45-minute plan's), as TV items placed right before their example
+function lpDemos(steps, key) {
+  const base = String(key || '').replace(/-30$/, ''), D = LP_DEMOS[base]; if (!D) return steps;
+  D.forEach(([id, before, opts, use]) => {
+    if (!IX[id]) return;
+    let si = steps.findIndex((s) => (s.show || []).some((x) => x.label === before)), at = before;
+    if (si < 0) { si = steps.findIndex((s) => (s.show || []).some((x) => /^Example/.test(x.label))); at = si >= 0 ? steps[si].show.find((x) => /^Example/.test(x.label)).label : null; }
+    if (si < 0) return;
+    const s = steps[si] = { ...steps[si] }, show = s.show = [...s.show], k = show.findIndex((x) => x.label === at);
+    show.splice(k, 0, { label: 'Interactive: ' + IX[id].title, demo: id, opts });
+    s.demos = [...(s.demos || []), { id, before: at, opts, use }];
+  });
+  return steps;
+}
+
 function tvShow(list, at) {
   let i = Math.max(0, at), q = null, shown = false;
   const old = document.getElementById('tvShow'); if (old) old.remove();
@@ -36867,6 +37754,7 @@ function tvShow(list, at) {
   let fresh = false; // false = the plan's own question; true = New numbers made one from a question type
   const make = () => {
     const x = list[i]; shown = false;
+    if (x.demo) { q = { topic: '', stem: '', demo: x.demo }; paint(); return; }
     if (x.q && !fresh) q = x.q; // a question from the student preview, exactly as it is on the page
     else if (x.fixed && !fresh) { const f = x.fixed; q = { topic: f.topic, stem: f.stem, choices: f.choices, answer: f.answer, mode: f.choices ? 'mc' : 'fr', fr: { display: f.display }, solution: f.solution };
       if (f.fig) q.draw = (cv) => drawFigure(cv, { polys: [
@@ -36883,6 +37771,14 @@ function tvShow(list, at) {
     body.innerHTML = '';
     if (T.on) body.append(big);
     const w = W();
+    if (q.demo) { // an interactive: built once per slide so it keeps its state when you come back to it
+      const x = list[i]; if (!x._ix) x._ix = ixMount(x.demo, x.opts);
+      if (T.on) body.append(big);
+      body.append(el('div', { class: 'tv-label', style: 'display:flex;gap:12px;align-items:center;flex-wrap:wrap' }, el('span', {}, list[i].label), ixLinkBtn(x.demo, x.opts)), x._ix);
+      ansBtn.style.display = 'none'; newBtn.style.display = 'none'; origBtn.style.display = 'none';
+      prevBtn.disabled = i === 0; nextBtn.disabled = i === list.length - 1; count.textContent = `${i + 1} of ${list.length}`; ink.show(i + '');
+      return;
+    }
     if (q.bonus) body.append(el('div', { style: 'display:inline-block;margin:0 0 8px;padding:6px 16px;border-radius:999px;background:#fbf1dc;border:2px solid #d4a72c;color:#8a6d0f;font-weight:800;font-size:24px;letter-spacing:.5px' }, `★ BONUS · extra credit${state && state.setKey && SETS[state.setKey] ? ` (+${+setting(state.setKey, 'bonusPct')}%)` : ''}`));
     body.append(el('div', { class: 'tv-label' }, `${list[i].label}${fresh && list[i].fixed ? ' · new numbers' : ''}${q.topic && q.topic !== list[i].label ? ` · ${q.topic}` : ''}`), ...(() => { // notes screens (theorems, summaries) get space between statements, and more at a blank line
       const notes = !q.choices && !(q.fr && q.fr.display) && !q.solution;
@@ -37394,6 +38290,7 @@ function teacherMenu() {
     el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key'), ' ',
     el('button', { class: 'btn secondary', onclick: () => printScreen() }, 'Print an assignment'), ' ',
     el('button', { class: 'btn secondary', onclick: () => lessonScreen() }, 'Lesson plans'), ' ',
+    el('button', { class: 'btn secondary', onclick: () => window.open(ixLink(''), '_blank') }, 'Interactives'), ' ',
     el('button', { class: 'btn secondary', onclick: () => { location.href = 'crossword.html?t=' + TEACHER_ID; } }, 'Vocabulary crossword')));
 }
 
@@ -38136,6 +39033,7 @@ function copyIntoBuilder(link) {
     return;
   }
   if (params.has('pad')) return padScreen(params.get('pad').replace(/\D/g, ''));
+  if (params.has('demo')) return demoScreen(params.get('demo'));
   if (viewOk()) return viewScreen();
   if (params.has('teacher') && teacherSession()) return teacherMenu(); // already unlocked in this tab (coming back from the crossword, for example)
   if (params.has('teacher')) {
