@@ -33534,6 +33534,29 @@ QUESTION_TYPES.push({ id: 'c134Comp', subject: 'calc3', section: '13.4 Motion in
   const chOf = (t) => (t.subject === 'geometry' ? parseInt(t.section.replace(/^Pre-/, ''), 10) || 0 : 0); // geometry chapters in order (Chapter 1 was added last)
   QUESTION_TYPES.sort((a, b) => first[a.subject] - first[b.subject] || chOf(a) - chOf(b));
 }
+/* AP Calculus: builder catalog. Question types shared with other subjects get their own ids (ap_…) so they list under AP Calculus. */
+(() => {
+  const LAB = {
+    cpRational: ['Domain and intercepts of a rational function', '#25–28'], cpZeros: ['Zeros, multiplicity, crosses or touches', '#21–22'],
+    cl11Table: ['Limits from a table', '#7–16'], cl11Graph: ['Limits and one-sided limits from a graph', '#17–28'], cl11Piece: ['Limits of piecewise functions', '#29–36'], cAP11: ['AP® Practice: limits from a graph', 'Multiple choice'],
+    cl12Poly: ['Limits by direct substitution', 'Polynomials, powers, roots'], cl12Factor: ['Limits by factoring (0/0)', ''], cl12Conj: ['Limits using a conjugate', ''], cl12DiffQ: ['Limit of a difference quotient', 'Slope of the tangent line'], cAP12: ['AP® Practice: limits', 'Multiple choice'],
+    cl13Piece: ['Continuity of a piecewise function', 'Which condition fails'], cl13Remove: ['Remove a discontinuity', ''], cl13FindK: ['Find k to make f continuous', ''], cl13IVT: ['Intermediate Value Theorem', ''], cAP13: ['AP® Practice: continuity', 'Multiple choice'],
+    cl14Trig: ['Trigonometric limits', 'sin θ/θ and (1 − cos θ)/θ'], cl14Squeeze: ['Squeeze Theorem', ''], cl14ExpLog: ['Exponential and logarithmic limits', ''], cAP14: ['AP® Practice: limits', 'Multiple choice'],
+    cl15Inf: ['Infinite limits', 'One-sided, vertical asymptotes'], cl15AtInf: ['Limits at infinity', 'Rational functions'], cl15Asym: ['Asymptotes of a rational function', ''], cAP15: ['AP® Practice: asymptotes and limits', 'Multiple choice'],
+    cl16Delta: ['Find δ for a given ε', 'Linear functions'] };
+  Object.keys(SETS).filter((k) => k.startsWith('calc-')).forEach((k) => {
+    const S = SETS[k];
+    S.items = S.items.map(([id, n, ...rest]) => {
+      const own = !!LAB[id], nid = own ? id : 'ap_' + id;
+      if (!own && !TEMPLATES[nid] && TEMPLATES[id]) TEMPLATES[nid] = (r) => TEMPLATES[id](r);
+      if (!QUESTION_TYPES.some((t) => t.id === nid)) {
+        const base = QUESTION_TYPES.find((t) => t.id === id) || {};
+        QUESTION_TYPES.push({ ...base, id: nid, subject: 'apcalc', section: S.title, label: own ? LAB[id][0] : base.label || id, desc: own ? LAB[id][1] : base.desc || '' });
+      }
+      return [nid, n, ...rest];
+    });
+  });
+})();
 /* ==== ALGEBRA CATALOG END ==== */
 
 // an edited assignment keeps the key of the original link (id=), so students keep their saved work and questions
