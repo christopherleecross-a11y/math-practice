@@ -9538,9 +9538,25 @@ function makeCanvas(w, h) {
 
 const TEXT_FONT = '17px "Times New Roman", Times, serif';
 const NOWRAP = '\u2063'; // a line that starts with this stays on one line (shrunk to fit if needed)
+// keep each equation on one line: a run of math words (no ordinary English words) that contains "=" is glued with
+// no-break spaces when it fits, so the line breaks between equations or before one, never in the middle of one
+function glueEquations(ctx, text, maxW) {
+  if (!text.includes('=')) return text;
+  const isMath = (w) => { if (!w) return false; const s = w.replace(/\uE000[^\uE001]*\uE001/g, 'x').replace(/sin|cos|tan|sec|csc|cot|ln|log|lim/g, ''); return !/[A-Za-z]{3,}/.test(s) && !/[;:,]$/.test(w.replace(/\uE001$/, '')); };
+  const words = text.split(' '), out = [];
+  for (let i = 0; i < words.length; ) {
+    if (!isMath(words[i])) { out.push(words[i]); i++; continue; }
+    let j = i; while (j < words.length && isMath(words[j])) j++;
+    if (j < words.length && /[;,]$/.test(words[j]) && !/[A-Za-z]{3,}/.test(words[j].replace(/sin|cos|tan|sec|csc|cot|ln|log/g, ''))) j++; // the last piece, with its ; or ,
+    const run = words.slice(i, j), glued = run.join('\u00a0');
+    out.push(run.some((w) => w.includes('=')) && tcLineW(ctx, glued) <= maxW ? glued : run.join(' ')); i = j;
+  }
+  return out.join(' ');
+}
 function wrapLines(ctx, text, maxW) {
   if (text.includes('\n')) return text.split('\n').flatMap((part) => (part ? wrapLines(ctx, part, maxW) : ['']));
   if (text.startsWith(NOWRAP)) return [text];
+  text = glueEquations(ctx, text, maxW);
   text = text.replace(/\([^()]*\)/g, (m) => (m.length > 28 ? m : m.replace(/ /g, ' '))); // keep (x + 30) on one line (short ones only)
   const words = text.split(' '); const lines = []; let line = '';
   for (const w of words) {
@@ -9582,7 +9598,7 @@ function mParse(src) {
     if ((m = /^_+/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
     if ((m = /^[A-Za-zθαβγπ]′?[₀₁₂₃₄₅₆₇₈₉]*[⁰¹²³⁴⁵⁶⁷⁸⁹⁻ˣⁿ]*/.exec(r))) { toks.push({ t: 'a', s: m[0] }); i += m[0].length; continue; }
     if ((m = /^\)′?[⁰¹²³⁴⁵⁶⁷⁸⁹⁻ˣⁿ]*/.exec(r))) { toks.push({ t: ')', s: m[0].slice(1) }); i += m[0].length; continue; }
-    if ('(+−-·=/√±×^'.includes(r[0])) { toks.push({ t: r[0] === '-' ? '−' : r[0] === '×' ? '·' : r[0] }); i++; continue; }
+    if ('(+−-·=/√±∓×^'.includes(r[0])) { toks.push({ t: r[0] === '-' ? '−' : r[0] === '×' ? '·' : r[0] }); i++; continue; }
     return null;
   }
   let k = 0; const is = (t) => k < toks.length && toks[k].t === t;
@@ -9611,7 +9627,7 @@ function mParse(src) {
     }
     return parts.length > 1 ? { k: 'row', c: mJoin(parts) } : parts[0];
   }
-  function expr() { const c = [term()]; while (is('+') || is('−') || is('±')) { const op = toks[k++].t; c.push({ k: 't', s: ` ${op} ` }, term()); } return c.length > 1 ? { k: 'row', c } : c[0]; }
+  function expr() { const c = [term()]; while (is('+') || is('−') || is('±') || is('∓')) { const op = toks[k++].t; c.push({ k: 't', s: ` ${op} ` }, term()); } return c.length > 1 ? { k: 'row', c } : c[0]; }
   try { const c = [expr()]; while (is('=')) { k++; c.push({ k: 't', s: ' = ' }, expr()); } if (k !== toks.length) return null; return c.length > 1 ? { k: 'row', c } : c[0]; } catch { return null; }
 }
 // implicit products get a thin space; a parenthesized denominator or numerator loses its parentheses (the bar groups it)
@@ -9675,7 +9691,7 @@ function mDraw(ctx, b, x, y, fs) { // y = baseline
 }
 /* ---------- automatic math: "(y₂ − y₁)/(x₂ − x₁)", "3/4", "½" become stacked fractions and "√(5² + 1²)", "2√26" get a
    radical whose bar covers the whole radicand. Only the drawing changes; the question's text (and the gradebook/Doc) stay as written. */
-const AM_SUB = '′₀₁₂₃₄₅₆₇₈₉⁰¹²³⁴⁵⁶⁷⁸⁹⁻°ˣ', AM_LET = /[A-Za-zθαβγπ]/, AM_OK = /^[0-9A-Za-zθαβγπ₀-₉⁰¹²³⁴⁵⁶⁷⁸⁹⁻°′ˣⁿ +−\-·×=/()√±.^…]*$/;
+const AM_SUB = '′₀₁₂₃₄₅₆₇₈₉⁰¹²³⁴⁵⁶⁷⁸⁹⁻°ˣ', AM_LET = /[A-Za-zθαβγπ]/, AM_OK = /^[0-9A-Za-zθαβγπ₀-₉⁰¹²³⁴⁵⁶⁷⁸⁹⁻°′ˣⁿ +−\-·×=/()√±∓.^…]*$/;
 const AM_WORDS = /^(opposite|adjacent|hypotenuse|opp|adj|hyp|period|rise|run)$/, AM_FN = /^(sin|cos|tan|csc|sec|cot|ln|log)[⁻¹²]* ?/;
 const AM_VULGAR = { '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4', '⅕': '1/5', '⅛': '1/8' };
 function amGroupOk(g) { // a parenthesized group that is really math (no words, commas, etc.)
