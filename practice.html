@@ -10106,7 +10106,7 @@ function drawFigure(cv, fig) {
       } else if (P.aarc && P.aarc[i]) { // a plain (blue) arc that shows which angle a label names; not a congruence mark
         const a1 = Math.atan2(u1[1], u1[0]), a2 = Math.atan2(u2[1], u2[0]);
         let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
-        ctx.strokeStyle = blue; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(v[0], v[1], 24, a1, a1 + d, d < 0); ctx.stroke();
+        ctx.strokeStyle = blue; ctx.lineWidth = 1.4; for (let k = 0; k < P.aarc[i]; k++) { ctx.beginPath(); ctx.arc(v[0], v[1], 22 + 5 * k, a1, a1 + d, d < 0); ctx.stroke(); }
       } else if (P.arcs && P.arcs[i]) {
         const a1 = Math.atan2(u1[1], u1[0]), a2 = Math.atan2(u2[1], u2[0]);
         let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
@@ -10175,7 +10175,9 @@ function drawFigure(cv, fig) {
       ctx.fillStyle = blue; ctx.fillText(t, best[0], best[1]);
     });
   });
-  // angle labels (inside, along the bisector)
+  // angle labels (inside, along the bisector). Angle arcs: different measures never share the same number of arcs
+  const arcUsed = new Set(polys.flatMap((P) => (P.aarc || []).filter(Boolean))), arcOf = {};
+  const arcsFor = (t) => { if (!arcOf[t]) { let k = 1; while (arcUsed.has(k)) k++; arcUsed.add(k); arcOf[t] = k; } return arcOf[t]; };
   polys.forEach((P) => {
     const n = P.c.length;
     (P.alab || []).forEach((t, i) => {
@@ -10185,7 +10187,7 @@ function drawFigure(cv, fig) {
       const big = t === '1';
       ctx.font = big ? 'bold 17px Times, serif' : '16px Times, serif';
       const tw = ctx.measureText(t).width;
-      const start = (P.aarc && P.aarc[i] ? 30 : P.arcs && P.arcs[i] ? 17 + 5 * P.arcs[i] : P.right && P.right[i] ? 18 : 12) + 10;
+      const start = (P.aarc && P.aarc[i] ? 24 + 5 * P.aarc[i] : P.arcs && P.arcs[i] ? 17 + 5 * P.arcs[i] : P.right && P.right[i] ? 18 : 12) + 10;
       let best = null;
       const others = P.c.filter((_, k) => k !== i);
       for (let d = start; d <= start + 70; d += 2) { // stay clearly closer to this vertex than any other
@@ -10215,10 +10217,10 @@ function drawFigure(cv, fig) {
         ctx.strokeStyle = blue; ctx.lineWidth = 1.3;
         ctx.beginPath(); ctx.moveTo(...from); ctx.lineTo(...tip); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(...VEC.add(tip, VEC.add(VEC.mul(back, 7), VEC.mul(sideV, 3.5)))); ctx.lineTo(...tip); ctx.lineTo(...VEC.add(tip, VEC.add(VEC.mul(back, 7), VEC.mul(sideV, -3.5)))); ctx.stroke();
-        if (!(P.arcs && P.arcs[i]) && !(P.right && P.right[i])) {
+        if (!(P.arcs && P.arcs[i]) && !(P.right && P.right[i]) && !(P.aarc && P.aarc[i])) {
           const a1 = Math.atan2(u1[1], u1[0]), a2 = Math.atan2(u2[1], u2[0]);
           let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
-          ctx.beginPath(); ctx.arc(v[0], v[1], 22, a1, a1 + d, d < 0); ctx.stroke();
+          for (let k = 0, K = arcsFor(t); k < K; k++) { ctx.beginPath(); ctx.arc(v[0], v[1], 22 + 5 * k, a1, a1 + d, d < 0); ctx.stroke(); }
         }
       }
       ctx.fillStyle = big ? ink : blue; ctx.fillText(t, best[0], best[1]);
@@ -13969,7 +13971,7 @@ TEMPLATES.g72Diag = (r) => {
   ];
   const [what, ans, why, deg] = pick(r, qs);
   // the angle at V3 between the diagonal and side V3V0 is its own triangle, so it gets an arc and a label inside that angle
-  const polys = [{ pts: P, names: V, slab: [String(s1), '', '', String(s2)], alab: [`${ang}°`, '', '', ''] }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }, { pts: [P[3], P[0], P[1]], alab: [`${part}°`, '', ''], aarc: [1, 0, 0] }];
+  const polys = [{ pts: P, names: V, slab: [String(s1), '', '', String(s2)], alab: [`${ang}°`, '', '', ''] }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }, { pts: [P[3], P[0], P[1]], alab: [`${part}°`, '', ''], aarc: [2, 0, 0] }]; // two arcs: a different angle from the one-arc angle at V0
   const side = (A, B, toward) => { const d = VEC.norm(VEC.sub(B, A)); let n = [-d[1], d[0]]; const m = VEC.mul(VEC.add(A, B), 0.5); if (VEC.len(VEC.sub(VEC.add(m, n), toward)) > VEC.len(VEC.sub(VEC.sub(m, n), toward))) n = VEC.mul(n, -1); return VEC.add(m, VEC.mul(n, 0.38)); };
   const texts = [{ p: side(P[0], O, P[1]), t: String(h1) }, { p: side(P[3], O, P[2]), t: String(h2) }, { p: VEC.add(O, [0, -0.45]), t: Pn }];
   return { topic: 'Properties of parallelograms', stem: `Find the indicated measure in ▱${V.join('')}. (m∠${V[3]}${V[0]}${V[1]} = ${ang}°)   ${what}`, ...g6Choices(r, ans, deg ? g7deg : (x) => fmt(x)), fr: FR.num(`${what} =`, ans, { suffix: deg ? '°' : '' }),
