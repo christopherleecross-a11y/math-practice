@@ -41435,7 +41435,7 @@ function builder() {
   const orderSel = el('select', {}, el('option', { value: 'grouped' }, 'Grouped by type (in the order listed)'), el('option', { value: 'mixed' }, 'Mixed up (different order for each student)'));
   orderSel.value = saved.order || 'grouped';
   const numIn = (val, min, max) => el('input', { type: 'number', min: String(min), max: String(max), value: String(val), style: 'width:80px;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
-  const checksIn = numIn(saved.checks ?? 1, 1, 5), retriesIn = numIn(saved.retries ?? 0, 0, 5), attemptsIn = numIn(saved.attempts ?? 1, 1, 10), leaveIn = numIn(saved.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, 0, 20);
+  const checksIn = numIn(saved.checks ?? 1, 1, 5), retriesIn = numIn((saved.retries ?? 0) + 1, 1, 6), rtOf = () => Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 1) - 1)), attemptsIn = numIn(saved.attempts ?? 1, 1, 10), leaveIn = numIn(saved.leaveLimit ?? CONFIG.LEAVE_LIMIT ?? 0, 0, 20);
   const bonusPctIn = numIn(saved.bonusPct ?? 5, 0.5, 50); bonusPctIn.step = '0.5';
   const bonusLab = el('label', {}, 'Percent added for each bonus question'), bonusBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, bonusPctIn, el('span', {}, '%'),
     el('span', { class: 'small' }, 'Each bonus question answered right adds this much to the student’s percent correct (75% + 5% = 80%); nothing is taken off when it’s wrong. Scores can go over 100%. Pick bonus questions with the ★ Bonus button on any question type below.'));
@@ -41466,8 +41466,8 @@ function builder() {
   // typed-answer questions: wrong Checks allowed on one version before it gets new numbers (grayed out with no retries)
   const checksLab = el('label', {}, 'Checks before new numbers (typed-answer questions)'), checksBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, checksIn,
     el('span', { class: 'small' }, 'How many of those tries one version gets before the numbers change. 1 = every wrong Check gives new numbers; 2 or more lets a student fix a typed answer first. Multiple choice always gets new numbers.'));
-  // can't be more than the retries: the max follows Retries, and a bigger number is pulled down to it
-  const checksGray = () => { const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), off = rt <= 0; checksIn.disabled = off; [checksLab, checksBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; });
+  // can't be more than the tries: the max follows Tries, and a bigger number is pulled down to it
+  const checksGray = () => { const rt = rtOf(), off = rt <= 0; checksIn.disabled = off; [checksLab, checksBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; });
     checksIn.max = String(rt + 1); if (!off && Math.floor(+checksIn.value || 1) > rt + 1) checksIn.value = String(rt + 1); };
   retriesIn.addEventListener('input', checksGray); checksIn.addEventListener('input', checksGray); checksIn.addEventListener('change', () => { if (+checksIn.value < 1) checksIn.value = '1'; }); checksGray();
   // grayed out when lockdown mode is off (it only applies in lockdown mode)
@@ -41588,8 +41588,8 @@ function builder() {
     el('label', {}, 'Assignment title'), titleIn,
     el('label', {}, 'Subject (which gradebook tab scores go to)'), subjSel,
     el('label', {}, 'Question order'), orderSel, seqBox,
-    el('label', {}, 'Retries on a missed question'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, retriesIn,
-      el('span', { class: 'small' }, '0 = graded only at Submit. 1 or more adds a Check button: a question gets this many tries after the first (3 retries = 4 tries in all).')),
+    el('label', {}, 'Tries on a question'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, retriesIn,
+      el('span', { class: 'small' }, 'How many times a student can Check a question. 1 = no Check button; it’s graded only at Submit. 2 or more adds a Check button.')),
     checksLab, checksBox,
     el('label', {}, 'Attempts at the whole assignment'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, attemptsIn,
       el('span', { class: 'small' }, '1 = one try. Every attempt is recorded.')),
@@ -41809,7 +41809,7 @@ function builder() {
     const title = titleIn.value.trim() || 'Custom Practice';
     changedNow = false;
     const prevLast = store.get(TK('builder:last')) || {};
-    const nextLast = { counts, formats, frCounts, bonusCounts, bonusFormats, seq, bonusPct: +bonusPctIn.value || 5, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: +retriesIn.value || 0, checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: helpNow(), more: moreIn.checked, desmos: desmosIn.checked, shareWork: shareIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
+    const nextLast = { counts, formats, frCounts, bonusCounts, bonusFormats, seq, bonusPct: +bonusPctIn.value || 5, title: titleIn.value, subject: subjSel.value, order: orderSel.value, retries: rtOf(), checks: +checksIn.value || 1, attempts: +attemptsIn.value || 1, leaveLimit: Math.max(0, Math.floor(+leaveIn.value || 0)), lockdown: lockIn.checked, same: sameIn.checked, hints: helpNow(), more: moreIn.checked, desmos: desmosIn.checked, shareWork: shareIn.checked, redo: redoSel.value, gen: editId ? saved.gen || 1 : 2, ...(editId ? { editId } : {}) };
     const sig = draftSig(nextLast);
     if (sig === store.get(TK('builder:sentSig'))) nextLast.t = prevLast.t || 0;
     else if (opening) { // first look at what was already here: copy it only if it came from loading an assignment just now
@@ -41827,7 +41827,7 @@ function builder() {
     q.set('mix', [...items.map(([id, n, f]) => `${id}.${n}${f === 'fr' ? '.fr' : ''}`), ...bItems.map(([id, n, f]) => `${id}.${n}.${f}.b`)].join('_'));
     q.set('title', title); q.set('subject', subjSel.value);
     if (orderSel.value === 'mixed') q.set('order', 'mixed');
-    const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), at = Math.max(1, Math.min(10, Math.floor(+attemptsIn.value || 1)));
+    const rt = rtOf(), at = Math.max(1, Math.min(10, Math.floor(+attemptsIn.value || 1)));
     if (rt) q.set('retries', String(rt));
     if (nBonus && bp !== 5) q.set('bpct', String(bp));
     const ck = Math.max(1, Math.min(5, rt || 1, Math.floor(+checksIn.value || 1)));
