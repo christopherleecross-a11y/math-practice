@@ -36211,6 +36211,7 @@ function startScreen0(teacher = false) {
         return g;
       }).filter((g) => g.children.length));
     card.append(el('label', { for: 'set' }, 'Assignment'), setSel);
+    if (!teacher) card.append(el('p', { class: 'small', style: 'margin:6px 0 0' }, 'Missed class? ', el('a', { href: stuLink('missed', '1'), style: 'color:var(--accent);font-weight:600' }, 'Catch up on a lesson'), ' (opens after school, at 3:30 PM).'));
     if (!teacher) card.append(el('p', { class: 'small', style: 'margin:6px 0 0' }, 'Looking for the vocabulary crossword? ', el('a', { href: 'crossword.html?t=' + TEACHER_ID, style: 'color:var(--accent);font-weight:600' }, 'Open it here')));
     const none = el('p', { class: 'small' }, teacher ? 'Loading the assignments you built…' : 'No assignments here yet.');
     if (!setSel.querySelector('option[value]:not([value=""])')) card.append(none);
@@ -40587,6 +40588,37 @@ function bellReview(key) {
       el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: make }, 'Pick bell ringers'))), out);
   if (!have.length) out.append(el('p', {}, 'No bell ringers found for this subject.')); else make();
 }
+// "Missed class?" on the student start page: pick a lesson and open its catch-up page. Open only outside the school day
+// (from 3:30 PM until 7:00 AM, and all weekend), so it can't be used for answers during class. Links a teacher posts always work.
+const CATCHUP_OPEN = { from: [15, 30], until: [7, 0] };
+const catchupOpenNow = (d = new Date()) => { const day = d.getDay(), m = d.getHours() * 60 + d.getMinutes(); return day === 0 || day === 6 || m >= CATCHUP_OPEN.from[0] * 60 + CATCHUP_OPEN.from[1] || m < CATCHUP_OPEN.until[0] * 60 + CATCHUP_OPEN.until[1]; };
+function missedScreen() {
+  document.getElementById('title').textContent = 'Missed class?';
+  document.getElementById('subtitle').textContent = `Catch up on a lesson · ${CONFIG.TEACHER_NAME}`;
+  app.innerHTML = '';
+  const back = el('p', { class: 'small', style: 'margin:10px 0 0' }, el('a', { href: location.pathname + (TEACHER_ID ? '?t=' + TEACHER_ID : ''), style: 'color:var(--accent);font-weight:600' }, '← Back to assignments'));
+  if (!catchupOpenNow()) {
+    app.append(el('div', { class: 'card' }, el('strong', {}, 'Catch-up pages open at 3:30 PM, after school.'),
+      el('p', { style: 'margin:6px 0 0' }, `They’re open evenings and weekends. During class, ask ${CONFIG.TEACHER_NAME} what you missed.`), back));
+    return;
+  }
+  const ord = (k) => { const t = ((lpSet(k) || {}).title || '').split(' ')[0], m = /^(P|\d+)\.(\d+)/.exec(t); return m ? (m[1] === 'P' ? 0 : +m[1]) * 1000 + +m[2] : 1e9; };
+  const keys = Object.keys(LESSONS).filter((k) => !LESSONS[k].base && lpSet(k) && SUBJECTS[lpSet(k).subject]);
+  const subs = Object.keys(SUBJECTS).filter((s) => keys.some((k) => lpSet(k).subject === s));
+  const subjSel = el('select', { id: 'mSubj' }, el('option', { value: '' }, 'Choose your class…'), ...subs.map((s) => el('option', { value: s }, SUBJECTS[s])));
+  const lessSel = el('select', { id: 'mLesson', disabled: true }, el('option', { value: '' }, 'Choose your class first'));
+  const err = el('div', { class: 'err' });
+  subjSel.addEventListener('change', () => {
+    const list = keys.filter((k) => lpSet(k).subject === subjSel.value).sort((a, b) => ord(a) - ord(b));
+    lessSel.innerHTML = ''; lessSel.append(el('option', { value: '' }, 'Choose the lesson you missed…'), ...list.map((k) => el('option', { value: k }, lpSet(k).title)));
+    lessSel.disabled = !list.length;
+  });
+  if (subs.length === 1) { subjSel.value = subs[0]; subjSel.dispatchEvent(new Event('change')); }
+  app.append(el('div', { class: 'card' },
+    el('p', { style: 'margin:0 0 10px' }, 'Pick the lesson you missed. You’ll get its notes filled in, the vocabulary, and the examples with answers. Do the practice in Google Classroom so it counts.'),
+    el('label', { for: 'mSubj' }, 'Class'), subjSel, el('label', { for: 'mLesson' }, 'Lesson'), lessSel,
+    el('button', { class: 'btn', type: 'button', onclick: () => { if (!lessSel.value) return (err.textContent = 'Choose the lesson you missed.'); location.href = stuLink('catchup', lessSel.value); } }, 'Open the lesson'), err, back));
+}
 function catchupScreen(key) {
   if (!LESSONS[key]) { app.append(el('div', { class: 'card' }, 'That lesson wasn’t found.')); return; }
   const L = stuHeader(key, 'Catch-up page'), steps = lpWithIcan(lessonOf(key), key);
@@ -41966,6 +41998,7 @@ function copyIntoBuilder(link) {
   }
   if (params.has('pad')) return padScreen(params.get('pad').replace(/\D/g, ''));
   if (params.has('demo')) return demoScreen(params.get('demo'));
+  if (params.has('missed')) return missedScreen();
   if (params.has('catchup')) return catchupScreen(params.get('catchup'));
   if (params.has('vocab')) return vocabScreen(params.get('vocab'));
   if (viewOk()) return viewScreen();
