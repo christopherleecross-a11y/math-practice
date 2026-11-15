@@ -37048,16 +37048,19 @@ function helpPanel(q, i) {
 /* ---------- per-question Check button and retries ---------- */
 // how many Checks a question gets on one version before new numbers (multiple choice: always 1)
 const perVersion = (q) => (q.mode === 'fr' ? Math.max(1, state.checks || 1) : 1);
+// Retries = how many more Checks after the first, so a question gets retries + 1 Checks in all.
+// "Checks before new numbers" = how many of those Checks one version gets before the numbers change.
+const wrongSoFar = (q, i) => (state.tries[i] || 0) * perVersion(q) + ((state.misses && state.misses[i]) || 0);
 function checkBar(q, i) {
   if (state.teacher) return el('span');
   const st = state.status[i], used = state.tries[i] || 0;
   const bar = el('div', { class: 'checkbar' });
   if (st === 'kept') { bar.append(el('span', { class: 'tag good' }, `✓ Correct on attempt ${state.carry && state.carry[i] ? state.carry[i].from : ''} — kept`)); return bar; }
   if (!state.retries) return el('span');
-  if (st === 'correct') bar.append(el('span', { class: 'tag good' }, used ? `Correct on try ${used + 1}` : 'Correct'));
+  if (st === 'correct') { const w = wrongSoFar(q, i); bar.append(el('span', { class: 'tag good' }, w ? `Correct on try ${w + 1}` : 'Correct')); }
   else if (st === 'locked') bar.append(el('span', { class: 'tag ' + (scoreOf(q, state.answers[i]) > 0 ? 'part' : 'bad') }, scoreOf(q, state.answers[i]) > 0 ? 'Out of tries (½ credit)' : 'Out of tries'));
   else if (!state.submitted) {
-    const left = state.retries - used, k = perVersion(q), m = (state.misses && state.misses[i]) || 0, total = left * k + (k - m);
+    const k = perVersion(q), m = (state.misses && state.misses[i]) || 0, total = state.retries + 1 - wrongSoFar(q, i), left = total > k - m ? 1 : 0;
     const btn = el('button', { class: 'btn checkbtn', type: 'button' }, 'Check');
     btn.addEventListener('click', () => { hideVK(); checkQ(i); });
     bar.append(btn, el('span', { class: 'small' }, `${total} ${total === 1 ? 'try' : 'tries'} left` + (k > 1 && left > 0 ? ` · new numbers after ${k - m} more ${k - m === 1 ? 'miss' : 'misses'}` : '')));
@@ -37071,23 +37074,23 @@ async function checkQ(i) {
   if (q.proofQ) await gradeAllProofs(i);
   const pts = scoreOf(q, a);
   state.flash[i] = '';
-  const k = perVersion(q), m = (state.misses[i] || 0) + 1;
-  if (pts === 1) { state.status[i] = 'correct'; delete state.misses[i]; }
+  const k = perVersion(q), m = (state.misses[i] || 0) + 1, wrong = wrongSoFar(q, i) + 1, total = state.retries + 1;
+  if (pts === 1) { state.status[i] = 'correct'; }
+  else if (wrong >= total) { state.status[i] = 'locked'; state.misses[i] = m; }
   else if (m < k) { // typed answer: more Checks on this same version before new numbers
     state.misses[i] = m;
-    const left = k - m, more = (state.tries[i] || 0) < state.retries;
-    state.flash[i] = `Not quite. Check your work and try again — ${more ? `${left} more ${left === 1 ? 'miss' : 'misses'} and you’ll get new numbers.` : `${left} ${left === 1 ? 'try' : 'tries'} left.`}`;
+    const left = total - wrong, more = k - m < left;
+    state.flash[i] = `Not quite. Check your work and try again — ${left} ${left === 1 ? 'try' : 'tries'} left${more ? `; new numbers after ${k - m} more ${k - m === 1 ? 'miss' : 'misses'}` : ''}.`;
   }
-  else if ((state.tries[i] || 0) < state.retries) {
+  else {
     delete state.misses[i]; state.fresh[i] = true;
     (state.history[i] = state.history[i] || []).push({ stem: q.stem, answer: answerText(q, a) });
     state.tries[i] = (state.tries[i] || 0) + 1;
     state.qs[i] = regenQuestion(state.seedStr, q, i, state.tries[i]);
     state.answers[i] = null;
     delete state.drawings[String(i)]; delete state.drawings['L' + i]; saveDrawings();
-    const left = state.retries - state.tries[i] + 1;
     state.flash[i] = `🔄 New numbers! This question just changed — solve the new version. Your last try and its worked-out solution are shown above.`;
-  } else { state.status[i] = 'locked'; delete state.misses[i]; }
+  }
   saveState();
   rerenderAt(i);
 }
@@ -37255,7 +37258,7 @@ function exportWork(pts) {
     const g = q.proofQ && state.ai[i];
     return { n: i + 1, topic: (q.bonus ? `★ BONUS (+${fmt(setting(state.setKey, 'bonusPct'))}% if right) · ` : '') + q.topic, stem: unM(q.stem), answer: answerText(q, state.answers[i]), correct, pts: pts[i],
       feedback: g ? (g.ai ? 'AI grader: ' : 'Step checker (AI not used): ') + g.feedback : '', typed: workLines(i).map(latexToText).filter(Boolean).join('\n'), fig, pad,
-      tries: (state.tries[i] || 0) + 1, history: state.history[i] || [] };
+      tries: state.retries ? Math.min(state.retries + 1, wrongSoFar(q, i) + (pts[i] === 1 ? 1 : 0)) || 1 : 1, history: state.history[i] || [] };
   });
 }
 
@@ -37277,7 +37280,7 @@ async function sendNow(pts, resend) {
     set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, subject: SUBJECTS[SETS[state.setKey].subject] || '', setTitle: SETS[state.setKey].title, period: state.period, name: state.name,
     score: sub.score, total: sub.total, percent: Math.round((100 * sub.score) / sub.total),
     detail: state.qs.map((q, i) => { const a = state.answers[i];
-      const tr = (state.tries[i] ? (pts[i] === 1 ? `(try ${state.tries[i] + 1})` : `(${state.tries[i] + 1} tries)`) : '') + (state.hintUsed && state.hintUsed[i] ? '(hint)' : '') + (state.exUsed && state.exUsed[i] ? '(example)' : '') + (q.bonus ? '(bonus)' : '');
+      const nTry = state.retries ? wrongSoFar(q, i) + (pts[i] === 1 ? 1 : 0) : 0, tr = (nTry > 1 ? (pts[i] === 1 ? `(try ${nTry})` : `(${nTry} tries)`) : '') + (state.hintUsed && state.hintUsed[i] ? '(hint)' : '') + (state.exUsed && state.exUsed[i] ? '(example)' : '') + (q.bonus ? '(bonus)' : '');
       if (pts[i] === 1) return `${i + 1}✓${tr}` + (q.proofQ && state.ai[i] && state.ai[i].ai ? '(AI)' : '');
       if (!isAnswered(q, a)) return `${i + 1}✗${tr}–`;
       const part = pts[i] > 0 ? `(${Math.round(100 * pts[i]) / 100} pt)` : ''; // exact partial credit, so a teacher override adds the right amount
@@ -41415,10 +41418,10 @@ function builder() {
   attemptsIn.addEventListener('input', redoGray); redoGray();
   // typed-answer questions: wrong Checks allowed on one version before it gets new numbers (grayed out with no retries)
   const checksLab = el('label', {}, 'Checks before new numbers (typed-answer questions)'), checksBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, checksIn,
-    el('span', { class: 'small' }, '1 = every wrong Check gives new numbers. 2 or more lets a student fix a typed answer before the question changes. Multiple choice always gets new numbers.'));
+    el('span', { class: 'small' }, 'How many of those tries one version gets before the numbers change. 1 = every wrong Check gives new numbers; 2 or more lets a student fix a typed answer first. Multiple choice always gets new numbers.'));
   // can't be more than the retries: the max follows Retries, and a bigger number is pulled down to it
   const checksGray = () => { const rt = Math.max(0, Math.min(5, Math.floor(+retriesIn.value || 0))), off = rt <= 0; checksIn.disabled = off; [checksLab, checksBox].forEach((e) => { e.style.opacity = off ? '0.45' : ''; });
-    checksIn.max = String(Math.max(1, rt)); if (!off && Math.floor(+checksIn.value || 1) > rt) checksIn.value = String(rt); };
+    checksIn.max = String(rt + 1); if (!off && Math.floor(+checksIn.value || 1) > rt + 1) checksIn.value = String(rt + 1); };
   retriesIn.addEventListener('input', checksGray); checksIn.addEventListener('input', checksGray); checksIn.addEventListener('change', () => { if (+checksIn.value < 1) checksIn.value = '1'; }); checksGray();
   // grayed out when lockdown mode is off (it only applies in lockdown mode)
   const leaveLab = el('label', {}, 'Lock after leaving (lockdown mode only)'), leaveBox = el('div', { style: 'display:flex;gap:10px;align-items:center' }, leaveIn,
@@ -41539,7 +41542,7 @@ function builder() {
     el('label', {}, 'Subject (which gradebook tab scores go to)'), subjSel,
     el('label', {}, 'Question order'), orderSel, seqBox,
     el('label', {}, 'Retries on a missed question'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, retriesIn,
-      el('span', { class: 'small' }, '0 = graded only at Submit. 1 or more adds a Check button; each retry is a new version of the question.')),
+      el('span', { class: 'small' }, '0 = graded only at Submit. 1 or more adds a Check button: a question gets this many tries after the first (3 retries = 4 tries in all).')),
     checksLab, checksBox,
     el('label', {}, 'Attempts at the whole assignment'), el('div', { style: 'display:flex;gap:10px;align-items:center' }, attemptsIn,
       el('span', { class: 'small' }, '1 = one try. Every attempt is recorded.')),
