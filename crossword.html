@@ -356,6 +356,17 @@ body.tp-open{overflow:hidden}
   <footer class="foot"><a class="practice-link" href="practice.html">← Math practice</a><button id="signinBtn" type="button" hidden>Class sign-in</button><button id="teacherBtn" type="button">Teacher</button></footer>
 </div>
 
+<div class="modal" id="cluesModal">
+  <div class="dialog" style="max-width:760px;width:100%">
+    <h3 id="clTitle">Edit clues</h3>
+    <p class="muted">Change any clue (and the harder clue used on Hard). Leave a box empty to go back to the original. Your clues are saved in your class Sheet, so they follow you to any computer, and every puzzle you build from now on uses them. Puzzles you already assigned keep the clues they had.</p>
+    <div id="clRows" style="max-height:55vh;overflow:auto;border:1px solid var(--line,#ddd);border-radius:10px;padding:8px"></div>
+    <div class="row">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="clSave">Save clues</button>
+    </div>
+  </div>
+</div>
 <div class="modal" id="customModal">
   <div class="dialog">
     <h3>Make your own crossword</h3>
@@ -441,7 +452,7 @@ osmosis: Movement of water across a membrane"></textarea>
 
     <section class="tp-panel" data-panel="make">
       <div class="cp-row">
-        <label>List <select id="cpSet"></select></label>
+        <label>List <select id="cpSet"></select></label> <button class="btn" id="cpClues" type="button">✏️ Edit clues</button>
       </div>
       <div class="cp-row">
         <label>Difficulty <select id="cpDiff"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
@@ -1857,6 +1868,8 @@ function fromShare(code) {
   const o = dec(code);
   if (o.s) {
     if (!SECURE_SETS[o.s]) throw new Error('unknown list');
+    LINK_CLUES = null;
+    if (o.ce && typeof o.ce === 'object') { const ce = {}; for (const [w, v] of Object.entries(o.ce)) if (SECURE_SETS[o.s].words[+w] && Array.isArray(v)) ce[+w] = [String(v[0] || '').slice(0, 300), String(v[1] || '').slice(0, 300)]; LINK_CLUES = { [o.s]: ce }; }
     const d = DIFFS[o.d] ? o.d : 'medium';
     let p;
     if (Array.isArray(o.V)) { // several versions: one is picked per student once their name is known
@@ -1912,9 +1925,18 @@ function packWords(name) {
 }
 packSel.addEventListener('change', () => { store.set('crossword-pack', packSel.value); newPuzzle(); });
 
+/* ---- clue edits: a teacher can reword any list's clues. Saved in their Sheet (a "Clue edits" row on the Puzzles tab) and on
+   this computer; a puzzle's link carries the edited clues it uses, so students see them with no change to the page. ---- */
+let LINK_CLUES = null; // { list: { wordIndex: [clue, harder clue] } } from the puzzle link being opened
+const clueKey = () => 'crossword-clues-' + (teacher.owner ? teacher.owner.name : 'me');
+const myClues = () => (teacher.on && store.get(clueKey())) || {};
+const clueId = name => { let x = 5381; for (const ch of name) x = ((x * 33) ^ ch.charCodeAt(0)) >>> 0; return 'clues-' + x.toString(36); };
+const isClueRow = e => /^clues-/.test(String(e && e.id || ''));
+function cluesFor(name) { return (LINK_CLUES && LINK_CLUES[name]) || myClues()[name] || null; }
 function puzzleFromLayout(name, L, d) {
-  const set = SECURE_SETS[name], D = DIFFS[d];
-  const list = L.e.map(([w, r, c, down]) => ({ answer: '?'.repeat(set.words[w].n), clue: D.hard ? set.words[w].k : set.words[w].c, r, c, dir: down ? 'down' : 'across', w }));
+  const set = SECURE_SETS[name], D = DIFFS[d], ov = cluesFor(name);
+  const pick = (w) => { const o = ov && ov[w]; return o ? (D.hard ? o[1] || o[0] : o[0]) : D.hard ? set.words[w].k : set.words[w].c; };
+  const list = L.e.map(([w, r, c, down]) => ({ answer: '?'.repeat(set.words[w].n), clue: pick(w), r, c, dir: down ? 'down' : 'across', w }));
   const p = normalize(list);
   Object.assign(p, { title: name, diff: d, secure: name, given: D.givens ? (L.g || []).map(g => g.slice()) : [], bank: Array.isArray(L.b) ? L.b.slice() : null });
   return p;
@@ -2423,6 +2445,9 @@ async function loadOverview() {
   TP.loading = tApi('overview');
   const r = await TP.loading; TP.loading = null;
   if (r.ok) for (const e of libLocal()) { const s = await tApi('save', { entry: e }); if (s.ok) libDelLocal(e.id); } // saved here while offline
+  if (r.ok) { const mine = Object.assign({}, store.get(clueKey()) || {}); // the Sheet's clue edits win
+    (TP.data.library || []).filter(isClueRow).forEach(e => { try { const o = dec(e.share); if (o && o.ce && teacher.answers[e.list]) mine[e.list] = o.ce; } catch {} });
+    store.set(clueKey(), mine); }
   $('#mineMsg').textContent = '';
   fillPers();
   if (tpOpen() && TP.tab === 'mine') renderMine();
@@ -2437,7 +2462,7 @@ function libPutLocal(e) { store.set(libKey(), [Object.assign({}, e, { local: tru
 function libDelLocal(id) { store.set(libKey(), libLocal().filter(x => x.id !== id)); }
 function libAll() {
   const server = sheetReady() ? TP.data.library || [] : [], ids = new Set(server.map(e => e.id));
-  return server.concat(libLocal().filter(e => !ids.has(e.id))).filter(e => teacher.answers[e.list])
+  return server.concat(libLocal().filter(e => !ids.has(e.id))).filter(e => teacher.answers[e.list] && !isClueRow(e))
     .sort((a, b) => String(b.saved).localeCompare(String(a.saved)));
 }
 async function saveEntry(e) {
@@ -2485,6 +2510,37 @@ function cpInit() {
   $('#cpResult').hidden = true;
   cpFill(true); cpMoreSum(); fillPers();
 }
+$('#cpClues').addEventListener('click', () => {
+  const name = cpSel.value, A = teacher.answers[name], set = SECURE_SETS[name]; if (!A) return;
+  const cur = myClues()[name] || {};
+  $('#clTitle').textContent = 'Edit clues: ' + name;
+  const box = $('#clRows'); box.innerHTML = '';
+  A.map((a, i) => [a, i]).sort((x, y) => x[0].localeCompare(y[0])).forEach(([a, i]) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:150px 1fr;gap:6px 10px;align-items:start;padding:8px 4px;border-bottom:1px solid var(--line,#eee)';
+    row.innerHTML = '<b style="padding-top:6px;word-break:break-all"></b><div><textarea rows="2" style="width:100%;min-height:0;font:inherit"></textarea><input type="text" style="width:100%;margin-top:4px" placeholder="Harder clue for Hard (optional)"></div>';
+    row.querySelector('b').textContent = a;
+    const [ta, inp] = row.querySelectorAll('textarea,input');
+    ta.value = cur[i] ? cur[i][0] : set.words[i].c; ta.dataset.orig = set.words[i].c; ta.dataset.w = i;
+    inp.value = cur[i] && cur[i][1] ? cur[i][1] : (set.words[i].k !== set.words[i].c ? set.words[i].k : ''); inp.dataset.orig = set.words[i].k !== set.words[i].c ? set.words[i].k : '';
+    box.appendChild(row);
+  });
+  openModal('#cluesModal');
+});
+$('#clSave').addEventListener('click', async () => {
+  const name = cpSel.value, edits = {};
+  $('#clRows').querySelectorAll('textarea').forEach(ta => {
+    const inp = ta.parentNode.querySelector('input'), c = ta.value.trim(), k = inp.value.trim();
+    if ((c && c !== ta.dataset.orig) || (k && k !== inp.dataset.orig)) edits[+ta.dataset.w] = [c || ta.dataset.orig, k];
+  });
+  const all = Object.assign({}, store.get(clueKey()) || {});
+  if (Object.keys(edits).length) all[name] = edits; else delete all[name];
+  store.set(clueKey(), all);
+  closeModals(); $('#cpResult').hidden = true;
+  const n = Object.keys(edits).length;
+  const r = !n ? await tApi('remove', { id: clueId(name) }) : await tApi('save', { entry: { id: clueId(name), label: 'Clue edits (not a puzzle)', list: name, diff: 'medium', words: n, versions: 1, mode: 'clue edits', share: enc({ ce: edits }) } });
+  toast(n ? `Saved ${n} edited ${n === 1 ? 'clue' : 'clues'}` + (r.ok ? '.' : ' on this computer (your Sheet couldn’t be reached).') : 'Back to the original clues.', 4000);
+});
 function cpFill(resetCount) {
   const A = teacher.answers[cpSel.value]; if (!A) return;
   const N = A.length, box = $('#cpWords'), cnt = $('#cpCount');
@@ -2582,6 +2638,7 @@ $('#cpBuild').addEventListener('click', async () => {
       }
     }
     const payload = lays.length > 1 ? { s: name, V: lays, d } : { s: name, L: lays[0], d };
+    const ce = myClues()[name]; if (ce && Object.keys(ce).length) { payload.ce = ce; LINK_CLUES = { [name]: ce }; }
     if ($('#cpBank').checked) payload.wb = 1;
     const tl = Math.round(+$('#cpTime').value);
     if (tl > 0) payload.tl = Math.min(300, tl);
