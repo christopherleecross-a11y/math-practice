@@ -39040,6 +39040,8 @@ function lessonScreen(preKey) {
           all.length ? el('button', { class: 'btn secondary', type: 'button', onclick: () => tvShow(all, 0) }, '📺 Examples and keys on the TV') : '',
           altKey ? el('button', { class: 'btn secondary', type: 'button', onclick: () => { LESSON.compare = true; draw(); } }, `⇆ Compare ${lessonOf(fullKey).minutes} and ${lessonOf(altKey).minutes} minutes`) : '',
           copyLinkBtn('🔗 Catch-up page', stuLink('catchup', LESSON.key), 'A page for students who missed class: notes, vocabulary, and examples with answers. Copy the link to post in Google Classroom.'),
+          chLink(LESSON.key) ? el('a', { class: 'btn secondary', href: chLink(LESSON.key), target: '_blank', rel: 'noopener', style: 'display:inline-block;text-decoration:none', title: 'A crossword from this chapter’s vocabulary (opens the crossword page). Copy its address to post it, or print it from there.' }, '🧩 Chapter crossword') : '',
+          el('button', { class: 'btn secondary', type: 'button', title: 'ACT bell ringers from the lessons you’ve already taught, for spiral review', onclick: () => bellReview(LESSON.key) }, '🔁 Review bell ringers'),
           (L.vocab || []).length ? copyLinkBtn('🔗 Vocab review', stuLink('vocab', LESSON.key), 'Flashcards and matching for this lesson’s vocabulary (students can switch to the whole chapter). Copy the link to post in Google Classroom.') : '',
           LESSON_EDITS.status === 'ok' ? el('button', { class: 'btn secondary', type: 'button', onclick: () => lessonEdit(LESSON.key) }, '✏️ Edit this plan') : '',
           LESSON_EDITS.data[LESSON.key] ? el('span', { class: 'small', style: 'align-self:center' }, '(your edited version)') : '')),
@@ -40545,13 +40547,55 @@ function stuHeader(key, what) {
   document.getElementById('subtitle').textContent = `${what} · ${SUBJECTS[S.subject] || ''}${CONFIG.TEACHER_NAME ? ' · ' + CONFIG.TEACHER_NAME : ''}`;
   return L;
 }
+// the chapter crossword for a lesson (crossword.html#v=geo-7), from that chapter's lesson-plan vocabulary
+const chLink = (key) => { const m = /^(geo|precalc|alg1|alg2|calc)-([0-9p]+)/.exec(key || ''); if (!m) return ''; return 'crossword.html' + (TEACHER_ID ? '?t=' + TEACHER_ID : '') + '#v=' + m[1] + '-' + m[2].replace(/[a-z]+$/, (s) => (s === 'p' ? 'p' : '')); };
+// spiral review: the ACT bell ringers from lessons already taught (same subject, from one section through another)
+function bellReview(key) {
+  teacherNav('lesson'); document.body.classList.add('printing');
+  document.getElementById('title').textContent = 'Review bell ringers';
+  document.getElementById('subtitle').textContent = 'ACT bell ringers from the lessons you’ve already taught, for spiral review.';
+  app.innerHTML = ''; window.scrollTo(0, 0);
+  const subj = (lpSet(key) || {}).subject, ord = (k) => secOrd(k);
+  const keys = Object.keys(LESSONS).filter((k) => !LESSONS[k].base && lpSet(k) && lpSet(k).subject === subj).sort((a, b) => ord(a) - ord(b));
+  const bellOf = (k) => { for (const st of (lessonOf(k) || {}).steps || []) for (const x of st.show || []) if (/bell ringer/i.test(x.label) && x.fixed && x.fixed.choices) return x.fixed; return null; };
+  const have = keys.filter(bellOf), cur = have.indexOf(key.replace(/-30$/, ''));
+  const opt = (k) => el('option', { value: k }, lpSet(k).title);
+  const from = el('select', { style: 'width:auto;max-width:320px' }, ...have.map(opt)), to = el('select', { style: 'width:auto;max-width:320px' }, ...have.map(opt));
+  from.value = have[0] || ''; to.value = have[Math.max(0, cur > 0 ? cur - 1 : cur)] || ''; // through the lesson before this one
+  const saved = store.get(TK('bellReview:' + subj)); if (saved && have.includes(saved.from) && have.includes(saved.to)) { from.value = saved.from; to.value = saved.to; }
+  const num = el('input', { type: 'number', min: 1, max: 30, value: (saved && saved.n) || 5, style: 'width:70px' });
+  const out = el('div', {});
+  let deck = [];
+  const make = () => {
+    const a = have.indexOf(from.value), b = have.indexOf(to.value), lo = Math.min(a, b), hi = Math.max(a, b);
+    store.set(TK('bellReview:' + subj), { from: from.value, to: to.value, n: +num.value || 5 });
+    const pool = have.slice(lo, hi + 1), r = mulberry32((Date.now() >>> 0) ^ 0x5bd1);
+    deck = shuffle(r, pool.slice()).slice(0, Math.max(1, Math.min(30, Math.floor(+num.value || 5)))).sort((x, y) => ord(x) - ord(y)).map((k) => ({ k, f: bellOf(k) }));
+    out.innerHTML = '';
+    out.append(el('div', { class: 'noprint', style: 'display:flex;gap:10px;flex-wrap:wrap;margin:10px 0' },
+      el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: () => tvShow(deck.map((d, i) => ({ label: `Bell ringer ${i + 1} · from ${lpSet(d.k).title.split(' ')[0]}`, fixed: d.f })), 0) }, '📺 Show them on the TV'),
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => window.print() }, '🖨 Print (answer key at the end)'),
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: make }, '🔀 Pick again')));
+    deck.forEach((d, i) => out.append(el('div', { class: 'card' }, el('div', { class: 'stu-tag' }, `${i + 1} · from ${lpSet(d.k).title}`), stuText(d.f.stem, 18), stuFigure(d.f.figure),
+      el('div', {}, ...d.f.choices.map((c, j) => stuText(`${LETTERS[j]}.  ${c}`, 17))), el('div', { class: 'noprint' }, ediaPanel(d.f)))));
+    out.append(el('div', { class: 'card', style: 'break-before:page' }, el('strong', {}, 'Answer key'),
+      ...deck.map((d, i) => el('div', { style: 'margin-top:8px' }, el('b', {}, `${i + 1}. ${LETTERS[d.f.answer]}`), stuText(d.f.solution || '', 15)))));
+  };
+  app.append(el('div', { class: 'card noprint' }, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 10px', onclick: () => lessonScreen(key) }, '← Back to the lesson plan'),
+    el('p', { style: 'margin:0 0 8px' }, `Every lesson plan has an ACT bell ringer (4 choices). This picks some at random from the ${SUBJECTS[subj] || ''} lessons you choose, so the bell ringers keep reviewing earlier material. The range you pick is remembered.`),
+    el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, 'From', from, 'through', to, 'How many', num,
+      el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: make }, 'Pick bell ringers'))), out);
+  if (!have.length) out.append(el('p', {}, 'No bell ringers found for this subject.')); else make();
+}
 function catchupScreen(key) {
   if (!LESSONS[key]) { app.append(el('div', { class: 'card' }, 'That lesson wasn’t found.')); return; }
   const L = stuHeader(key, 'Catch-up page'), steps = lpWithIcan(lessonOf(key), key);
   const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '900px';
   app.append(el('div', { class: 'card' }, el('strong', {}, 'Missed class? Start here.'),
     el('p', { style: 'margin:6px 0 0' }, 'Read each note, then try each example on paper before you click Show answer. When you finish, do the practice assignment in Google Classroom.'),
-    el('div', { style: 'margin-top:10px' }, el('a', { class: 'btn secondary', href: stuLink('vocab', key), style: 'display:inline-block;text-decoration:none' }, '📇 Vocabulary review'))));
+    el('div', { class: 'noprint', style: 'margin-top:10px;display:flex;gap:10px;flex-wrap:wrap' }, el('a', { class: 'btn secondary', href: stuLink('vocab', key), style: 'display:inline-block;text-decoration:none;margin:0' }, '📇 Vocabulary review'),
+      chLink(key) ? el('a', { class: 'btn secondary', href: chLink(key), style: 'display:inline-block;text-decoration:none;margin:0' }, '🧩 Chapter crossword') : '',
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { const a = [...app.querySelectorAll('.stu-ans')], was = a.map((x) => x.style.display); a.forEach((x) => { x.style.display = ''; }); document.body.classList.add('printing'); window.print(); document.body.classList.remove('printing'); a.forEach((x, i) => { x.style.display = was[i]; }); } }, '🖨 Print this page (with answers)'))));
   app.append(el('div', { class: 'card' }, el('h3', { class: 'lp-h', style: 'margin-top:0' }, 'Today’s goal'), el('p', {}, L.objective), el('h3', { class: 'lp-h' }, 'I can …'), el('ul', { class: 'lp-ul' }, ...(L.iCan || []).map((x) => el('li', {}, x))),
     (L.vocab || []).length ? el('h3', { class: 'lp-h' }, 'Vocabulary') : '', (L.vocab || []).length ? el('ul', { class: 'lp-ul' }, ...L.vocab.map(([t, d]) => el('li', {}, el('b', {}, t), ' — ', lpMath(d, 16)))) : ''));
   const skip = /^(bell ringer|i can statements|exit ticket)/i;
@@ -40570,6 +40614,9 @@ function catchupScreen(key) {
     app.append(el('div', { class: 'card' }, el('div', { class: 'stu-tag' }, x.label + (f.topic ? ' · ' + f.topic : '')), stuText(f.stem), stuFigure(f.figure),
       f.choices ? el('div', {}, ...f.choices.map((c, j) => stuText(`${LETTERS[j]}.  ${c}`, 18))) : '', btn, ans));
   }));
+  const pset = (LESSONS[key] && LESSONS[key].base) || key;
+  if (SETS[pset]) app.append(el('div', { class: 'card noprint' }, el('strong', {}, 'Practice'), el('p', { style: 'margin:6px 0 8px' }, 'If your teacher assigned this lesson’s practice in Google Classroom, do it there so it counts. Otherwise you can start it here:'),
+    el('a', { class: 'btn', href: stuLink('set', pset), style: 'display:inline-block;text-decoration:none;margin:0' }, `▶ Start the ${SETS[pset].title.split(' ')[0]} Practice`)));
   app.append(el('div', { class: 'card' }, el('strong', {}, 'Done?'), el('p', { style: 'margin:6px 0 0' }, 'Now do the practice assignment for this lesson in Google Classroom. If something didn’t make sense, write down the example number and ask.')));
 }
 function vocabScreen(key) {

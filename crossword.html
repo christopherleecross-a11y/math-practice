@@ -502,7 +502,7 @@ osmosis: Movement of water across a membrane"></textarea>
       <p>To change your lists: edit them here, click <b>Generate code</b>, then in crossword.html replace the whole line that starts with <code>const SECURE_SETS =</code> with the new code (or ask Claude to make the change for you). Changing a list gives it new puzzle grids, so let students finish anything they're working on from that list first.</p>
       <textarea id="tLists" spellcheck="false"></textarea>
       <input type="text" id="tNewPw" placeholder="Password for these lists (leave blank to keep the current one)" autocomplete="off">
-      <div class="row"><button class="btn primary" id="tGen">Generate code</button></div>
+      <div class="row"><button class="btn" id="tAddCh">➕ Add chapter vocab lists</button><button class="btn primary" id="tGen">Generate code</button></div>
       <textarea id="tOut" readonly placeholder="The generated code appears here" spellcheck="false"></textarea>
       <div class="row"><button class="btn" id="tCopy">Copy code</button></div>
       </section>
@@ -3362,9 +3362,41 @@ kbd.addEventListener('input', e => {
   resetKbd();
 });
 
+/* ================= CHAPTER VOCAB (from the lesson plans: chapter-vocab.json) ================= */
+let chVocab = null;
+const loadChVocab = async () => chVocab || (chVocab = await (await fetch('chapter-vocab.json', { cache: 'no-cache' })).json());
+const chListName = c => c.course + ': Ch. ' + c.chapter + ' ' + c.title;
+async function openChapter(id) {
+  const all = await loadChVocab(), c = all[id];
+  if (!c) { toast('That chapter wasn’t found.'); newPuzzle(); return; }
+  const entries = shuffle(c.words.map(w => ({ answer: w[0], clue: w[1] }))).slice(0, 20);
+  let best = null;
+  for (let t = 0; t < 8; t++) { const g = generate(entries, entries.length, 150); if (!best || g.entries.length > best.entries.length) best = g; if (best.entries.length === entries.length) break; }
+  best.title = 'Chapter ' + c.chapter + ' vocabulary: ' + c.title;
+  best.diff = diff; best.given = pickGivens(best, DIFFS[diff].givens);
+  setup(best, null);
+  toast('Chapter ' + c.chapter + ' vocabulary · ' + best.entries.length + ' words. Reload the page for a different mix.', 4000);
+}
+$('#tAddCh').addEventListener('click', async () => {
+  let all; try { all = await loadChVocab(); } catch { toast('Couldn’t load the chapter lists.'); return; }
+  const mine = (teacher.owner && teacher.owner.courses) || [];
+  let text = $('#tLists').value, n = 0;
+  for (const c of Object.values(all)) {
+    if (!c.course || !mine.includes(c.course)) continue;
+    const name = chListName(c);
+    if (text.includes('## ' + name)) continue;
+    text += (text.trim() ? '\n\n' : '') + '## ' + name + '\n' + c.words.map(w => w[0] + ' | ' + w[1].replace(/\s*\|\s*/g, ' / ')).join('\n');
+    n++;
+  }
+  $('#tLists').value = text;
+  toast(n ? `Added ${n} chapter lists at the bottom. Delete any you don’t want, then click Generate code.` : 'Your chapter lists are already here.', 6000);
+});
+
 /* ================= INIT ================= */
 (function init() {
   flushOutbox();
+  const vm = location.hash.match(/^#v=([\w-]+)/);
+  if (vm) { openChapter(vm[1]).catch(() => { toast('Couldn’t load that chapter.'); newPuzzle(); }); return; }
   const m = location.hash.match(/^#p=([\w-]+)/);
   const saved = store.get(SAVE_KEY);
   const keep = keepGet(); // the teacher's own computer, signed in for 30 days
