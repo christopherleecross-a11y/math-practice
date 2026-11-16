@@ -37792,6 +37792,27 @@ function dashOverview(titles) {
     app.append(el('div', { class: 'card' }, el('strong', {}, '🖨 Progress reports'), el('p', { class: 'small', style: 'margin:4px 0 10px' }, `One page per student in ${DASH.period} period${DASH.subject ? ' for ' + DASH.subject : ''}: average, scores over time, missing work, strong and weak skills, and every assignment. (Change “Show the last” to set the time span.)`),
       el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: () => printReports(list) }, `Print ${list.length} report${list.length === 1 ? '' : 's'}`)));
   } else app.append(el('p', { class: 'small', style: 'margin:0 4px 16px' }, 'Tip: pick a period above to print progress reports for the whole class, or click a student for one report.'));
+  const vis = dashVisits(); if (vis) app.append(vis);
+}
+// who opened a lesson's catch-up page (the "Missed class?" link); needs PracticeResults.gs with logVisit (dashboard v10)
+function dashVisits(only) {
+  const D = DASH.data;
+  if (!D.visits) return only ? null : el('p', { class: 'small', style: 'margin:0 4px 16px' }, 'Catch-up page visits: update your Apps Script to the latest version to see who opened the catch-up pages.');
+  const list = D.visits.filter((v) => (!DASH.period || v.period === DASH.period) && (!DASH.subject || v.lesson.startsWith(DASH.subject)) && (!only || who(v.period, v.name) === only));
+  if (only && !list.length) return null;
+  const d = el('details', { class: 'card' }, el('summary', { style: 'cursor:pointer' }, el('strong', {}, `📖 Catch-up page visits (${list.length})`)));
+  if (DASH.visOpen || only) d.open = true;
+  d.addEventListener('toggle', () => { DASH.visOpen = d.open; });
+  d.append(el('p', { class: 'small', style: 'margin:6px 0 8px' }, 'Students who opened a lesson’s catch-up page (from your Missed-class link or a Catch-up page link). One row per student per lesson.'));
+  if (!list.length) d.append(el('p', {}, 'No visits yet for these choices.'));
+  else d.append(dashTable([
+    ...(only ? [] : [{ k: 'name', t: 'Student', sort: byStudent, show: (v) => linkBtn(v.name, () => { DASH.student = { period: v.period, name: v.name }; dashRender(); }) }, { k: 'period', t: 'Period', sort: byStudent }]),
+    { k: 'lesson', t: 'Lesson' },
+    { k: 'vlast', t: 'Last opened', desc: true, sort: (v) => v.last, show: (v) => dashDate(v.last) },
+    { k: 'vfirst', t: 'First opened', desc: true, sort: (v) => v.first, show: (v) => dashDate(v.first) },
+    { k: 'times', t: 'Times', desc: true },
+  ], list));
+  return d;
 }
 
 function dashAssignment(a) {
@@ -37899,6 +37920,7 @@ function dashStudent(s) {
       { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn({ ...r, name: s.name, period: s.period }) },
     ], best) : el('p', {}, 'Nothing turned in yet.'),
     prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered${p.correct != null ? `, ${p.correct} correct` : ''}, ${dashDate(p.t)})`).join('; ')) : ''));
+  const vis = dashVisits(k); if (vis) app.append(vis);
 }
 /* ---------- Reteach and progress reports (built from the dashboard data) ---------- */
 // the question type of each question number on an assignment (null when the order differs from student to student)
@@ -40646,8 +40668,61 @@ function missedScreen() {
     el('label', { for: 'mLesson' }, 'Lesson'), lessSel,
     el('button', { class: 'btn', type: 'button', onclick: () => { if (!lessSel.value) return (err.textContent = 'Choose the lesson you missed.'); location.href = stuLink('catchup', lessSel.value); } }, 'Open the lesson'), err));
 }
+/* ---------- Catch-up page visits: the student signs in, and the teacher's Sheet logs who opened which lesson ---------- */
+const cuSess = { get: (k) => { try { return JSON.parse(sessionStorage.getItem(TK(k)) || 'null'); } catch { return null; } }, set: (k, v) => { try { sessionStorage.setItem(TK(k), JSON.stringify(v)); } catch {} } };
+function catchupLog(key, who) {
+  const lk = 'cuLogged:' + key, last = cuSess.get(lk);
+  if (last && Date.now() - last < 30 * 60e3) return; // a refresh in the same tab doesn't count as another visit
+  cuSess.set(lk, Date.now());
+  const S = lpSet(key) || { title: key }, title = `${SUBJECTS[S.subject] || ''} ${S.title.replace(/ \(30-minute plan\)$/, '')}`.trim();
+  fetch(CONFIG.SCRIPT_URL, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'logVisit', key, lesson: title, period: who.period, name: who.name, rid: who.rid || undefined, token: who.token || undefined }) }).catch(() => {});
+}
+// true: show the page now. false: a sign-in card (or the trip to Google sign-in) is showing instead.
+function catchupWho(key) {
+  if (PREVIEW || params.has('teacher') || !CONFIG.SCRIPT_URL) return true; // the teacher looking: nothing is logged
+  const pass = signinPass();
+  if (pass) { catchupLog(key, { period: pass.ps[0], name: pass.n, rid: pass.rid, token: pass.token }); return true; }
+  const picked = cuSess.get('cuWho');
+  if (picked && picked.name && picked.period) { catchupLog(key, picked); return true; }
+  stuHeader(key, 'Catch-up page');
+  if (CONFIG.SIGNIN_URL && !signinBroken) { // students come from Classroom already signed in to their school account: one automatic trip
+    let tried = true; try { tried = sessionStorage.getItem(TK('signin:tried')) === '1'; if (!tried) sessionStorage.setItem(TK('signin:tried'), '1'); } catch {}
+    if (!tried) { app.append(el('div', { class: 'card' }, el('p', {}, 'Signing you in with your school account…'))); signinGo(); return false; }
+  }
+  const card = el('div', { class: 'card' }, el('strong', {}, 'Missed class? Sign in first.'),
+    el('p', { style: 'margin:6px 0 10px' }, `So ${CONFIG.TEACHER_NAME || 'your teacher'} knows you caught up on this lesson.`));
+  if (CONFIG.SIGNIN_URL && !signinBroken) card.append(el('button', { class: 'btn', type: 'button', style: 'margin-top:0;display:flex;align-items:center;gap:10px', onclick: signinGo },
+    el('span', { style: 'display:inline-flex;width:22px;height:22px;border-radius:50%;background:#fff;color:#692b31;font:700 15px system-ui;align-items:center;justify-content:center' }, 'G'), 'Sign in with Google'),
+    el('div', { style: 'display:flex;align-items:center;gap:10px;margin:18px 0 6px;color:var(--muted)' }, el('hr', { style: 'flex:1;border:0;border-top:1px solid var(--line)' }), 'or pick your name', el('hr', { style: 'flex:1;border:0;border-top:1px solid var(--line)' })));
+  const per = el('select', {}, el('option', { value: '' }, 'Choose your class period…'), ...CONFIG.PERIODS.map((p) => el('option', { value: p }, p + ' period')));
+  const nameSel = el('select', { disabled: true }, el('option', { value: '' }, 'Choose your class period first'));
+  const typed = el('input', { type: 'text', placeholder: 'First and last name', autocomplete: 'off', style: 'display:none' });
+  const err = el('div', { class: 'err' });
+  let roster = {};
+  const fill = () => { const list = roster[per.value] || []; nameSel.innerHTML = '';
+    if (!per.value) { nameSel.style.display = ''; typed.style.display = 'none'; nameSel.disabled = true; nameSel.append(el('option', { value: '' }, 'Choose your class period first')); return; }
+    if (!list.length) { nameSel.style.display = 'none'; typed.style.display = per.value ? '' : 'none'; return; }
+    nameSel.style.display = ''; typed.style.display = 'none'; nameSel.disabled = !per.value;
+    nameSel.append(el('option', { value: '' }, 'Choose your name…'), ...list.map((x) => el('option', { value: x.id }, x.label)), el('option', { value: '__typed' }, 'My name isn’t on the list')); };
+  per.addEventListener('change', fill);
+  nameSel.addEventListener('change', () => { typed.style.display = nameSel.value === '__typed' ? '' : 'none'; });
+  loadRoster().then((r) => { roster = r || {}; fill(); });
+  card.append(el('label', {}, 'Class period'), per, el('label', {}, 'Your name'), nameSel, typed,
+    el('button', { class: 'btn', type: 'button', onclick: () => {
+      if (!per.value) return (err.textContent = 'Choose your class period.');
+      const useList = nameSel.style.display !== 'none' && nameSel.value !== '__typed';
+      if (useList && !nameSel.value) return (err.textContent = 'Choose your name.');
+      const who = useList ? { period: per.value, rid: nameSel.value, name: nameSel.selectedOptions[0].textContent } : { period: per.value, name: typed.value.trim() };
+      if (!who.name || (!useList && who.name.split(/\s+/).length < 2)) return (err.textContent = 'Type your first and last name.');
+      cuSess.set('cuWho', who); app.innerHTML = ''; catchupScreen(key);
+    } }, 'Open the lesson'), err);
+  app.append(card);
+  return false;
+}
 function catchupScreen(key) {
   if (!LESSONS[key]) { app.append(el('div', { class: 'card' }, 'That lesson wasn’t found.')); return; }
+  if (!catchupWho(key)) return;
   const L = stuHeader(key, 'Catch-up page'), steps = lpWithIcan(lessonOf(key), key);
   const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '900px';
   app.append(el('div', { class: 'card' }, el('strong', {}, 'Missed class? Start here.'),
