@@ -14027,8 +14027,9 @@ TEMPLATES.g72Coord = (r) => {
     }
     return { topic: 'Finding the fourth vertex', stem: `Three vertices of ▱${N.join('')} are ${N[0]}${ptT(A)}, ${N[1]}${ptT(B)}, and ${N[2]}${ptT(C)}. Find the coordinates of vertex ${N[3]}.`,
       ...buildChoices(r, ptT(D), [ptT(VEC.sub(VEC.add(A, B), C)), ptT(VEC.sub(VEC.add(B, C), A)), ptT(VEC.add(A, VEC.sub(B, C))), ptT([D[0], -D[1]])].filter((x, i, X) => x !== ptT(D) && X.indexOf(x) === i), (i) => ptT([D[0] + i + 1, D[1]])),
-      fr: { fields: [{ kind: 'expr', keys: 'point', label: `${N[3]} =` }], key: [`\\left(${D[0]},${D[1]}\\right)`], display: ptT(D), check: (x) => onePointOk(x[0], D) },
-      solution: `Opposite sides are parallel and congruent, so ${N[3]} = ${N[0]} + (${N[2]} − ${N[1]}).\n${N[2]} − ${N[1]} = (${fmt(C[0] - B[0])}, ${fmt(C[1] - B[1])}), so ${N[3]} = (${g7add(A[0], C[0] - B[0])}, ${g7add(A[1], C[1] - B[1])}) = ${ptT(D)}` };
+      fr: { fields: [{ kind: 'expr', keys: 'point', label: `${N[3]} =` }], key: [`\\left(${D[0]},${D[1]}\\right)`], display: ptT(D), check: (x) => onePointOk(x[0], D),
+        near: (x) => (g7otherCorner(x[0], A, B, C) ? g7orderNote(N) : '') },
+      solution: `Opposite sides are parallel and congruent, so ${N[3]} = ${N[0]} + (${N[2]} − ${N[1]}).\n${N[2]} − ${N[1]} = (${fmt(C[0] - B[0])}, ${fmt(C[1] - B[1])}), so ${N[3]} = (${g7add(A[0], C[0] - B[0])}, ${g7add(A[1], C[1] - B[1])}) = ${ptT(D)}\nThe name ▱${N.join('')} gives the order around the shape, so ${N[0]} and ${N[2]} are opposite corners; that is why ${N[3]} is the only answer.` };
   }
 };
 
@@ -27623,6 +27624,10 @@ TEMPLATES.g71Challenge = (r) => {
       : `Let e = an exterior angle. The interior angle is e + ${i - e}, and interior + exterior = 180°:\ne + ${i - e} + e = 180  →  e = ${e}°`) +
       `\nThe exterior angles add to 360°: n = 360 ÷ ${e} = ${n} sides.\nSum of interior angles: (${n} − 2) · 180° = ${sum}°` };
 };
+// "Three vertices of ▱PQST": the name gives the order around the shape, so only one fourth corner works.
+// A student who finds one of the other two parallelograms through the three points gets told why.
+function g7otherCorner(v, A, B, C) { return [VEC.sub(VEC.add(B, C), A), VEC.sub(VEC.add(A, B), C)].some((P) => onePointOk(v, P)); }
+function g7orderNote(N) { return `That point does make a parallelogram with the three given points, but not ▱${N.join('')}: the letters go around the shape in order, so ${N[0]} and ${N[2]} are opposite corners (diagonals ${SEG(N[0] + N[2])} and ${SEG(N[1] + N[3])}).`; }
 /* Geometry 7.2: the fourth vertex and the diagonals' intersection */
 TEMPLATES.g72Challenge = (r) => {
   for (;;) {
@@ -27633,8 +27638,8 @@ TEMPLATES.g72Challenge = (r) => {
     const wr = [[[B[0] + C[0] - A[0], B[1] + C[1] - A[1]], M], [[A[0] + B[0] - C[0], A[1] + B[1] - C[1]], M], [D, [(B[0] + C[0]) / 2, (B[1] + C[1]) / 2]], [D, [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]]].map(([d, m]) => `${t}${ptT(d)}, intersection ${ptT(m)}`);
     return { topic: 'Challenge: parallelogram coordinates', stem: `Three vertices of ▱${p}${q}${s}${t} are ${p}${ptT(A)}, ${q}${ptT(B)}, and ${s}${ptT(C)}. Find the coordinates of vertex ${t} and of the point where the diagonals intersect.`,
       ...buildChoices(r, correct, [...new Set(wr)].filter((w) => w !== correct), (i) => `${t}${ptT([D[0] + i + 1, D[1]])}, intersection ${ptT(M)}`),
-      fr: chPtFR([{ label: `${t} =`, P: D }, { label: 'Diagonals intersect at', P: M }], correct),
-      solution: `The diagonals of a parallelogram bisect each other, so ${SEG(p + s)} and ${SEG(q + t)} have the same midpoint.\nMidpoint of ${SEG(p + s)}: ${ptT(M)} (this is where the diagonals intersect).\n${t} = 2 · ${ptT(M)} − ${q}: ${t} = ${ptT(D)}.\n(Or slide: from ${q} to ${p} is the same move as from ${s} to ${t}.)` };
+      fr: { ...chPtFR([{ label: `${t} =`, P: D }, { label: 'Diagonals intersect at', P: M }], correct), near: (x) => (g7otherCorner(x[0], A, B, C) ? g7orderNote([p, q, s, t]) : '') },
+      solution: `The diagonals of a parallelogram bisect each other, so ${SEG(p + s)} and ${SEG(q + t)} have the same midpoint.\nMidpoint of ${SEG(p + s)}: ${ptT(M)} (this is where the diagonals intersect).\n${t} = 2 · ${ptT(M)} − ${q}: ${t} = ${ptT(D)}.\n(Or slide: from ${q} to ${p} is the same move as from ${s} to ${t}.)\nThe name ▱${p}${q}${s}${t} gives the order around the shape, so ${p} and ${s} are opposite corners; that is why ${t} is the only answer.` };
   }
 };
 /* Geometry 7.3: two variables that make a quadrilateral a parallelogram (a system) */
@@ -37080,7 +37085,8 @@ async function checkQ(i) {
   else if (m < k) { // typed answer: more Checks on this same version before new numbers
     state.misses[i] = m;
     const left = total - wrong, more = k - m < left;
-    state.flash[i] = `Not quite. Check your work and try again — ${left} ${left === 1 ? 'try' : 'tries'} left${more ? `; new numbers after ${k - m} more ${k - m === 1 ? 'miss' : 'misses'}` : ''}.`;
+    const near = q.mode === 'fr' && q.fr && q.fr.near && Array.isArray(a) ? q.fr.near(cleanAns(a)) : '';
+    state.flash[i] = `${near ? near + ' ' : ''}Not quite. Check your work and try again — ${left} ${left === 1 ? 'try' : 'tries'} left${more ? `; new numbers after ${k - m} more ${k - m === 1 ? 'miss' : 'misses'}` : ''}.`;
   }
   else {
     delete state.misses[i]; state.fresh[i] = true;
