@@ -1270,6 +1270,7 @@ const KEYROWS_P = {
   slope: [['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['undefined', '\\text{undefined}'], ['none', '\\text{none}']],
   point: [['( , )', '\\left(#?,#?\\right)'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['none', '\\text{none}']],
   num: [['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['±', '\\pm '], [',', ','], ['π', '\\pi'], ['none', '\\text{none}']],
+  coordgeo: [['( , )', '\\left(#?,#?\\right)'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], ['undefined', '\\text{undefined}']],
 };
 const numF = (label, val, opts = {}) => ({ kind: 'expr', keys: opts.keys || 'num', label, suffix: opts.suffix || '', _val: val });
 // free response with several numeric boxes; each worth an equal share
@@ -14071,12 +14072,40 @@ TEMPLATES.g73Coord = (r) => {
     const N = pickLetters(r, 4), A = [ri(r, -6, 3), ri(r, -6, 3)], u = [ri(r, 2, 8), ri(r, -4, 4)], v = [ri(r, -4, 4), ri(r, 2, 8)];
     if (u[0] * v[1] - u[1] * v[0] <= 0) continue;
     const yes = r() < 0.6, B = VEC.add(A, u), D = VEC.add(A, v), C = yes ? VEC.add(B, v) : VEC.add(VEC.add(B, v), pick(r, [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1]]));
-    const sl = (p, q) => (q[0] === p[0] ? 'undefined' : fracT((q[1] - p[1]) / (q[0] - p[0]))), M1 = VEC.mul(VEC.add(A, C), 0.5), M2 = VEC.mul(VEC.add(B, D), 0.5);
+    const P = [A, B, C, D], seg = (a, b) => SEG(N[a] + N[b]);
+    const slopeOf = (p, q) => (q[0] === p[0] ? null : (q[1] - p[1]) / (q[0] - p[0])), sl = (p, q) => { const m = slopeOf(p, q); return m === null ? 'undefined' : fracT(m); };
+    const M1 = VEC.mul(VEC.add(A, C), 0.5), M2 = VEC.mul(VEC.add(B, D), 0.5);
+    const sides = [[0, 1], [3, 2], [1, 2], [0, 3]]; // AB and DC, then BC and AD: the opposite pairs side by side
     const correct = yes ? 'Yes: the diagonals have the same midpoint, so they bisect each other' : 'No: the diagonals do not bisect each other';
+    // free response: the student picks a test (slopes, side lengths, or the diagonals' midpoints), works it, then decides
+    const METHODS = ['Slopes of the sides', 'Lengths of the sides', 'Midpoints of the diagonals'];
+    const items = [
+      ...sides.map(([a, b], k) => { const m = slopeOf(P[a], P[b]);
+        return { m: 0, f: { kind: 'expr', keys: 'coordgeo', label: `slope of ${seg(a, b)} =`, when: [0, METHODS[0]], part: k === 0 ? 'Step 2: Find the slope of each side. One pair of opposite sides:' : k === 2 ? 'The other pair of opposite sides:' : undefined },
+          key: m === null ? '\\text{undefined}' : fracL(m), ok: (x) => (m === null ? /undefined|none|nosl/.test(pxWords(x)) : numOk(x, m)) }; }),
+      ...sides.map(([a, b], k) => { const d = distExact(P[a], P[b]);
+        return { m: 1, f: { kind: 'expr', keys: 'coordgeo', label: `${seg(a, b)} =`, when: [0, METHODS[1]], part: k === 0 ? 'Step 2: Find the length of each side (exact, or rounded to the hundredths). One pair of opposite sides:' : k === 2 ? 'The other pair of opposite sides:' : undefined },
+          key: d.latex || d.text, ok: (x) => numOk(x, d.val, 0.006 / Math.max(1, d.val)) }; }),
+      ...[[0, 2, M1], [1, 3, M2]].map(([a, b, M], k) => ({ m: 2, f: { kind: 'expr', keys: 'coordgeo', label: `midpoint of ${seg(a, b)} =`, when: [0, METHODS[2]], part: k ? undefined : 'Step 2: Find the midpoint of each diagonal.' },
+        key: `\\left(${fracL(M[0])},${fracL(M[1])}\\right)`, ok: (x) => onePointOk(x, M) })),
+    ];
+    const last = items.length + 1, verdict = yes ? 'Yes' : 'No';
+    const score = (val) => { const mi = METHODS.indexOf(val[0]); if (mi < 0) return 0;
+      const mine = items.map((it, k) => [it, k + 1]).filter(([it]) => it.m === mi), got = mine.filter(([it, k]) => it.ok(val[k] || '')).length + (val[last] === verdict ? 1 : 0);
+      return got / (mine.length + 1); };
+    const lens = sides.map(([a, b]) => distExact(P[a], P[b]).text);
     return { topic: 'Parallelograms in the coordinate plane', stem: `Is the quadrilateral with vertices ${N[0]}${ptT(A)}, ${N[1]}${ptT(B)}, ${N[2]}${ptT(C)}, and ${N[3]}${ptT(D)} a parallelogram?`,
       ...buildChoices(r, correct, [yes ? 'No: the diagonals do not bisect each other' : 'Yes: the diagonals have the same midpoint, so they bisect each other', yes ? 'No: the sides are not all congruent' : 'Yes: one pair of opposite sides is parallel', 'Yes: the diagonals are congruent'], () => null),
-      fr: FR.select('Is it a parallelogram?', ['Yes', 'No'], yes ? 'Yes' : 'No'),
-      solution: `Midpoint of ${SEG(N[0] + N[2])}: ${ptT(M1)}. Midpoint of ${SEG(N[1] + N[3])}: ${ptT(M2)}.\n${yes ? 'Same midpoint, so the diagonals bisect each other: it is a parallelogram (Parallelogram Diagonals Converse).' : 'Different midpoints, so the diagonals do not bisect each other: it is not a parallelogram.'}\n(Slopes: ${SEG(N[0] + N[1])} ${sl(A, B)}, ${SEG(N[3] + N[2])} ${sl(D, C)}; ${SEG(N[1] + N[2])} ${sl(B, C)}, ${SEG(N[0] + N[3])} ${sl(A, D)}.)` };
+      frStem: `Is the quadrilateral with vertices ${N[0]}${ptT(A)}, ${N[1]}${ptT(B)}, ${N[2]}${ptT(C)}, and ${N[3]}${ptT(D)} a parallelogram? Choose a way to test it, show the numbers, then decide.`,
+      fr: {
+        fields: [{ kind: 'select', label: 'Test it with:', options: METHODS, part: 'Step 1: Choose how to test it.' }, ...items.map((it) => it.f),
+          { kind: 'select', label: 'Is it a parallelogram?', options: ['Yes', 'No'], part: 'Step 3: Decide.' }],
+        key: [METHODS[2], ...items.map((it) => it.key), verdict],
+        answered: (val) => { const mi = METHODS.indexOf(val[0]); return mi >= 0 && items.every((it, k) => it.m !== mi || String(val[k + 1] || '').trim() !== '') && !!val[last]; },
+        score, check: (val) => score(val) === 1,
+        display: `${verdict}. Any one test works: slopes ${seg(0, 1)} ${sl(A, B)}, ${seg(3, 2)} ${sl(D, C)}, ${seg(1, 2)} ${sl(B, C)}, ${seg(0, 3)} ${sl(A, D)}; lengths ${seg(0, 1)} ${lens[0]}, ${seg(3, 2)} ${lens[1]}, ${seg(1, 2)} ${lens[2]}, ${seg(0, 3)} ${lens[3]}; midpoints ${seg(0, 2)} ${ptT(M1)}, ${seg(1, 3)} ${ptT(M2)}`,
+      },
+      solution: `Any one of these tests works.\nSlopes: ${seg(0, 1)} ${sl(A, B)} and ${seg(3, 2)} ${sl(D, C)}; ${seg(1, 2)} ${sl(B, C)} and ${seg(0, 3)} ${sl(A, D)}. ${yes ? 'Both pairs of opposite sides are parallel.' : 'Not both pairs of opposite sides are parallel.'}\nLengths: ${seg(0, 1)} = ${lens[0]} and ${seg(3, 2)} = ${lens[1]}; ${seg(1, 2)} = ${lens[2]} and ${seg(0, 3)} = ${lens[3]}. ${yes ? 'Both pairs of opposite sides are congruent.' : 'Not both pairs of opposite sides are congruent.'}\nMidpoints: ${seg(0, 2)} ${ptT(M1)}, ${seg(1, 3)} ${ptT(M2)}. ${yes ? 'Same midpoint, so the diagonals bisect each other.' : 'Different midpoints, so the diagonals do not bisect each other.'}\n${yes ? 'It is a parallelogram.' : 'It is not a parallelogram.'}` };
   }
 };
 
@@ -36734,8 +36763,8 @@ function frArea(q, i) {
     if (f.kind === 'proof') { wrap.append(proofEditor(q, i, vals, reveal, save)); controls[k] = { set disabled(_) {}, set placeholder(_) {} }; return; }
     if (f.kind === 'graph') { wrap.append(graphInput(q, i, f, k, vals, reveal, save)); controls[k] = { set disabled(_) {}, set placeholder(_) {} }; return; }
     if (!row || f.part) {
-      if (f.part) wrap.append(el('div', { class: 'frpart' }, f.part));
-      row = el('div', { class: 'frrow' }); wrap.append(row);
+      if (f.part) wrap.append(el('div', { class: 'frpart', 'data-when': f.when ? f.when.join('|') : '' }, f.part));
+      row = el('div', { class: 'frrow', 'data-when': f.when ? f.when.join('|') : '' }); wrap.append(row);
     }
     if (f.kind === 'choice') { // multiple-choice part inside a multi-part question
       const box = el('div', { class: 'choices', style: 'margin-top:0;width:100%' });
@@ -36812,6 +36841,11 @@ function frArea(q, i) {
     row.append(el('label', { class: 'frfield' }, f.label ? el('span', { class: 'frlabel' }, frLab(f.label)) : '', f.prefix ? el('span', { class: 'frprefix' }, f.prefix) : '', input, f.suffix ? el('span', { class: 'frprefix' }, f.suffix) : ''));
   });
   applyLocks();
+  // a field with when: [k, option] shows only while select k is set to that option (the teacher's key shows every field)
+  if (q.fr.fields.some((f) => f.when) && !state.teacher) {
+    const sync = () => wrap.querySelectorAll('[data-when]').forEach((n) => { const w = n.getAttribute('data-when'); if (!w) return; const [k, o] = w.split('|'); n.style.display = vals[+k] === o ? '' : 'none'; });
+    sync(); controls.forEach((c) => c && c.addEventListener && c.addEventListener('change', sync));
+  }
   if (hasMath && !reveal) { // small symbol row for the answer boxes
     const firstAns = () => lastAns || wrap.querySelector('math-field.mans');
     const keys = pKeys ? KEYROWS_P[pKeys] : hasTF ? [['( )', '\\left(#?\\right)'], ['cos', '\\cos '], ['sin', '\\sin '], ['i', 'i'], ['°', '^{\\circ}'], ['π', '\\pi'], ['a⁄b', '\\frac{#@}{#?}'], ['√', '\\sqrt{#?}'], [',', ',']]
