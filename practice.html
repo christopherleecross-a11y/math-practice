@@ -7684,7 +7684,7 @@ TEMPLATES.trigSumDiffFormula = (r) => {
       const useNums = r() < 0.5;
       let a, b, d;
       if (useNums) { a = ri(r, 2, 6); b = ri(r, 1, a - 1); if (!plus && a === b) continue; show = (x) => (x.d ? radS(x.n, x.d) : String(x)); A = a; B = b; }
-      else { d = pick(r, [5, 7, 9, 11]); a = ri(r, 1, d - 1); b = ri(r, 1, d - 1); if (a === b) continue; show = (x) => radS(x.n, x.d); A = { n: a, d }; B = { n: b, d }; }
+      else { d = pick(r, [5, 7, 9, 11]); a = ri(r, 1, d - 1); b = ri(r, 1, d - 1); if (a === b) continue; if (!plus && a < b) [a, b] = [b, a]; /* A − B stays positive, as in the book */ show = (x) => radS(x.n, x.d); A = { n: a, d }; B = { n: b, d }; }
       const val = (x) => (typeof x === 'number' ? x : (x.n * Math.PI) / x.d);
       const resN = plus ? val(A) + val(B) : val(A) - val(B);
       const resText = typeof A === 'number' ? String(plus ? A + B : A - B) : (() => { const n = plus ? A.n + B.n : A.n - B.n; return radS(n, A.d); })();
@@ -7697,7 +7697,8 @@ TEMPLATES.trigSumDiffFormula = (r) => {
     const sg = plus ? '+' : MINUS, sgc = plus ? MINUS : '+';
     const expr = fn === 'sin' ? `sin ${s(A)} cos ${s(B)} ${sg} cos ${s(A)} sin ${s(B)}`
       : fn === 'cos' ? `cos ${s(A)} cos ${s(B)} ${sgc} sin ${s(A)} sin ${s(B)}`
-      : `(tan ${s(A)} ${sg} tan ${s(B)}) / (1 ${sgc} tan ${s(A)} tan ${s(B)})`;
+      : (() => { const t = (x) => (/\//.test(s(x)) ? `tan(${s(x)})` : `tan ${s(x)}`); // tan(2π/5): inside the big fraction a bare 2π/5 would split as (tan 2π)/5
+        return `(${t(A)} ${sg} ${t(B)}) / (1 ${sgc} ${t(A)} ${t(B)})`; })();
     const formula = fn === 'sin' ? `sin(A ${sg} B) = sin A cos B ${sg} cos A sin B` : fn === 'cos' ? `cos(A ${sg} B) = cos A cos B ${sgc} sin A sin B` : `tan(A ${sg} B) = (tan A ${sg} tan B)/(1 ${sgc} tan A tan B)`;
     if (exactKind) {
       const cands = [specialExact(-ans), specialExact((fn === 'tan' ? Math.sin : FN3[COFN[fn]])((plus ? A + B : A - B) * DEG)), specialExact(FN3[fn]((plus ? A - B : A + B) * DEG))]
