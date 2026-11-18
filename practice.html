@@ -42014,7 +42014,11 @@ function builder() {
     items.forEach((it) => (need[keyOf(it)] = it[1]));
     const old = seq.length && !seq.some((k, j) => seq.indexOf(k) !== j) && seq.length < items.reduce((a, it) => a + it[1], 0) ? seq.flatMap((k) => Array(need[k] || 0).fill(k)) : seq; // a list saved before questions could be split up
     seq = old.filter((k) => need[k] && (used[k] = (used[k] || 0) + 1) <= need[k]);
-    items.forEach((it) => { const k = keyOf(it); while ((used[k] || 0) < need[k]) { seq.push(k); used[k] = (used[k] || 0) + 1; } });
+    // a newly added question goes at the end, but ahead of the ★ Challenge questions there (a challenge stays last)
+    const isCh = (k) => /Challenge$/.test(k.split(':')[0]);
+    items.forEach((it) => { const k = keyOf(it); while ((used[k] || 0) < need[k]) {
+      let at = seq.length; if (!isCh(k)) while (at > 0 && isCh(seq[at - 1])) at--;
+      seq.splice(at, 0, k); used[k] = (used[k] || 0) + 1; } });
     items.length = 0; // the question list in that order; a type that comes back later is listed again
     seq.forEach((k) => { const [id, f] = k.split(':'), last = items[items.length - 1]; if (last && last[0] === id && last[2] === f) last[1]++; else items.push([id, 1, f]); });
     drawSeq();
