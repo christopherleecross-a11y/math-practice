@@ -36160,6 +36160,10 @@ function signinPass() {
     return { ...o, token: t };
   } catch { return null; }
 }
+// Only a Chromebook is sure to be signed in to just the school account. On a home computer or phone, Google often
+// shows an error page instead (the browser is signed in to a personal account too), and the student never gets back here,
+// so off a Chromebook nobody is sent to Google automatically: they click the button or pick their name.
+const ON_CHROMEBOOK = /\bCrOS\b/.test(navigator.userAgent);
 const signinGo = () => { location.href = CONFIG.SIGNIN_URL + (CONFIG.SIGNIN_URL.includes('?') ? '&' : '?') + 'signin=1&back=' + encodeURIComponent(location.href.split('#')[0]); };
 const signOut = () => { passMem = ''; try { sessionStorage.removeItem(TK('signin:pass')); sessionStorage.setItem(TK('signin:tried'), '1'); } catch {} };
 async function loadRoster() {
@@ -36252,7 +36256,7 @@ function startScreen0(teacher = false) {
   }
   // students arrive from Google Classroom already signed in to their school account, so sign them in automatically
   // (once per tab; if it doesn't work, the button and the name list below are still here)
-  if (!teacher && CONFIG.SIGNIN_URL && !params.has('teacher') && !signinBroken && !PREVIEW) {
+  if (!teacher && CONFIG.SIGNIN_URL && ON_CHROMEBOOK && !params.has('teacher') && !signinBroken && !PREVIEW) {
     let tried = true; try { tried = sessionStorage.getItem(TK('signin:tried')) === '1'; if (!tried) sessionStorage.setItem(TK('signin:tried'), '1'); } catch {}
     if (!tried) { card.append(el('p', {}, 'Signing you in with your school account…')); app.append(card); signinGo(); return; }
   }
@@ -36260,7 +36264,7 @@ function startScreen0(teacher = false) {
   if (!teacher && CONFIG.SIGNIN_URL && !signinBroken && !PREVIEW) {
     card.append(el('button', { class: 'btn', type: 'button', style: 'margin-top:6px;display:flex;align-items:center;gap:10px', onclick: signinGo },
       el('span', { style: 'display:inline-flex;width:22px;height:22px;border-radius:50%;background:#fff;color:#692b31;font:700 15px system-ui;align-items:center;justify-content:center' }, 'G'), 'Sign in with Google'),
-      el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Use your school account. On a school Chromebook it’s one click.'));
+      el('p', { class: 'small', style: 'margin:8px 0 0' }, ON_CHROMEBOOK ? 'Use your school account. On a school Chromebook it’s one click.' : 'Use your school account. Not on a school Chromebook? If Google shows an error or the wrong account, come back to this page and pick your name below instead.'));
     if (CONFIG.REQUIRE_SIGNIN) { app.append(card); return; }
     card.append(el('div', { style: 'display:flex;align-items:center;gap:10px;margin:18px 0 0;color:var(--muted)' }, el('hr', { style: 'flex:1;border:0;border-top:1px solid var(--line)' }), 'or', el('hr', { style: 'flex:1;border:0;border-top:1px solid var(--line)' })));
   }
@@ -40729,7 +40733,7 @@ function catchupWho(key) {
   const picked = cuSess.get('cuWho');
   if (picked && picked.name && picked.period) { catchupLog(key, picked); return true; }
   stuHeader(key, 'Catch-up page');
-  if (CONFIG.SIGNIN_URL && !signinBroken) { // students come from Classroom already signed in to their school account: one automatic trip
+  if (CONFIG.SIGNIN_URL && ON_CHROMEBOOK && !signinBroken) { // students come from Classroom already signed in to their school account: one automatic trip
     let tried = true; try { tried = sessionStorage.getItem(TK('signin:tried')) === '1'; if (!tried) sessionStorage.setItem(TK('signin:tried'), '1'); } catch {}
     if (!tried) { app.append(el('div', { class: 'card' }, el('p', {}, 'Signing you in with your school account…'))); signinGo(); return false; }
   }
