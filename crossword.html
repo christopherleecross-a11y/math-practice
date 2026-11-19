@@ -2783,16 +2783,19 @@ async function classLoad() {
     go.disabled = true; go.textContent = 'Assigning…'; msg.style.color = ''; msg.textContent = '';
     try {
       try { await saveEntry(e); } catch {} // keep it in My assignments too
-      let postLink = link;
-      if (link.length > 1900) { // Classroom's limit is about 2,000 characters
+      // Classroom refuses a link over about 2,000 characters. Squeeze it; if that's still too long, Classroom gets a short
+      // link (#x=code) and your Practice Results sheet keeps the full one and hands it to the student page.
+      let postLink = link, short = '';
+      if (link.length > 1900) {
         const code = (link.match(/#p=([\w-]+)/) || [])[1];
         if (code) postLink = siteURL() + '#p=' + await zipCode(code);
-        if (postLink.length > 2000) throw new Error('This puzzle’s link is too long for Google Classroom (' + postLink.length + ' characters; the limit is about 2,000). Build it with fewer versions (“Same puzzle for everyone” is shortest) or fewer reworded clues, then assign it again.');
+        if (postLink.length > 1900) { short = siteURL() + '#x=' + e.pcode + '-' + TEACHERS.indexOf(teacher.owner); postLink = link; }
       }
-      const r = await classPost({ action: 'postAssignment', key: 'crossword:' + e.pcode, link: postLink, title: title.value.trim(), periods: ps, mode: modeSel.value, students: ids, points: +pts.value || 100, due: due.value, time: tm.value, perPeriod });
+      const r = await classPost({ action: 'postAssignment', key: 'crossword:' + e.pcode, link: postLink, short, title: title.value.trim(), periods: ps, mode: modeSel.value, students: ids, points: +pts.value || 100, due: due.value, time: tm.value, perPeriod });
       if (!r.ok) throw new Error(r.wrong ? 'That dashboard password didn’t match.' : r.error === 'unknown action' || /practice link/.test(r.error || '') ? 'Update your PracticeResults.gs to version 12 to assign crosswords in Classroom.' : r.error || 'failed');
       msg.style.color = r.failed.length ? '#b03a2e' : '#2e7d32';
-      msg.textContent = (r.posted.length ? '✓ Assigned to ' + r.posted.join(', ') + '.' : '') + (r.failed.length ? '\nProblems:\n' + r.failed.join('\n') : '');
+      msg.textContent = (r.posted.length ? '✓ Assigned to ' + r.posted.join(', ') + '.' : '') + (r.failed.length ? '\nProblems:\n' + r.failed.join('\n') : '')
+        + (short && r.failed.some(f => /invalid argument/i.test(f)) ? '\nThis puzzle needs the short Classroom link: update the Apps Script in your Practice Results sheet to the newest PracticeResults.gs (Deploy > Manage deployments > Edit > New version > Deploy), then assign it again.' : '');
       go.textContent = 'Assign again';
     } catch (err) { msg.style.color = '#b03a2e'; msg.textContent = String(err.message || err); go.textContent = 'Assign in Classroom'; }
     go.disabled = false;
@@ -3490,6 +3493,19 @@ async function openChapter(id) {
   const vm = location.hash.match(/^#v=([\w-]+)/);
   if (vm) { openChapter(vm[1]).catch(() => { toast('Couldn’t load that chapter.'); newPuzzle(); }); return; }
   const m = location.hash.match(/^#p=([\w-]+)/);
+  const xm = location.hash.match(/^#x=([\w]+)-(\d+)$/);
+  if (xm) { // a short Classroom link: the full puzzle link is kept in the teacher's Practice Results sheet
+    const tch = TEACHERS[+xm[2]], back = () => { history.replaceState(null, '', location.pathname + location.search); init(); };
+    if (!tch || !/^https:\/\//.test(tch.results || '')) { toast('That link doesn’t work. Ask your teacher for the crossword link.', 6000); back(); return; }
+    toast('Opening your crossword…', 4000);
+    fetch(tch.results, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'crosswordLink', code: xm[1] }) })
+      .then(r => r.json()).then(r => {
+        const code = r && r.found && (String(r.link).match(/#p=([\w-]+)/) || [])[1];
+        if (!code) { toast('That crossword couldn’t be found. Ask your teacher.', 6000); back(); return; }
+        history.replaceState(null, '', location.pathname + location.search + '#p=' + code); init();
+      }).catch(() => { toast('Couldn’t reach your teacher’s sheet. Check your internet and reload the page.', 8000); });
+    return;
+  }
   if (m && m[1][0] === 'Z') { // a squeezed link (from Google Classroom): unpack it, then load as usual
     unzipCode(m[1]).then(code => { history.replaceState(null, '', location.pathname + location.search + '#p=' + code); init(); })
       .catch(() => { history.replaceState(null, '', location.pathname + location.search); toast('That share link looks broken — here’s a fresh puzzle.'); init(); });
