@@ -10093,7 +10093,7 @@ function drawFigure(cv, fig) {
     fig = { ...fig, polys: [fig.polys[0], { ...fig.polys[1], pts: fig.polys[1].pts.map((p) => [p[0] + dx, p[1] + dy]) }] };
   }
   const all = fig.polys.flatMap((p) => p.pts);
-  const bb = bbox(all), m = fig.polys.some((P) => (P.slab || []).some(Boolean)) ? 66 : 46, noteH = fig.note ? 16 : 0;
+  const bb = bbox(all), m = fig.margin != null ? fig.margin : fig.polys.some((P) => (P.slab || []).some(Boolean)) ? 66 : 46, noteH = fig.note ? 16 : 0;
   const s = Math.min((W - 2 * m) / (bb.x1 - bb.x0), (H - 2 * m - noteH) / (bb.y1 - bb.y0));
   const ox = (W - (bb.x1 - bb.x0) * s) / 2, oy = (H - noteH - (bb.y1 - bb.y0) * s) / 2;
   const X = (p) => [ox + (p[0] - bb.x0) * s, oy + (bb.y1 - p[1]) * s];
@@ -39655,7 +39655,7 @@ function pgramWaysDraw(F) {
       ctx.strokeStyle = c.bad ? '#b03a2e' : '#d8d2c4'; ctx.lineWidth = c.bad ? 2 : 1; ctx.setLineDash(c.bad ? [6, 4] : []);
       ctx.strokeRect(x + 6, y + 6, cw - 12, ch - 12); ctx.setLineDash([]);
       const fw = cw - 24, fh = ch - capH - 10, z = fz > 1 ? 0.85 : 0.72, sub = makeCanvas(Math.round(fw * z), Math.round(fh * z)); sub._stack = false;
-      drawFigure(sub, { polys: c.polys }); // drawn small, then scaled up so the shape fills its box (drawFigure keeps a fixed margin)
+      drawFigure(sub, { polys: c.polys, margin: fz > 1 ? 20 : undefined }); /* the TV chart: a small margin, so the shape fills its box */ // drawn small, then scaled up so the shape fills its box (drawFigure keeps a fixed margin)
       ctx.drawImage(sub, x + 12, y + 10, fw, fh);
       ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
       ctx.font = `bold ${Math.round(16 * fz)}px "Times New Roman", Times, serif`; ctx.fillStyle = c.bad ? '#b03a2e' : '#1d1d1b';
@@ -40933,9 +40933,15 @@ function tvShow(list, at) {
       return String(q.stem).split('\n').map((ln) => { if (notes && !ln.trim()) return el('div', { style: 'height:22px' }); const cv = textCanvas(ln, w, font, 42); if (notes) { cv.style.display = 'block'; cv.style.marginBottom = '16px'; } return cv; });
     })());
     if (q.draw) {
-      const graph = q.topic.startsWith('Graphs'), sz = q.size || (graph ? [620, 330] : [560, 300]);
+      const graph = q.topic.startsWith('Graphs');
+      let sz = q.size || (graph ? [620, 330] : [560, 300]), roomH = window.innerHeight * 0.5;
+      if (q.bigFig) { // a summary chart takes the shape of the room left on the screen, so it fills it
+        const last = body.lastElementChild, used = last ? last.getBoundingClientRect().bottom : body.getBoundingClientRect().top;
+        roomH = Math.max(300, window.innerHeight - used - 36);
+        sz = [sz[0], Math.max(480, Math.min(900, Math.round((sz[0] * roomH) / w)))];
+      }
       const cv = makeCanvas(sz[0], sz[1]); cv._stack = false; try { q.draw(cv); } catch {}
-      const k = Math.min(w / sz[0], (q.bigFig ? window.innerHeight - 170 : window.innerHeight * 0.5) / sz[1], q.bigFig ? 3 : 2); cv.style.width = Math.round(sz[0] * k) + 'px'; cv.style.maxWidth = '100%';
+      const k = Math.min(w / sz[0], roomH / sz[1], q.bigFig ? 3 : 2); cv.style.width = Math.round(sz[0] * k) + 'px'; cv.style.maxWidth = '100%';
       cv.style.display = 'block'; body.append(el('div', { style: 'display:flex;justify-content:center;margin:10px 0' }, cv));
     }
     if (q.mode !== 'fr' && q.choices) body.append(el('div', { class: 'tv-ch' }, ...q.choices.map((c, j) => el('div', { class: shown && j === q.answer ? 'tv-right' : '' }, el('b', {}, LETTERS[j] + '. '), textCanvas(c, Math.floor(w / 2) - 60, font, 42)))));
