@@ -1866,6 +1866,18 @@ function enc(obj) {
   bytes.forEach(b => s += String.fromCharCode(b));
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+// A shorter link for Google Classroom, which refuses a link over about 2,000 characters (a puzzle with
+// 10 versions is about 5,000). "Z" + the code squeezed with deflate; an ordinary code always starts "eyJ".
+async function zipCode(code) {
+  const raw = new TextEncoder().encode(code);
+  const out = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+  let s = ''; out.forEach(b => s += String.fromCharCode(b));
+  return 'Z' + btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function unzipCode(z) {
+  const s = atob(z.slice(1).replace(/-/g, '+').replace(/_/g, '/')), bytes = Uint8Array.from(s, ch => ch.charCodeAt(0));
+  return new TextDecoder().decode(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+}
 function dec(str) {
   const s = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
   return JSON.parse(new TextDecoder().decode(Uint8Array.from(s, ch => ch.charCodeAt(0))));
@@ -2771,7 +2783,13 @@ async function classLoad() {
     go.disabled = true; go.textContent = 'Assigning…'; msg.style.color = ''; msg.textContent = '';
     try {
       try { await saveEntry(e); } catch {} // keep it in My assignments too
-      const r = await classPost({ action: 'postAssignment', key: 'crossword:' + e.pcode, link, title: title.value.trim(), periods: ps, mode: modeSel.value, students: ids, points: +pts.value || 100, due: due.value, time: tm.value, perPeriod });
+      let postLink = link;
+      if (link.length > 1900) { // Classroom's limit is about 2,000 characters
+        const code = (link.match(/#p=([\w-]+)/) || [])[1];
+        if (code) postLink = siteURL() + '#p=' + await zipCode(code);
+        if (postLink.length > 2000) throw new Error('This puzzle’s link is too long for Google Classroom (' + postLink.length + ' characters; the limit is about 2,000). Build it with fewer versions (“Same puzzle for everyone” is shortest) or fewer reworded clues, then assign it again.');
+      }
+      const r = await classPost({ action: 'postAssignment', key: 'crossword:' + e.pcode, link: postLink, title: title.value.trim(), periods: ps, mode: modeSel.value, students: ids, points: +pts.value || 100, due: due.value, time: tm.value, perPeriod });
       if (!r.ok) throw new Error(r.wrong ? 'That dashboard password didn’t match.' : r.error === 'unknown action' || /practice link/.test(r.error || '') ? 'Update your PracticeResults.gs to version 12 to assign crosswords in Classroom.' : r.error || 'failed');
       msg.style.color = r.failed.length ? '#b03a2e' : '#2e7d32';
       msg.textContent = (r.posted.length ? '✓ Assigned to ' + r.posted.join(', ') + '.' : '') + (r.failed.length ? '\nProblems:\n' + r.failed.join('\n') : '');
@@ -3472,6 +3490,11 @@ async function openChapter(id) {
   const vm = location.hash.match(/^#v=([\w-]+)/);
   if (vm) { openChapter(vm[1]).catch(() => { toast('Couldn’t load that chapter.'); newPuzzle(); }); return; }
   const m = location.hash.match(/^#p=([\w-]+)/);
+  if (m && m[1][0] === 'Z') { // a squeezed link (from Google Classroom): unpack it, then load as usual
+    unzipCode(m[1]).then(code => { history.replaceState(null, '', location.pathname + location.search + '#p=' + code); init(); })
+      .catch(() => { history.replaceState(null, '', location.pathname + location.search); toast('That share link looks broken — here’s a fresh puzzle.'); init(); });
+    return;
+  }
   const saved = store.get(SAVE_KEY);
   const keep = keepGet(); // the teacher's own computer, signed in for 30 days
   if (m) {
