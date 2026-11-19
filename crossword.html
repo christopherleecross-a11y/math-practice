@@ -533,6 +533,13 @@ osmosis: Movement of water across a membrane"></textarea>
 <div id="toast"></div>
 
 <script>
+// default post time for each period: the start of class (bell schedule), unless the teacher set their own.
+// Same list and same saved times as the practice site (both pages share this computer's storage).
+const BELL_POST = { 1: '07:54', 2: '09:02', 3: '09:51', 4: '10:40', 5: '11:29', 6: '12:57', 7: '13:46', 8: '14:35' };
+const postTimes = () => { try { return JSON.parse(localStorage.getItem('postTimes') || '{}'); } catch { return {}; } };
+const postTimeFor = (p) => { const n = parseInt(String(p), 10); return postTimes()[n] || BELL_POST[n] || '07:30'; };
+const savePostTime = (p, v) => { const n = parseInt(String(p), 10); if (!n) return; try { const o = postTimes(); if (v === BELL_POST[n]) delete o[n]; else o[n] = v; localStorage.setItem('postTimes', JSON.stringify(o)); } catch {} };
+
 (() => {
 'use strict';
 
@@ -2721,9 +2728,10 @@ async function classLoad() {
   $('#cpLabel').addEventListener('input', () => { if (!title.dataset.typed) title.value = 'Crossword: ' + ($('#cpLabel').value.trim() || (TP.built && TP.built.list) || ''); });
   const tIn = (type, v) => mk('input', { type, value: v || '', style: 'width:auto;padding:3px 6px' });
   const pds = g.periods.map((x) => {
-    const c = mk('input', { type: 'checkbox', value: x.p }), postD = tIn('date'), postT = tIn('time', '07:30'), dueD = tIn('date'), dueT = tIn('time', '23:59');
+    const c = mk('input', { type: 'checkbox', value: x.p }), postD = tIn('date'), postT = tIn('time', postTimeFor(x.p)), dueD = tIn('date'), dueT = tIn('time', '23:59');
     const when = mk('div', { class: 'when' }, mk('span', {}, 'Post on ', postD, ' at ', postT), mk('span', {}, 'Due ', dueD, ' at ', dueT));
     c.addEventListener('change', () => { when.style.display = c.checked ? 'flex' : 'none'; drawStuds(); });
+    postT.addEventListener('change', () => { if (postT.value) savePostTime(x.p, postT.value); });
     return { x, c, postD, postT, dueD, dueT, row: mk('div', {}, mk('label', { class: 'pd' }, c, mk('b', {}, x.p + ' period'), mk('span', { class: 'muted' }, x.classes)), when) };
   });
   const modeSel = mk('select', {}, mk('option', { value: 'all' }, 'Everyone in the checked periods'), mk('option', { value: 'only' }, 'Only the students I check'), mk('option', { value: 'except' }, 'Everyone except the students I check'));
@@ -2754,7 +2762,7 @@ async function classLoad() {
     const perPeriod = {}, now = Date.now();
     for (const p of pds.filter((q) => q.c.checked)) {
       const o = {};
-      if (p.postD.value) { if (new Date(p.postD.value + 'T' + (p.postT.value || '07:30')).getTime() < now - 60000) { msg.textContent = p.x.p + ' period: that post time has already passed. Clear the date to post it right away.'; return; } o.post = p.postD.value; o.postTime = p.postT.value || '07:30'; }
+      if (p.postD.value) { if (new Date(p.postD.value + 'T' + (p.postT.value || postTimeFor(p.x.p))).getTime() < now - 60000) { msg.textContent = p.x.p + ' period: that post time has already passed. Clear the date to post it right away.'; return; } o.post = p.postD.value; o.postTime = p.postT.value || '07:30'; }
       if (p.dueD.value) { o.due = p.dueD.value; o.time = p.dueT.value || '23:59'; }
       const dueAt = o.due ? o.due + 'T' + o.time : due.value ? due.value + 'T' + (tm.value || '23:59') : '';
       if (o.post && dueAt && dueAt <= o.post + 'T' + o.postTime) { msg.textContent = p.x.p + ' period: the due date has to be after the post time.'; return; }
