@@ -41490,7 +41490,11 @@ function printScreen(preKey) {
     if (PRINT.key && SETS[PRINT.key] && SETS[PRINT.key].custom && !lib.some((e) => e.key === PRINT.key)) pick.append(el('option', { value: PRINT.key }, SETS[PRINT.key].title + ' (built)'));
     Object.entries(SUBJECTS).forEach(([sk, sname]) => {
       const mine = lib.filter((e) => e.subject === sk);
-      if (mine.length) pick.append(el('optgroup', { label: `${sname} — assignments you built` }, ...mine.map((e) => el('option', { value: 'url:' + e.url }, e.title))));
+      const dup = (e) => mine.filter((o) => o.title === e.title).length > 1, when = (e) => (e.t ? new Date(e.t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '');
+      const bonusN = (e) => { try { return (new URL(e.url).searchParams.get('mix') || '').split('_').filter((p) => /\.b$/.test(p)).length; } catch { return 0; } };
+      /* two built assignments with the same title: show when each was saved and whether it has a bonus, so the right one is easy to pick */
+      if (mine.length) pick.append(el('optgroup', { label: `${sname} — assignments you built` }, ...mine.map((e) => el('option', { value: 'url:' + e.url },
+        e.title + (dup(e) ? ` (${[when(e), bonusN(e) ? '★ bonus' : 'no bonus'].filter(Boolean).join(', ')})` : '')))));
       const menu = Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden && !v.custom && !CONFIG.HIDE_MENU);
       if (menu.length) pick.append(el('optgroup', { label: `${sname} — menu assignments` }, ...menu.map(([k, v]) => el('option', { value: k }, v.title))));
     });
@@ -41629,7 +41633,10 @@ async function builderLibrary() {
     if (!q.get('mix') || (q.get('t') || '') !== TEACHER_ID) return; // only this teacher's built assignments
     const key = customKeyFor(q), cur = by[key];
     const x = { key, url: e.url, title: q.get('title') || e.title || 'Custom Practice', subject: q.get('subject') || e.subject || '', t: e.t || 0, src: e.src };
-    if (!cur || rank[x.src] > rank[cur.src] || (rank[x.src] === rank[cur.src] && x.t > cur.t)) by[key] = { ...x, t: Math.max(x.t, cur ? cur.t : 0) };
+    /* the same assignment from several places: the newest copy wins (an edited assignment's latest link), and a link rebuilt
+       from turned-in work only when there's nothing else */
+    const better = !cur || (cur.src === 'results' && x.src !== 'results') || ((x.src === 'results') === (cur.src === 'results') && x.t > cur.t);
+    if (better) by[key] = { ...x, t: Math.max(x.t, cur ? cur.t : 0) };
     else cur.t = Math.max(cur.t, x.t);
   });
   return Object.values(by).filter((e) => !deleted.has(e.key)).sort((a, b) => b.t - a.t);
