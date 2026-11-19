@@ -13930,6 +13930,13 @@ const g7para = (w = 6, h = 3.4, s = 1.6) => [[0, 0], [w, 0], [w + s, h], [s, h]]
 const g7paraA = (A, w = 6, len = 3.6) => { const t = (A * Math.PI) / 180, d = [len * Math.cos(t), len * Math.sin(t)]; return [[0, 0], [w, 0], [w + d[0], d[1]], d]; };
 const g7center = (P) => VEC.mul(VEC.add(P[0], P[2]), 0.5);
 // intersection of the diagonals of quadrilateral P
+/* label for a piece of a segment (half a diagonal): beside the middle of that piece, pushed off the line toward a given
+   point so it sits clearly in one triangle and never on top of a line */
+function g7halfLab(A, B, toward, t, d = 0.5) {
+  const u = VEC.norm(VEC.sub(B, A)), m = VEC.mul(VEC.add(A, B), 0.5); let n = [-u[1], u[0]];
+  if (VEC.len(VEC.sub(VEC.add(m, n), toward)) > VEC.len(VEC.sub(VEC.sub(m, n), toward))) n = VEC.mul(n, -1);
+  return { p: VEC.add(m, VEC.mul(n, d)), t };
+}
 function g7center2(P) {
   const [A, B, C, D] = P, d1 = VEC.sub(C, A), d2 = VEC.sub(D, B), det = d1[0] * -d2[1] - d1[1] * -d2[0];
   const t = ((B[0] - A[0]) * -d2[1] - (B[1] - A[1]) * -d2[0]) / det; return VEC.add(A, VEC.mul(d1, t));
@@ -14002,7 +14009,7 @@ TEMPLATES.g72Alg = (r) => {
     if (kind === 'diag') {
       const E = g6Eq(r, 2, 9, 3); if (!E) continue; const O = g7center2(P);
       return { topic: 'Algebra in parallelograms', stem: 'Find the value of x in the parallelogram.', ...g6Choices(r, E.x), fr: FR.num('x =', E.x),
-        draw: g7Fig([{ pts: P, names: N }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }], { texts: [{ p: VEC.add(VEC.mul(VEC.add(P[0], O), 0.5), [0, 0.4]), t: E.L }, { p: VEC.add(VEC.mul(VEC.add(P[2], O), 0.5), [0, 0.4]), t: E.R }] }), size: [420, 280],
+        draw: g7Fig([{ pts: P, names: N }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }], { texts: [g7halfLab(P[0], O, P[3], E.L), g7halfLab(P[2], O, P[1], E.R)] }), size: [420, 280],
         solution: `The diagonals of a parallelogram bisect each other, so the two parts of ${SEG(N[0] + N[2])} are equal:\n${E.L} = ${E.R}  →  x = ${E.x}` };
     }
     const x = ri(r, 4, 30), k = pick(r, [1, 2, 3, 4]), b = ri(r, -20, 30), A = k * x + b; if (A < 40 || A > 140 || A === 90) continue;
@@ -14062,7 +14069,7 @@ TEMPLATES.g73FindX = (r) => {
     let polys, why, texts;
     if (kind === 'sides') { polys = [{ pts: P, names: N, slab: [E.L, '', E.R, ''], par: [1, 0, 1, 0] }]; why = `The marked sides are parallel. If they are also congruent, it is a parallelogram (Opposite Sides Parallel and Congruent Theorem):\n${E.L} = ${E.R}  →  x = ${E.x}`; }
     else if (kind === 'angles') { polys = [{ pts: P, names: N, alab: [g7ang(E.L), `${180 - E.val}°`, g7ang(E.R), `${180 - E.val}°`] }]; why = `Opposite angles must be congruent (Parallelogram Opposite Angles Converse):\n${E.L} = ${E.R}  →  x = ${E.x}`; }
-    else { const O = g7center2(P); polys = [{ pts: P, names: N }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }]; texts = [{ p: VEC.add(VEC.mul(VEC.add(P[1], O), 0.5), [0.2, -0.45]), t: E.L }, { p: VEC.add(VEC.mul(VEC.add(P[3], O), 0.5), [-0.2, 0.45]), t: E.R }]; why = `The diagonals must bisect each other (Parallelogram Diagonals Converse):\n${E.L} = ${E.R}  →  x = ${E.x}`; }
+    else { const O = g7center2(P); polys = [{ pts: P, names: N }, { pts: [P[0], P[2]] }, { pts: [P[1], P[3]] }]; texts = [g7halfLab(P[1], O, P[2], E.L), g7halfLab(P[3], O, P[0], E.R)]; why = `The diagonals must bisect each other (Parallelogram Diagonals Converse):\n${E.L} = ${E.R}  →  x = ${E.x}`; }
     return { topic: 'Making a parallelogram', stem: 'Find the value of x that makes the quadrilateral a parallelogram.', ...g6Choices(r, E.x), fr: FR.num('x =', E.x), draw: g7Fig(polys, { texts }), size: [420, 280], solution: why };
   }
 };
