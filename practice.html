@@ -40996,7 +40996,7 @@ function tvShow(list, at) {
     const st = JSON.stringify([T.on, T.run, T.left, T.len]); if (st !== tmSent) { tmSent = st; ink.tell({ t: 'timer', on: T.on, run: T.run, left: T.left, len: T.len }); } // keep the iPad's timer in step
   }
   let tmSent = '';
-  const close = () => { clearInterval(T.id); ink.close(); window.removeEventListener('resize', onResize); box.remove(); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  const close = () => { clearInterval(T.id); ink.close(); window.removeEventListener('resize', onResize); document.removeEventListener('fullscreenchange', onFs); document.removeEventListener('webkitfullscreenchange', onFs); box.remove(); document.removeEventListener('keydown', keys); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
   // keyboard, and a wireless presenter clicker (they send Page Down / Page Up, F5 to start, and . or b for the blank-screen button)
   const keys = (e) => {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
@@ -41007,11 +41007,19 @@ function tvShow(list, at) {
     else if (k === ' ' || k === '.' || k === 'b' || k === 'B' || k === 'Enter') { if (k === 'Enter' && e.target !== document.body) return; e.preventDefault(); ansBtn.click(); }
     else if (k === 'F5') { e.preventDefault(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else box.requestFullscreen().catch(() => {}); }
   };
+  /* Full screen ⇄ Exit full screen: the button says what it will do */
+  const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const fsBtn = el('button', { class: 'btn secondary', type: 'button', onclick: () => {
+    if (isFs()) { const x = document.exitFullscreen || document.webkitExitFullscreen; if (x) Promise.resolve(x.call(document)).catch(() => {}); }
+    else { const f = box.requestFullscreen || box.webkitRequestFullscreen; if (f) Promise.resolve(f.call(box)).catch(() => {}); }
+  } }, 'Full screen');
+  const onFs = () => { fsBtn.textContent = isFs() ? 'Exit full screen' : 'Full screen'; };
+  document.addEventListener('fullscreenchange', onFs); document.addEventListener('webkitfullscreenchange', onFs);
   let rT = null; const onResize = () => { clearTimeout(rT); rT = setTimeout(() => { ink.resize(); if (q && q.bigFig) paint(); }, 200); }; /* a summary chart re-fits the screen (Full screen, timer, window size) */ window.addEventListener('resize', onResize);
   box.append(el('div', { class: 'tv-bar' }, prevBtn, count, nextBtn, el('span', { style: 'flex:1' }), ...ink.bar, tmBtn, tmBox, ansBtn,
     newBtn,
     origBtn,
-    el('button', { class: 'btn secondary', type: 'button', onclick: () => { const f = box.requestFullscreen || box.webkitRequestFullscreen; if (f) f.call(box); } }, 'Full screen'),
+    fsBtn,
     el('button', { class: 'btn secondary', type: 'button', onclick: close }, 'Close ✕')), stage);
   document.body.append(box); document.addEventListener('keydown', keys);
   T.on = /^bell ringer/i.test(list[i].label || ''); tmPaint();
