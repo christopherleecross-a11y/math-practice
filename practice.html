@@ -37751,7 +37751,7 @@ function dashRender() {
   const tabOfSubj = {}; all.forEach((r) => { const sj = subjOfSet(r.set); if (sj && !tabOfSubj[sj]) tabOfSubj[sj] = r.tab; });
   const addEmpty = (title, set, t, period) => {
     if (!title || !inPer({ period })) return;
-    const tab = tabOfSubj[subjOfSet(set)] || '';
+    const tab = /^crossword/.test(String(set || '')) ? 'Crosswords' : tabOfSubj[subjOfSet(set)] || ''; /* a crossword in progress (sent by the crossword page) */
     if (DASH.subject && tab !== DASH.subject) return;
     const a = (byTitle[title] = byTitle[title] || { title, tab, set, last: 0, rows: [], periods: new Set() });
     if (!a.periods) a.periods = new Set();
@@ -37958,7 +37958,7 @@ function dashAssignment(a) {
     dashTable([{ k: 'name', t: 'Student', sort: byStudent }, { k: 'period', t: 'Period', sort: byStudent },
       { k: 'answered', t: 'Answered', desc: true, show: (p) => `${p.answered} of ${p.total || '?'}` }, { k: 'correct', t: 'Correct so far', desc: true, sort: (p) => (p.correct == null ? -1 : p.correct), show: (p) => (p.correct == null ? '—' : p.answered ? el('span', {}, el('strong', {}, pctT(p.correct / p.answered)), el('span', { class: 'small' }, ` (${p.correct} of ${p.answered})`)) : '0'), bg: (p) => (p.correct != null && p.answered ? band(p.correct / p.answered) : '') }, { k: 't', t: 'Last saved', desc: true, show: (p) => dashDate(p.t) },
       { k: 'frozen', t: 'Status', sort: (p) => (p.frozen ? 1 : 0), show: (p) => (p.frozen ? el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0;padding:6px 14px', onclick: (e) => dashUnlock(p, e.target) }, '🔒 Unlock') : 'working') },
-      { k: 'reset', t: '', sort: () => 0, show: (p) => resetBtn(p) }], wip)));
+      { k: 'reset', t: '', sort: () => 0, show: (p) => (/^xw:/.test(p.key || '') ? '' : resetBtn(p)) }], wip))); /* a crossword is reset on the crossword page */
   if (lost.length) app.append(el('div', { class: 'card', style: 'border:2px solid #c0392b' }, el('strong', {}, 'Turned in, but the score didn’t reach your Sheet'),
     el('p', { class: 'small', style: 'margin:4px 0 8px' }, 'These students finished, but their score row never arrived (a dropped connection or a busy moment for the Sheet). Have them open the assignment link again on any Chromebook: it checks and sends the score by itself within a few seconds. The score below is the one their Chromebook showed.'),
     dashTable([{ k: 'name', t: 'Student', sort: byStudent }, { k: 'period', t: 'Period', sort: byStudent },

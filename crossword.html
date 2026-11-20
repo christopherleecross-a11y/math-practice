@@ -2337,6 +2337,15 @@ const nName = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9\s'
 const nPer = p => String(p == null ? '' : p).trim().toLowerCase().replace(/^(period|per\.?|p)\s*/, '').replace(/\s+/g, ' ');
 const perLabel = p => /^\d+$/.test(nPer(p)) ? ordinalOf(nPer(p)) + ' period' : String(p);
 function ordinalOf(n) { n = +n; return n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')); }
+const fmtClock = t => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
+// when a student started, from their saved-work row: the earliest time in it other than "last saved" (column 6)
+function startedAt(g) {
+  if (!Array.isArray(g)) return 0;
+  const last = new Date(g[5]).getTime() || Infinity; let best = 0;
+  g.forEach((v, i) => { if (i < 4 || i === 5) return; const t = typeof v === 'number' ? v : /^\d{4}-\d\d-\d\dT/.test(String(v)) ? Date.parse(v) : NaN;
+    if (t > 1.6e12 && t <= last + 60000 && (!best || t < best)) best = t; });
+  return best;
+}
 function fmtDate(iso) {
   const d = new Date(iso); if (isNaN(d)) return '';
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -3044,7 +3053,7 @@ async function renderResults() {
     const tr = document.createElement('tr'), r = x.res, g = x.prog;
     let st;
     if (r) st = `<span class="st ${/early|ran out/i.test(r[11]) ? 'flag' : 'done'}">${r[11] === 'Solved' ? 'Turned in' : hx(r[11])}</span>` + (r[13] === 'Yes' ? ' <span class="st flag" title="Teacher mode was on in that tab">· teacher mode</span>' : '');
-    else if (g && !g[3]) st = `<span class="st work">Working</span> <span class="muted">${hx(fmtDate(g[5]))}</span>`;
+    else if (g && !g[3]) st = `<span class="st work">Working</span> <span class="muted">${startedAt(g) ? 'started ' + hx(fmtClock(startedAt(g))) + ' · ' : ''}last active ${hx(fmtDate(g[5]))}</span>`;
     else st = '<span class="st none">Not started</span>';
     tr.innerHTML = `<td>${hx(x.name)}</td>${showPer ? `<td>${hx(perLabel(x.period))}</td>` : ''}<td>${st}</td><td class="num">${r && r[6] !== '' ? hx(r[6]) + '%' : ''}${r && r[5] ? ' <span class="muted">(' + hx(r[5]) + ')</span>' : ''}</td>` +
       `<td class="num">${r ? hx(r[9]) : ''}</td><td class="num">${r && +r[10] ? hx(r[10]) + '×' : r ? '0' : ''}</td><td class="num">${r ? hx(fmtDate(r[0])) : ''}</td><td class="acts"></td>`;
@@ -3224,11 +3233,27 @@ async function pushProgress(leaving) {
       done: !!done, score: integ.score ? integ.score.correct + ' of ' + integ.score.total : '', merge: mine.restored === 'failed' });
     if (leaving) fetch(mine.assign.sheet, { method: 'POST', body, keepalive: true }).catch(() => {});
     else await fetchJSON(mine.assign.sheet, { method: 'POST', body });
+    dashProgress(mine, leaving);
     cloudSig = sig; cloudAt = Date.now();
   } catch { /* offline: the next change or heartbeat tries again */ }
   finally { cloudBusy = false; }
 }
 setInterval(() => { if (cloudOn() && !done) cloudSoon(); }, 60000);
+/* the practice site's Results dashboard: this student's crossword as "still working" (how many words filled in, and when
+   they started; never the letters), on the teacher's Practice Results sheet like a practice assignment in progress */
+async function dashProgress(mine, leaving) {
+  try {
+    const tch = TEACHERS.find(t => t.sheet === mine.assign.sheet);
+    if (!tch || !/^https:\/\//.test(tch.results || '') || mine.assign.label === 'Teacher view' || !mine.code) return;
+    const filled = mine.entries.map(e => (e.cells.every(([r, c]) => user[r][c]) ? '1' : ''));
+    const saved = { answers: filled, started: integ.started, tabAways: integ.away || 0 };
+    if (done && integ.score) saved.submitted = { score: integ.score.correct, total: integ.score.total, at: Date.now() };
+    const body = JSON.stringify({ action: 'saveProgress', key: ('xw:' + ordinal(mine.assign.period) + ':crossword-' + mine.code + ':' + student).slice(0, 300),
+      period: ordinal(mine.assign.period), name: student, title: 'Crossword: ' + (mine.assign.label && mine.assign.label !== 'Shared link' ? mine.assign.label : mine.title),
+      updated: Date.now(), data: JSON.stringify({ meta: { attempt: 1 }, saved }) });
+    await fetch(tch.results, { method: 'POST', mode: 'no-cors', keepalive: !!leaving, headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
+  } catch { /* the crossword's own sheet already has it; this is only for the practice dashboard */ }
+}
 window.addEventListener('pagehide', () => { if (cloudOn()) pushProgress(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && cloudOn()) pushProgress(true); });
 
