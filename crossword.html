@@ -60,6 +60,7 @@ details.menu .items button:hover{background:var(--word)}
 
 main{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
 .play{flex:1 1 440px;min-width:0;position:relative}
+.cell{scroll-margin-top:84px;scroll-margin-bottom:16px}
 .cluebar{position:sticky;top:0;z-index:10;display:flex;align-items:stretch;gap:6px;background:var(--word);border-radius:10px;margin-bottom:10px;min-height:52px}
 .cluebar button{background:none;border:0;font-size:1.5rem;padding:0 12px;cursor:pointer;color:var(--ink)}
 #clueText{flex:1;min-width:0;display:flex;align-items:center;padding:8px 2px;cursor:pointer;font-size:1rem}
@@ -1609,8 +1610,16 @@ const curEntryIdx = () => { const m = cellMap[key(cur.r, cur.c)]; return m[cur.d
 const curEntry = () => P.entries[curEntryIdx()];
 const posInEntry = e => e.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
 
+let shownCur = '';
 function render() {
   renderBank(false);
+  /* the selected square stays in view: never hidden under the clue bar that sticks to the top while scrolling */
+  if (P && cur && shownCur !== cur.r + ',' + cur.c) {
+    shownCur = cur.r + ',' + cur.c;
+    const ce = cellEls[cur.r] && cellEls[cur.r][cur.c], bar = document.querySelector('.cluebar');
+    if (ce && ce.getBoundingClientRect) { const r = ce.getBoundingClientRect(), top = bar ? bar.getBoundingClientRect().bottom : 0;
+      if (r.top < top + 4 || r.bottom > window.innerHeight - 4) ce.scrollIntoView({ block: 'nearest' }); }
+  }
   const e = curEntry();
   const inword = new Set(e.cells.map(([r, c]) => key(r, c)));
   for (let r = 0; r < P.rows; r++) for (let c = 0; c < P.cols; c++) {
