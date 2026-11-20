@@ -22,15 +22,9 @@
  *   5. Reload this Sheet. Use the new Crossword menu > "Connect the teacher page…" and type the password
  *      you use to unlock teacher mode in the crossword. (Do this again if you ever change that password.)
  *
- * AUTOMATIC UPDATES (one-time setup; after this, new copies install themselves every night):
- *   1. Go to script.google.com/home/usersettings and switch "Google Apps Script API" On.
- *   2. In Apps Script: Project Settings (gear icon) > tick "Show 'appsscript.json' manifest file in editor".
- *      Back in the Editor, open appsscript.json, delete everything in it, and paste the text from
- *      https://christopherleecross-a11y.github.io/math-practice/scripts/crossword-sheet.json . Save.
- *   3. Paste this whole file over your script, Save, then (last time by hand)
- *      Deploy > Manage deployments > Edit (pencil) > Version: New version > Deploy.
- *   4. Reload the Sheet and click Crossword > Turn on automatic updates. Approve the permissions it asks for.
- *   Crossword > Undo the last update goes back one version if something goes wrong.
+ * AUTOMATIC UPDATES: put the short "starter" script in Apps Script instead of this file
+ *   (Crossword starter: https://christopherleecross-a11y.github.io/math-practice/scripts/crossword-sheet-starter.gs).
+ *   The starter loads the newest copy of this file from Mr. Cross's site, so updates arrive by themselves.
  *
  * Version 3 (Nov 2026): a student who signs in with Google and is in your class in Classroom (your Practice Results
  * roster) is added to the Roster tab by themselves, so you don't have to type new students in. "5", "5th" and
@@ -47,6 +41,8 @@
  * Privacy: students only ever receive the list of period names and their own puzzle.
  * The roster, assignments and results are never sent to a student's browser.
  */
+var SCRIPT_BUILD = '2026-11-20.2'; // which copy this is (Check for updates now shows it)
+
 
 var TABS = {
   assign: {
@@ -91,7 +87,7 @@ function doGet(e) {
     if (p.action === 'config') return json_({ ok: true, periods: periodsFrom(rows_('roster'), rows_('assign')) });
     if (p.action === 'assignment') return json_(lookupSigned_(p));
     if (p.action === 'progress') return json_(progressGet(rows_('progress'), rows_('roster'), p.period, p.name, p.key));
-    return json_({ ok: true, hello: 'Crossword class sheet is running.', version: 3, build: SCRIPT_BUILD });
+    return json_({ ok: true, hello: 'Crossword class sheet is running.', version: 3, build: typeof SCRIPT_BUILD === 'undefined' ? '' : SCRIPT_BUILD });
   } catch (err) {
     return json_({ ok: false, error: 'Sheet error: ' + err });
   }
@@ -147,9 +143,7 @@ function onOpen() {
     .addItem('Connect the teacher page…', 'connectTeacherPage')
     .addItem('Redraw the Summary tab', 'refreshSummary')
     .addSeparator()
-    .addItem('Update the script now', 'updateScriptNow')
-    .addItem('Undo the last update', 'undoLastUpdate')
-    .addItem('Turn on automatic updates', 'turnOnAutomaticUpdates')
+    .addItem('Check for updates now', 'checkForUpdatesNow')
     .addToUi();
 }
 function teacherKey(pw) {
@@ -715,165 +709,4 @@ function mergeLetters(saved, now) {
   var out = '';
   for (var i = 0; i < now.length; i++) out += now.charAt(i) === '.' ? saved.charAt(i) : now.charAt(i);
   return out;
-}
-
-
-/* ======================= automatic updates =======================
-   Once a night this script checks Mr. Cross's site for a newer copy of itself. When there is one, it installs it
-   and moves your web app deployments to it: same URLs, same "Who has access" settings, same data.
-   Menu: Update the script now / Undo the last update. One-time setup: see AUTOMATIC UPDATES at the top. */
-var SCRIPT_BUILD = '2026-11-20.1'; // the date of this copy, plus a number for more than one a day
-var UPDATE_SRC = 'https://christopherleecross-a11y.github.io/math-practice/scripts/crossword-sheet.gs';
-var UPDATE_MARK = 'Crossword class sheet'; // only a file with this name in it can replace this script
-
-function buildCmp_(a, b) {
-  var x = String(a).split(/[-.]/).map(Number), y = String(b).split(/[-.]/).map(Number);
-  for (var i = 0; i < Math.max(x.length, y.length); i++) { var d = (x[i] || 0) - (y[i] || 0); if (d) return d; }
-  return 0;
-}
-function updateApi_(method, path, body) {
-  var o = { method: method, muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } };
-  if (body) { o.contentType = 'application/json'; o.payload = JSON.stringify(body); }
-  var r = UrlFetchApp.fetch('https://script.googleapis.com/v1/projects/' + ScriptApp.getScriptId() + path, o);
-  var code = r.getResponseCode(), t = r.getContentText();
-  if (code >= 300) {
-    var msg = t; try { msg = JSON.parse(t).error.message; } catch (e) {}
-    if (/Apps Script API|has not been used|is disabled/i.test(msg)) throw new Error('The Google Apps Script API is off for this account. Go to script.google.com/home/usersettings, switch it On, and try again.');
-    if (code === 403 && /scope|insufficient|permission/i.test(msg)) throw new Error('This script needs the new appsscript.json (the one with the update permissions). See AUTOMATIC UPDATES at the top of the script.');
-    if (/version/i.test(msg) && /limit|maximum|200/i.test(msg)) throw new Error('This project has too many saved versions (Google allows 200). In Apps Script, open Project history (clock icon) and delete some old versions, then try again.');
-    throw new Error(method.toUpperCase() + ' ' + path.split('?')[0] + ': ' + msg);
-  }
-  return t ? JSON.parse(t) : {};
-}
-function webAppOf_(dep) {
-  return JSON.stringify((dep.entryPoints || []).filter(function (e) { return e.entryPointType === 'WEB_APP'; })
-    .map(function (e) { var c = (e.webApp && e.webApp.entryPointConfig) || {}; return [c.access || '', c.executeAs || '']; }));
-}
-function manifestOf_(files) {
-  var f = files.filter(function (x) { return x.name === 'appsscript'; })[0];
-  return f ? JSON.parse(f.source) : {};
-}
-// what the new copy needs (scripts/<name>.json on the site) must already be allowed here, or it would stop working
-function missingPermissions_(have) {
-  var r = UrlFetchApp.fetch(UPDATE_SRC.replace(/\.gs$/, '.json') + '?t=' + Date.now(), { muteHttpExceptions: true });
-  if (r.getResponseCode() !== 200) return [];
-  var want = JSON.parse(r.getContentText()), miss = [];
-  (want.oauthScopes || []).forEach(function (s) { if ((have.oauthScopes || []).indexOf(s) < 0) miss.push(s); });
-  ((want.dependencies || {}).enabledAdvancedServices || []).forEach(function (s) {
-    if (!((have.dependencies || {}).enabledAdvancedServices || []).some(function (h) { return h.userSymbol === s.userSymbol; })) miss.push(s.userSymbol + ' service');
-  });
-  return miss;
-}
-
-// returns a sentence saying what happened
-function selfUpdate_() {
-  var props = PropertiesService.getScriptProperties();
-  var res = UrlFetchApp.fetch(UPDATE_SRC + '?t=' + Date.now(), { muteHttpExceptions: true });
-  if (res.getResponseCode() !== 200) return 'Couldn’t reach the update file (error ' + res.getResponseCode() + '). Nothing was changed.';
-  var src = res.getContentText(), m = src.match(/var SCRIPT_BUILD = '([^']+)'/);
-  if (!m || src.indexOf(UPDATE_MARK) < 0 || src.indexOf('function selfUpdate_') < 0) return 'The update file doesn’t look right, so nothing was changed.';
-  if (buildCmp_(m[1], SCRIPT_BUILD) <= 0) return 'Already up to date (version ' + SCRIPT_BUILD + ').';
-  try { new Function(src); } catch (e) { if (e instanceof SyntaxError) return 'The new copy has a mistake in it, so nothing was changed (' + e.message + '). Tell Mr. Cross.'; }
-
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(30000)) return 'Busy right now. Try again in a minute.';
-  try {
-    var files = updateApi_('get', '/content').files || [];
-    var target = files.filter(function (f) { return f.type === 'SERVER_JS' && f.source.indexOf(UPDATE_MARK) >= 0 && f.source.indexOf('function selfUpdate_') >= 0; })[0];
-    if (!target) return 'Couldn’t find this script’s file in the project, so nothing was changed.';
-    var head = manifestOf_(files), miss = missingPermissions_(head);
-    if (miss.length) { props.setProperty('UPDATE_WAITING', m[1]); return 'Version ' + m[1] + ' needs new permissions (' + miss.join(', ') + '), so it has to be installed by hand once. Ask Mr. Cross for the new copy.'; }
-
-    var clean = function (f, source) { return { name: f.name, type: f.type, source: source }; };
-    var oldFiles = files.map(function (f) { return clean(f, f.source); });
-    var newFiles = files.map(function (f) { return clean(f, f === target ? src : f.source); });
-    // each deployment keeps its own web app settings ("Anyone", "Anyone within your school"), which live in its version's manifest
-    var deps = (updateApi_('get', '/deployments').deployments || []).filter(function (d) { return d.deploymentConfig && d.deploymentConfig.versionNumber; });
-    var groups = {}, before = {};
-    deps.forEach(function (d) {
-      var v = d.deploymentConfig.versionNumber, man = manifestOf_(updateApi_('get', '/content?versionNumber=' + v).files || []);
-      var wa = man.webapp || head.webapp || null, k = JSON.stringify(wa);
-      (groups[k] = groups[k] || { wa: wa, deps: [] }).deps.push(d);
-      before[d.deploymentId] = { v: v, web: webAppOf_(d), desc: d.deploymentConfig.description || '' };
-    });
-    var withWebApp = function (wa) {
-      return newFiles.map(function (f) {
-        if (f.name !== 'appsscript') return f;
-        var mm = JSON.parse(f.source); if (wa) mm.webapp = wa; else delete mm.webapp;
-        return clean(f, JSON.stringify(mm, null, 2));
-      });
-    };
-    var moved = [], problems = [];
-    var put = function (id, v) {
-      return updateApi_('put', '/deployments/' + id, { deploymentConfig: { scriptId: ScriptApp.getScriptId(), versionNumber: v, manifestFileName: 'appsscript', description: before[id].desc } });
-    };
-    try {
-      Object.keys(groups).forEach(function (k) {
-        var g = groups[k];
-        updateApi_('put', '/content', { files: withWebApp(g.wa) });
-        var ver = updateApi_('post', '/versions', { description: 'Automatic update to ' + m[1] });
-        g.deps.forEach(function (d) {
-          var after = put(d.deploymentId, ver.versionNumber);
-          if (webAppOf_(after) !== before[d.deploymentId].web) { put(d.deploymentId, before[d.deploymentId].v); problems.push(d.deploymentId); }
-          else moved.push(d.deploymentId);
-        });
-      });
-      updateApi_('put', '/content', { files: newFiles }); // the editor shows the new code
-    } catch (err) { // put everything back the way it was
-      moved.forEach(function (id) { try { put(id, before[id].v); } catch (e) {} });
-      try { updateApi_('put', '/content', { files: oldFiles }); } catch (e) {}
-      throw err;
-    }
-    var undo = {}; moved.forEach(function (id) { undo[id] = before[id].v; });
-    props.setProperty('UPDATE_UNDO', JSON.stringify({ from: SCRIPT_BUILD, to: m[1], deps: undo, at: new Date().toISOString() }));
-    props.deleteProperty('UPDATE_WAITING');
-    if (problems.length) return 'Updated the code to version ' + m[1] + ', but ' + problems.length + ' deployment(s) would have changed their access settings, so they were left on the old version. Update those by hand: Deploy > Manage deployments > Edit > New version.';
-    return 'Updated from version ' + SCRIPT_BUILD + ' to ' + m[1] + (moved.length ? ' (' + moved.length + ' web app deployment' + (moved.length === 1 ? '' : 's') + ' moved to it).' : '.');
-  } finally { lock.releaseLock(); }
-}
-
-function undoLastUpdate_() {
-  var props = PropertiesService.getScriptProperties(), u = JSON.parse(props.getProperty('UPDATE_UNDO') || 'null');
-  if (!u) return 'There is no automatic update to undo.';
-  var ids = Object.keys(u.deps), oldV = ids.length ? u.deps[ids[0]] : 0;
-  ids.forEach(function (id) {
-    var d = updateApi_('get', '/deployments/' + id);
-    updateApi_('put', '/deployments/' + id, { deploymentConfig: { scriptId: ScriptApp.getScriptId(), versionNumber: u.deps[id], manifestFileName: 'appsscript', description: (d.deploymentConfig || {}).description || '' } });
-  });
-  if (oldV) { // the editor goes back to the old code too (with today's appsscript.json)
-    var now = updateApi_('get', '/content').files || [], old = updateApi_('get', '/content?versionNumber=' + oldV).files || [];
-    var oldCode = old.filter(function (f) { return f.type === 'SERVER_JS' && f.source.indexOf(UPDATE_MARK) >= 0; })[0];
-    if (oldCode) updateApi_('put', '/content', { files: now.map(function (f) {
-      return { name: f.name, type: f.type, source: f.type === 'SERVER_JS' && f.source.indexOf(UPDATE_MARK) >= 0 ? oldCode.source : f.source };
-    }) });
-  }
-  props.deleteProperty('UPDATE_UNDO');
-  props.setProperty('UPDATE_SKIP', u.to); // don't reinstall the same copy tonight
-  return 'Went back to version ' + u.from + '. Automatic updates will wait for a copy newer than ' + u.to + '.';
-}
-
-// menu items and the nightly trigger
-function updateScriptNow() {
-  var msg; try { msg = selfUpdate_(); } catch (e) { msg = 'Update didn’t work: ' + (e && e.message || e); }
-  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { Logger.log(msg); }
-}
-function undoLastUpdate() {
-  var msg; try { msg = undoLastUpdate_(); } catch (e) { msg = 'Undo didn’t work: ' + (e && e.message || e); }
-  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { Logger.log(msg); }
-}
-function turnOnAutomaticUpdates() {
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'nightlyUpdate') ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('nightlyUpdate').timeBased().everyDays(1).atHour(2).create();
-  var msg; try { msg = selfUpdate_(); } catch (e) { msg = 'The check didn’t work yet: ' + (e && e.message || e); }
-  try { SpreadsheetApp.getUi().alert('Automatic updates are on: this script checks for a newer copy every night around 2 AM.\n\n' + msg); } catch (e) { Logger.log(msg); }
-}
-function nightlyUpdate() {
-  var props = PropertiesService.getScriptProperties();
-  
-  try {
-    var skip = props.getProperty('UPDATE_SKIP');
-    var r = UrlFetchApp.fetch(UPDATE_SRC + '?t=' + Date.now(), { muteHttpExceptions: true }), m = r.getContentText().match(/var SCRIPT_BUILD = '([^']+)'/);
-    if (skip && m && buildCmp_(m[1], skip) <= 0) return;
-    props.setProperty('UPDATE_LAST', new Date().toISOString() + ' ' + selfUpdate_());
-  } catch (e) { props.setProperty('UPDATE_LAST', new Date().toISOString() + ' ' + (e && e.message || e)); }
 }
