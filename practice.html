@@ -37575,7 +37575,7 @@ window.addEventListener('resize', () => {
 
 /* ==== RESULTS DASHBOARD BEGIN ==== */
 /* ---------- teacher results dashboard: reads your Sheet through the script (password in Script properties) ---------- */
-const DASH = { data: null, subject: '', period: '', title: '', student: null, sort: 'name', dir: 1, days: 200 };
+const DASH = { data: null, subject: '', period: '', title: '', student: null, sort: 'name', dir: 1, days: 200, q: '' };
 const dashPw = { get() { try { return localStorage.getItem(TK('dash:pw')) || ''; } catch { return ''; } }, set(v) { try { v ? localStorage.setItem(TK('dash:pw'), v) : localStorage.removeItem(TK('dash:pw')); } catch {} } };
 const perOrder = (p) => { const n = parseInt(p, 10); return isNaN(n) ? 99 : n; };
 // sort students by class period, then last name, then first name ("Smith, Ava" works too; Jr./III are skipped)
@@ -37765,15 +37765,37 @@ function dashRender() {
   if (DASH.title && !byTitle[DASH.title] && !D.progress.some((p) => p.title === DASH.title)) DASH.title = '';
 
   const sel = (opts, val, on) => { const s = el('select', {}, ...opts.map(([v, t]) => el('option', { value: v }, t))); s.value = val; s.addEventListener('change', () => on(s.value)); return s; };
+  let assignSel = null;
   const ctl = el('div', { class: 'card', style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end' },
     el('div', {}, el('label', {}, 'Subject'), sel([['', 'All subjects'], ...tabs.map((t) => [t, t])], DASH.subject, (v) => { DASH.subject = v; DASH.title = ''; DASH.student = null; dashRender(); })),
     el('div', {}, el('label', {}, 'Period'), sel([['', 'All periods'], ...periods.map((p) => [p, p + ' period'])], DASH.period, (v) => { DASH.period = v; DASH.sort = 'name'; DASH.dir = 1; dashRender(); })),
-    el('div', {}, el('label', {}, 'Assignment'), sel([['', 'All assignments (overview)'], ...titles.map((a) => [a.title, a.title])], DASH.title, (v) => { DASH.title = v; DASH.student = null; dashRender(); })),
+    el('div', {}, el('label', {}, 'Assignment'), assignSel = sel([['', 'All assignments (overview)'], ...titles.map((a) => [a.title, a.title])], DASH.title, (v) => { DASH.title = v; DASH.student = null; dashRender(); })),
     el('div', {}, el('label', {}, 'Show the last'), sel([['30', '30 days'], ['90', '90 days'], ['200', '200 days'], ['400', '400 days']], String(DASH.days), (v) => { DASH.days = +v; dashboard(); })),
     el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
       el('button', { class: 'btn', style: 'margin-top:0', onclick: dashboard }, 'Refresh'),
       el('button', { class: 'btn secondary', style: 'margin-top:0', onclick: () => { dashPw.set(''); dashLogin(''); } }, 'Lock')));
   app.append(ctl);
+  /* Search: narrows the assignment list (the menu and the overview table) and finds students by name, as you type */
+  const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim();
+  const search = el('input', { type: 'search', placeholder: 'Search assignments or students (for example: 7.3, quiz, Smith)', value: DASH.q || '', 'aria-label': 'Search assignments or students', style: 'width:100%;box-sizing:border-box;padding:10px 12px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
+  const found = el('div', { class: 'small', style: 'margin-top:8px;display:flex;gap:6px 12px;flex-wrap:wrap;align-items:center' });
+  ctl.append(el('div', { style: 'grid-column:1 / -1' }, el('label', {}, 'Search'), search, found));
+  const people = {};
+  [...titles.flatMap((a) => a.rows), ...D.progress].forEach((r) => { if (r && r.name && (!DASH.period || r.period === DASH.period)) people[r.period + '|' + r.name] = { period: r.period, name: r.name }; });
+  const applyQ = () => {
+    DASH.q = search.value; const words = norm(search.value).split(' ').filter(Boolean), hit = (t) => { const n = norm(t); return words.every((w) => n.includes(w)); };
+    if (assignSel) [...assignSel.options].forEach((o) => { o.hidden = !!(words.length && o.value && o.value !== DASH.title && !hit(o.textContent)); });
+    let shown = 0, total = 0;
+    app.querySelectorAll('[data-dash-ov] tbody tr').forEach((tr) => { total++; const ok = !words.length || hit(tr.cells[0] ? tr.cells[0].textContent : ''); tr.style.display = ok ? '' : 'none'; if (ok) shown++; });
+    found.innerHTML = '';
+    if (!words.length) return;
+    const studs = Object.values(people).filter((p) => hit(p.name)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 12);
+    if (total) found.append(el('span', {}, `${shown} of ${total} assignments match.`));
+    if (studs.length) found.append(el('span', {}, 'Students:'), ...studs.map((p) => linkBtn(`${p.name} (${p.period})`, () => { DASH.student = { period: p.period, name: p.name }; DASH.title = ''; dashRender(); })));
+    else if (!total || !shown) found.append(el('span', {}, 'No assignments or students match.'));
+  };
+  search.addEventListener('input', applyQ);
+  setTimeout(applyQ); /* after the rest of the page is drawn */
   // students locked out right now (left the page too many times): unlock them from here
   const frozen = D.progress.filter((p) => p.frozen && (!DASH.period || p.period === DASH.period)).sort((a, b) => b.t - a.t);
   if (frozen.length) app.append(el('div', { class: 'card', style: 'border-left:4px solid #c0392b' },
@@ -37825,14 +37847,14 @@ function dashOverview(titles) {
     tile(allBest.length ? pctT(allBest.reduce((s, r) => s + r.pct, 0) / allBest.length) : '—', 'average best score'),
     tile(String(prog.length), 'started but not turned in yet', '#fbf1dc')));
   if (!titles.length) card.append(el('p', {}, 'No results yet for these choices.'));
-  else card.append(dashTable([
+  else card.append(el('div', { 'data-dash-ov': '1' }, dashTable([
     { k: 'title', t: 'Assignment', show: (a) => linkBtn(a.title, () => { DASH.title = a.title; dashRender(); }) },
     { k: 'tab', t: 'Subject' },
     { k: 'n', t: 'Turned in', desc: true },
     { k: 'wip', t: 'Still working', desc: true },
     { k: 'avg', t: 'Average', desc: true, show: (a) => (a.n ? pctT(a.avg) : '—'), bg: (a) => (a.n ? band(a.avg) : '') },
     { k: 'last', t: 'Last turned in', desc: true, show: (a) => (a.n ? dashDate(a.last) : 'nobody yet') },
-  ], titles.map((a) => { const b = bestRows(a.rows); return { ...a, n: b.length, avg: b.reduce((s, r) => s + r.pct, 0) / (b.length || 1), wip: prog.filter((p) => p.title === a.title).length }; })));
+  ], titles.map((a) => { const b = bestRows(a.rows); return { ...a, n: b.length, avg: b.reduce((s, r) => s + r.pct, 0) / (b.length || 1), wip: prog.filter((p) => p.title === a.title).length }; }))));
   app.append(card);
   card.append(el('p', { class: 'small', style: 'margin-top:10px' }, 'Click an assignment for each student’s score and which questions the class missed. Click a column title to sort.'));
   const allRows = titles.flatMap((a) => a.rows);
