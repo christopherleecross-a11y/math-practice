@@ -2235,7 +2235,8 @@ $('#nameStart').addEventListener('click', () => {
   restoreProgress();
   // students ticked for a word bank on the Roster get one on shared links too
   const owner = P.assign && P.assign.sheet ? P.assign : null, mine = P;
-  if (owner) sheetGet(owner.sheet, { action: 'assignment', period: owner.period, name: student })
+  const passTok = owner ? (googlePass(TEACHERS.findIndex(t => t.sheet === owner.sheet)) || {}).token : ''; // lets the Sheet add a new student to its Roster
+  if (owner) sheetGet(owner.sheet, Object.assign({ action: 'assignment', period: owner.period, name: student }, passTok ? { token: passTok } : {}))
     .then(r => { if (r && r.ok && r.wordBank && P === mine) { P.wordBank = true; save(); renderBank(true); } }).catch(() => {});
 });
 $('#studentName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#nameStart').click(); });
@@ -2481,7 +2482,7 @@ async function tApi(op, extra) {
   const o = teacher.owner;
   if (!o || !hasSheet(o)) { tpNote('nosheet'); return { ok: false, noSheet: true }; }
   let r;
-  try { r = await sheetPost(o.sheet, Object.assign({ action: 'teacher', op, key: teacher.key, site: siteURL() }, extra || {})); }
+  try { r = await sheetPost(o.sheet, Object.assign({ action: 'teacher', op, key: teacher.key, site: siteURL(), results: o.results || '' }, extra || {})); }
   catch { tpNote('offline'); return { ok: false, offline: true }; }
   if (r && r.ok) { TP.data = r; tpNote(''); }
   else if (r && r.needSetup) tpNote('setup');
@@ -3376,7 +3377,8 @@ $('#siGo').addEventListener('click', async () => {
   if (name.length < 2) { siMsg('Type your first and last name.'); return; }
   const btn = $('#siGo'); btn.disabled = true; siMsg('Looking up your puzzle…', true);
   try {
-    const r = await sheetGet(tch.sheet, { action: 'assignment', period, name });
+    const tok = (googlePass(+tSel.value) || {}).token; // signed in with Google: the Sheet can add a new student to its Roster
+    const r = await sheetGet(tch.sheet, Object.assign({ action: 'assignment', period, name }, tok ? { token: tok } : {}));
     if (!r || !r.ok) { siMsg((r && r.error) || 'Something went wrong. Try again.'); return; }
     if (!r.found) { siMsg('No puzzle is assigned to you right now. Check with your teacher, or practice instead.'); return; }
     let p = null;
