@@ -3342,6 +3342,11 @@ function openSignin() {
   document.body.classList.add('signing');
   openModal('#signinModal');
   const ti = +tSel.value;
+  // the teacher signed in with Google and came back as "Teacher view": go to the teacher password, not student sign-in
+  if (/[?&]preview=1\b/.test(location.search)) {
+    history.replaceState(null, '', location.pathname + location.search.replace(/([?&])preview=1\b&?/, '$1').replace(/[?&]$/, '') + location.hash);
+    $('#siTeacher').click(); return;
+  }
   if (googleAuto(ti)) { siMsg('Signing you in with your school account…', true); googleGo(ti); return; }
   googleUI();
   loadTeacherPeriods().then(() => {
