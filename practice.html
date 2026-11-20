@@ -39044,8 +39044,9 @@ function lpMath(text, px = 15, maxW = 640) {
 function lpMoments(L, s) {
   const order = (s.show || []).map((x) => x.label), at = (b) => (b ? order.indexOf(b) : -1);
   const when = (b, w) => w || (b && order.includes(b) ? `Right before ${b}:` : `At the start of this part:`);
+  const vocabWhen = 'On the TV right after the I can statements (the vocabulary box on page 1); bring it up again here:';
   const def = (t) => ((L.vocab || []).find(([x]) => x === t) || [])[1] || '';
-  return [...(s.vocab || []).map((v, i) => ({ k: at(v.before), i, kind: 'Vocabulary', t: v.t, when: when(v.before, v.when), ask: v.ask, ans: v.ans || (lpVocabBlank(v.t, def(v.t)) || {}).ans || '—' })),
+  return [...(s.vocab || []).map((v, i) => ({ k: at(v.before), i, kind: 'Vocabulary', t: v.t, when: vocabWhen, ask: v.ask, ans: v.ans || (lpVocabBlank(v.t, def(v.t)) || {}).ans || '—' })),
     ...(s.notes || []).map((n, i) => ({ k: at(n.before), i: 100 + i, kind: 'Notes', t: n.t, when: when(n.before), ans: n.ans.join(', ') }))]
     .sort((a, b) => (a.k < 0 ? -1 : a.k) - (b.k < 0 ? -1 : b.k) || a.i - b.i);
 }
@@ -39059,6 +39060,40 @@ function lpVocabBlank(term, df) {
   if (cand.length) { const m = cand.reduce((a, b) => (b[0].length > a[0].length ? b : a)); return { ans: m[0], at: m.index }; }
   const m = /=\s*(.+?)(?=\s*=|;|, |  | when | where | for |$)/.exec(df);
   return m ? { ans: m[1], at: m.index + m[0].indexOf(m[1], 1) } : null;
+}
+// each lesson's student sheet layout (handouts/<plan>/sheet.json), fetched when the plan is opened
+const LP_SHEET = {};
+function lpSheetLoad(key) {
+  if (!key || LP_SHEET[key] !== undefined) return;
+  LP_SHEET[key] = null;
+  fetch(`handouts/${key}/sheet.json`).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) LP_SHEET[key] = j; }).catch(() => {});
+}
+// "Part 2", "Page 1" or '' for a TV slide: where students write it on the sheet
+function lpSheetPart(x) {
+  const spec = x && LP_SHEET[x._key]; if (!spec || !spec.blocks) return '';
+  if (!spec._map) {
+    const map = {}, secs = []; let part = '';
+    spec.blocks.forEach((b) => {
+      if (b.icans) map['I can statements'] = 'Page 1';
+      if (b.sec) { const m = /^(Part \d+) · (.*)$/.exec(b.sec); part = m ? m[1] : ''; if (m) secs.push([m[2], m[1]]); }
+      (b.titles || []).forEach((t) => (map[t] = map[t] || part));
+      if (b.prob) map[b.prob] = map[b.prob] || part;
+      (b.grid || []).forEach((g) => { if (g.prob) map[g.prob] = map[g.prob] || part; });
+    });
+    spec._map = map; spec._secs = secs;
+  }
+  const label = String(x.label || '');
+  if (/^Vocabulary: /.test(label)) return 'Page 1';
+  if (spec._map[label]) return spec._map[label];
+  const nz = (t) => String(t).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const L = nz(label), St = nz(x._step || ''), St2 = nz(String(x._step || '').split(':').slice(1).join(':'));
+  for (const [title, p] of spec._secs) {
+    const T = nz(title);
+    if (L && (T === L || T.includes(L) || L.includes(T))) return p;
+    if (/^(notes|partner|independent|exit)/.test(T)) continue;
+    if (St && (T === St || T.includes(St) || St.includes(T) || (St2 && (T.includes(St2) || St2.includes(T))))) return p;
+  }
+  return '';
 }
 function lpWithIcan(L, key) {
   const steps = L.steps.map((s) => ({ ...s })), bi = Math.max(0, steps.findIndex((s) => /bell ringer/i.test(s.name)));
@@ -39076,16 +39111,23 @@ function lpWithIcan(L, key) {
     const show = s.show = [...(s.show || [])], k = before ? show.findIndex((x) => x.label === before) : -1;
     if (k >= 0) show.splice(k, 0, item); else { const j = show.filter((x) => x.moment).length; show.splice(j, 0, item); }
   };
+  // vocabulary: one slide per word, all together right after the I can statements, in the same order as the
+  // vocabulary box on page 1 of the student sheet (so students always know where to write)
+  const vocabSlides = [], vocabOf = {};
+  steps.forEach((s) => (s.vocab || []).forEach((v) => { if (!vocabOf[v.t]) vocabOf[v.t] = v; }));
+  (L.vocab || []).forEach(([t, def]) => {
+    const v = vocabOf[t] || { t };
+    const r = v.ans ? { ans: v.ans, at: def.indexOf(v.ans) } : lpVocabBlank(t, def) || { ans: '', at: -1 }, ans = r.ans, at = r.at;
+    const blank = at < 0 ? def : def.slice(0, at) + '_'.repeat(Math.max(10, ans.length + 3)) + def.slice(at + ans.length);
+    vocabSlides.push({ moment: 1, label: 'Vocabulary: ' + t, fixed: { topic: 'Fill in the blank in the vocabulary box', stem: t + '\n \n' + blank, display: ans || def, solution: t + ': ' + def } });
+  });
   steps.forEach((s) => {
-    (s.vocab || []).forEach((v) => {
-      const def = ((L.vocab || []).find(([t]) => t === v.t) || [])[1] || '';
-      const r = v.ans ? { ans: v.ans, at: def.indexOf(v.ans) } : lpVocabBlank(v.t, def) || { ans: '', at: -1 }, ans = r.ans, at = r.at;
-      const blank = at < 0 ? def : def.slice(0, at) + '_'.repeat(Math.max(10, ans.length + 3)) + def.slice(at + ans.length);
-      putBefore(s, { moment: 1, label: 'Vocabulary: ' + v.t, fixed: { topic: 'Fill in the blank on your sheet', stem: v.t + '\n \n' + blank, display: ans || def, solution: v.t + ': ' + def } }, v.before);
-    });
     (s.notes || []).forEach((n) => putBefore(s, { moment: 1, label: n.t, fixed: { topic: 'Notes · fill in the blank on your sheet', stem: n.t + '\n \n' + n.stem, display: n.ans.join(';   '), solution: n.full, figure: n.figure } }, n.before));
   });
-  if (L.iCan && L.iCan.length && steps.length) steps[bi] = { ...steps[bi], afterIcan: true, show: [...(steps[bi].show || []), { label: 'I can statements', fixed: { topic: 'Today’s lesson', stem: L.iCan.map((x) => '•  ' + x).join('\n \n') } }] };
+  if (steps.length && ((L.iCan && L.iCan.length) || vocabSlides.length)) steps[bi] = { ...steps[bi], afterIcan: true, show: [...(steps[bi].show || []),
+    ...(L.iCan && L.iCan.length ? [{ label: 'I can statements', fixed: { topic: 'Today’s lesson', stem: L.iCan.map((x) => '•  ' + x).join('\n \n') } }] : []), ...vocabSlides] };
+  // where each slide is on the student sheet ("Part 2", "Page 1"), shown at the top of the TV
+  steps.forEach((s) => { if (s.show) s.show = s.show.map((x) => ({ ...x, _key: key || L.base, _step: s.name })); });
   lpDemos(steps, key || L.base);
   return steps;
 }
@@ -39148,7 +39190,7 @@ function lessonScreen(preKey) {
     const h = (t) => el('h3', { class: 'lp-h' }, t);
     const list = (arr) => el('ul', { class: 'lp-ul' }, ...arr.map((x) => el('li', {}, x)));
     // the I can statements go on the TV right after the bell ringer (built from the plan, so an edited plan keeps them up to date)
-    const steps = lpWithIcan(L, LESSON.key);
+    const steps = lpWithIcan(L, LESSON.key); lpSheetLoad(LESSONS[LESSON.key].base || LESSON.key); lpSheetLoad(LESSON.key);
     const all = steps.flatMap((s) => s.show || []);
     out.append(el('div', { class: 'card lp' },
       el('div', { class: 'lp-top' }, el('div', {}, el('h2', { style: 'margin:0' }, S.title), el('div', { class: 'small' }, `${SUBJECTS[S.subject] || ''} · ${L.minutes} minutes · ${CONFIG.TEACHER_NAME}`),
@@ -41024,7 +41066,8 @@ function tvShow(list, at) {
       return;
     }
     if (q.bonus) body.append(el('div', { style: 'display:inline-block;margin:0 0 8px;padding:6px 16px;border-radius:999px;background:#fbf1dc;border:2px solid #d4a72c;color:#8a6d0f;font-weight:800;font-size:24px;letter-spacing:.5px' }, `★ BONUS · extra credit${state && state.setKey && SETS[state.setKey] ? ` (+${+setting(state.setKey, 'bonusPct')}%)` : ''}`));
-    body.append(el('div', { class: 'tv-label' }, `${list[i].label}${fresh && list[i].fixed ? ' · new numbers' : ''}${q.topic && q.topic !== list[i].label ? ` · ${q.topic}` : ''}`), ...(() => { // notes screens (theorems, summaries) get space between statements, and more at a blank line
+    const where = lpSheetPart(list[i]);
+    body.append(el('div', { class: 'tv-label' }, where ? el('span', { style: 'display:inline-block;background:#692b31;color:#fff;border-radius:8px;padding:4px 14px;margin-right:12px;font-weight:800;font-size:26px;vertical-align:middle' }, 'Sheet · ' + where) : '', `${list[i].label}${fresh && list[i].fixed ? ' · new numbers' : ''}${q.topic && q.topic !== list[i].label ? ` · ${q.topic}` : ''}`), ...(() => { // notes screens (theorems, summaries) get space between statements, and more at a blank line
       const notes = !q.choices && !(q.fr && q.fr.display) && !q.solution;
       if (q.bigFig) return []; /* the chart has its own title: the question line would only take room from it */
       return String(q.stem).split('\n').map((ln) => { if (notes && !ln.trim()) return el('div', { style: 'height:22px' }); const cv = textCanvas(ln, w, font, 42); if (notes) { cv.style.display = 'block'; cv.style.marginBottom = '16px'; } return cv; });
