@@ -400,6 +400,8 @@ osmosis: Movement of water across a membrane"></textarea>
   <div class="dialog">
     <h3>🔒 Test mode</h3>
     <p>Type your name to start. Check, Reveal and copying are turned off. If you leave this page or switch to another tab or app, the puzzle pauses and it's recorded for your teacher.</p>
+    <button class="btn primary" id="nameGoogle" type="button" hidden>Sign in with Google</button>
+    <p id="nameSigned" class="muted" hidden></p>
     <label id="namePeriodRow" class="field" hidden>Class period <select id="namePeriod"><option value="">Loading…</option></select></label>
     <input type="text" id="studentName" placeholder="First and last name" autocomplete="off" maxlength="40">
     <div class="row"><button class="btn primary" id="nameStart">Start</button></div>
@@ -410,6 +412,8 @@ osmosis: Movement of water across a membrane"></textarea>
   <div class="dialog">
     <h3>Sign in to your class</h3>
     <p>Choose your teacher and class period, then type your name to get the puzzle your teacher assigned.</p>
+    <button class="btn primary" id="siGoogle" type="button" hidden>Sign in with Google</button>
+    <p id="siGoogleNote" class="muted" hidden>Use your school account. Not on a school Chromebook? If Google shows an error or the wrong account, come back here and fill in your period and name instead.</p>
     <label class="field" id="siTeacherRow">Teacher <select id="siTeacherSel"></select></label>
     <label class="field">Class period <select id="siPeriod"><option value="">Loading…</option></select></label>
     <input type="text" id="siName" placeholder="First and last name" autocomplete="off" maxlength="40">
@@ -575,11 +579,13 @@ const TEACHERS = [
     sheet: 'https://script.google.com/macros/s/AKfycbyxLSWqfM1mZ0OcZz4JfzmaYGwLKmz_gL3sHBJg4IMmuK4l3UDzT7d_YG2Mtj4ox9smNg/exec',
     results: 'https://script.google.com/macros/s/AKfycbycKSv_XXuM9HI9evVQ6dapHk0hGWBgqPVEh8CneUqkoOKx8CzKUUGa14x3lHrQl-Ih/exec',
     practice: '', // this teacher's practice page: practice.html?t=<this>
+    signin: 'https://script.google.com/a/macros/atoka.org/s/AKfycbznxrlxQqktH6_7yRUVciYV4PtFtDy3FMfxnAg6gPq7Llz0Eo_3mdFAxrRhq4EBMmje/exec', // Sign in with Google (SIGNIN_URL in practice.html)
     courses: ['Geometry 1', 'Geometry 2', 'Pre-Cal 1', 'Pre-Cal 2'] },
   { name: 'Mr. Spencer (Algebra I & II)',
     sheet: 'https://script.google.com/macros/s/AKfycby7_Vq0F1elfsaH7Hca7UtnTFKjzX5RCFpik0-f-u-fcYAYyNg3ZEffrRiP6cxmSrFMbw/exec',
     results: 'https://script.google.com/macros/s/AKfycbxjKMy-XuQt8LR0Cd5ILEGk_lverjHGze1ob4_k-HAro1tV7wGVznySDxaQrToUfwoH/exec',
     practice: 'spencer',
+    signin: 'https://script.google.com/a/macros/atoka.org/s/AKfycbz2j4eEizsnhR9tzIxJI7xBETVirVtdnyBOeUTMUw5n82Wpe9WzRGjeXA82Us42Jt2b/exec',
     courses: ['Algebra I 1', 'Algebra I 2', 'Algebra II 1', 'Algebra II 2'] }
 ];
 const courseOf = n => (String(n).split(':')[0] || n).trim();
@@ -2189,10 +2195,16 @@ function bumpCumulative(starts, away, awaySec) {
 function startAttempt() { integ = freshInteg(); integ.started = Date.now(); bumpCumulative(1, 0, 0); }
 function askName() {
   $('#studentName').value = store.get('crossword-student') || '';
-  const owner = teacherOfList(P.secure);
+  const owner = teacherOfList(P.secure) || (P.assign && TEACHERS.find(t => t.sheet === P.assign.sheet));
+  const ti = TEACHERS.indexOf(owner), pass = googlePass(ti);
+  if (!pass && googleAuto(ti)) { googleGo(ti); return; } // school Chromebook: sign in with Google, then back to this puzzle
+  $('#nameGoogle').hidden = !(owner && owner.signin) || !!pass;
+  $('#nameSigned').hidden = !pass; $('#nameSigned').textContent = pass ? 'Signed in with Google as ' + pass.n + '.' : '';
+  $('#studentName').readOnly = !!pass; if (pass) $('#studentName').value = pass.n;
   const needPeriod = hasSheet(owner) && !P.assign;
   $('#namePeriodRow').hidden = !needPeriod;
-  if (needPeriod) loadPeriods($('#namePeriod'), owner.sheet).catch(() => { $('#namePeriodRow').hidden = true; });
+  if (needPeriod) loadPeriods($('#namePeriod'), owner.sheet).then(() => { if (pass) { const per = matchPeriod(periodsCache[owner.sheet] || [], pass.ps); if (per) $('#namePeriod').value = per; } })
+    .catch(() => { $('#namePeriodRow').hidden = true; });
   openModal('#nameModal');
   setTimeout(() => $('#studentName').focus(), 50);
 }
@@ -2218,6 +2230,7 @@ $('#nameStart').addEventListener('click', () => {
     .then(r => { if (r && r.ok && r.wordBank && P === mine) { P.wordBank = true; save(); renderBank(true); } }).catch(() => {});
 });
 $('#studentName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#nameStart').click(); });
+$('#nameGoogle').addEventListener('click', () => { const owner = teacherOfList(P.secure) || (P.assign && TEACHERS.find(t => t.sheet === P.assign.sheet)); googleGo(TEACHERS.indexOf(owner)); });
 
 const guardActive = () => isLocked() && student && !done;
 function goAway() {
@@ -3280,7 +3293,7 @@ function loadTeacherPeriods() {
     .then(() => setTimeout(() => ($('#siPeriod').value ? $('#siName') : $('#siPeriod')).focus(), 50))
     .catch(() => siMsg('Couldn’t reach your teacher’s class sheet. Check your internet connection, or practice instead.'));
 }
-tSel.addEventListener('change', () => { store.set('crossword-teacher', chosenTeacher().name); loadTeacherPeriods(); });
+tSel.addEventListener('change', () => { store.set('crossword-teacher', chosenTeacher().name); if (typeof googleUI === 'function') googleUI(); loadTeacherPeriods(); });
 
 let practiceTab = false;
 try { practiceTab = sessionStorage.getItem('crossword-practice') === '1'; } catch {}
@@ -3293,8 +3306,25 @@ function openSignin() {
   tSel.value = String(fromI >= 0 ? fromI : lastT >= 0 ? lastT : Math.max(0, TEACHERS.findIndex(hasSheet)));
   document.body.classList.add('signing');
   openModal('#signinModal');
-  loadTeacherPeriods();
+  const ti = +tSel.value;
+  if (googleAuto(ti)) { siMsg('Signing you in with your school account…', true); googleGo(ti); return; }
+  googleUI();
+  loadTeacherPeriods().then(() => {
+    const pass = googlePass(+tSel.value), t = chosenTeacher();
+    if (!pass || !$('#signinModal').classList.contains('open')) return;
+    const per = matchPeriod(periodsCache[t.sheet] || [], pass.ps);
+    if (per) { $('#siPeriod').value = per; $('#siGo').click(); } // signed in with Google: straight to the puzzle
+    else siMsg('Choose your class period.', true);
+  });
 }
+// the Google button, or "signed in as …" with the name filled in and locked
+function googleUI() {
+  const ti = +tSel.value, t = TEACHERS[ti], pass = googlePass(ti);
+  $('#siGoogle').hidden = $('#siGoogleNote').hidden = !(t && t.signin) || !!pass;
+  $('#siName').readOnly = !!pass;
+  if (pass) { $('#siName').value = pass.n; siMsg('Signed in with Google as ' + pass.n + '.', true); }
+}
+$('#siGoogle').addEventListener('click', () => googleGo(+tSel.value));
 function closeSignin() { $('#signinModal').classList.remove('open'); document.body.classList.remove('signing'); }
 // a student signing in always gets a locked puzzle, even in a tab where the teacher unlocked teacher mode
 function lockTeacher() {
@@ -3420,7 +3450,8 @@ async function queueDash(rid) {
     period: ordinal(P.assign.period), name: student, score: sc.correct, total: sc.total || 1, percent: Math.round(100 * sc.correct / (sc.total || 1)),
     detail, minutes: Math.round(timer.elapsed / 6) / 10, tabAways: integ.away || 0,
     version: [DIFFS[P.diff].label, P.entries.length + ' words', showBank() ? 'word bank' : '', verText(P), 'id ' + rid].filter(Boolean).join(' · '),
-    set: 'crossword:' + (P.code || P.title) } });
+    set: 'crossword:' + (P.code || P.title),
+    token: (() => { const g = googlePass(TEACHERS.indexOf(tch)); return g && g.n === student ? g.token : undefined; })() } });
   store.set(DASH_OUTBOX, dashBox); flushDash();
 }
 async function flushDash() {
@@ -3485,6 +3516,44 @@ async function openChapter(id) {
   best.diff = diff; best.given = pickGivens(best, DIFFS[diff].givens);
   setup(best, null);
   toast('Chapter ' + c.chapter + ' vocabulary · ' + best.entries.length + ' words. Reload the page for a different mix.', 4000);
+}
+
+/* ================= SIGN IN WITH GOOGLE (the same sign-in as the practice site) =================
+   The teacher's Practice Results script checks the school account and sends the student back here with a signed pass
+   (#signin=…): name, class periods and Classroom ID. It lasts only for this tab, since Chromebooks are shared. */
+const ON_CHROMEBOOK = /\bCrOS\b/.test(navigator.userAgent);
+const sst = { get: k => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch {} } };
+(function catchPass() {
+  if (/[?&]preview=1\b/.test(location.search)) sst.set('xw-signin-tried', '1'); // the teacher came back from sign-in: no second trip
+  const m = /^#signin=([\w-]+\.[\w-]+)/.exec(location.hash);
+  if (!m) return;
+  sst.set('xw-pass', m[1]);
+  const back = sst.get('xw-return') || ''; sst.set('xw-return', null); // the puzzle link the student was on before signing in
+  history.replaceState(null, '', location.pathname + location.search + (/^#[px]=[\w-]+$/.test(back) ? back : ''));
+})();
+// { n: full name, ps: [periods], rid, token, t: teacher index } for that teacher, or null
+function googlePass(tIdx) {
+  const tok = sst.get('xw-pass'), who = +sst.get('xw-pass-t');
+  if (!tok || who !== tIdx) return null;
+  try {
+    const b = tok.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    const o = JSON.parse(decodeURIComponent(escape(atob(b + '==='.slice((b.length + 3) % 4)))));
+    if (!o || !o.rid || !o.n || !(o.exp > Date.now()) || !Array.isArray(o.ps) || !o.ps.length) return null;
+    return { ...o, token: tok, t: tIdx };
+  } catch { return null; }
+}
+function googleGo(tIdx) {
+  const t = TEACHERS[tIdx]; if (!t || !t.signin) return;
+  sst.set('xw-signin-tried', '1'); sst.set('xw-pass-t', String(tIdx)); sst.set('xw-return', location.hash || null);
+  location.href = t.signin + (t.signin.includes('?') ? '&' : '?') + 'signin=1&back=' + encodeURIComponent(location.origin + location.pathname + location.search);
+}
+// On a school Chromebook the student is already signed in to their school account: go once, automatically
+const googleAuto = tIdx => !!(TEACHERS[tIdx] && TEACHERS[tIdx].signin && ON_CHROMEBOOK && sst.get('xw-signin-tried') !== '1' && !googlePass(tIdx));
+// the crossword Sheet's period that matches one of the student's periods ('2nd', '2nd Hour', '2' all match 2nd)
+function matchPeriod(list, ps) {
+  const num = x => (String(x).match(/\d+/) || [''])[0];
+  for (const p of ps) { const hit = list.find(x => String(x) === String(p)) || list.find(x => num(x) && num(x) === num(p)); if (hit) return String(hit); }
+  return '';
 }
 
 /* ================= INIT ================= */
