@@ -10167,6 +10167,28 @@ function drawFigure(cv, fig) {
         const n = P.c.length, d1 = VEC.norm(VEC.sub(P.c[(i + n - 1) % n], v)), d2 = VEC.norm(VEC.sub(P.c[(i + 1) % n], v));
         dirN = VEC.norm(VEC.sub(d1, d2));
       }
+      /* a point in the middle of the figure (diagonals meeting at E): "outward" means nothing there, so use the widest
+         gap between the segments that meet at it, skipping an angle that has a right-angle mark or an arc */
+      if (VEC.len(VEC.sub(v, cen)) < 12) {
+        const near = (a, b) => VEC.len(VEC.sub(a, b)) < 1, ang = (d) => Math.atan2(d[1], d[0]);
+        const nbrs = [], marked = [];
+        polys.forEach((Q) => Q.c.forEach((q, j) => {
+          if (!near(q, v)) return;
+          const n = Q.c.length, a = Q.c[(j + n - 1) % n], b = Q.c[(j + 1) % n];
+          [a, b].forEach((x) => { if (!nbrs.some((y) => near(x, y))) nbrs.push(x); });
+          if ((Q.right && Q.right[j]) || (Q.arcs && Q.arcs[j]) || (Q.alab && Q.alab[j])) marked.push(VEC.norm(VEC.add(VEC.norm(VEC.sub(a, v)), VEC.norm(VEC.sub(b, v)))));
+        }));
+        if (nbrs.length >= 2) {
+          const as = nbrs.map((x) => ang(VEC.sub(x, v))).sort((x, y) => x - y);
+          let best = null;
+          as.forEach((a0, k) => {
+            const a1 = k + 1 < as.length ? as[k + 1] : as[0] + 2 * Math.PI, mid = (a0 + a1) / 2, d = [Math.cos(mid), Math.sin(mid)];
+            const score = (a1 - a0) - (marked.some((m) => m[0] * d[0] + m[1] * d[1] > 0.9) ? 10 : 0) + (d[1] < 0 ? 0.01 : 0); // ties: above the point
+            if (!best || score > best.score) best = { score, d };
+          });
+          dirN = best.d;
+        }
+      }
       const o = VEC.add(v, VEC.mul(dirN, 17));
       ctx.fillStyle = ink; ctx.fillText(nm, o[0], o[1]); placed.push({ x: o[0], y: o[1], w: 14, h: 18 });
     });
