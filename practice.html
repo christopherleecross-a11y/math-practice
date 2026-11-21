@@ -11989,7 +11989,7 @@ TEMPLATES.a46Residual = (r) => {
     topic: 'Finding a residual', stem: `The equation y = ${lin(m, b)} models a data set. Find the residual for the data point (${x}, ${fmt(y)}).`,
     ...buildChoices(r, fmt(res), [fmt(-res), fmt(pred), fmt(y + pred)].filter((c) => c !== fmt(res)), (i) => fmt(res + i + 1)),
     fr: FR.num('Residual:', res),
-    solution: `Residual = data y ${MINUS} model y.\nModel at x = ${x}: ${fmt(m)}(${x})${b ? ` ${b < 0 ? MINUS : '+'} ${Math.abs(b)}` : ''} = ${fmt(pred)}.\nResidual = ${a4dif(y, pred)} = ${fmt(res)}.`,
+    solution: `Residual = data y ${MINUS} model y.\nModel at x = ${x}: ${fmt(m)}(${x})${b ? ` ${b < 0 ? MINUS : '+'} ${Math.abs(b)}` : ''} = ${fmt(pred)}.\nResidual = ${fmt(y)} − ${fmt(pred) < 0 || pred < 0 ? `(${fmt(pred)})` : fmt(pred)} = ${fmt(res)}.`,
   };
 };
 TEMPLATES.a46GoodFit = (r) => {
@@ -19167,7 +19167,7 @@ TEMPLATES.skLine = (r) => {
     const form = ri(r, 0, 2), p1 = [0, b], p2 = [den, b + num];
     const W = skWin([p1, p2]); if (!skOk(W, [p1, p2])) continue;
     let eq;
-    if (form === 0) eq = `y = ${skLinT(m, b)}`;
+    if (form === 0) eq = skLinT(m, b);
     else if (form === 1) { const x1 = nz(r, -3, 3) * den, y1 = m * x1 + b; if (!skOk(W, [[x1, y1]])) continue; const mT = den > 1 ? `(${fracT(m)})` : m === 1 ? '' : m === -1 ? MINUS : fmt(m); eq = `${y1 ? `y ${y1 < 0 ? '+' : MINUS} ${Math.abs(y1)}` : 'y'} = ${mT}(x ${x1 < 0 ? '+' : MINUS} ${Math.abs(x1)})`; }
     else { const A = -num, B = den, C = b * den, g = gcd(gcd(Math.abs(A), B), Math.abs(C)) || 1; eq = `${lin(A / g, 0).replace(/ \+ 0$/, '')} ${B / g > 0 ? '+' : MINUS} ${Math.abs(B / g) === 1 ? '' : Math.abs(B / g)}y = ${fmt(C / g)}`; }
     return skQ({ topic: 'Graphing lines', stem: `Graph the equation by placing two points on the line.\n${eq}`, family: 'line', target: (x) => m * x + b, keyPts: [p1, p2], win: W,
