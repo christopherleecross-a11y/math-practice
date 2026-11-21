@@ -22486,7 +22486,7 @@ TEMPLATES.b64Describe = (r) => {
   if (opts.length < 2) return TEMPLATES.b64Describe(r);
   const use = [ans, ...shuffle(r, opts.slice(1)).slice(0, 3)];
   return { topic: 'Transformations', stem: `Describe the transformation of f represented by g.   f(x) = ${T.fT},  g(x) = ${T.gT}`, ...buildChoices(r, ans, use.slice(1), () => null), fr: FR.select('Transformation:', shuffle(r, use), ans),
-    solution: `Compare g with f: ${T.refy ? 'x is replaced by −x; ' : T.h ? `x is replaced by x ${T.h > 0 ? '−' : '+'} ${Math.abs(T.h)}; ` : ''}${T.a !== 1 ? `the function is multiplied by ${fracT(T.a)}; ` : ''}${T.k ? `${Math.abs(T.k)} is ${T.k > 0 ? 'added' : 'subtracted'}; ` : ''}\nSo the graph of g is ${ans} of the graph of f.` };
+    solution: `Compare g with f: ${T.refy ? 'x is replaced by −x; ' : T.h ? `x is replaced by x ${T.h > 0 ? '−' : '+'} ${Math.abs(T.h)}; ` : ''}${T.a !== 1 ? `the function is multiplied by ${fracT(T.a)}; ` : ''}${T.k ? `${Math.abs(T.k)} is ${T.k > 0 ? 'added' : 'subtracted'}; ` : ''}`.replace(/; $/, '.') + `\nSo the graph of g is ${ans} of the graph of f.` };
 };
 TEMPLATES.b64Write = (r) => {
   let T; do { T = b6trans(r, r() < 0.5); } while (T.refy && T.h);
@@ -22502,7 +22502,8 @@ TEMPLATES.b65Approx = (r) => {
   const val = p ** i * q ** j, approx = Math.round((i * lp + j * lq) * 1000) / 1000;
   const vT = fracT(val);
   return b6d3Q(r, { topic: 'Properties of logarithms', stem: `Use ${logT(b)} ${p} ≈ ${lp} and ${logT(b)} ${q} ≈ ${lq} to evaluate the logarithm.   ${logT(b)} ${/\//.test(vT) ? `(${vT})` : vT}`, val: approx, tol: 0.0035, wrongs: [Math.round((i * lp - j * lq) * 1000) / 1000, Math.round(lp * lq * 1000) / 1000, Math.round((j * lp + i * lq) * 1000) / 1000],
-    solution: `${vT} = ${[i ? `${p}${i === 1 ? '' : powT('', String(i).replace('-', '−'))}` : '', j ? `${q}${j === 1 ? '' : powT('', String(j).replace('-', '−'))}` : ''].filter(Boolean).join(' · ')}, so ${logT(b)} ${vT} = ${[i ? `${i === 1 ? '' : fmt(i)}${logT(b)} ${p}` : '', j ? `${j === 1 ? '' : fmt(j)}${logT(b)} ${q}` : ''].filter(Boolean).join(' + ').replace(/\+ −/g, '− ')} ≈ ${fmt(approx)}` });
+    solution: (() => { const L = [[i, p, lp], [j, q, lq]].filter((t) => t[0]); const sum = (f) => L.map(([k, , v], n) => `${k < 0 ? (n ? ' − ' : MINUS) : n ? ' + ' : ''}${Math.abs(k) === 1 ? '' : Math.abs(k)}${f(v, L[n][1])}`).join('');
+      return `${vT} = ${[i ? `${p}${i === 1 ? '' : powT('', String(i).replace('-', '−'))}` : '', j ? `${q}${j === 1 ? '' : powT('', String(j).replace('-', '−'))}` : ''].filter(Boolean).join(' · ')}, so ${logT(b)} ${/\//.test(vT) ? `(${vT})` : vT} = ${sum((v, x) => `${logT(b)} ${x}`)}\n≈ ${sum((v) => (Math.abs(L.find((t) => t[2] === v)[0]) === 1 ? String(v) : `(${v})`))} = ${String(approx).replace('-', MINUS)}`; })() });
 };
 TEMPLATES.b65ChangeBase = (r) => {
   const b = pick(r, [7, 9, 6, 8, 2, 4, 5, 3]), [a, aT] = pick(r, [[13, '13'], [15, '15'], [17, '17'], [22, '22'], [28, '28'], [3 / 16, '3/16'], [9 / 40, '9/40'], [5 / 8, '5/8'], [100, '100']]), v = Math.log(a) / Math.log(b);
