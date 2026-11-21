@@ -21966,7 +21966,7 @@ TEMPLATES.a31DomRange = (r) => {
 TEMPLATES.a31IndDep = (r) => {
   const C = pick(r, [['the number of quarters you put into a parking meter', 'the amount of time on the meter'], ['the amount of time spent driving', 'the amount of gasoline in a car’s fuel tank'], ['the number of hours you work', 'the amount of money you earn'], ['the number of tickets sold', 'the money raised'], ['the length of a side of a square', 'the area of the square'], ['the number of miles you ride in a taxi', 'the cost of the ride']]), ind = C[0];
   const opts = shuffle(r, C.map((t) => t[0].toUpperCase() + t.slice(1)));
-  return a3sel(r, `Identify the independent variable.   ${opts[0]} and ${opts[1].toLowerCase()}`, opts, ind[0].toUpperCase() + ind.slice(1), `The ${C[1]} depends on ${ind}, so ${ind} is the independent variable and ${C[1]} is the dependent variable.`, 'Functions');
+  return a3sel(r, `Identify the independent variable.   ${opts[0]} and ${opts[1].toLowerCase()}`, opts, ind[0].toUpperCase() + ind.slice(1), `${C[1][0].toUpperCase() + C[1].slice(1)} depends on ${ind}, so ${ind} is the independent variable and ${C[1]} is the dependent variable.`, 'Functions');
 };
 // #19–22: does the equation represent a function? Domain?
 TEMPLATES.a31EqFunc = (r) => {
@@ -22220,7 +22220,7 @@ TEMPLATES.a37FindR = (r) => {
   let gm = m, gb = b, gT;
   if (kind === 'shiftx') { gb = b - m * rr; gT = 'g(x) = f(x − r)'; } else if (kind === 'shifty') { gb = b + rr; gT = 'g(x) = f(x) + r'; } else if (kind === 'scale') { gm = m * rr; gb = b * rr; gT = 'g(x) = r·f(x)'; } else { gm = m * rr; gT = 'g(x) = f(rx)'; }
   if (!Number.isInteger(gb * 6)) return TEMPLATES.a37FindR(r);
-  return a1numQ(r, { topic: 'Transformations', stem: `f(x) = ${a3lin(m, b)} and g(x) = ${a3lin(gm, gb)}. If ${gT}, find the value of r.`, val: rr, label: 'r =', wrongs: [-rr, gb - b, gm / m + 1], solution: kind === 'shiftx' ? `f(x − r) = ${a3lin(m, 0)}(x − r) + ${fmt(b)} → constant ${fmt(b)} − ${a1P(m)}r = ${fracT(gb)}, so r = ${fmt(rr)}.`.replace('xx', 'x') : kind === 'shifty' ? `f(x) + r = ${a3lin(m, b)} + r, so ${fmt(b)} + r = ${fracT(gb)} and r = ${fmt(rr)}.` : kind === 'scale' ? `r·f(x) multiplies every coefficient by r: ${fracT(gm)} ÷ ${fracT(m)} = ${fmt(rr)}.` : `f(rx) = ${fracT(m)}(rx) + ${fmt(b)}, so ${fracT(m)}r = ${fracT(gm)} and r = ${fmt(rr)}.` });
+  return a1numQ(r, { topic: 'Transformations', stem: `f(x) = ${a3lin(m, b)} and g(x) = ${a3lin(gm, gb)}. If ${gT}, find the value of r.`, val: rr, label: 'r =', wrongs: [-rr, gb - b, gm / m + 1], solution: kind === 'shiftx' ? `f(x − r) = ${fracT(m)}(x − r) ${b < 0 ? MINUS : '+'} ${fmt(Math.abs(b))} → constant ${fmt(b)} − ${a1P(m)}r = ${fracT(gb)}, so r = ${fmt(rr)}.`.replace('xx', 'x') : kind === 'shifty' ? `f(x) + r = ${a3lin(m, b)} + r, so ${fmt(b)} + r = ${fracT(gb)} and r = ${fmt(rr)}.` : kind === 'scale' ? `r·f(x) multiplies every coefficient by r: ${fracT(gm)} ÷ ${fracT(m)} = ${fmt(rr)}.` : `f(rx) = ${fracT(m)}(rx) ${b < 0 ? MINUS : '+'} ${fmt(Math.abs(b))}, so ${fracT(m)}r = ${fracT(gm)} and r = ${fmt(rr)}.` });
 };
 
 // ---------- 3.8 Graphing Absolute Value Functions ----------
