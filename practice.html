@@ -15235,7 +15235,7 @@ TEMPLATES.a61Word = (r) => {
       stem = `The human body produces about ${m1} × 10${a6sup(e1)} red blood cells in ${m2} × 10${a6sup(e2)} minute. How many red blood cells does the body produce each minute? Write your answer in scientific notation and in standard form.`; unit = 'cells'; how = 'cells ÷ minutes'; }
     else { const m1 = pick(r, [7.8, 6.3, 4.5, 1.5, 2.4, 9.6, 5.7]), e1 = 8; a = m1 * 10 ** e1; b = 3 * 10 ** 5; if (Math.abs(Math.round(m1 / 3 * 100) - m1 / 3 * 100) > 1e-6) continue;
       stem = `The speed of light is approximately 3 × 10⁵ kilometers per second. A planet is about ${m1} × 10⁸ kilometers from the sun. How long does it take sunlight to reach the planet, in seconds? Write your answer in scientific notation and in standard form.`; unit = 'seconds'; how = 'distance ÷ speed'; }
-    const v = a / b, correct = `${a6sciT(v)} = ${a6stdT(v)} ${unit}`, [vm, ve] = a6sciParts(v);
+    const v = +(a / b).toPrecision(12), correct = `${a6sciT(v)} = ${a6stdT(v)} ${unit}`, [vm, ve] = a6sciParts(v);
     sol = `${how}: (${a6sciT(a)}) / (${a6sciT(b)}) = ${a6sciT(v)} = ${a6stdT(v)} ${unit}.`;
     return { topic: 'Scientific notation in real life', stem,
       ...buildChoices(r, correct, [[vm, ve + 1], [vm, ve - 1], [a6sciParts(a * b)[0], a6sciParts(a * b)[1]]].map(([m, e]) => `${a6sciT(m * 10 ** e)} = ${a6stdT(m * 10 ** e)} ${unit}`).filter((w) => w !== correct), (i) => `${a6sciT(vm * 10 ** (ve + i + 2))} = ${a6stdT(vm * 10 ** (ve + i + 2))} ${unit}`),
@@ -15409,7 +15409,7 @@ TEMPLATES.a62NthRoot = (r) => {
     topic: 'Real nth roots', stem: `Find the indicated real nth root(s) of a.\nn = ${n},  a = ${fmt(a)}`,
     ...buildChoices(r, correct, wr, (i) => `±${k + i + 1}`),
     fr: { fields: [{ kind: 'expr', keys: 'roots', label: 'Root(s):' }], key: [vals.length === 2 ? `\\pm${k}` : vals.length ? String(vals[0]) : '\\text{none}'], display: correct, check: (x) => (/noreal|none|nosolution/.test(pxWords(x[0])) ? !vals.length : realListOk(x[0], vals)) },
-    solution: `${n % 2 ? `n = ${n} is odd, so there is exactly one real ${n}th root.` : neg ? `n = ${n} is even and a < 0, so there are no real ${n}th roots.` : `n = ${n} is even and a > 0, so there are two real ${n}th roots.`}\n${vals.length ? `(${fmt(vals[0])})${a6sup(n)} = ${fmt(a)}, so the answer is ${correct}.` : ''}`,
+    solution: `${n % 2 ? `n = ${n} is odd, so there is exactly one real ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} root.` : neg ? `n = ${n} is even and a < 0, so there are no real ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} roots.` : `n = ${n} is even and a > 0, so there are two real ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} roots.`}\n${vals.length ? `(${fmt(vals[0])})${a6sup(n)} = ${fmt(a)}, so the answer is ${correct}.` : ''}`,
   };
 };
 // #9–10: side of a cube from its volume
@@ -15419,7 +15419,7 @@ TEMPLATES.a62Cube = (r) => {
     topic: 'Cube roots', stem: `A cube has a volume of ${V} ${u[1]}. Find the length of each side of the cube.`,
     ...buildChoices(r, `${s} ${u[0]}`, [`${fmt(V / 3)} ${u[0]}`, `${fmt(Math.round(Math.sqrt(V) * 10) / 10)} ${u[0]}`, `${fmt(V / 6)} ${u[0]}`, `${s + 1} ${u[0]}`], (i) => `${s + i + 2} ${u[0]}`),
     fr: FR.num('s =', s, { suffix: ' ' + u[0] }),
-    solution: `V = s³, so s = ∛${V} = ${s} ${u[0]}.\nCheck: ${s}³ = ${V} ✓`,
+    solution: `V = s³, so s = ∛${V} = ${s} ${u[0]}${u[0].endsWith('.') ? '' : '.'}\nCheck: ${s}³ = ${V} ✓`,
   };
 };
 const a6notReal = (raw) => /notareal|notreal|norealnumber|undefined|none|noreal|imaginary/.test(pxWords(raw));
