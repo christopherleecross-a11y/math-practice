@@ -18959,6 +18959,16 @@ for (const n of [4, 5]) SKETCH['path' + n] = { roles: ['the point for the first 
   fit: () => null, match: (pts, T, win) => pts.length === n && pts.every((p, i) => skNear(p, win.path[i])) };
 const skStyle = (v) => (String(v || '').split('|')[1] || '');
 const skParse = (v) => String(v || '').split('|')[0].split(';').filter(Boolean).map((p) => p.split(',').map(Number)).filter((p) => p.length === 2 && p.every(isFinite));
+// the correct graph of a graphing (sketch) question, drawn a little at a time: show(f) places the first fraction f of its points (all of them at f = 1)
+function skAnswerFig(t, W) {
+  const f0 = t && t.sketch && t.fr && t.fr.fields && t.fr.fields[0]; if (!f0 || !f0.family || !SKETCH[f0.family]) return null;
+  const all = skParse(t.fr.key[0]), style = skStyle(t.fr.key[0]); if (!all.length) return null;
+  const w = Math.min(340, (W || 400) - 40), h = f0.win && f0.win.hFrac ? Math.round(w * f0.win.hFrac) : w, box = el('div', { style: 'display:flex;justify-content:center;margin:6px 0' });
+  const show = (frac) => { const k = frac >= 1 ? all.length : Math.max(0, Math.floor(all.length * frac + 1e-9)); let cv = makeCanvas(w, h);
+    try { skDraw(cv, f0, all.slice(0, k), null, style); } catch (e) { cv = makeCanvas(w, h); try { skDraw(cv, f0, k ? all : [], null, style); } catch (e2) { return; } }
+    box.innerHTML = ''; box.append(cv); };
+  show(0); return { box, show };
+}
 const skText = (pts) => pts.map(([x, y]) => `(${fmt(Math.round(x * 100) / 100)}, ${fmt(Math.round(y * 100) / 100)})`).join(', ');
 // does the sketch match the target function T on the window?
 function skMatch(family, pts, T, win, style) {
@@ -37061,11 +37071,11 @@ const HELP = {}; // per question on this page: { ex: which twin is showing (0 = 
 const twinable = (q) => !!(q && q.tpl && TEMPLATES[q.tpl] && q.solution);
 // a problem of the same type and format with different numbers (never the student's own question or one of its retry versions)
 function twinOf(q, i, n) {
-  const own = unM(q.stem);
+  const own = unM(q.stem) + '|' + q.solution; // some questions show their expression only in the figure, so compare the solution too
   for (let k = 0; k < 8; k++) {
     try {
       const t = applyMode(TEMPLATES[q.tpl](mulberry32(cyrb53(`${state.seedStr}|q${i}|twin${n}|${k}`))), q.fmt);
-      if (t && unM(t.stem) !== own && t.solution) return t;
+      if (t && unM(t.stem) + '|' + t.solution !== own && t.solution) return t;
     } catch (e) {}
   }
   return null;
@@ -37085,6 +37095,7 @@ function helpPanel(q, i) {
       const lines = String(t.solution).split('\n').filter((l) => l.trim()), shown = Math.min(lines.length, (H.step || 0) + 1), done = shown >= lines.length;
       box.append(el('div', { class: 'helphead' }, '📘 A problem like yours, worked out (different numbers)'), textCanvas(t.stem, W - 34));
       if (t.draw) { const cv = t.size ? makeCanvas(Math.min(t.size[0], W - 40), Math.round(t.size[1] * Math.min(1, (W - 40) / t.size[0]))) : makeCanvas(Math.min(560, W - 40), 300); try { t.draw(cv); box.append(cv); } catch (e) {} }
+      const G = skAnswerFig(t, W); if (G) { G.show(shown / lines.length); box.append(G.box); } // a graphing question: the graph fills in as the steps are shown
       if (t.mode !== 'fr' && t.choices) box.append(el('div', { class: 'small', style: 'margin:4px 0' }, 'Choices: ', t.choices.map((c, j) => `${LETTERS[j]}. ${unM(c)}`).join('     ')));
       box.append(el('div', { class: 'helpsteps' }, solNode(lines.slice(0, shown).join('\n'))));
       const ans = t.mode === 'fr' ? (t.proofQ ? '' : t.fr && t.fr.display) : `${LETTERS[t.answer]}. ${t.choices[t.answer]}`;
@@ -37099,10 +37110,11 @@ function helpPanel(q, i) {
   }
   if (H.vid) {
     const vs = practiceVideos(q), v = vs[Math.min(H.vk || 0, vs.length - 1)];
-    if (v) { const P = walkPlayer(v.steps, v.fig); P.wrap.style.display = ''; P.wrap.style.marginTop = '4px';
-      const t = v.seed != null ? pvInst(v) : null; // a video from the file: show its problem (and the template's figure) above the player
+    if (v) { const t = v.seed != null ? pvInst(v) : null, G = t ? skAnswerFig(t, contentWidth()) : null; // a video from the file: show its problem (and the template's figure) above the player
+      const P = walkPlayer(v.steps, v.fig, G ? (k, n) => G.show(k < 0 ? 0 : (k + 1) / n) : null); P.wrap.style.display = ''; P.wrap.style.marginTop = '4px';
       if (t) { const W = contentWidth(), top = el('div', { style: 'margin:4px 0 2px' }, textCanvas(t.stem, W - 34));
         if (t.draw) { const cv = t.size ? makeCanvas(Math.min(t.size[0], W - 40), Math.round(t.size[1] * Math.min(1, (W - 40) / t.size[0]))) : makeCanvas(Math.min(560, W - 40), 300); try { t.draw(cv); top.append(cv); } catch (e) {} }
+        if (G) top.append(G.box); // a graphing question: the graph is drawn as the video goes
         P.wrap.insertBefore(top, P.wrap.children[1]); }
       // more than one kind of answer: the student picks which example to watch (never chosen from their own answer)
       const pick = vs.length > 1 ? el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 6px' }, el('span', { class: 'small' }, 'Pick an example:'),
@@ -41037,7 +41049,7 @@ function walkLoad(subject) {
   if (!WALK_FILES[subject]) WALK_FILES[subject] = fetch(`walks/${subject}.json`, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
   return WALK_FILES[subject];
 }
-function walkPlayer(steps, baseFig) {
+function walkPlayer(steps, baseFig, onStep) {
   steps = steps.map((st) => (Array.isArray(st) ? { line: st[0], say: st[1], fig: st[2] } : st));
   const wrap = el('div', { class: 'stu-walk', style: 'display:none;margin-top:10px;border:2px solid #692b31;border-radius:12px;padding:12px;background:#fffdf8' });
   const figBox = el('div', {}), lines = el('div', { style: 'margin:6px 0' }), cap = el('div', { style: 'background:#f3efe4;border-radius:8px;padding:10px 12px;font-size:17px;line-height:1.45;min-height:48px' });
@@ -41058,6 +41070,7 @@ function walkPlayer(steps, baseFig) {
     cap.textContent = i < 0 ? 'Press ▶ Play. Turn your sound on, or read along here.' : steps[i].say;
     count.textContent = i < 0 ? `${steps.length} steps` : `Step ${i + 1} of ${steps.length}`;
     playBtn.textContent = playing ? '⏸ Pause' : i >= steps.length - 1 ? '↺ Watch again' : '▶ Play';
+    if (onStep) onStep(i, steps.length);
   };
   const advance = () => { if (!playing) return; if (!wrap.isConnected) { playing = false; stopTalk(); return; } if (i >= steps.length - 1) { playing = false; draw(); return; } i++; draw(); talk(); };
   const talk = () => {
