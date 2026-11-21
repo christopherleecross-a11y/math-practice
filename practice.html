@@ -16206,11 +16206,11 @@ TEMPLATES.b53Transform = (r) => {
 // #33: radical function models
 TEMPLATES.b53Word = (r) => {
   const x = pick(r, [16, 25, 36, 49, 64, 81, 100]), f = pick(r, [0.6, 0.38, 0.17, 0.9]), place = { 0.6: 'Mars', 0.38: 'Mercury', 0.17: 'the Moon', 0.9: 'Venus' }[f];
-  const E = 8 * Math.sqrt(x), M = f * E;
-  const fig = a6tex(['E(x)=8\\sqrt{x}', `M(x)=${f}\\cdot E(x)`]);
-  return { topic: 'Radical functions in real life', stem: `The functions below approximate the velocity (in feet per second) of an object dropped from a height of x feet right before it hits the ground on Earth (E) and on ${place} (M). What is the velocity of an object dropped from a height of ${x} feet right before it hits the ground on ${place}?`, draw: fig.draw, size: fig.size,
+  const E = 8 * Math.sqrt(x), M = f * E, L = place === 'Venus' ? 'V' : 'M';
+  const fig = a6tex(['E(x)=8\\sqrt{x}', `${L}(x)=${f}\\cdot E(x)`]);
+  return { topic: 'Radical functions in real life', stem: `The functions below approximate the velocity (in feet per second) of an object dropped from a height of x feet right before it hits the ground on Earth (E) and on ${place} (${L}). What is the velocity of an object dropped from a height of ${x} feet right before it hits the ground on ${place}?`, draw: fig.draw, size: fig.size,
     ...buildChoices(r, `${fmt(M)} ft/sec`, [`${fmt(E)} ft/sec`, `${fmt(f * 8 * x)} ft/sec`, `${fmt(8 * Math.sqrt(f * x))} ft/sec`], (i) => `${fmt(M + i + 1)} ft/sec`),
-    fr: FR.num('velocity =', M, { suffix: ' ft/sec' }), solution: `E(${x}) = 8√${x} = ${fmt(E)}\nM(${x}) = ${f} · ${fmt(E)} = ${fmt(M)} feet per second` };
+    fr: FR.num('velocity =', M, { suffix: ' ft/sec' }), solution: `E(${x}) = 8√${x} = ${fmt(E)}\n${L}(${x}) = ${f} · ${fmt(E)} = ${fmt(M)} feet per second` };
 };
 
 /* ----- 5.4 Solving Radical Equations and Inequalities ----- */
@@ -16244,7 +16244,7 @@ TEMPLATES.b54TwoRad = (r) => {
     return { topic: 'Equations with two radicals', stem: 'Solve the equation. Check your solution.', draw: fig.draw, size: fig.size,
       ...b5listQ(r, sols, [[x], [-x], [x + 1], [(C2 + C1) / (a1 + a2)]].filter((L) => L.every((t) => Number.isInteger(t)))),
       fr: { fields: [{ kind: 'expr', keys: 'words', label: `${v} =` }], key: [b5listL(sols)], display: b5list(sols), check: (q) => b5listOk(q[0], sols) },
-      solution: `${idx === 2 ? 'Square' : 'Cube'} both sides: ${R(a1, C1)} = ${R(a2, C2)}\n${v} = ${fmt(x)}\n${bad ? `Check: the radicands are ${fmt(a1 * x + C1)} and ${fmt(a2 * x + C2)}, which are negative, so ${v} = ${fmt(x)} is extraneous. No solution.` : `Check: both sides equal ${idx === 2 ? '√' : '∛'}${fmt(a1 * x + C1)} ✓`}` };
+      solution: `${idx === 2 ? 'Square' : 'Cube'} both sides: ${R(a1, C1).replace('-', ' − ').replace('+', ' + ')} = ${R(a2, C2).replace('-', ' − ').replace('+', ' + ')}\n${v} = ${fmt(x)}\n${bad ? `Check: the radicands are ${fmt(a1 * x + C1)} and ${fmt(a2 * x + C2)}, which are negative, so ${v} = ${fmt(x)} is extraneous. No solution.` : `Check: both sides equal ${idx === 2 ? '√' : '∛'}${fmt(a1 * x + C1)} ✓`}` };
   }
 };
 // #31–38: cube roots
@@ -16256,7 +16256,7 @@ TEMPLATES.b54Cube = (r) => {
     return { topic: 'Equations with cube roots', stem: 'Solve the equation. Check your solution.', draw: fig.draw, size: fig.size,
       ...b5listQ(r, [x], [[(s * s - c) / a], [(-(s ** 3) - c) / a], [(3 * s - c) / a], []].filter((L) => L.every((t) => Number.isInteger(t)))),
       fr: { fields: [{ kind: 'expr', keys: 'words', label: `${v} =` }], key: [String(x)], display: fmt(x), check: (q) => b5listOk(q[0], [x]) },
-      solution: `Cube both sides: ${inner} = ${s ** 3}\n${v} = ${fmt(x)}\nCheck: ∛${fmt(a * x + c)} = ${s} ✓ (a cube root can be negative, so nothing is extraneous)` };
+      solution: `Cube both sides: ${inner.replace('-', ' − ').replace('+', ' + ')} = ${fmt(s ** 3)}\n${v} = ${fmt(x)}\nCheck: ∛${fmt(a * x + c)} = ${s} ✓ (a cube root can be negative, so nothing is extraneous)` };
   }
 };
 // √(ax + b) = px + q, built from two roots of the squared equation
