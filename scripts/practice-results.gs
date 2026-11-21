@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-20.2'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-21.1'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -142,6 +142,12 @@ function doPost(e) {
   if (d.action === 'override') { // the teacher marks a question right (or undoes it) on the Results dashboard
     let out;
     try { out = overrideQuestion_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'rosterAdd' || d.action === 'rosterMove' || d.action === 'rosterPeriods') { // the dashboard's "Add or move a student"
+    let out;
+    try { const bad = teacherAuth_(d); out = bad || (d.action === 'rosterPeriods' ? { ok: true, periods: Object.keys(periodCourses_()) } : d.action === 'rosterAdd' ? rosterAdd_(d) : rosterMove_(d)); }
+    catch (err) { out = { ok: false, error: String(err && err.message || err) }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'roster') {
@@ -845,6 +851,81 @@ function rosterName_(d) {
   if (hit) { d.name = String(hit.full); d.rosterStudent = { id: hit.id, full: String(hit.full) }; }
 }
 
+/* ---------- Add or move a student from the Results dashboard ----------
+   Google lets a teacher INVITE a student to a class (the student accepts in Classroom); only a domain admin can add one
+   directly, so this tries a direct add and falls back to an invitation. The Roster tab changes right away either way,
+   so the student can sign in to the practice site in the new period immediately. */
+function invitedTo_(courseId) {
+  const out = [];
+  try {
+    let token;
+    do {
+      const res = Classroom.Invitations.list({ courseId: courseId, pageSize: 100, pageToken: token });
+      (res.invitations || []).forEach(function (v) {
+        if (v.role !== 'STUDENT') return;
+        let full = '';
+        try { const pr = Classroom.UserProfiles.get(v.userId); full = pr && pr.name && pr.name.fullName || ''; } catch (e) {}
+        out.push({ id: String(v.userId), full: full || String(v.userId) });
+      });
+      token = res.nextPageToken;
+    } while (token);
+  } catch (e) {}
+  return out;
+}
+function enrollIn_(courseId, who) { // who = email or user ID → 'added' | 'invited' | 'already'
+  try { Classroom.Courses.Students.get(courseId, who); return 'already'; } catch (e) {}
+  try { Classroom.Courses.Students.create({ userId: who }, courseId); return 'added'; } catch (e) {}
+  try { Classroom.Invitations.create({ courseId: courseId, userId: who, role: 'STUDENT' }); return 'invited'; }
+  catch (e) { if (/already exists|ALREADY_EXISTS/i.test(String(e))) return 'invited'; throw new Error('Google Classroom wouldn’t add or invite that student: ' + (e && e.message || e)); }
+}
+function courseForPeriod_(period) {
+  const list = periodCourses_()[String(period)] || [];
+  if (!list.length) throw new Error('No Classroom class is set for ' + period + ' period (Classroom tab, column A).');
+  return list[0].id;
+}
+function rosterSetRow_(period, full, id, course, keepFrom) { // put the student on the Roster tab in this period (moving their row if they have one)
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(ROSTER_TAB);
+  if (!sh) { refreshRoster(); sh = ss.getSheetByName(ROSTER_TAB); }
+  const H = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  const col = function (re) { for (let i = 0; i < H.length; i++) if (re.test(H[i])) return i; return -1; };
+  const a = col(/^Also types/), g = col(/^Group/), u = col(/user ID/), c = col(/^Course ID/);
+  const rows = rosterRows_(), old = rows.filter(function (r) { return r.id === String(id) && (!keepFrom || r.period === String(keepFrom)); })[0];
+  const line = []; for (let i = 0; i < H.length; i++) line.push('');
+  line[0] = String(period); line[1] = full;
+  if (a >= 0) line[a] = old ? old.aliases : ''; if (g >= 0) line[g] = old ? old.group : '';
+  if (u >= 0) line[u] = String(id); if (c >= 0) line[c] = String(course);
+  if (old) sh.getRange(old.row, 1, 1, line.length).setValues([line]);
+  else sh.appendRow(line);
+  const cache = CacheService.getScriptCache(); cache.remove('rosterPub'); cache.remove('roster' + course);
+}
+function rosterAdd_(d) {
+  const email = String(d.email || '').trim().toLowerCase(), period = String(d.period || '');
+  if (!/^[^@\s]+@[^@\s]+$/.test(email)) return { ok: false, error: 'Type the student’s school email address.' };
+  const course = courseForPeriod_(period);
+  let prof; try { prof = Classroom.UserProfiles.get(email); } catch (e) { return { ok: false, error: 'Google didn’t find ' + email + '. Check the spelling of the school email.' }; }
+  const id = String(prof.id), full = prof.name && prof.name.fullName || email;
+  const how = enrollIn_(course, email);
+  PropertiesService.getScriptProperties().setProperty('uid:' + email, id);
+  rosterSetRow_(period, full, id, course);
+  return { ok: true, name: full, period: period, classroom: how };
+}
+function rosterMove_(d) {
+  const id = String(d.id || ''), from = String(d.from || ''), to = String(d.to || '');
+  if (!id || !to || from === to) return { ok: false, error: 'Pick the student and the new period.' };
+  const row = rosterRows_().filter(function (r) { return r.id === id && r.period === from; })[0];
+  if (!row) return { ok: false, error: 'That student isn’t on the roster in ' + from + ' period anymore. Refresh the dashboard and try again.' };
+  const course = courseForPeriod_(to), how = enrollIn_(course, id);
+  let removed = false;
+  if (d.removeOld && row.course) {
+    try { Classroom.Courses.Students.remove(row.course, id); removed = true; } catch (e) {}
+    try { Classroom.Invitations.list({ courseId: row.course, userId: id }).invitations.forEach(function (v) { Classroom.Invitations.remove(v.id); }); } catch (e) {}
+  }
+  rosterSetRow_(to, row.full, id, course, from);
+  CacheService.getScriptCache().remove('roster' + row.course);
+  return { ok: true, name: String(row.full), period: to, classroom: how, removed: removed };
+}
+
 /* ---------- Roster: names from Classroom plus the nicknames students type ---------- */
 // Roster tab columns: Period | Student (as in Classroom) | Also types as (comma-separated) | Classroom user ID | Course ID
 function refreshRoster() {
@@ -862,6 +943,10 @@ function refreshRoster() {
       CacheService.getScriptCache().remove('roster' + c.id); // always read fresh
       rosterOf_(c.id).slice().sort(function (a, b) { return (a.family + a.given).localeCompare(b.family + b.given); })
         .forEach(function (s) { const k = keep[c.id + '|' + s.id] || {}; rows.push([p, s.full, k.aliases || '', k.group || '', s.id, c.id]); });
+      invitedTo_(c.id).forEach(function (s) { // invited from the dashboard, not accepted in Classroom yet
+        if (rows.some(function (r) { return r[4] === s.id && r[5] === c.id; })) return;
+        const k = keep[c.id + '|' + s.id] || {}; rows.push([p, s.full, k.aliases || '', k.group || '', s.id, c.id]);
+      });
     });
   });
   sh.clear();
@@ -1237,7 +1322,7 @@ function dashboard_(d) {
       progress.push({ key: String(r[0]), set: k[2] || '', period: String(r[2]), name: String(r[3]), title: String(r[4]), t: t, answered: answered, total: total, submitted: submitted, attempt: attempt, frozen: frozen, away: away, correct: correct, subScore: subScore, subTotal: subTotal, subAt: subAt });
     });
   }
-  const roster = rosterRows_().map(function (r) { return { period: r.period, full: String(r.full), aliases: r.aliases, group: r.group }; });
+  const roster = rosterRows_().map(function (r) { return { period: r.period, full: String(r.full), aliases: r.aliases, group: r.group, id: r.id }; });
   let dues = {}; try { dues = postedDues_(); } catch (e) { /* the dashboard works without late marking */ }
   // assignments posted to Classroom from this Sheet, so they show on the dashboard before anyone opens them
   const posted = [], ash = ss.getSheetByName(POSTED_TAB);

@@ -37922,6 +37922,70 @@ function dashOverview(titles) {
       el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: () => printReports(list) }, `Print ${list.length} report${list.length === 1 ? '' : 's'}`)));
   } else app.append(el('p', { class: 'small', style: 'margin:0 4px 16px' }, 'Tip: pick a period above to print progress reports for the whole class, or click a student for one report.'));
   const vis = dashVisits(); if (vis) app.append(vis);
+  app.append(dashRosterCard());
+}
+// 👥 Add a student to a period, or move one to another period (Classroom invite + the Roster tab on the Sheet)
+function dashRosterCard() {
+  const d = el('details', { class: 'card' }, el('summary', { style: 'cursor:pointer' }, el('strong', {}, '👥 Add or move a student')));
+  if (DASH.rosOpen) d.open = true;
+  const body = el('div', { style: 'margin-top:8px' }, el('p', { class: 'small' }, 'Loading your periods…'));
+  d.append(body);
+  const post = async (o) => { const r = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ password: dashPw.get(), ...o }) }); return r.json(); };
+  const sel = (opts, first) => { const s = el('select', {}); if (first) s.append(el('option', { value: '' }, first)); opts.forEach(([v, t]) => s.append(el('option', { value: v }, t))); return s; };
+  const perName = (p) => (/^\d+$/.test(p) ? `${p}${['th', 'st', 'nd', 'rd'][(p % 100 > 10 && p % 100 < 14) || p % 10 > 3 ? 0 : p % 10]} period` : `${p} period`);
+  let loaded = false;
+  const load = async () => {
+    if (loaded) return; loaded = true;
+    let g; try { g = await post({ action: 'rosterPeriods' }); } catch (e) { g = { ok: false, error: 'Couldn’t reach your script.' }; }
+    body.innerHTML = '';
+    if (!g.ok) { loaded = false; body.append(el('p', { class: 'err' }, g.error && /action|unknown/i.test(g.error) ? 'Your Sheet’s script hasn’t picked up this feature yet. It updates itself within about 10 minutes; or in the Sheet use Practice > Check for updates now.' : String(g.error || 'Something went wrong.'))); return; }
+    const periods = g.periods.slice().sort((a, b) => (parseInt(a, 10) || 99) - (parseInt(b, 10) || 99));
+    const popts = periods.map((p) => [p, perName(p)]);
+    const msg = (box, ok, text) => { box.innerHTML = ''; box.append(el('div', { class: ok ? 'small' : 'err', style: ok ? 'margin-top:8px;padding:8px 10px;border-radius:8px;background:#e6f4ea' : 'margin-top:8px' }, text)); };
+    const classroomLine = (r) => r.classroom === 'added' ? 'They’re in the Google Classroom class now.' : r.classroom === 'already' ? 'They were already in that Google Classroom class.' : 'Google Classroom sent them an invitation: they need to click Join in Classroom (or in the email) to see the class’s assignments there.';
+    // add
+    const email = el('input', { type: 'text', inputmode: 'email', autocomplete: 'off', placeholder: 'Student’s school email address' });
+    const addP = sel(popts, 'Period…'), addOut = el('div', {});
+    const addBtn = el('button', { class: 'btn', type: 'button', style: 'margin-top:0' }, 'Add student');
+    addBtn.onclick = async () => {
+      if (!email.value.trim() || !addP.value) return msg(addOut, false, 'Type the email and pick a period.');
+      addBtn.disabled = true; addBtn.textContent = 'Adding…';
+      let r; try { r = await post({ action: 'rosterAdd', email: email.value.trim(), period: addP.value }); } catch (e) { r = { ok: false, error: 'Couldn’t reach your script.' }; }
+      addBtn.disabled = false; addBtn.textContent = 'Add student';
+      if (!r.ok) return msg(addOut, false, String(r.error || 'Something went wrong.'));
+      msg(addOut, true, `✅ ${r.name} is on your roster in ${perName(r.period)} and can sign in to the practice site now. ${classroomLine(r)}`);
+      email.value = ''; DASH.data.roster.push({ period: r.period, full: r.name, aliases: '', group: '' });
+    };
+    // move
+    const studs = DASH.data.roster.filter((s) => s.id).slice().sort((a, b) => (parseInt(a.period, 10) || 99) - (parseInt(b.period, 10) || 99) || lastFirst(a.full).localeCompare(lastFirst(b.full)));
+    const pick = sel(studs.map((s, i) => [String(i), `${s.full} (${perName(s.period)})`]), 'Student…');
+    const toP = sel(popts, 'New period…'), moveOut = el('div', {});
+    const rm = el('input', { type: 'checkbox' });
+    const moveBtn = el('button', { class: 'btn', type: 'button', style: 'margin-top:0' }, 'Move student');
+    moveBtn.onclick = async () => {
+      const s = studs[+pick.value];
+      if (!pick.value || !toP.value) return msg(moveOut, false, 'Pick the student and the new period.');
+      if (toP.value === s.period) return msg(moveOut, false, `${s.full} is already in ${perName(s.period)}.`);
+      moveBtn.disabled = true; moveBtn.textContent = 'Moving…';
+      let r; try { r = await post({ action: 'rosterMove', id: s.id, from: s.period, to: toP.value, removeOld: rm.checked }); } catch (e) { r = { ok: false, error: 'Couldn’t reach your script.' }; }
+      moveBtn.disabled = false; moveBtn.textContent = 'Move student';
+      if (!r.ok) return msg(moveOut, false, String(r.error || 'Something went wrong.'));
+      msg(moveOut, true, `✅ ${r.name} is now in ${perName(r.period)} on your roster and signs in there from now on. ${classroomLine(r)}` + (rm.checked ? (r.removed ? ` They were taken out of the ${perName(s.period)} Classroom class.` : ` They couldn’t be taken out of the ${perName(s.period)} Classroom class; remove them there by hand.`) : ` They’re still in the ${perName(s.period)} Classroom class too; remove them there when you’re ready, or the next roster refresh will list them in both periods.`) + ' Their past scores stay under their old period.');
+      s.period = r.period; pick.options[+pick.value + 1].textContent = `${s.full} (${perName(s.period)})`;
+    };
+    const row = (...k) => el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, ...k);
+    body.append(
+      el('div', { style: 'font-weight:700;margin-bottom:4px' }, 'Add a new student'),
+      row(email, addP, addBtn), addOut,
+      el('div', { style: 'font-weight:700;margin:16px 0 4px' }, 'Move a student to another period'),
+      row(pick, toP, moveBtn),
+      el('label', { class: 'small', style: 'display:flex;gap:6px;align-items:center;margin-top:6px;font-weight:400' }, rm, 'Also take them out of the old period’s Google Classroom class (leave this off if you might want their old Classroom work)'),
+      moveOut,
+      el('p', { class: 'small', style: 'margin:14px 0 0;opacity:.8' }, 'The practice site and your Sheet’s Roster tab change right away. Google only lets teachers invite students to a class, so a new or moved student gets a Classroom invitation to accept before they see that class’s Classroom assignments.'));
+  };
+  d.addEventListener('toggle', () => { DASH.rosOpen = d.open; if (d.open) load(); });
+  if (d.open) load();
+  return d;
 }
 // who opened a lesson's catch-up page (the "Missed class?" link); needs PracticeResults.gs with logVisit (dashboard v10)
 function dashVisits(only) {
