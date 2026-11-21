@@ -22362,7 +22362,7 @@ TEMPLATES.b61Rate = (r) => {
     () => { const a = pick(r, [325, 500, 200]), b = pick(r, [0.71, 0.85, 0.6]); return [`The amount y (in milligrams) of a medication in your bloodstream t hours after a dose is y = ${a}(${b})ᵗ.`, b]; },
     () => { const a = pick(r, [2500, 6850, 1500]), b = pick(r, [1.5, 1.03, 1.08]); return [`The number y of users of a website t years after it launched can be modeled by y = ${a}(${b})ᵗ.`, b]; }])();
   const b = C[1], growth = b > 1, pct = Math.round(Math.abs(b - 1) * 10000) / 100;
-  return b6rateQ(r, { topic: 'Exponential growth and decay', stem: `${C[0]} Determine whether the model represents exponential growth or exponential decay, and identify the percent increase or decrease.`, growth, pct, dp: 2, solution: `The base is ${b}, which is ${growth ? 'greater than 1, so the model is exponential growth' : 'less than 1, so the model is exponential decay'}.\n${growth ? `1 + r = ${b}, so r = ${fmt(b - 1)}` : `1 − r = ${b}, so r = ${fmt(Math.round((1 - b) * 100) / 100)}`}: a ${fmt(pct)}% ${growth ? 'increase' : 'decrease'} each year.` });
+  return b6rateQ(r, { topic: 'Exponential growth and decay', stem: `${C[0]} Determine whether the model represents exponential growth or exponential decay, and identify the percent increase or decrease.`, growth, pct, dp: 2, solution: `The base is ${b}, which is ${growth ? 'greater than 1, so the model is exponential growth' : 'less than 1, so the model is exponential decay'}.\n${growth ? `1 + r = ${b}, so r = ${+(b - 1).toFixed(4)}` : `1 − r = ${b}, so r = ${+(1 - b).toFixed(4)}`}: a ${fmt(pct)}% ${growth ? 'increase' : 'decrease'} each ${/ hours /.test(C[0]) ? 'hour' : 'year'}.` });
 };
 // #27–34: rewrite a(b)^(t/k) or a(b)^(kt) as a(1 ± r)^t
 TEMPLATES.b61Rewrite = (r) => {
@@ -22418,7 +22418,7 @@ TEMPLATES.b62Rate = (r) => {
 };
 TEMPLATES.b62Continuous = (r) => {
   const P = pick(r, [3224, 4856, 2500, 1200, 6000]), rr = pick(r, [0.05, 0.04, 0.035, 0.06, 0.025]), t = pick(r, [12, 10, 8, 5, 20]), A = P * Math.exp(rr * t);
-  return b6moneyQ(r, { topic: 'The natural base e', stem: `The balance A (in dollars) of an account that earns interest compounded continuously is A = ${P}${powT('e', `${fmt(rr)}t`)}, where t is the number of years. Find the balance after ${t} years.`, val: A, tol: 0.021, wrongs: [P * (1 + rr) ** t, P * Math.exp(rr) * t, P * (1 + rr * t)], solution: `A = ${P}e^(${fmt(rr)} · ${t}) = ${P}e^(${fmt(rr * t)}) ≈ ${b6money(Math.round(A * 100) / 100)}` });
+  return b6moneyQ(r, { topic: 'The natural base e', stem: `The balance A (in dollars) of an account that earns interest compounded continuously is A = ${P}${powT('e', `${rr}t`)}, where t is the number of years. Find the balance after ${t} years.`, val: A, tol: 0.021, wrongs: [P * (1 + rr) ** t, P * Math.exp(rr) * t, P * (1 + rr * t)], solution: `A = ${P}e^(${rr} · ${t}) = ${P}e^(${+(rr * t).toFixed(4)}) ≈ ${b6money(Math.round(A * 100) / 100)}` });
 };
 
 // ---------- 6.3 Logarithms and Logarithmic Functions ----------
@@ -28877,7 +28877,7 @@ TEMPLATES.b61Challenge = (r) => {
     ...buildChoices(r, disp, [`Account ${better === 'A' ? 'B' : 'A'}, by about $${chR2(diff).toFixed(2)}`, `Account ${better}, by about $${chR2(Math.abs(P * (1 + r1 / 100 * t) - P * (1 + r2 / 100 * t))).toFixed(2)}`, `Account ${better}, by about $${chR2(Math.abs(P * (1 + r1 / 100) ** t - P * (1 + r2 / 100) ** t)).toFixed(2)}`].filter((w, i, A) => A.indexOf(w) === i && w !== disp), (i) => `Account ${better}, by about $${chR2(diff + 10 * (i + 1)).toFixed(2)}`),
     fr: { fields: [{ kind: 'select', label: 'Account that earns more:', options: ['A', 'B'] }, { kind: 'number', label: 'By how much ($):' }], key: [better, chR2(diff).toFixed(2)], display: disp,
       check: (v) => v[0] === better && numEq(v[1], diff), score: (v) => (v[0] === better ? 0.5 : 0) + (numEq(v[1], diff) ? 0.5 : 0) },
-    solution: `A = P(1 + r/n)^(nt)\nAccount A: ${P}(1 + ${fmt(r1 / 100)})^${t} ≈ $${chR2(A1).toFixed(2)}\nAccount B: ${P}(1 + ${fmt(r2 / 100)}/${n2})^(${n2 * t}) ≈ $${chR2(A2).toFixed(2)}\nAccount ${better} earns about $${chR2(diff).toFixed(2)} more.` };
+    solution: `A = P(1 + r/n)^(nt)\nAccount A: ${P}(1 + ${+(r1 / 100).toFixed(5)})^${t} ≈ $${chR2(A1).toFixed(2)}\nAccount B: ${P}(1 + ${+(r2 / 100).toFixed(5)}/${n2})^(${n2 * t}) ≈ $${chR2(A2).toFixed(2)}\nAccount ${better} earns about $${chR2(diff).toFixed(2)} more.` };
 };
 /* 6.2: continuous compounding — doubling time, then the amount at a later time */
 TEMPLATES.b62Challenge = (r) => {
