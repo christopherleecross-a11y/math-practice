@@ -3037,8 +3037,8 @@ async function renderResults() {
     sum.textContent = rows.length ? rows.length + ' crossword' + (rows.length === 1 ? '' : 's') + ' turned in' + (per ? ' in ' + perLabel(per) : '') + (rows.length === 300 ? ' (the newest 300)' : '') + '.' : 'Nothing turned in yet.';
     tbl.innerHTML = '<thead><tr><th>Turned in</th><th>Period</th><th>Student</th><th>Assignment</th><th>Grade</th><th>Status</th></tr></thead>';
     const tb = document.createElement('tbody');
-    rows.forEach(r => { const tr = document.createElement('tr'); tr.innerHTML = `<td class="num">${hx(fmtDate(r[0]))}</td><td>${hx(r[1])}</td><td>${hx(r[2])}</td><td>${hx(r[3] || r[4])}</td><td class="num">${r[6] !== '' ? hx(r[6]) + '%' : ''}</td><td>${hx(r[11])}</td>`; tb.appendChild(tr); });
-    tbl.appendChild(tb); return;
+    rows.forEach(r => { const tr = document.createElement('tr'); tr.innerHTML = `<td class="num" data-sort="${+new Date(r[0]) || ''}">${hx(fmtDate(r[0]))}</td><td data-sort="${hx(nPer(r[1]))}">${hx(r[1])}</td><td data-sort="${hx(sortName(r[2]))}">${hx(r[2])}</td><td>${hx(r[3] || r[4])}</td><td class="num" data-sort="${r[6] !== '' ? hx(r[6]) : ''}">${r[6] !== '' ? hx(r[6]) + '%' : ''}</td><td>${hx(r[11])}</td>`; tb.appendChild(tr); });
+    tbl.appendChild(tb); sortableTable(tbl, 'all'); return;
   }
   const e = rsEntries.find(x => x.id === pick); if (!e) { sum.textContent = ''; return; }
   if (e.share && !e.pcode) { try { const p = fromShare(e.share); e.pcode = await puzzleCode(p); } catch {} }
@@ -3073,14 +3073,43 @@ async function renderResults() {
     if (r) st = `<span class="st ${/early|ran out/i.test(r[11]) ? 'flag' : 'done'}">${r[11] === 'Solved' ? 'Turned in' : hx(r[11])}</span>` + (r[13] === 'Yes' ? ' <span class="st flag" title="Teacher mode was on in that tab">· teacher mode</span>' : '');
     else if (g && !g[3]) st = `<span class="st work">Working</span> <span class="muted">${startedAt(g) ? 'started ' + hx(fmtClock(startedAt(g))) + ' · ' : ''}last active ${hx(fmtDate(g[5]))}</span>`;
     else st = '<span class="st none">Not started</span>';
-    tr.innerHTML = `<td>${hx(x.name)}</td>${showPer ? `<td>${hx(perLabel(x.period))}</td>` : ''}<td>${st}</td><td class="num">${r && r[6] !== '' ? hx(r[6]) + '%' : ''}${r && r[5] ? ' <span class="muted">(' + hx(r[5]) + ')</span>' : ''}</td>` +
-      `<td class="num">${r ? hx(sheetTime(r[9])) : ''}</td><td class="num">${r && +r[10] ? hx(r[10]) + '×' : r ? '0' : ''}</td><td class="num">${r ? hx(fmtDate(r[0])) : ''}</td><td class="acts"></td>`;
+    const tSec = r ? String(sheetTime(r[9])).split(':').reduce((a, b) => a * 60 + (+b || 0), 0) : '';
+    tr.innerHTML = `<td data-sort="${hx(sortName(x.name))}">${hx(x.name)}</td>${showPer ? `<td data-sort="${hx(nPer(x.period))}">${hx(perLabel(x.period))}</td>` : ''}<td data-sort="${r ? 1 : g && !g[3] ? 2 : 3}">${st}</td><td class="num" data-sort="${r && r[6] !== '' ? hx(r[6]) : ''}">${r && r[6] !== '' ? hx(r[6]) + '%' : ''}${r && r[5] ? ' <span class="muted">(' + hx(r[5]) + ')</span>' : ''}</td>` +
+      `<td class="num" data-sort="${r ? tSec : ''}">${r ? hx(sheetTime(r[9])) : ''}</td><td class="num" data-sort="${r ? +r[10] || 0 : ''}">${r && +r[10] ? hx(r[10]) + '×' : r ? '0' : ''}</td><td class="num" data-sort="${r ? +new Date(r[0]) || '' : ''}">${r ? hx(fmtDate(r[0])) : ''}</td><td class="acts"></td>`;
     const acts = tr.querySelector('.acts');
     if (r || g) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = 'Their work'; b.addEventListener('click', () => showWork(e, x.name, x.period)); acts.appendChild(b); }
     if (e.versions > 1) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = 'Their version'; b.addEventListener('click', () => showVersion(e, x.name, x.period)); acts.append(' ', b); }
     tb.appendChild(tr);
   });
   tbl.appendChild(tb);
+  sortableTable(tbl, 'one');
+}
+
+/* ---- click a column heading to sort by it (click again to reverse); blanks always go last ---- */
+const sortName = n => { const t = String(n || '').replace(/ \(not on roster\)$/, '').trim(); if (/,/.test(t)) return t.toLowerCase(); const w = t.split(/\s+/); return (w.pop() + ', ' + w.join(' ')).toLowerCase(); };
+function sortableTable(tbl, which) {
+  TP.rsSort = TP.rsSort || {};
+  const ths = [...tbl.querySelectorAll('thead th')], tb = tbl.querySelector('tbody'); if (!tb) return;
+  const keyOf = (tr, i) => { const td = tr.children[i]; if (!td) return ''; return td.hasAttribute('data-sort') ? td.getAttribute('data-sort') : td.textContent.trim(); };
+  const apply = () => {
+    const st = TP.rsSort[which]; ths.forEach((th, i) => { th.dataset.arrow = st && st.i === i ? (st.dir > 0 ? ' ▲' : ' ▼') : ''; th.lastChild && th.lastChild.nodeType === 1 && th.lastChild.remove(); if (th.dataset.arrow) th.append(Object.assign(document.createElement('span'), { textContent: th.dataset.arrow })); });
+    if (!st) return;
+    const rows = [...tb.children];
+    rows.sort((a, b) => {
+      const x = keyOf(a, st.i), y = keyOf(b, st.i);
+      if (x === '' || y === '') return x === y ? 0 : x === '' ? 1 : -1;
+      const nx = Number(x), ny = Number(y);
+      const c = !isNaN(nx) && !isNaN(ny) ? nx - ny : x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' });
+      return c * st.dir;
+    });
+    rows.forEach(r => tb.appendChild(r));
+  };
+  ths.forEach((th, i) => {
+    if (!th.textContent.trim()) return;
+    th.style.cursor = 'pointer'; th.title = 'Click to sort';
+    th.addEventListener('click', () => { const st = TP.rsSort[which]; TP.rsSort[which] = { i, dir: st && st.i === i ? -st.dir : 1 }; apply(); });
+  });
+  apply();
 }
 
 /* ---- one student's copy of an assignment: the version their name gets, keyed exactly as their device saves it ---- */
