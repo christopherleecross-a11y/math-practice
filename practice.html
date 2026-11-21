@@ -310,6 +310,7 @@ tr.dash-late td strong { color: #b42318; }
 .morebar .btn { margin: 0; padding: 7px 14px; font-size: 14px; }
 .morebox { margin-top: 12px; padding: 12px 14px; border: 2px dashed var(--accent); border-radius: 10px; background: #fffaf3; }
 </style>
+<script src="sylogist.js"></script>
 </head>
 <body>
 <div class="school"><img class="school-logo" src="atoka-logo.png" alt="Atoka Public Schools"><span class="school-sub">Mathematics</span></div>
@@ -37989,7 +37990,13 @@ function dashAssignment(a) {
   // students
   const scard = el('div', { class: 'card' }, el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap' }, el('strong', {}, 'Students who turned it in'),
     best.length ? el('button', { class: 'btn secondary', style: 'margin-top:0;padding:7px 14px', onclick: () => dashCsv(a.title, ['Period', 'Name', 'Best score', 'Out of', 'Percent', 'Tries', 'Last turned in', 'Late', 'Minutes', 'Times left tab', 'Hints', 'Work'],
-      best.map((r) => [r.period, r.name, r.score, r.total, Math.round(100 * r.pct), r.tries, new Date(r.lastT).toLocaleString(), dashLate(r) ? 'late' : '', r.minutes, r.away, parseDetail(r.detail).filter((d) => d.hint).length, r.work])) }, 'Download CSV') : ''));
+      best.map((r) => [r.period, r.name, r.score, r.total, Math.round(100 * r.pct), r.tries, new Date(r.lastT).toLocaleString(), dashLate(r) ? 'late' : '', r.minutes, r.away, parseDetail(r.detail).filter((d) => d.hint).length, r.work])) }, 'Download CSV') : '',
+    best.length || notStarted.length ? el('button', { class: 'btn secondary', style: 'margin-top:0;padding:7px 14px', title: 'Copy these scores for the Fill Sylogist bookmark', onclick: async (e) => {
+      const missing = [...wip.map((p) => p.name), ...lost.map((p) => p.name), ...notStarted.map((s) => s.full)];
+      const zero = missing.length ? confirm(`${missing.length} student${missing.length === 1 ? ' hasn’t' : 's haven’t'} turned it in${DASH.period ? '' : ' (in all periods)'}.\n\nOK = put 0 for them in Sylogist\nCancel = leave their boxes blank`) : false;
+      const ok = await SYLOGIST.copy([...best.map((r) => ({ name: r.name, score: 100 * r.pct })), ...missing.map((n) => ({ name: n, score: zero ? 0 : '' }))], `${a.title}${DASH.period ? ' · ' + DASH.period + ' period' : ''}`);
+      const b = e.target, t = b.textContent; b.textContent = ok ? '✓ Copied — now use Fill Sylogist' : 'Couldn’t copy'; setTimeout(() => (b.textContent = t), 4000);
+    } }, '📋 Copy for Sylogist') : ''));
   if (!best.length) scard.append(el('p', {}, 'Nobody has turned this in yet.'));
   else scard.append(dashTable([
     { k: 'name', t: 'Student', sort: byStudent, show: (r) => linkBtn(r.name, () => { DASH.student = { period: r.period, name: r.name }; dashRender(); }) },
@@ -38004,6 +38011,7 @@ function dashAssignment(a) {
     { k: 'grade', t: '', sort: () => 0, show: (r) => adjustBtn(r) },
     { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn(r) },
   ], best));
+  if (window.SYLOGIST) scard.append(SYLOGIST.installCard('small'));
   if (best.some(dashLate)) scard.append(el('p', { class: 'small', style: 'margin-top:10px;color:#b42318' }, 'Red rows: the student first turned it in after the Classroom due date for their period. Hover a red row to see the due date.'));
   app.append(scard);
   if (best.length) app.append(dashReteach(a.rows, 'on this assignment'));

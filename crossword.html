@@ -286,6 +286,7 @@ body.tp-open{overflow:hidden}
   .chip{background:none!important;color:#000!important;opacity:1!important;text-decoration:none!important;font-size:10pt}
 }
 </style>
+<script src="sylogist.js"></script>
 </head>
 <body>
 <div class="school"><img class="school-logo" src="atoka-logo.png" alt="Atoka Public Schools"><span class="school-sub">Mathematics</span></div>
@@ -3030,7 +3031,7 @@ function fillResults() {
 }
 async function renderResults() {
   const sum = $('#rsSum'), tbl = $('#rsTable'), R = TP.res.results, pick = TP.rsPick, per = TP.rsPer;
-  tbl.innerHTML = '';
+  tbl.innerHTML = ''; { const o = document.getElementById('rsSylo'); if (o) o.remove(); }
   // results columns: 0 Submitted, 1 Period, 2 Student, 3 Assignment, 4 Puzzle, 5 Score, 6 Grade, 7 Difficulty, 8 Puzzle code, 9 Time, 10 Left page, 11 Status, 12 Version, 13 Teacher mode used
   if (pick === 'all') {
     const rows = R.filter(r => !per || nPer(r[1]) === nPer(per)).slice(-300).reverse();
@@ -3083,6 +3084,21 @@ async function renderResults() {
   });
   tbl.appendChild(tb);
   sortableTable(tbl, 'one');
+  // putting the grades in Sylogist
+  let sy = document.getElementById('rsSylo'); if (sy) sy.remove();
+  if (window.SYLOGIST && list.length) {
+    sy = document.createElement('div'); sy.id = 'rsSylo'; sy.style.marginTop = '14px';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = '📋 Copy for Sylogist';
+    b.title = 'Copy these grades for the Fill Sylogist bookmark';
+    b.addEventListener('click', async () => {
+      const missing = list.filter(x => !x.res || x.res[6] === '');
+      const zero = missing.length ? confirm(`${missing.length} student${missing.length === 1 ? ' hasn’t' : 's haven’t'} turned it in${per ? '' : ' (in all periods)'}.\n\nOK = put 0 for them in Sylogist\nCancel = leave their boxes blank`) : false;
+      const ok = await SYLOGIST.copy(list.map(x => ({ name: x.name, score: x.res && x.res[6] !== '' ? +x.res[6] : zero ? 0 : '' })), (e.title || e.label || '') + (per ? ' · ' + perLabel(per) : ''));
+      const t = '📋 Copy for Sylogist'; b.textContent = ok ? '✓ Copied — now use Fill Sylogist' : 'Couldn’t copy'; setTimeout(() => (b.textContent = t), 4000);
+    });
+    sy.append(b, SYLOGIST.installCard());
+    tbl.after(sy);
+  }
 }
 
 /* ---- click a column heading to sort by it (click again to reverse); blanks always go last ---- */
