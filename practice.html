@@ -40858,7 +40858,14 @@ const WALKS = {
     { line: 'AC ≠ BD, so it is not a rectangle, and not a square.', say: '6 is not equal to 4, so the diagonals are not congruent. It is not a rectangle, and that means it cannot be a square either.' },
     { line: 'Answer: a rhombus (not a rectangle or a square)', say: 'Final answer: it is a rhombus, but not a rectangle or a square.' }],
 };
-function walkPlayer(steps) {
+// walkthroughs for every lesson, kept in walks/<subject>.json and loaded when a catch-up page opens
+const WALK_FILES = {};
+function walkLoad(subject) {
+  if (!WALK_FILES[subject]) WALK_FILES[subject] = fetch(`walks/${subject}.json`, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+  return WALK_FILES[subject];
+}
+function walkPlayer(steps, baseFig) {
+  steps = steps.map((st) => (Array.isArray(st) ? { line: st[0], say: st[1], fig: st[2] } : st));
   const wrap = el('div', { class: 'stu-walk', style: 'display:none;margin-top:10px;border:2px solid #692b31;border-radius:12px;padding:12px;background:#fffdf8' });
   const figBox = el('div', {}), lines = el('div', { style: 'margin:6px 0' }), cap = el('div', { style: 'background:#f3efe4;border-radius:8px;padding:10px 12px;font-size:17px;line-height:1.45;min-height:48px' });
   const btn = (t, f) => el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: f }, t);
@@ -40871,7 +40878,7 @@ function walkPlayer(steps) {
   const pickVoice = () => { if (!synth) return null; const vs = synth.getVoices().filter((v) => /^en(-|_)US/i.test(v.lang)); return vs.find((v) => /Google US English/i.test(v.name)) || vs.find((v) => v.localService) || vs[0] || null; };
   const stopTalk = () => { token++; clearTimeout(timer); if (synth) synth.cancel(); };
   const draw = () => {
-    let fig = null; for (let k = 0; k <= Math.max(0, i); k++) if (steps[k] && steps[k].fig) fig = steps[k].fig;
+    let fig = baseFig || null; for (let k = 0; k <= Math.max(0, i); k++) if (steps[k] && steps[k].fig) fig = steps[k].fig;
     if (fig !== shownFig) { figBox.innerHTML = ''; figBox.append(stuFigure(fig)); shownFig = fig; }
     lines.innerHTML = '';
     steps.slice(0, i + 1).forEach((st, k) => { const t = stuText(st.line, 19); t.style.padding = '4px 8px'; t.style.borderRadius = '6px'; if (k === i) t.style.background = '#fbf1dc'; lines.append(t); });
@@ -41098,9 +41105,13 @@ function catchupScreen(key) {
     const ans = el('div', { class: 'stu-ans', style: 'display:none' }, el('div', { class: 'stu-tag' }, 'Answer'), stuText(f.choices ? `${LETTERS[f.answer]}. ${f.choices[f.answer]}` : f.display || '', 19), f.solution ? stuText(f.solution, 17) : '');
     const btn = el('button', { class: 'btn secondary', type: 'button' }, 'Show answer');
     btn.addEventListener('click', () => { const on = ans.style.display === 'none'; ans.style.display = on ? '' : 'none'; btn.textContent = on ? 'Hide answer' : 'Show answer'; });
-    const walk = WALKS[f.stem] ? walkPlayer(WALKS[f.stem]) : null;
+    // 🎬 Watch it worked: written here (WALKS) or in walks/<subject>.json; the button appears once the file has loaded
+    const openSlot = el('span', {}), wrapSlot = el('div', {});
+    const addWalk = (steps) => { if (!steps || !steps.length || openSlot.firstChild) return; const w = walkPlayer(steps, f.figure); openSlot.append(w.open); wrapSlot.append(w.wrap); };
+    if (WALKS[f.stem]) addWalk(WALKS[f.stem]);
+    else if (lpSet(key)) walkLoad(lpSet(key).subject).then((all) => addWalk(all[f.stem]));
     app.append(el('div', { class: 'card' }, el('div', { class: 'stu-tag' }, x.label + (f.topic ? ' · ' + f.topic : '')), stuText(f.stem), stuFigure(f.figure),
-      f.choices ? el('div', {}, ...f.choices.map((c, j) => stuText(`${LETTERS[j]}.  ${c}`, 18))) : '', walk ? walk.open : '', btn, walk ? walk.wrap : '', ans));
+      f.choices ? el('div', {}, ...f.choices.map((c, j) => stuText(`${LETTERS[j]}.  ${c}`, 18))) : '', openSlot, btn, wrapSlot, ans));
   }));
   const pset = (LESSONS[key] && LESSONS[key].base) || key;
   if (SETS[pset]) app.append(el('div', { class: 'card noprint' }, el('strong', {}, 'Practice'), el('p', { style: 'margin:6px 0 8px' }, 'If your teacher assigned this lesson’s practice in Google Classroom, do it there so it counts. Otherwise you can start it here:'),
