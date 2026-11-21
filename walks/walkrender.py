@@ -1,7 +1,7 @@
 # render every walkthrough line with the site's text drawer; report errors and save a sample sheet
 from playwright.sync_api import sync_playwright
 import re,json,sys
-W=json.load(open('/home/claude/math-practice/walks/geometry.json'))
+W=json.load(open('/home/claude/math-practice/walks/'+(sys.argv[1] if len(sys.argv)>1 and not sys.argv[1].startswith('-') and not ' ' in sys.argv[1] and sys.argv[1].isalnum() else 'geometry')+'.json'))
 with sync_playwright() as p:
     b=p.chromium.launch(); pg=b.new_page(viewport={'width':900,'height':800})
     pg.route(re.compile(r'https://.*'), lambda r: r.abort())

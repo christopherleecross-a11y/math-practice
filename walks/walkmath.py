@@ -1,6 +1,6 @@
 # recompute every plain-number equality chain in the walkthrough lines ("a + b = c = d")
-import json,re,math
-W=json.load(open('/home/claude/math-practice/walks/geometry.json'))
+import json,re,math,sys
+W=json.load(open('/home/claude/math-practice/walks/'+(sys.argv[1] if len(sys.argv)>1 and not sys.argv[1].startswith('-') else 'geometry')+'.json'))
 def ev(t):
     t=t.strip()
     if not t or re.search(r'[a-zA-Zπ°%$]', t.replace('√','')): return None
