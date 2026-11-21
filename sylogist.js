@@ -18,16 +18,19 @@
     const isBox = (x) => x && x.tagName === 'INPUT' && /^(text|number|tel|)$/i.test(x.type || '') && !x.disabled && !x.readOnly;
     if (!isBox(box)) return say('First click the score box for any student in the assignment’s column, then click this bookmark again.');
     const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z, ]/g, '').replace(/\s+/g, ' ').trim();
-    const parts = (n) => {
+    const parts = (n) => { // LAST, FIRST is clear; "First Middle Last Last2" could split anywhere, so keep every split
       n = norm(n);
-      if (n.includes(',')) { const [l, f] = n.split(','); return { last: l.replace(/ /g, ''), first: f.trim() }; }
-      const w = n.split(' '); return { last: (w.pop() || '').replace(/ /g, ''), first: w.join(' ') };
+      if (n.includes(',')) { const [l, f] = n.split(','); const p = { last: l.replace(/ /g, ''), first: f.trim() }; p.alts = [p]; return p; }
+      const w = n.split(' ').filter(Boolean), alts = [];
+      for (let k = w.length - 1; k >= 1; k--) alts.push({ last: w.slice(k).join(''), first: w.slice(0, k).join(' ') });
+      const p = alts[0] || { last: w.join(''), first: '' }; p.alts = alts.length ? alts : [p]; return p;
     };
-    const same = (a, b) => { // last names equal; first names agree on their first word (SARAH vs SARAH ANN)
+    const same1 = (a, b) => { // last names equal; first names agree on their first word (SARAH vs SARAH ANN)
       if (!a.last || a.last !== b.last) return false;
       const fa = a.first.split(' ')[0] || '', fb = b.first.split(' ')[0] || '';
       return !!fa && !!fb && (fa === fb || fa.startsWith(fb) || fb.startsWith(fa));
     };
+    const same = (a, b) => a.alts.some((x) => b.alts.some((y) => same1(x, y)));
     const go = (text) => {
       text = String(text || '').trim();
       if (!text.startsWith(TAG)) return say('The copied scores weren’t found. On the Results dashboard (or the crossword Results), click 📋 Copy for Sylogist first, then come back and click this bookmark.');
@@ -82,7 +85,9 @@
       .then(go, () => go(prompt('Fill Sylogist: press Ctrl+V (⌘V on a Mac) to paste the copied scores here, then OK.') || ''));
   }
 
-  const href = 'javascript:' + encodeURIComponent('(' + fill.toString() + ')()');
+  const SRC = 'https://christopherleecross-a11y.github.io/math-practice/sylogist.js';
+  // the bookmark loads the newest version of this file (so fixes need no new bookmark); if the page blocks that, it runs the copy inside it
+  const href = 'javascript:' + encodeURIComponent(`(function(){var run=${fill.toString()};window.__syloRun=1;var s=document.createElement('script');var done=0;s.src='${SRC}?v='+Date.now();s.onload=function(){done=1;if(window.SYLOGIST&&window.SYLOGIST.fill){window.SYLOGIST.fill();}else{run();}};s.onerror=function(){if(!done){done=1;run();}};setTimeout(function(){if(!done){done=1;run();}},4000);(document.head||document.body).appendChild(s);})()`);
 
   // rows: [{ name, score }] with score a number (percent) or '' for none
   async function copy(rows, title) {
@@ -108,5 +113,5 @@
     return box;
   }
 
-  window.SYLOGIST = { copy, installCard, href, TAG };
+  window.SYLOGIST = { copy, installCard, href, TAG, fill };
 })();
