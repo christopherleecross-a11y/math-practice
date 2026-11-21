@@ -36995,6 +36995,8 @@ function hintBar(q, i) {
     const row = el('span', { style: 'display:inline-flex;gap:0;flex-wrap:wrap;vertical-align:middle' });
     if (on('e') && twinable(q)) row.append(el('button', { class: 'btn secondary' + (H.ex ? ' on' : ''), type: 'button', style: sm, title: 'See a problem like this one solved step by step',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); if (h.ex) { h.ex = 0; } else { h.ex = (h.n || 0) + 1; h.n = h.ex; h.step = 0; if (!state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } } rerenderAt(i); } }, H.ex ? '📘 Hide example' : '📘 Worked example'));
+    if (on('e') && practiceVideo(q)) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
+      onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.vid = !h.vid; if (h.vid && !state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } rerenderAt(i); } }, H.vid ? '🎬 Hide video' : '🎬 Video'));
     if (on('n') && lessonFor(q.tpl)) row.append(el('button', { class: 'btn secondary', type: 'button', style: sm, title: 'Review the notes and class examples for this section',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.notes = !h.notes; rerenderAt(i); } }, H.notes ? '📖 Hide notes' : '📖 Notes'));
     if (row.childNodes.length) bar.append(row);
@@ -37094,6 +37096,11 @@ function helpPanel(q, i) {
       box.append(btns);
     }
     wrap.append(box);
+  }
+  if (H.vid) {
+    const v = practiceVideo(q);
+    if (v) { const P = walkPlayer(v.steps, v.fig); P.wrap.style.display = ''; P.wrap.style.marginTop = '4px';
+      wrap.append(el('div', { class: 'helpbox' }, el('div', { class: 'helphead' }, `🎬 Video: ${v.title} (a problem like yours, different numbers)`), P.wrap)); }
   }
   if (H.notes) {
     const k = lessonFor(q.tpl), L = k && LESSONS[k], box = el('div', { class: 'helpbox notes' });
@@ -40858,6 +40865,109 @@ const WALKS = {
     { line: 'AC ≠ BD, so it is not a rectangle, and not a square.', say: '6 is not equal to 4, so the diagonals are not congruent. It is not a rectangle, and that means it cannot be a square either.' },
     { line: 'Answer: a rhombus (not a rectangle or a square)', say: 'Final answer: it is a rhombus, but not a rectangle or a square.' }],
 };
+/* ---------- Practice videos: a narrated walkthrough for each kind of practice question (the 🎬 Video button in homework help) ----------
+   One per question type; when a type has more than one kind of problem, one per kind (picked by `when`). Same player as the catch-up page. */
+const PV_RHOMBUS = (diag, extra = {}) => ({ kind: 'polys', size: [440, 300], polys: [{ pts: [[-3, 0], [0, -2], [3, 0], [0, 2]], names: ['P', 'Q', 'R', 'S'], ticks: [1, 1, 1, 1] },
+  ...(diag ? [{ pts: [[-3, 0], [3, 0]], names: ['', ''] }, { pts: [[0, -2], [0, 2]], names: ['', ''] }] : [])], ...extra });
+const PV_JKLM = { kind: 'polys', size: [460, 300], polys: [{ pts: [[-4, 0], [0, -2.5], [4, 0], [0, 2.5]], names: ['J', 'K', 'L', 'M'], ticks: [1, 1, 1, 1] }, { pts: [[-4, 0], [4, 0]], names: ['', ''] }, { pts: [[0, -2.5], [0, 2.5]], names: ['', ''] }],
+  texts: [{ p: [0.35, -0.4], t: 'N' }, { p: [-2.75, -0.32], t: '32°' }, { p: [-2, 0.3], t: '8' }, { p: [-0.3, -1.25], t: '5' }] };
+const PV_WXYZ = { kind: 'polys', size: [440, 300], polys: [{ pts: [[0, 0], [5, 0], [5, 3.5], [0, 3.5]], names: ['W', 'X', 'Y', 'Z'], right: [1, 1, 1, 1] }, { pts: [[0, 0], [5, 3.5]], names: ['', ''] }, { pts: [[5, 0], [0, 3.5]], names: ['', ''] }],
+  texts: [{ p: [2.5, 1.3], t: 'P' }, { p: [1.15, 0.28], t: '35°' }] };
+const PV_ABCD_SQ = { kind: 'polys', size: [380, 320], polys: [{ pts: [[0, 0], [4, 0], [4, 4], [0, 4]], names: ['A', 'B', 'C', 'D'], right: [1, 1, 1, 1], ticks: [1, 1, 1, 1] }, { pts: [[0, 0], [4, 4]], names: ['', ''] }, { pts: [[4, 0], [0, 4]], names: ['', ''] }],
+  texts: [{ p: [2, 1.55], t: 'E' }, { p: [1.45, 0.95], t: '7' }] };
+const PV_PQRS_RECT = { kind: 'polys', size: [440, 280], polys: [{ pts: [[0, 0], [6, 0], [6, 3.2], [0, 3.2]], names: ['P', 'Q', 'R', 'S'], right: [1, 1, 1, 1] }, { pts: [[0, 0], [6, 3.2]], names: ['', ''] }, { pts: [[6, 0], [0, 3.2]], names: ['', ''] }] };
+const PV_GRID = (diag) => ({ kind: 'grid', size: [400, 420], xr: [-6, 2], yr: [-3, 6], step: 1, polys: [
+  { pts: [[-3, -2], [0, -1], [-2, 5], [-5, 4]], names: ['A', 'B', 'C', 'D'], color: '#692b31', fill: 'rgba(105,43,49,0.08)' },
+  ...(diag ? [{ pts: [[-3, -2], [-2, 5]], closed: false, dash: true, color: '#1f5fa8' }, { pts: [[0, -1], [-5, 4]], closed: false, dash: true, color: '#1f5fa8' }] : [])] });
+const PV_CHALL = { kind: 'polys', size: [460, 260], polys: [{ pts: [[-6, 0], [0, -2.5], [6, 0], [0, 2.5]], names: ['A', 'B', 'C', 'D'], ticks: [1, 1, 1, 1] }, { pts: [[-6, 0], [6, 0]], names: ['', ''] }, { pts: [[0, -2.5], [0, 2.5]], names: ['', ''] }],
+  texts: [{ p: [0.35, -0.4], t: 'E' }] };
+const PRACTICE_VIDS = [
+  { tpl: 'g74Always', when: (q) => !String(q.stem).includes('___'), title: 'Always, sometimes, or never: a statement about a named shape', fig: PV_RHOMBUS(false), steps: [
+    ['In rhombus PQRS,  ∠P ≅ ∠R', 'This video shows how to decide whether a statement about a named shape is always, sometimes, or never true. Here is rhombus P Q R S. The first statement says angle P is congruent to angle R.'],
+    ['Which angles are these?  P and R are opposite angles.', 'First, figure out what kind of pair you have. P and R are across from each other, so they are opposite angles.'],
+    ['A rhombus is a parallelogram: opposite angles are congruent.', 'A rhombus is a parallelogram, and the opposite angles of every parallelogram are congruent.'],
+    ['∠P ≅ ∠R:  Always', 'That is true no matter what the rhombus looks like, so the answer is always.'],
+    ['In rhombus PQRS,  P̅R̅ ≅ Q̅S̅', 'Now a second statement: diagonal P R is congruent to diagonal Q S.', PV_RHOMBUS(true)],
+    ['In this rhombus, PR = 6 and QS = 4: not congruent.', 'Look at this rhombus. Diagonal P R is 6 units long, and Q S is only 4. So the statement is not true for every rhombus.', PV_RHOMBUS(true, { texts: [{ p: [-1.5, 0.3], t: '3' }, { p: [1.5, 0.3], t: '3' }, { p: [0.3, 1], t: '2' }, { p: [0.3, -1], t: '2' }] })],
+    ['But a square is a rhombus, and its diagonals are congruent.', 'But a square is also a rhombus, and the diagonals of a square are congruent. So the statement is true for some rhombuses.'],
+    ['P̅R̅ ≅ Q̅S̅:  Sometimes', 'True for some, but not for all: the answer is sometimes.'],
+    ['Tip: test a squished shape and a square.', 'Tip: when you are stuck, picture two shapes, a squished one and a square. If the statement is true for every shape, it is always. If it is true for some, it is sometimes. If it can never be true, it is never.']] },
+  { tpl: 'g74Always', when: (q) => String(q.stem).includes('___'), title: 'Always, sometimes, or never: fill in the blank', steps: [
+    ['A rhombus is ___ a square.', 'This kind of question has a blank. You fill it in with always, sometimes, or never. The first one says: a rhombus is blank a square.'],
+    ['Square: 4 congruent sides and 4 right angles', 'Start with what it takes to be the second shape. A square needs four congruent sides and four right angles.'],
+    ['Every rhombus has 4 congruent sides. Only some have right angles.', 'Every rhombus has four congruent sides. But only some rhombuses have right angles. A squished rhombus does not.'],
+    ['A rhombus is sometimes a square.', 'So a rhombus is sometimes a square.'],
+    ['A kite is ___ a rectangle.', 'Here is a second one: a kite is blank a rectangle.'],
+    ['Rectangle: opposite sides are congruent.  Kite: opposite sides are not congruent.', 'A rectangle is a parallelogram, so its opposite sides are congruent. A kite’s opposite sides are not congruent.'],
+    ['A kite is never a rectangle.', 'So no kite can ever be a rectangle. The answer is never.'],
+    ['Always: every one fits.  Sometimes: some fit.  Never: none can.', 'To sum up: ask whether every one of the first shape fits, only some of them fit, or none of them can.']] },
+  { tpl: 'g74Which', title: 'Which quadrilaterals have the property?', steps: [
+    ['The diagonals are perpendicular.', 'This video shows how to find every quadrilateral that always has a property. The property is: the diagonals are perpendicular.'],
+    ['Check each shape: parallelogram, rectangle, rhombus, square.', 'Check the four shapes one at a time: parallelogram, rectangle, rhombus, and square.'],
+    ['Parallelogram: no. Its diagonals only bisect each other.', 'Parallelogram: no. The diagonals of a parallelogram bisect each other, but they do not have to be perpendicular.'],
+    ['Rectangle: no. Its diagonals are congruent, not always perpendicular.', 'Rectangle: no. A rectangle’s diagonals are congruent, but in a long, skinny rectangle they are not perpendicular.'],
+    ['Rhombus: yes. The diagonals of a rhombus are perpendicular.', 'Rhombus: yes. That is the Rhombus Diagonals Theorem.'],
+    ['Square: yes. A square is a rhombus.', 'Square: yes. A square is a rhombus, so it has every rhombus property.'],
+    ['Answer: rhombus, square', 'So the answer is rhombus and square.'],
+    ['Tip: anything true for a rectangle or a rhombus is true for a square.', 'Tip: the square always makes the list when a rectangle or a rhombus does, because a square is both.']] },
+  { tpl: 'g74Measure', when: (q) => /rhombus/.test(q.topic), title: 'Measures in a rhombus', fig: PV_JKLM, steps: [
+    ['Rhombus JKLM:  m∠KJL = 32°,  JN = 8,  KN = 5', 'This video finds every kind of measure these rhombus questions ask for. Rhombus J K L M has diagonals that meet at N. Angle K J L is 32 degrees, J N is 8, and K N is 5. Your question asks for just one of these, so find the step that matches it.'],
+    ['m∠MJL = 32°   (a diagonal bisects the angle)', 'Angle M J L. A diagonal of a rhombus bisects the angles at its ends. Diagonal J L cuts angle J into two equal halves, so angle M J L is also 32 degrees.'],
+    ['m∠JNK = 90°   (the diagonals are perpendicular)', 'Angle J N K, where the diagonals cross. The diagonals of a rhombus are perpendicular, so it is 90 degrees.'],
+    ['m∠JKM = 90° − 32° = 58°   (right △JNK)', 'Angle J K M. Look at right triangle J N K. Its acute angles add to 90 degrees, so 90 minus 32 is 58 degrees.'],
+    ['m∠KJM = 2(32°) = 64°', 'Angle J M L, at the top vertex. First find the whole angle at J: two halves of 32 degrees make 64 degrees.'],
+    ['m∠JML = 180° − 64° = 116°   (consecutive angles are supplementary)', 'Angles J and M are consecutive angles of a parallelogram, so they add to 180 degrees. 180 minus 64 is 116 degrees.'],
+    ['LN = JN = 8   (the diagonals bisect each other)', 'Length L N. The diagonals bisect each other, so N is the midpoint of J L. L N equals J N, which is 8.'],
+    ['KM = 2(KN) = 2(5) = 10', 'Length K M, a whole diagonal. N is its midpoint too, so K M is twice K N: 2 times 5 is 10.'],
+    ['Rhombus: ⊥ diagonals, they bisect the angles, and they bisect each other.', 'The three facts to remember for a rhombus: the diagonals are perpendicular, they bisect the angles, and they bisect each other.']] },
+  { tpl: 'g74Measure', when: (q) => /rectangle/.test(q.topic), title: 'Measures in a rectangle', fig: PV_WXYZ, steps: [
+    ['Rectangle WXYZ:  m∠XWY = 35°,  WY = 18', 'This video finds every kind of measure these rectangle questions ask for. The diagonals of rectangle W X Y Z meet at P. Angle X W Y is 35 degrees and diagonal W Y is 18. Your question asks for just one of these, so find the step that matches it.'],
+    ['m∠WYX = 90° − 35° = 55°   (right △WXY)', 'Angle W Y X. Triangle W X Y has a right angle at X, so its acute angles add to 90 degrees. 90 minus 35 is 55 degrees.'],
+    ['m∠YWZ = 90° − 35° = 55°   (∠W is a right angle)', 'Angle Y W Z. The whole angle at W is a right angle, and the diagonal splits it into 35 degrees and the rest. 90 minus 35 is 55 degrees.'],
+    ['m∠WYZ = 35°   (alternate interior angles, W̅X̅ ∥ Z̅Y̅)', 'Angle W Y Z. Sides W X and Z Y are parallel, and the diagonal is a transversal. Angle W Y Z and angle X W Y are alternate interior angles, so they are congruent: 35 degrees.'],
+    ['PW = PX, so △WPX is isosceles: m∠PXW = 35°', 'Angle W P X, where the diagonals cross. The diagonals are congruent and bisect each other, so all four halves are equal. P W equals P X, so triangle W P X is isosceles, and its base angles are both 35 degrees.'],
+    ['m∠WPX = 180° − 2(35°) = 110°', 'The angles of the triangle add to 180 degrees. 180 minus 70 is 110 degrees.'],
+    ['XZ = WY = 18   (the diagonals are congruent)', 'Length X Z, the other diagonal. The diagonals of a rectangle are congruent, so X Z is 18.'],
+    ['PZ = 18 ÷ 2 = 9   (the diagonals bisect each other)', 'Length P Z, half of a diagonal. 18 divided by 2 is 9.'],
+    ['Rectangle: 4 right angles, and the diagonals are congruent and bisect each other.', 'The facts to remember for a rectangle: all four angles are right angles, and the diagonals are congruent and bisect each other.']] },
+  { tpl: 'g74Measure', when: (q) => /square/.test(q.topic), title: 'Measures in a square', fig: PV_ABCD_SQ, steps: [
+    ['Square ABCD:  AE = 7', 'This video finds every kind of measure these square questions ask for. The diagonals of square A B C D meet at E, and A E is 7. Your question asks for just one of these, so find the step that matches it.'],
+    ['A square is a rectangle and a rhombus.', 'A square is both a rectangle and a rhombus, so its diagonals have every property of both.'],
+    ['m∠AEB = 90°   (the diagonals are perpendicular)', 'Angle A E B, where the diagonals cross. Like a rhombus, the diagonals are perpendicular: 90 degrees.'],
+    ['m∠BAC = 90° ÷ 2 = 45°   (a diagonal bisects the right angle)', 'Angle B A C. Like a rhombus, a diagonal bisects the angle. Each angle of a square is 90 degrees, and half of 90 is 45 degrees.'],
+    ['BE = AE = 7   (congruent diagonals that bisect each other)', 'Length B E. Like a rectangle, the diagonals are congruent and bisect each other. So all four halves are equal: B E is 7.'],
+    ['BD = 2(7) = 14', 'Length B D, a whole diagonal: two halves of 7 make 14.']] },
+  { tpl: 'g74RectDiag', title: 'Diagonals of a rectangle', fig: PV_PQRS_RECT, steps: [
+    ['PR = 5x − 8,   QS = 3x + 6', 'Find the lengths of the diagonals of rectangle P Q R S. Diagonal P R is 5 x minus 8, and diagonal Q S is 3 x plus 6.'],
+    ['Rectangle: the diagonals are congruent, so PR = QS.', 'The key fact: the diagonals of a rectangle are congruent. So P R equals Q S.'],
+    ['5x − 8 = 3x + 6', 'Set the expressions equal: 5 x minus 8 equals 3 x plus 6.'],
+    ['2x − 8 = 6', 'Subtract 3 x from both sides: 2 x minus 8 equals 6.'],
+    ['2x = 14', 'Add 8 to both sides: 2 x equals 14.'],
+    ['x = 7', 'Divide by 2: x equals 7.'],
+    ['PR = 5(7) − 8 = 27', 'Don’t stop at x. The question asks for the lengths. Put 7 into P R: 35 minus 8 is 27.'],
+    ['QS = 3(7) + 6 = 27 ✓', 'Check with Q S: 21 plus 6 is 27. They match.'],
+    ['Each diagonal is 27.', 'So each diagonal is 27 units long.']] },
+  { tpl: 'g74Coord', title: 'Rectangle, rhombus, or square? (coordinates)', fig: PV_GRID(false), steps: [
+    ['A(−3, −2),  B(0, −1),  C(−2, 5),  D(−5, 4)', 'Decide whether parallelogram A B C D is a rectangle, a rhombus, or a square. Here it is on the grid.'],
+    ['Rectangle test: are the diagonals congruent?', 'Use the diagonals for two tests. First, the rectangle test: are the diagonals congruent?', PV_GRID(true)],
+    ['AC = √(1² + 7²) = √50', 'From A to C, go 1 right and 7 up. By the distance formula, A C is the square root of 1 plus 49, which is root 50.'],
+    ['BD = √((−5)² + 5²) = √50', 'From B to D, go 5 left and 5 up. B D is the square root of 25 plus 25, which is also root 50.'],
+    ['AC = BD, so it is a rectangle.', 'The diagonals are congruent, so it is a rectangle.'],
+    ['Rhombus test: are the diagonals perpendicular?', 'Second, the rhombus test: are the diagonals perpendicular?'],
+    ['slope AC = 7/1 = 7,   slope BD = 5/(−5) = −1', 'The slope of A C is 7 over 1, which is 7. The slope of B D is 5 over negative 5, which is negative 1.'],
+    ['7 · (−1) = −7, not −1: not perpendicular, so not a rhombus.', 'Perpendicular slopes multiply to negative 1. These multiply to negative 7, so the diagonals are not perpendicular. It is not a rhombus.'],
+    ['Answer: rectangle only', 'So the answer is rectangle only. If both tests pass, it is a square, and that means rectangle, rhombus, and square. If only the perpendicular test passes, it is a rhombus only. If neither passes, it is just a parallelogram.']] },
+  { tpl: 'g74Challenge', title: 'Challenge: rhombus from its perimeter and a diagonal', fig: PV_CHALL, steps: [
+    ['Rhombus ABCD:  perimeter 52,  AC = 24', 'Rhombus A B C D has a perimeter of 52, and diagonal A C is 24. Find the side length and the length of diagonal B D.'],
+    ['side = 52 ÷ 4 = 13', 'All four sides of a rhombus are congruent, so each side is 52 divided by 4, which is 13.'],
+    ['The diagonals are perpendicular bisectors: 4 right triangles.', 'The diagonals of a rhombus are perpendicular, and they bisect each other. So they cut the rhombus into four congruent right triangles.'],
+    ['legs: AE = 24 ÷ 2 = 12 and BE;   hypotenuse AB = 13', 'Look at triangle A E B. One leg is half of A C: 12. The other leg is B E, half of B D. The hypotenuse is a side of the rhombus: 13.'],
+    ['12² + BE² = 13²', 'Use the Pythagorean Theorem: 12 squared plus B E squared equals 13 squared.'],
+    ['BE² = 169 − 144 = 25,  so BE = 5', '169 minus 144 is 25, so B E is 5.'],
+    ['BD = 2(5) = 10', 'B D is twice B E: 10.'],
+    ['Answer: side 13,  BD = 10', 'So the side length is 13, and diagonal B D is 10.']] },
+];
+const practiceVideo = (q) => (q && q.tpl ? PRACTICE_VIDS.find((v) => v.tpl === q.tpl && (!v.when || v.when(q))) || null : null);
 // walkthroughs for every lesson, kept in walks/<subject>.json and loaded when a catch-up page opens
 const WALK_FILES = {};
 function walkLoad(subject) {
@@ -40886,7 +40996,7 @@ function walkPlayer(steps, baseFig) {
     count.textContent = i < 0 ? `${steps.length} steps` : `Step ${i + 1} of ${steps.length}`;
     playBtn.textContent = playing ? '⏸ Pause' : i >= steps.length - 1 ? '↺ Watch again' : '▶ Play';
   };
-  const advance = () => { if (!playing) return; if (i >= steps.length - 1) { playing = false; draw(); return; } i++; draw(); talk(); };
+  const advance = () => { if (!playing) return; if (!wrap.isConnected) { playing = false; stopTalk(); return; } if (i >= steps.length - 1) { playing = false; draw(); return; } i++; draw(); talk(); };
   const talk = () => {
     stopTalk(); const my = ++token, rate = +speed.value, text = steps[i].say;
     const readMs = Math.max(2500, text.split(/\s+/).length * 380) / rate;
