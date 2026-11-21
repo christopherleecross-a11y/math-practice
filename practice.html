@@ -22773,7 +22773,7 @@ TEMPLATES.b74Like = (r) => {
   const kind = pick(r, ['mono', 'lin', 'quad']);
   if (kind === 'mono') { const c = pick(r, [4, 2, 16, 3]), a = ri(r, 2, 20), b = ri(r, 1, 15) * pick(r, [1, -1]), e = pick(r, [1, 2]), dv = e === 1 ? [c, 0] : [c, 0, 0], sum = a + b; if (!sum) return TEMPLATES.b74Like(r);
     const g = gcd(Math.abs(sum), c), N = [sum / g], D = e === 1 ? [c / g, 0] : [c / g, 0, 0];
-    return b7Q(r, { topic: 'Adding and subtracting rational expressions', stem: `Find the ${b < 0 ? 'difference' : 'sum'}.   ${a}/${polyT(dv)} ${b < 0 ? '−' : '+'} ${Math.abs(b)}/${polyT(dv)}`, N, D, nT: fmt(sum / g), dT: polyT(D), wrongs: [b7fracT(fmt(sum), polyT(b7scale(dv, 2))), b7fracT(fmt(a - b), polyT(dv))], solution: `The denominators are the same, so ${b < 0 ? 'subtract' : 'add'} the numerators: ${fmt(sum)}/${polyT(dv)} = ${b7fracT(fmt(sum / g), polyT(D))}` }); }
+    return b7Q(r, { topic: 'Adding and subtracting rational expressions', stem: `Find the ${b < 0 ? 'difference' : 'sum'}.   ${a}/(${polyT(dv)}) ${b < 0 ? '−' : '+'} ${Math.abs(b)}/(${polyT(dv)})`, N, D, nT: fmt(sum / g), dT: polyT(D), wrongs: [b7fracT(fmt(sum), polyT(b7scale(dv, 2))), b7fracT(fmt(a - b), polyT(dv))], solution: `The denominators are the same, so ${b < 0 ? 'subtract' : 'add'} the numerators: ${fmt(sum)}/(${polyT(dv)})${g === 1 ? '' : ` = ${b7fracT(fmt(sum / g), polyT(D))}`}` }); }
   const F = b7lin(r), a = nz(r, -12, 12), b = nz(r, -9, 9), s = pick(r, [1, -1]);
   const N1 = kind === 'lin' ? [0, a] : [ri(r, 2, 5), 0, 0], N2 = kind === 'lin' ? [b, 0] : [ri(r, 2, 8), 0];
   const N = b7add(N1, b7scale(N2, s));
@@ -22796,13 +22796,14 @@ TEMPLATES.b74LCM = (r) => {
 };
 TEMPLATES.b74AddDiff = (r) => {
   for (let t = 0; t < 300; t++) {
-    const kind = pick(r, ['mono', 'lin', 'lin', 'shared']), s = pick(r, [1, -1]);
+    const kind = pick(r, ['mono', 'lin', 'lin', 'shared']); let s = pick(r, [1, -1]);
     let n1, F1, n2, F2, show1, show2;
     if (kind === 'mono') { const a = pick(r, [5, 3, 2]), b = pick(r, [6, 4, 3].filter((x) => x !== a)), m = ri(r, 2, 12), n = ri(r, 1, 9), L = a * b / gcd(a, b), top = m * L / a + s * n * L / b; if (!top) continue; const g = gcd(Math.abs(top), L);
       const nT = fmt(top / g), dT = `${L / g === 1 ? '' : L / g}x`;
       return b7Q(r, { topic: 'Adding and subtracting rational expressions', stem: `Find the ${s < 0 ? 'difference' : 'sum'}.   ${m}/(${a}x) ${s < 0 ? '−' : '+'} ${n}/(${b}x)`, N: [top / g], D: [L / g, 0], nT, dT, wrongs: [b7fracT(fmt(m + s * n), `${a + b}x`), b7fracT(fmt(top), `${L}x²`), b7fracT(fmt(-top / g), dT)], solution: `The LCD is ${L}x: ${m * L / a}/(${L}x) ${s < 0 ? '−' : '+'} ${n * L / b}/(${L}x) = ${fmt(top)}/(${L}x)${g > 1 ? ` = ${b7fracT(nT, dT)}` : ''}` }); }
     else if (kind === 'lin') { const A = b7lin(r), B = b7lin(r); if (A[1] === B[1]) continue; n1 = [nz(r, -9, 9)]; n2 = r() < 0.5 ? [nz(r, -6, 6)] : [ri(r, 1, 3), 0]; F1 = [A]; F2 = [B]; show1 = b7fT(A, 'x', true); show2 = b7fT(B, 'x', true); }
     else { const A = b7lin(r), B = b7lin(r); if (A[1] === B[1]) continue; n1 = [nz(r, -12, 12)]; n2 = [nz(r, -6, 6)]; F1 = [A, B]; F2 = [B]; show1 = polyT(b7prod(A, B)); show2 = b7fT(B, 'x', true); }
+    if (n2.length === 1 && n2[0] < 0) { n2 = [-n2[0]]; s = -s; }
     const R = b7sum(n1, F1, n2, F2, s); if (R.N.length === 1 && R.N[0] === 0) continue;
     const den = R.F.length ? b7prod(...R.F) : [1], nT = polyT(R.N), dT = R.F.length ? b7facT(1, R.F) : '1';
     const g = R.F.length === 1 && R.F[0][1] === 0 ? R.F[0][0] : 1;
@@ -22864,7 +22865,7 @@ TEMPLATES.b75LCD = (r) => {
     const good = roots.filter((x) => x !== p && x !== q), extr = roots.filter((x) => !good.includes(x)); if (!good.length && r() < 0.6) continue;
     const den = (z) => (z === 0 ? 'x' : `x ${z < 0 ? '+' : '−'} ${Math.abs(z)}`);
     const eq = `${A}/(${den(p)}) ${B < 0 ? '−' : '+'} ${Math.abs(B)}/(${den(q)}) = ${C}`.replace(/\(x\)/g, 'x').replace(/^-/, '−');
-    return b7solQ(r, { topic: 'Solving rational equations', eq, sols: good, extr, wrongs: [roots.map((x) => x + 1)], solution: `Multiply each side by the LCD, ${p ? `(${den(p)})` : 'x'}${q ? `(${den(q)})` : 'x'}:\n${A}(${den(q)}) ${B < 0 ? '−' : '+'} ${Math.abs(B)}(${den(p)}) = ${C}(${den(p)})(${den(q)})\n${polyT(P)} = 0 → x = ${roots.map(fracT).join(' or ')}${extr.length ? `\n${extr.map(fracT).join(', ')} makes a denominator 0, so it is extraneous.` : ''}\n${good.length ? `x = ${good.map(fracT).join(' and ')}` : 'No solution'}`.replace(/^-|\(-/g, (m) => m.replace('-', '−')) });
+    return b7solQ(r, { topic: 'Solving rational equations', eq, sols: good, extr, wrongs: [roots.map((x) => x + 1)], solution: `Multiply each side by the LCD, ${p ? `(${den(p)})` : 'x'}${q ? `(${den(q)})` : 'x'}:\n${A}(${den(q)}) ${B < 0 ? '−' : '+'} ${Math.abs(B)}(${den(p)}) = ${C ? `${C === 1 ? '' : C}(${den(p)})(${den(q)})` : '0'}\n${polyT(P)} = 0 → x = ${roots.map(fracT).join(' or ')}${extr.length ? `\n${extr.map(fracT).join(', ')} makes a denominator 0, so it is extraneous.` : ''}${good.length && !extr.length && roots.length === good.length ? '' : `\n${good.length ? `x = ${good.map(fracT).join(' and ')}` : 'No solution'}`}`.replace(/^-|\(-/g, (m) => m.replace('-', '−')) });
   }
 };
 TEMPLATES.b75Inverse = (r) => {
