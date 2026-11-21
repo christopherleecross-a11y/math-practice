@@ -36995,7 +36995,7 @@ function hintBar(q, i) {
     const row = el('span', { style: 'display:inline-flex;gap:0;flex-wrap:wrap;vertical-align:middle' });
     if (on('e') && twinable(q)) row.append(el('button', { class: 'btn secondary' + (H.ex ? ' on' : ''), type: 'button', style: sm, title: 'See a problem like this one solved step by step',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); if (h.ex) { h.ex = 0; } else { h.ex = (h.n || 0) + 1; h.n = h.ex; h.step = 0; if (!state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } } rerenderAt(i); } }, H.ex ? '📘 Hide example' : '📘 Worked example'));
-    if (on('e') && practiceVideos(q).length) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
+    if (on('e') && practiceVideos(q, () => rerenderAt(i)).length) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.vid = !h.vid; if (h.vid && !state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } rerenderAt(i); } }, H.vid ? '🎬 Hide video' : '🎬 Video'));
     if (on('n') && lessonFor(q.tpl)) row.append(el('button', { class: 'btn secondary', type: 'button', style: sm, title: 'Review the notes and class examples for this section',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.notes = !h.notes; rerenderAt(i); } }, H.notes ? '📖 Hide notes' : '📖 Notes'));
@@ -37100,6 +37100,10 @@ function helpPanel(q, i) {
   if (H.vid) {
     const vs = practiceVideos(q), v = vs[Math.min(H.vk || 0, vs.length - 1)];
     if (v) { const P = walkPlayer(v.steps, v.fig); P.wrap.style.display = ''; P.wrap.style.marginTop = '4px';
+      const t = v.seed != null ? pvInst(v) : null; // a video from the file: show its problem (and the template's figure) above the player
+      if (t) { const W = contentWidth(), top = el('div', { style: 'margin:4px 0 2px' }, textCanvas(t.stem, W - 34));
+        if (t.draw) { const cv = t.size ? makeCanvas(Math.min(t.size[0], W - 40), Math.round(t.size[1] * Math.min(1, (W - 40) / t.size[0]))) : makeCanvas(Math.min(560, W - 40), 300); try { t.draw(cv); top.append(cv); } catch (e) {} }
+        P.wrap.insertBefore(top, P.wrap.children[1]); }
       // more than one kind of answer: the student picks which example to watch (never chosen from their own answer)
       const pick = vs.length > 1 ? el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 6px' }, el('span', { class: 'small' }, 'Pick an example:'),
         ...vs.map((x, k) => el('button', { class: 'btn secondary' + (x === v ? ' on' : ''), type: 'button', style: 'margin:0;padding:4px 12px;font-size:14px' + (x === v ? ';background:#692b31;color:#fff' : ''), onclick: () => { H.vk = k; rerenderAt(i); } }, x.pick || String(k + 1)))) : '';
@@ -41004,7 +41008,29 @@ const PRACTICE_VIDS = [
     ['BD = 2(5) = 10', 'B D is twice B E: 10.'],
     ['Answer: side 13,  BD = 10', 'So the side length is 13, and diagonal B D is 10.']] },
 ];
-const practiceVideos = (q) => (q && q.tpl ? PRACTICE_VIDS.filter((v) => v.tpl === q.tpl && (!v.when || v.when(q))) : []);
+// videos kept in walks/pv-<subject>.json: { tpl, seed, stem, kind (a pattern for "topic ## stem"), pick, title, steps }.
+// The example is the template's own problem at that seed (so its figure is drawn by the template); if the template
+// has changed since the video was written (the stem no longer matches), the video is left out rather than shown wrong.
+const PV_FILES = {}, PV_WAIT = {};
+const pvSubject = (q) => (QUESTION_TYPES.find((t) => t.id === q.tpl) || {}).subject || '';
+function pvLoad(subj, then) {
+  if (PV_FILES[subj] || !subj) return;
+  (PV_WAIT[subj] = PV_WAIT[subj] || []).push(then);
+  if (PV_WAIT[subj].length > 1) return;
+  fetch(`walks/pv-${subj}.json`, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((list) => {
+    PV_FILES[subj] = (Array.isArray(list) ? list : []).map((v) => { try { return { ...v, re: new RegExp(v.kind || '') }; } catch { return null; } }).filter(Boolean);
+    PV_WAIT[subj].forEach((f) => { try { f(); } catch {} }); PV_WAIT[subj] = [];
+  });
+}
+const pvInst = (v) => { if (v.inst !== undefined) return v.inst; let t = null; try { t = TEMPLATES[v.tpl](mulberry32(v.seed)); if (!t || String(t.stem) !== v.stem) t = null; } catch { t = null; } v.inst = t; return t; };
+const practiceVideos = (q, onLoad) => {
+  if (!q || !q.tpl) return [];
+  const inline = PRACTICE_VIDS.filter((v) => v.tpl === q.tpl && (!v.when || v.when(q)));
+  if (inline.length) return inline;
+  const subj = pvSubject(q); if (!PV_FILES[subj]) { if (onLoad) pvLoad(subj, onLoad); return []; }
+  const key = `${q.topic || ''} ## ${q.stem || ''}`;
+  return PV_FILES[subj].filter((v) => v.tpl === q.tpl && v.re.test(key) && pvInst(v));
+};
 // walkthroughs for every lesson, kept in walks/<subject>.json and loaded when a catch-up page opens
 const WALK_FILES = {};
 function walkLoad(subject) {
