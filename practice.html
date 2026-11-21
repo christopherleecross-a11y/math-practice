@@ -15409,7 +15409,7 @@ TEMPLATES.a62NthRoot = (r) => {
     topic: 'Real nth roots', stem: `Find the indicated real nth root(s) of a.\nn = ${n},  a = ${fmt(a)}`,
     ...buildChoices(r, correct, wr, (i) => `±${k + i + 1}`),
     fr: { fields: [{ kind: 'expr', keys: 'roots', label: 'Root(s):' }], key: [vals.length === 2 ? `\\pm${k}` : vals.length ? String(vals[0]) : '\\text{none}'], display: correct, check: (x) => (/noreal|none|nosolution/.test(pxWords(x[0])) ? !vals.length : realListOk(x[0], vals)) },
-    solution: `${n % 2 ? `n = ${n} is odd, so there is exactly one real ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} root.` : neg ? `n = ${n} is even and a < 0, so there are no real ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} roots.` : `n = ${n} is even and a > 0, so there are two real ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} roots.`}\n${vals.length ? `(${fmt(vals[0])})${a6sup(n)} = ${fmt(a)}, so the answer is ${correct}.` : ''}`,
+    solution: `${n % 2 ? `n = ${n} is odd, so there is exactly one real ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} root.` : neg ? `n = ${n} is even and a < 0, so there are no real ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} roots.` : `n = ${n} is even and a > 0, so there are two real ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} roots.`}${vals.length ? `\n(${fmt(vals[0])})${a6sup(n)} = ${fmt(a)}, so the answer is ${correct}.` : ''}`,
   };
 };
 // #9–10: side of a cube from its volume
@@ -15626,7 +15626,7 @@ TEMPLATES.a63Conj = (r) => {
       const conj = first ? `√${p} ${minus ? '+' : MINUS} ${a}` : `${a} ${minus ? '+' : MINUS} √${p}`;
       return { topic: 'Rationalizing with conjugates', stem: 'Simplify the expression.', draw: fig.draw, size: fig.size, ...buildChoices(r, correct, wr.filter((w, j, all) => w !== correct && all.indexOf(w) === j), (i) => T(A0 + i + 1, A1, Dd)),
         fr: { fields: [{ kind: 'expr', keys: 'rad', label: '' }], key: [lat], display: correct, check: (x) => a6RadOk(x[0], () => val, []) },
-        solution: `Multiply the numerator and denominator by the conjugate ${conj}.\nDenominator: ${first ? `(√${p})² ${MINUS} ${a}² = ${p} ${MINUS} ${a * a}` : `${a}² ${MINUS} (√${p})² = ${a * a} ${MINUS} ${p}`} = ${D}\nNumerator: ${c}(${conj})\n= ${correct}` };
+        solution: `Multiply the numerator and denominator by the conjugate ${conj}.\nDenominator: ${first ? `(√${p})² ${MINUS} ${a}² = ${p} ${MINUS} ${a * a}` : `${a}² ${MINUS} (√${p})² = ${a * a} ${MINUS} ${p}`} = ${fmt(D)}\nNumerator: ${c}(${conj})\n= ${correct}` };
     }
     // c / (√p ± √q) = c(√p ∓ √q)/(p − q)
     const q = pick(r, A6SQF.slice(0, 10).filter((x) => x !== p)), D = p - q;
@@ -15639,7 +15639,7 @@ TEMPLATES.a63Conj = (r) => {
     const lat = `\\frac{${c}\\left(\\sqrt{${p}}${minus ? '+' : '-'}\\sqrt{${q}}\\right)}{${D}}`;
     return { topic: 'Rationalizing with conjugates', stem: 'Simplify the expression.', draw: fig.draw, size: fig.size, ...buildChoices(r, correct, wr.filter((w, j, all) => w !== correct && all.indexOf(w) === j), (i) => T(k + i + 1, Dd)),
       fr: { fields: [{ kind: 'expr', keys: 'rad', label: '' }], key: [lat], display: correct, check: (x) => a6RadOk(x[0], () => val, [], { maxRoots: 2 }) },
-      solution: `Multiply the numerator and denominator by the conjugate ${inner}.\nDenominator: (√${p})² ${MINUS} (√${q})² = ${p} ${MINUS} ${q} = ${D}\n= ${c}(${inner})/${D} = ${correct}` };
+      solution: `Multiply the numerator and denominator by the conjugate ${inner}.\nDenominator: (√${p})² ${MINUS} (√${q})² = ${p} ${MINUS} ${q} = ${fmt(D)}\n= ${c}(${inner})/${D < 0 ? `(${fmt(D)})` : D} = ${correct}` };
   }
 };
 
@@ -15909,7 +15909,7 @@ TEMPLATES.b51Calc = (r) => {
     return { topic: 'Evaluating with technology', stem: 'Evaluate the expression using technology. Round your answer to two decimal places, if necessary.', draw: fig.draw, size: fig.size,
       ...buildChoices(r, A, [...new Set(wr)].filter((w) => w !== A), (i) => fmt(b5r2(ans + 0.37 * (i + 1)))),
       fr: { fields: [{ kind: 'expr', keys: 'num', label: '≈' }], key: [String(ans)], display: A, check: (x) => { const g = pxConst(a6pre(x[0])); return Math.abs(g - ans) < 0.0051 || Math.abs(g - v) < 1e-6; } },
-      solution: `${form === 'rad' ? `${a6rootSym(n)}a = a^(1/${n}), so this is ${fmt(a)}^(${m}/${n}).` : `Type ${fmt(a)}^(${m}/${n}) with parentheses around the exponent.`}\n≈ ${fmt(+v.toFixed(5))} ≈ ${A}` };
+      solution: `${form === 'rad' ? `${a6rootSym(n)}a = a^(1/${n}), so this is ${fmt(a)}^(${m}/${n}).` : `Type ${fmt(a)}^(${m}/${n}) with parentheses around the exponent.`}\n≈ ${String(fmt(+v.toFixed(5))) === String(A) ? A : `${fmt(+v.toFixed(5))} ≈ ${A}`}` };
   }
 };
 // #29–38: real solutions of a power equation
@@ -15936,7 +15936,7 @@ TEMPLATES.b51Solve = (r) => {
     return { topic: 'Solving equations with nth roots', stem: 'Find the real solution(s) of the equation. Round your answer to two decimal places, if necessary.', draw: fig.draw, size: fig.size,
       ...b5listQ(r, roots, [one, roots.length ? roots.map((x) => b5r2(x + 2 * h)) : [b5r2(Math.abs(rhs) ** (1 / n))], roots.length === 2 ? [] : [b5r2(Math.abs(rhs) ** (1 / n)), b5r2(-(Math.abs(rhs) ** (1 / n)))], [b5r2(R / n)]]),
       fr: { fields: [{ kind: 'expr', keys: 'roots', label: `${v} =` }], key: [b5listL(roots)], display: b5list(roots), check: (x) => b5listOk(x[0], roots, exact ? 1e-6 : 0.0051) },
-      solution: `Isolate the power: ${h ? `(${v} ${h > 0 ? '+' : MINUS} ${Math.abs(h)})` : v}${a6sup(n)} = ${fmt(rhs)}\n${rhs < 0 && n % 2 === 0 ? `An even power is never negative, so there is no real solution.` : `Take the ${n}th root${n % 2 ? '' : ' (± because n is even)'}: ${h ? `${v} ${h > 0 ? '+' : MINUS} ${Math.abs(h)}` : v} = ${n % 2 ? '' : '±'}${a6rootSym(n)}${fmt(Math.abs(rhs))}${rhs < 0 ? ` = ${MINUS}${a6rootSym(n)}${-rhs}` : ''}${h ? `\n${v} = ${h > 0 ? MINUS : ''}${Math.abs(h)} ${n % 2 ? '+' : '±'} ${a6rootSym(n)}${fmt(Math.abs(rhs))}` : ''}`}\n${v} = ${b5list(roots)}` };
+      solution: `Isolate the power: ${h ? `(${v} ${h > 0 ? '+' : MINUS} ${Math.abs(h)})` : v}${a6sup(n)} = ${fmt(rhs)}\n${rhs < 0 && n % 2 === 0 ? `An even power is never negative, so there is no real solution.` : `Take the ${n}${n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} root${n % 2 ? '' : ' (± because n is even)'}: ${h ? `${v} ${h > 0 ? '+' : MINUS} ${Math.abs(h)}` : v} = ${n % 2 ? '' : '±'}${a6rootSym(n)}${fmt(Math.abs(rhs))}${rhs < 0 ? ` = ${MINUS}${a6rootSym(n)}${-rhs}` : ''}${h ? `\n${v} = ${h > 0 ? MINUS : ''}${Math.abs(h)} ${n % 2 ? '+' : '±'} ${a6rootSym(n)}${fmt(Math.abs(rhs))}` : ''}`}${rhs < 0 && n % 2 === 0 ? '' : `\n${v} = ${b5list(roots)}`}` };
   }
 };
 // #39–40: rational exponents in real life
@@ -16120,7 +16120,7 @@ TEMPLATES.b52RatVar = (r) => {
     return { topic: 'Rational exponents with variables', stem: 'Write the expression in simplest form. Assume all variables are positive.', draw: fig.draw, size: fig.size,
       ...buildChoices(r, correct, [...new Set(wr)], (i) => W2({ ...A.v, [u]: (eu || 1) + (i + 1) / 2 })),
       fr: { fields: [{ kind: 'expr', keys: 'expo', label: '' }], key: [key], display: correct, check: (x) => a6MonoOk(x[0], A) },
-      solution: `Divide the coefficients: ${c1}/${c2} = ${a6fracT(c1, c2)}.\nSubtract exponents: ${u}: ${fracT(nu / q1)} − ${du < 0 ? `(${fracT(du / q1)})` : fracT(du / q1)} = ${fracT(eu)}; ${w}: ${fracT(nw / q2)} − ${dw < 0 ? `(${fracT(dw / q2)})` : fracT(dw / q2)} = ${fracT(ew)}.\nMove negative exponents to the denominator: ${correct}` };
+      solution: `Divide the coefficients: ${c1}/${c2}${String(a6fracT(c1, c2)) === `${c1}/${c2}` ? ' (already in simplest form)' : ` = ${a6fracT(c1, c2)}`}.\nSubtract exponents: ${u}: ${fracT(nu / q1)} − ${du < 0 ? `(${fracT(du / q1)})` : fracT(du / q1)} = ${fracT(eu)}; ${w}: ${fracT(nw / q2)} − ${dw < 0 ? `(${fracT(dw / q2)})` : fracT(dw / q2)} = ${fracT(ew)}.\nMove negative exponents to the denominator: ${correct}` };
   }
 };
 // #63–68: like radicals with variables
