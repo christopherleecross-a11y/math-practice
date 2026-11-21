@@ -235,6 +235,7 @@ body.tp-open{overflow:hidden}
 .tp-table td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
 .tp-table .btn{padding:4px 9px;font-size:.84rem}
 .tp-table td.acts{white-space:nowrap;text-align:right}
+.tp-table td.acts .btn{display:block;width:100%;margin:2px 0}
 .st{font-weight:600;white-space:nowrap}
 .st.done{color:var(--given)}.st.work{color:var(--accent)}.st.none{color:var(--muted);font-weight:500}.st.flag{color:var(--wrong)}
 .rs-sum{font-weight:600}
@@ -1260,6 +1261,13 @@ const $ = s => document.querySelector(s);
 const rand = n => Math.floor(Math.random() * n);
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const clean = s => String(s).toUpperCase().replace(/[^A-Z]/g, '');
+// a time the Sheet turned into a clock time (results saved before 2026-11-21): "5:27" came back as 1899-12-31T05:27:00.000Z
+const sheetTime = t => {
+  const m = String(t == null ? '' : t).match(/^(1899|1900)-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)/);
+  if (!m) return t == null ? '' : t;
+  const days = Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 31)) / 864e5), a = days * 24 + +m[4], b = +m[5], c = +m[6];
+  return c ? `${a}:${String(b).padStart(2, '0')}:${String(c).padStart(2, '0')}` : `${a}:${String(b).padStart(2, '0')}`;
+};
 const fmtTime = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -3066,7 +3074,7 @@ async function renderResults() {
     else if (g && !g[3]) st = `<span class="st work">Working</span> <span class="muted">${startedAt(g) ? 'started ' + hx(fmtClock(startedAt(g))) + ' · ' : ''}last active ${hx(fmtDate(g[5]))}</span>`;
     else st = '<span class="st none">Not started</span>';
     tr.innerHTML = `<td>${hx(x.name)}</td>${showPer ? `<td>${hx(perLabel(x.period))}</td>` : ''}<td>${st}</td><td class="num">${r && r[6] !== '' ? hx(r[6]) + '%' : ''}${r && r[5] ? ' <span class="muted">(' + hx(r[5]) + ')</span>' : ''}</td>` +
-      `<td class="num">${r ? hx(r[9]) : ''}</td><td class="num">${r && +r[10] ? hx(r[10]) + '×' : r ? '0' : ''}</td><td class="num">${r ? hx(fmtDate(r[0])) : ''}</td><td class="acts"></td>`;
+      `<td class="num">${r ? hx(sheetTime(r[9])) : ''}</td><td class="num">${r && +r[10] ? hx(r[10]) + '×' : r ? '0' : ''}</td><td class="num">${r ? hx(fmtDate(r[0])) : ''}</td><td class="acts"></td>`;
     const acts = tr.querySelector('.acts');
     if (r || g) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = 'Their work'; b.addEventListener('click', () => showWork(e, x.name, x.period)); acts.appendChild(b); }
     if (e.versions > 1) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = 'Their version'; b.addEventListener('click', () => showVersion(e, x.name, x.period)); acts.append(' ', b); }

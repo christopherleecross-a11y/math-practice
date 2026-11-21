@@ -41,7 +41,7 @@
  * Privacy: students only ever receive the list of period names and their own puzzle.
  * The roster, assignments and results are never sent to a student's browser.
  */
-var SCRIPT_BUILD = '2026-11-20.2'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-21.1'; // which copy this is (Check for updates now shows it)
 
 
 var TABS = {
@@ -564,9 +564,9 @@ function resultRow(d, rosterRows, assignRows, now) {
     'Difficulty': safeCell(d.diff, 10),
     'Words': Number(d.words) || '',
     'Puzzle code': safeCell(d.code, 10),
-    'Time': mmss(d.timeSec),
+    'Time': "'" + mmss(d.timeSec), // the ' keeps it text: otherwise the Sheet reads 5:27 as 5 hours 27 minutes
     'Left page (times)': Number(d.away) || 0,
-    'Time away': mmss(d.awaySec),
+    'Time away': "'" + mmss(d.awaySec),
     'Attempts on this device': Number(d.attempts) || '',
     'Teacher mode used': d.teacher ? 'Yes' : 'No',
     'Letters revealed': d.revealed ? 'Yes' : 'No',
@@ -611,8 +611,15 @@ function wordData(d) {
 }
 
 /* ---- Summary tab (pure: takes the Results rows, returns what to write) ---- */
+// a time the Sheet turned into a clock time (rows saved before 2026-11-21): 5:27 came back as 1899-12-31 05:27
+function sheetTimeText(t) {
+  var m = String(t instanceof Date ? t.toISOString() : t || '').match(/^(1899|1900)-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)/);
+  if (!m) return t;
+  var days = Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 31)) / 864e5), a = days * 24 + +m[4], b = +m[5], c = +m[6];
+  return c ? a + ':' + ('0' + b).slice(-2) + ':' + ('0' + c).slice(-2) : a + ':' + ('0' + b).slice(-2);
+}
 function secondsOf(t) {
-  var p = String(t || '').split(':').map(Number);
+  var p = String(sheetTimeText(t) || '').split(':').map(Number);
   if (p.some(isNaN) || !p.length) return null;
   return p.reduce(function (a, b) { return a * 60 + b; }, 0);
 }
