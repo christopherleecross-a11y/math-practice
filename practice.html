@@ -40557,6 +40557,24 @@ IX.wave = {
       }
       if (isFinite(ty) && ty > yr[0] && ty < yr[1]) { ixLine(ctx, [V.X(tx), V.Y(S.d)], [V.X(tx), V.Y(ty)], IXC.purple, 2); ixDot(ctx, V.X(tx), V.Y(ty), IXC.purple, 8, true); }
       ixLabel(ctx, 'midline y = ' + ixFrac(S.d), V.X(V.xr[0]) + 6, V.Y(S.d) - 24, 15, 'left', IXC.green);
+      { // the equation, on the graph (top right, on a white card so the curve doesn't hide it)
+        // fractions (π/2, 3/2, 2π/3) are drawn stacked
+        const parts = eq().replace(/\((−?\d+\/\d+)\)\s*/, '$1 ').replace(/(\d\/\d+)·x/, '$1x').split(/((?:\d*π|\d+)\/\d+)/).filter(Boolean), big = 'bold 22px "Times New Roman", serif', small = 'bold 17px "Times New Roman", serif';
+        ctx.save(); ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+        const wid = (q) => { const m = /^(.+)\/(\d+)$/.exec(q); if (m && /\//.test(q)) { ctx.font = small; return Math.max(ctx.measureText(m[1]).width, ctx.measureText(m[2]).width) + 6; } ctx.font = big; return ctx.measureText(q).width; };
+        const W = parts.reduce((t, q) => t + wid(q), 0), hasFr = parts.some((q) => /\//.test(q)), H = hasFr ? 56 : 38;
+        const x0 = cv._w - W - 34, y0 = 10, mid = y0 + H / 2 + 1;
+        ctx.fillStyle = 'rgba(255,255,255,0.93)'; ctx.strokeStyle = IXC.blue; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0, y0, W + 24, H, 8) : ctx.rect(x0, y0, W + 24, H); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = IXC.blue; ctx.strokeStyle = IXC.blue; let x = x0 + 12;
+        parts.forEach((q) => {
+          const w = wid(q), m = /^(.+)\/(\d+)$/.exec(q);
+          if (m) { ctx.font = small; ctx.textAlign = 'center'; ctx.fillText(m[1], x + w / 2, mid - 11); ctx.fillText(m[2], x + w / 2, mid + 13); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x + 1, mid + 1); ctx.lineTo(x + w - 1, mid + 1); ctx.stroke(); ctx.textAlign = 'left'; }
+          else { ctx.font = big; ctx.fillText(q, x, mid); }
+          x += w;
+        });
+        ctx.restore();
+      }
       paintRead();
     }
     function paintRead() {
