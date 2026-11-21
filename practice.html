@@ -21074,7 +21074,7 @@ TEMPLATES.a12Edge = (r) => {
   const k = pick(r, [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 30, 40, 50]), V = k ** 3;
   if (kind === 'word') return a1numQ(r, { topic: 'Cube roots', stem: `The volume of a plastic storage cube is ${V.toLocaleString('en-US')} cubic ${u === 'in.' ? 'inches' : u === 'ft' ? 'feet' : u === 'm' ? 'meters' : 'centimeters'}. What is the edge length of the storage cube?`, val: k, unit: u, wrongs: [Math.round(V / 3), Math.round(Math.sqrt(V))], solution: `s = ∛${V} = ${k} ${u}` });
   if (kind === 'area') return a1numQ(r, { topic: 'Cube roots', stem: `The volume of a cube of ice is ${V.toLocaleString('en-US')} cubic inches. What is the surface area of the cube?`, val: 6 * k * k, unit: 'in.²', wrongs: [k * k, 4 * k * k, 6 * k], solution: `Edge: ∛${V} = ${k} in. Surface area: 6s² = 6(${k})² = ${6 * k * k} in.²` });
-  return a1numQ(r, { topic: 'Cube roots', stem: `Find the edge length s of the cube.   Volume = ${V.toLocaleString('en-US')} ${u}³`, val: k, unit: u, wrongs: [Math.round(V / 3), V / 6 > 50 ? 0 : V / 6], draw: a1cube(`Volume = ${V.toLocaleString('en-US')} ${u}³`), size: [300, 270], solution: `s³ = ${V}, so s = ∛${V} = ${k} ${u}.` });
+  return a1numQ(r, { topic: 'Cube roots', stem: `Find the edge length s of the cube.   Volume = ${V.toLocaleString('en-US')} ${u}³`, val: k, unit: u, wrongs: [Math.round(V / 3), V / 6 > 50 ? 0 : V / 6], draw: a1cube(`Volume = ${V.toLocaleString('en-US')} ${u}³`), size: [300, 270], solution: `s³ = ${V}, so s = ∛${V} = ${k} ${u}` });
 };
 // #5–10
 TEMPLATES.a12Cube = (r) => {
@@ -21109,7 +21109,7 @@ TEMPLATES.a12Var = (r) => {
 };
 // #27–30: <, >, or =
 TEMPLATES.a12Compare = (r) => {
-  const L = pick(r, [() => { const k = pick(r, [2, 3, 5]), q = pick(r, [5, 4, 6]); return [`∛(${MINUS}${k ** 3}/${q ** 3})`, -k / q]; }, () => { const k = pick(r, [1, 2, 3]); return [`∛${fmt(k ** 3 / 1000)}`, k / 10]; }, () => { const k = pick(r, [2, 3, 4, 5]); return [`∛${k ** 6}`, k * k]; }, () => { const k = ri(r, 2, 9); return [`∛${k ** 3}`, k]; }])();
+  const L = pick(r, [() => { const k = pick(r, [2, 3, 5]), q = pick(r, [5, 4, 6]); return [`∛(${MINUS}${k ** 3}/${q ** 3})`, -k / q]; }, () => { const k = pick(r, [1, 2, 3]); return [`∛${+(k ** 3 / 1000).toFixed(3)}`, k / 10]; }, () => { const k = pick(r, [2, 3, 4, 5]); return [`∛${k ** 6}`, k * k]; }, () => { const k = ri(r, 2, 9); return [`∛${k ** 3}`, k]; }])();
   const R = pick(r, [() => { const x = Math.round((L[1] + (Number.isInteger(L[1]) ? pick(r, [-1, 1, 0]) : pick(r, [-0.05, 0.05, 0]))) * 1000) / 1000, p = fracParts(x); return [p && p[1] <= 20 ? fracT(x) : fmt(x), x]; }, () => { const k = ri(r, 2, 8); return [`√${k * k}`, k]; }, () => { const k = nz(r, -6, 6); return [`∛${k < 0 ? `(${MINUS}${(-k) ** 3})` : k ** 3}`, k]; }, () => [fracT(L[1]), L[1]]])();
   const rv = R[1] == null ? pxConst(R[0].replace(MINUS, '-')) : R[1], ans = Math.abs(L[1] - rv) < 1e-9 ? '=' : L[1] < rv ? '<' : '>';
   return { topic: 'Cube roots', stem: `Complete the statement with <, >, or =.   ${L[0]}  ___  ${R[0]}`, ...buildChoices(r, ans, ['<', '>', '='].filter((x) => x !== ans), () => null), fr: FR.select(`${L[0]}  ___  ${R[0]}:`, ['<', '>', '='], ans),
@@ -21148,7 +21148,7 @@ TEMPLATES.a13Frac = (r) => {
   const v = a1V(r), kind = pick(r, ['coef', 'coef', 'int', 'mixed']);
   if (kind === 'coef') { const [n, d] = pick(r, [[2, 5], [3, 7], [3, 4], [2, 3], [5, 6], [4, 9]]), sg = pick(r, [1, -1]), x = d * nz(r, -6, 6), rhs = sg * n * x / d;
     return a1solQ(r, { v, val: x, eq: `${sg < 0 ? MINUS : ''}(${n}/${d})${v} = ${fmt(rhs)}`, wrongs: [rhs * n / d * sg, -x, rhs * sg * n / d + d], topic: 'Solving simple equations', solution: `Multiply each side by the reciprocal, ${sg < 0 ? MINUS : ''}${d}/${n}: ${v} = ${fmt(rhs)} · ${sg < 0 ? `(${MINUS}${d}/${n})` : `${d}/${n}`} = ${fmt(x)}` }); }
-  if (kind === 'int') { const k = nz(r, -6, 6), q = pick(r, [[1, 5], [2, 3], [3, 4], [-1, 2]]), b = q[0] / q[1];
+  if (kind === 'int') { const k = pick(r, [-6, -5, -4, -3, -2, 2, 3, 4, 5, 6]), q = pick(r, [[1, 5], [2, 3], [3, 4], [-1, 2]]), b = q[0] / q[1];
     return a1solQ(r, { v, val: b / k, eq: `${fmt(k)}${v} = ${fracT(b)}`, wrongs: [b * k, k / b], topic: 'Solving simple equations', solution: `Divide each side by ${a1P(k)}: ${v} = ${fracT(b)} ÷ ${a1P(k)} = ${fracT(b / k)}` }); }
   const w = ri(r, 1, 4), f = pick(r, [[1, 6], [1, 2], [1, 3], [3, 4]]), g = pick(r, [[2, 3], [1, 4], [5, 6]]), L = -(w + f[0] / f[1]), x = L + g[0] / g[1];
   return a1solQ(r, { v, val: x, eq: `${MINUS}${w}${B3VF[`${f[0]}/${f[1]}`]} = ${v} ${MINUS} ${g[0]}/${g[1]}`, wrongs: [L - g[0] / g[1], -x], topic: 'Solving simple equations', solution: `Add ${g[0]}/${g[1]} to each side: ${v} = ${fracT(L)} + ${g[0]}/${g[1]} = ${fracT(x)}` });
@@ -21300,7 +21300,7 @@ TEMPLATES.a16Est = (r) => {
 TEMPLATES.a16Bags = (r) => {
   const dia = pick(r, [[4, 3], [1, 1], [3, 2], [5, 4]]), d = dia[0] / dia[1], h = pick(r, [3, 4, 3.5, 5]), y = pick(r, [0.6, 0.45, 0.5]), V = Math.PI * (d / 2) ** 2 * h, n = Math.ceil(V / y - 1e-9);
   const dt = dia[1] === 1 ? String(dia[0]) : `${Math.floor(d)}${B3VF[`${dia[0] % dia[1]}/${dia[1]}`] || ''}`;
-  return a1numQ(r, { topic: 'Estimating results', stem: `You dig a cylindrical hole ${dt} feet across and ${fmt(h)} feet deep for a basketball post. Each bag of concrete mix yields ${fmt(y)} cubic feet. How many bags do you need to fill the hole?`, val: n, unit: 'bags', wrongs: [Math.floor(V / y), Math.ceil(Math.PI * d * d * h / y), Math.ceil(V)], solution: `V = πr²h = π(${fracT(d / 2)})²(${fmt(h)}) ≈ ${V.toFixed(2)} ft³.\n${V.toFixed(2)} ÷ ${fmt(y)} ≈ ${(V / y).toFixed(2)}, so you need ${n} bags (round up).` });
+  return a1numQ(r, { topic: 'Estimating results', stem: `You dig a cylindrical hole ${dt} ${dt === '1' ? 'foot' : 'feet'} across and ${fmt(h)} feet deep for a basketball post. Each bag of concrete mix yields ${fmt(y)} cubic feet. How many bags do you need to fill the hole?`, val: n, unit: 'bags', wrongs: [Math.floor(V / y), Math.ceil(Math.PI * d * d * h / y), Math.ceil(V)], solution: `V = πr²h = π(${fracT(d / 2)})²(${fmt(h)}) ≈ ${V.toFixed(2)} ft³.\n${V.toFixed(2)} ÷ ${fmt(y)} ≈ ${(V / y).toFixed(2)}, so you need ${n} bags (round up).` });
 };
 // #7: which is not an appropriate approximation
 TEMPLATES.a16Approx = (r) => {
@@ -21464,7 +21464,7 @@ TEMPLATES.a19Formula = (r) => {
   const F = pick(r, [
     ['Profit: P = R − C. Solve for C.', 'c', ['p', 'r'], (e) => e.r - e.p, 'R − P', 'R-P', ['P − R', 'R + P', 'P/R'], 'Add C and subtract P: C = R − P.'],
     ['Surface area of a cylinder: S = 2πr² + 2πrh. Solve for h.', 'h', ['s', 'r'], (e) => (e.s - 2 * Math.PI * e.r ** 2) / (2 * Math.PI * e.r), '(S − 2πr²)/(2πr)', '\\frac{S-2\\pi r^2}{2\\pi r}', ['S/(2πr) − 2πr²', '(S − 2πr)/(2πr²)', 'S − 2πr² − 2πr'], 'Subtract 2πr²: S − 2πr² = 2πrh. Divide by 2πr.'],
-    ['Area of a trapezoid: A = ½h(b + c). Solve for c.', 'c', ['a', 'h', 'b'], (e) => (2 * e.a) / e.h - e.b, '2A/h − b', '\\frac{2A}{h}-b', ['2A/h + b', 'A/(2h) − b', '2A − h − b'], 'Multiply by 2: 2A = h(b + c). Divide by h: 2A/h = b + c. Subtract b.'],
+    ['Area of a trapezoid: A = ½h(b + c). Solve for c.', 'cl', ['a', 'h', 'b'], (e) => (2 * e.a) / e.h - e.b, '2A/h − b', '\\frac{2A}{h}-b', ['2A/h + b', 'A/(2h) − b', '2A − h − b'], 'Multiply by 2: 2A = h(b + c). Divide by h: 2A/h = b + c. Subtract b.'],
     ['Average acceleration: a = (v − u)/t. Solve for v.', 'v', ['a', 'u', 't'], (e) => e.a * e.t + e.u, 'at + u', 'at+u', ['at − u', '(a + u)/t', 'a/t + u'], 'Multiply by t: at = v − u. Add u: v = at + u.'],
     ['Simple interest: I = Prt. Solve for r.', 'r', ['i', 'p', 't'], (e) => e.i / (e.p * e.t), 'I/(Pt)', '\\frac{I}{Pt}', ['IPt', 'Pt/I', 'I − Pt'], 'Divide each side by Pt.'],
     ['Distance: d = rt. Solve for t.', 't', ['d', 'r'], (e) => e.d / e.r, 'd/r', '\\frac{d}{r}', ['dr', 'r/d', 'd − r'], 'Divide each side by r.'],
@@ -21472,7 +21472,7 @@ TEMPLATES.a19Formula = (r) => {
     ['Temperature: C = (5/9)(F − 32). Solve for F.', 'f', ['c'], (e) => (9 / 5) * e.c + 32, '(9/5)C + 32', '\\frac{9}{5}C+32', ['(5/9)C + 32', '(9/5)(C + 32)', '(9/5)C − 32'], 'Multiply by 9/5: (9/5)C = F − 32. Add 32.'],
     ['Perimeter of a rectangle: P = 2ℓ + 2w. Solve for w.', 'w', ['p', 'l'], (e) => (e.p - 2 * e.l) / 2, '(P − 2ℓ)/2', '\\frac{P-2l}{2}', ['P − 2ℓ/2', '(P + 2ℓ)/2', 'P/2 − 2ℓ'], 'Subtract 2ℓ: P − 2ℓ = 2w. Divide by 2.'],
     ['Quarterback completion rating: R = 5(C/A − 0.3). Solve for C.', 'c', ['r', 'a'], (e) => e.a * (e.r / 5 + 0.3), 'A(R/5 + 0.3)', 'A\\left(\\frac{R}{5}+0.3\\right)', ['A(5R + 0.3)', 'A(R/5 − 0.3)', 'R/5 + 0.3A'], 'Divide by 5: R/5 = C/A − 0.3. Add 0.3, then multiply by A.']]);
-  const [stem, tv, vars, truth, text, latex, wrongs, how] = F, shown = { c: 'C', h: 'h', v: 'v', r: 'r', t: 't', w: 'w', f: 'F' }[tv];
+  const [stem, tv, vars, truth, text, latex, wrongs, how] = F, shown = { c: 'C', cl: 'c', h: 'h', v: 'v', r: 'r', t: 't', w: 'w', f: 'F' }[tv];
   const q = a1litQ(r, { stem: `Solve the formula for the indicated variable.   ${stem}`, target: shown, vars, truth, text, latex, wrongs, solution: `${how}\n${shown} = ${text}`, topic: 'Formulas' });
   q.fr.check = (v) => a1litOk(String(v[0] || '').replace(/ℓ|\\ell/g, 'l'), shown, vars, truth);
   return q;
@@ -29985,10 +29985,10 @@ TEMPLATES.a11Challenge = (r) => {
     const N = p * x * x - q * y; if (N % (x - y)) continue;
     const E = N / (x - y) + s * Math.abs(x * y), Nw = p * (x < 0 ? -x * x : x * x) - q * y;
     const w = [Nw / (x - y) + s * Math.abs(x * y), N / (x - y) + s * x * y, N / (x + y || 1) + s * Math.abs(x * y), p * x * x - q * y / (x - y) + s * Math.abs(x * y)].map(fmt);
-    return { topic: 'Challenge: evaluate a complicated expression', stem: `Evaluate (${chCo(p)}x² − ${q}y) ÷ (x − y) + ${s === 1 ? '' : s}|xy| when x = ${fmt(x)} and y = ${fmt(y)}.`,
+    return { topic: 'Challenge: evaluate a complicated expression', stem: `Evaluate (${chCo(p)}x² − ${q === 1 ? '' : q}y) ÷ (x − y) + ${s === 1 ? '' : s}|xy| when x = ${fmt(x)} and y = ${fmt(y)}.`,
       ...buildChoices(r, fmt(E), w, (i) => fmt(E + i + 1)),
       fr: chNums([{ label: 'Value:', val: E }], fmt(E)),
-      solution: `Numerator: ${p === 1 ? '' : `${p} · `}${chP(x)}² − ${q} · ${chP(y)} = ${p === 1 ? '' : `${p} · `}${x * x} ${-q * y < 0 ? MINUS : '+'} ${Math.abs(q * y)} = ${fmt(N)}\nDenominator: ${fmt(x)} − ${chP(y)} = ${fmt(x - y)}\nQuotient: ${fmt(N)} ÷ ${chP(x - y)} = ${fmt(N / (x - y))}\n${s === 1 ? '' : `${s} · `}|${fmt(x)} · ${chP(y)}| = ${s === 1 ? '' : `${s} · `}${Math.abs(x * y)}${s === 1 ? '' : ` = ${s * Math.abs(x * y)}`}\nTotal: ${fmt(N / (x - y))} + ${s * Math.abs(x * y)} = ${fmt(E)}` };
+      solution: `Numerator: ${p === 1 ? '' : `${p} · `}${chP(x)}² − ${q === 1 ? '' : `${q} · `}${chP(y)} = ${p === 1 ? '' : `${p} · `}${x * x} ${-q * y < 0 ? MINUS : '+'} ${Math.abs(q * y)} = ${fmt(N)}\nDenominator: ${fmt(x)} − ${chP(y)} = ${fmt(x - y)}\nQuotient: ${fmt(N)} ÷ ${chP(x - y)} = ${fmt(N / (x - y))}\n${s === 1 ? '' : `${s} · `}|${fmt(x)} · ${chP(y)}| = ${s === 1 ? '' : `${s} · `}${Math.abs(x * y)}${s === 1 ? '' : ` = ${s * Math.abs(x * y)}`}\nTotal: ${fmt(N / (x - y))} + ${s * Math.abs(x * y)} = ${fmt(E)}` };
   }
 };
 /* 1.2: a cube from its volume (a fraction) */

@@ -2,7 +2,7 @@
 # each video's seed makes a problem of its own kind, and every problem the covered types make has a video.
 from playwright.sync_api import sync_playwright
 import re, json, glob, sys
-PRE = sys.argv[1] if len(sys.argv) > 1 else 'geo'; SUBJ = {'geo': 'geometry'}[PRE]
+PRE = sys.argv[1] if len(sys.argv) > 1 else 'geo'; SUBJ = {'geo': 'geometry', 'alg1': 'algebra1', 'alg2': 'algebra2'}[PRE]
 vids, errs = [], []
 for fn in sorted(glob.glob(f'/home/claude/math-practice/walks/pv/{PRE}-*.txt')):
     cur = None
@@ -30,9 +30,11 @@ with sync_playwright() as p:
         if (!v.title) errs.push(`${v.tpl} ${v.seed}: no title`); if (v.steps.length < 2) errs.push(`${v.tpl} ${v.seed}: no steps`);
       }
       const miss = [];
-      for (const t of tpls) { const mine = vids.filter((v) => v.tpl === t).map((v) => new RegExp(v.kind)); let bad = 0, ex = '';
+      for (const t of tpls) { const mv = vids.filter((v) => v.tpl === t), mine = mv.map((v) => new RegExp(v.kind)); let bad = 0, ex = '', ov = 0, oex = '';
         for (let k = 0; k < 400; k++) { let q; try { q = TEMPLATES[t](mulberry32(5000 + k)); } catch (e) { continue; } const key = `${q.topic || ''} ## ${q.stem}`;
-          if (!mine.some((r) => r.test(key))) { bad++; ex = ex || key.slice(0, 110); } }
+          if (!mine.some((r) => r.test(key))) { bad++; ex = ex || key.slice(0, 110); }
+          const hit = mv.filter((v, i) => mine[i].test(key)); if (hit.length > 1 && hit.some((v) => !v.pick)) { ov++; oex = oex || hit.map((v) => v.seed).join('+') + ' ' + key.slice(0, 90); } }
+        if (ov) miss.push(`${t}: ${ov}/400 problems match several videos without picks, e.g. ${oex}`);
         if (bad) miss.push(`${t}: ${bad}/400 problems have no video, e.g. ${ex}`); }
       const sections = [...new Set(tpls.map((t) => (QUESTION_TYPES.find((x) => x.id === t) || {}).section))];
       const notDone = QUESTION_TYPES.filter((x) => x.subject === '""" + SUBJ + """' && sections.includes(x.section) && !tpls.includes(x.id) && !PRACTICE_VIDS.some((v) => v.tpl === x.id)).map((x) => x.id);
