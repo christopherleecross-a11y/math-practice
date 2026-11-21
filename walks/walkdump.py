@@ -18,7 +18,7 @@ def figdesc(f):
     if f.get('kind')=='circ': return 'FIG circ points '+','.join(k for k in f.get('pts',{}) if not k.startswith('_'))+(' labels '+','.join(t.get('t','') for t in f.get('txt',[])) if f.get('txt') else '')
     if f.get('kind')=='grid': return 'FIG grid '+json.dumps(f.get('polys',[]))[:200]
     return 'FIG '+f.get('kind','?')
-for m in re.finditer(r"^  '("+PRE+r"-(\d+|P)-[\w-]+)': (\{\"minutes\".*?)(,?)$", s, re.M):
+for m in re.finditer(r"^  '("+PRE+r"-([A-Za-z0-9]+)-[\w-]+)': (\{\"minutes\".*?)(,?)$", s, re.M):
     k,ch=m.group(1),m.group(2)
     if ch not in chs: continue
     d=json.loads(m.group(3))
