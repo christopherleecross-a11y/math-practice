@@ -37778,10 +37778,10 @@ function dashWatch() {
     } catch {}
   }, 30000);
 }
-function dashLogin(msg) {
+function dashLogin(msg, next) {
   app.innerHTML = '';
   const pw = el('input', { type: 'password', placeholder: 'Dashboard password', autocomplete: 'current-password' });
-  const go = () => { if (!pw.value) return; dashPw.set(pw.value); dashboard(); };
+  const go = () => { if (!pw.value) return; dashPw.set(pw.value); (next || dashboard)(); };
   pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   app.append(el('div', { class: 'card' }, el('label', {}, 'Dashboard password'), pw, msg ? el('div', { class: 'err' }, msg) : '',
     el('p', { class: 'small' }, 'This is the DASHBOARD_PASSWORD you saved in your Apps Script’s Script properties. It’s remembered on this computer only.'),
@@ -37922,7 +37922,163 @@ function dashOverview(titles) {
       el('button', { class: 'btn', type: 'button', style: 'margin-top:0', onclick: () => printReports(list) }, `Print ${list.length} report${list.length === 1 ? '' : 's'}`)));
   } else app.append(el('p', { class: 'small', style: 'margin:0 4px 16px' }, 'Tip: pick a period above to print progress reports for the whole class, or click a student for one report.'));
   const vis = dashVisits(); if (vis) app.append(vis);
-  app.append(dashRosterCard());
+  app.append(el('p', { class: 'small', style: 'margin:0 4px 16px' }, 'Adding or moving a student, matching periods to Classroom classes, nicknames, and the end of the year are on the ', linkBtn('Classes & roster', () => classesScreen()), ' page.'));
+}
+/* ---------- Classes & roster: everything the Sheet's Practice menu and tabs did, here on the site ---------- */
+async function setupPost(op, extra) {
+  const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'setup', op, password: dashPw.get(), ...(extra || {}) }) });
+  return res.json();
+}
+const PERIOD_CHOICES = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+async function classesScreen() {
+  teacherNav('classes');
+  document.getElementById('title').textContent = 'Classes & roster';
+  document.getElementById('subtitle').textContent = 'Your Classroom classes, students, nicknames, and settings. No need to open the Sheet.';
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '1000px';
+  app.innerHTML = '';
+  if (!CONFIG.SCRIPT_URL) { app.append(el('div', { class: 'card' }, 'CONFIG.SCRIPT_URL is empty, so there is no Sheet to set up.')); return; }
+  if (!dashPw.get()) return dashLogin('', classesScreen);
+  app.append(el('div', { class: 'card' }, 'Loading your classes…'));
+  const safe = (p) => p.catch(() => ({ ok: false, error: 'Couldn’t reach your script.' }));
+  const [cls, ros, un, st] = await Promise.all([safe(setupPost('classes')), safe(setupPost('roster')), safe(setupPost('unmatched')), safe(setupPost('settings'))]);
+  app.innerHTML = '';
+  const bad = [cls, ros, un, st].find((g) => g && !g.ok);
+  if (bad && (bad.wrong || bad.locked)) { dashPw.set(''); return dashLogin(bad.wrong ? 'That password didn’t match your dashboard password.' : 'Too many wrong passwords. Wait 15 minutes and try again.', classesScreen); }
+  if (bad && bad.setup) { app.append(el('div', { class: 'card' }, 'Your Sheet has no dashboard password yet. (This is the one step of first-time setup that happens in the Sheet’s Apps Script: Project Settings > Script properties > DASHBOARD_PASSWORD.)')); return; }
+  if (bad && /unknown action/i.test(bad.error || '')) { app.append(el('div', { class: 'card' }, el('strong', {}, 'Almost ready'), el('p', {}, 'Your Sheet’s script hasn’t picked up this page yet. It updates itself within about 10 minutes.'), el('button', { class: 'btn', onclick: classesScreen }, 'Try again'))); return; }
+  const roster = ros.ok ? ros.roster : [];
+  const note = (box, ok, text) => { box.innerHTML = ''; if (text) box.append(el('div', { class: ok ? 'small' : 'err', style: ok ? 'margin-top:8px;padding:8px 10px;border-radius:8px;background:#e6f4ea' : 'margin-top:8px' }, text)); };
+  const card = (title, ...kids) => el('div', { class: 'card' }, el('div', { style: 'font-weight:700;font-size:1.1em;margin-bottom:6px' }, title), ...kids);
+  const th = (...t) => el('tr', {}, ...t.map((x) => el('th', { style: 'text-align:left;padding:6px 8px;border-bottom:2px solid var(--line)' }, x)));
+  const td = (...k) => el('td', { style: 'padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle' }, ...k);
+  const perList = el('datalist', { id: 'perChoices' }, ...PERIOD_CHOICES.map((p) => el('option', { value: p })));
+
+  // 1. Classroom classes ↔ periods
+  { const out = el('div', {});
+    const box = card('🏫 Your Google Classroom classes', perList,
+      el('p', { class: 'small', style: 'margin:0 0 8px' }, 'Type each class’s period the way students pick it on the practice page (1st, 2nd, 4th, …). Leave it blank for classes that don’t use the practice site. Two classes can share a period.'));
+    if (!cls.ok) box.append(el('p', { class: 'err' }, String(cls.error || 'Couldn’t read your Classroom classes.')));
+    else if (!cls.classes.length) box.append(el('p', {}, 'No active Google Classroom classes were found for your account.'));
+    else {
+      const inputs = cls.classes.map((c) => { const i = el('input', { type: 'text', list: 'perChoices', value: c.period || '', style: 'width:110px', placeholder: '—' }); if (!c.saved && c.period) i.style.background = '#fff8d6'; return i; });
+      const tb = el('table', { style: 'width:100%;border-collapse:collapse' }, th('Classroom class', 'Period'), ...cls.classes.map((c, i) => el('tr', {}, td(c.name), td(inputs[i]))));
+      const save = el('button', { class: 'btn', type: 'button' }, 'Save periods');
+      save.onclick = async () => {
+        save.disabled = true; save.textContent = 'Saving…';
+        let r; try { r = await setupPost('classesSave', { classes: cls.classes.map((c, i) => ({ id: c.id, name: c.name, period: inputs[i].value.trim() })) }); } catch { r = { ok: false, error: 'Couldn’t reach your script.' }; }
+        save.disabled = false; save.textContent = 'Save periods';
+        if (!r.ok) return note(out, false, r.error || 'Something went wrong.');
+        inputs.forEach((i) => (i.style.background = '')); box.querySelector('.yellowNote')?.remove();
+        note(out, true, `✅ Saved. ${r.linked} class${r.linked === 1 ? '' : 'es'} matched to a period. Next, click Refresh roster from Classroom below.`);
+      };
+      box.append(el('div', { style: 'overflow-x:auto' }, tb), save, out);
+      if (cls.classes.some((c) => !c.saved && c.period)) box.append(el('p', { class: 'small yellowNote', style: 'margin:8px 0 0' }, 'Yellow boxes are guesses from the class names. Check them, then click Save periods.'));
+    }
+    app.append(box); }
+
+  // 2. Roster: refresh, nicknames, groups
+  { const out = el('div', {}), list = el('div', {});
+    const refresh = el('button', { class: 'btn', type: 'button', style: 'margin-top:0' }, '🔄 Refresh roster from Classroom');
+    const perSel = el('select', { style: 'width:auto' });
+    const draw = () => {
+      const pers = [...new Set(roster.map((r) => r.period))].sort((a, b) => perOrder(a) - perOrder(b));
+      const keep = perSel.value; perSel.innerHTML = '';
+      pers.forEach((p) => perSel.append(el('option', { value: p }, `${p} period (${roster.filter((r) => r.period === p).length})`)));
+      if (pers.includes(keep)) perSel.value = keep;
+      list.innerHTML = '';
+      if (!roster.length) { list.append(el('p', { class: 'small' }, 'No roster yet. Match your classes to periods above, then click Refresh roster from Classroom.')); perSel.style.display = 'none'; return; }
+      perSel.style.display = '';
+      const rows = roster.filter((r) => r.period === perSel.value).sort((a, b) => lastFirst(a.full).localeCompare(lastFirst(b.full)));
+      const edit = (r, field) => {
+        const i = el('input', { type: 'text', value: r[field] || '', placeholder: field === 'aliases' ? 'like Bobby, Rob' : 'like Short' });
+        const mark = el('span', { class: 'small', style: 'margin-left:6px;min-width:1.2em;display:inline-block' });
+        let t = null;
+        const send = async () => {
+          clearTimeout(t); if (i.value.trim() === (r[field] || '')) return;
+          mark.textContent = '…';
+          let g; try { g = await setupPost('rosterEdit', { id: r.id, period: r.period, [field]: i.value.trim() }); } catch { g = { ok: false }; }
+          if (g.ok) { r[field] = i.value.trim(); mark.textContent = '✓'; mark.style.color = '#2e7d32'; } else { mark.textContent = '✗'; mark.style.color = '#c0392b'; mark.title = g.error || 'Not saved'; }
+        };
+        i.addEventListener('input', () => { clearTimeout(t); mark.textContent = ''; t = setTimeout(send, 1200); });
+        i.addEventListener('change', send);
+        return el('div', { style: 'display:flex;align-items:center' }, i, mark);
+      };
+      list.append(el('div', { style: 'overflow-x:auto' }, el('table', { style: 'width:100%;border-collapse:collapse;margin-top:8px' }, th('Student (as in Classroom)', 'Also types as (nicknames, separated by commas)', 'Group'),
+        ...rows.map((r) => el('tr', {}, td(r.full), td(edit(r, 'aliases')), td(edit(r, 'group')))))));
+    };
+    perSel.onchange = draw;
+    refresh.onclick = async () => {
+      refresh.disabled = true; refresh.textContent = 'Refreshing… (this can take a minute)';
+      let r; try { r = await setupPost('refresh'); } catch { r = { ok: false, error: 'Couldn’t reach your script.' }; }
+      refresh.disabled = false; refresh.textContent = '🔄 Refresh roster from Classroom';
+      if (!r.ok) return note(out, false, r.error || 'Something went wrong.');
+      roster.splice(0, roster.length, ...r.roster); draw();
+      note(out, true, `✅ Roster updated: ${roster.length} students. Nicknames and groups you typed are kept.`);
+    };
+    app.append(card('👥 Roster',
+      el('p', { class: 'small', style: 'margin:0 0 8px' }, 'Students sign in to the practice site from this list. Refresh it after students join or leave a class in Classroom. Nicknames help match a typed name (like “Bobby”) to the student. Groups are for your own sorting.'),
+      el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, refresh, perSel), out, list));
+    draw(); }
+
+  // 3. add or move a student
+  app.append(dashRosterCard(roster));
+
+  // 4. names that didn't match a student (from before Google sign-in, or a typed name)
+  { const box = card('❓ Names to match');
+    const drawUn = (g) => {
+      [...box.childNodes].slice(1).forEach((n) => n.remove());
+      if (!g.ok) return box.append(el('p', { class: 'err' }, String(g.error || 'Couldn’t read the list.')));
+      if (!g.unmatched.length) return box.append(el('p', { class: 'small', style: 'margin:0' }, 'None right now. When a student’s typed name can’t be matched to your roster, it shows up here so you can pick the student once; their grade then goes to Classroom, and the name is remembered as a nickname.'));
+      box.append(el('p', { class: 'small', style: 'margin:0 0 8px' }, 'These scores couldn’t be matched to a student. Pick the student: the grade goes to Google Classroom, and the typed name is saved as their nickname so it matches next time.'));
+      const tb = el('table', { style: 'width:100%;border-collapse:collapse' }, th('When', 'Period', 'Typed name', 'Assignment', 'Score', 'Student'));
+      g.unmatched.forEach((u) => {
+        const sel = el('select', { style: 'width:auto;max-width:220px' }, el('option', { value: '' }, 'Pick…'), ...g.roster.filter((r) => r.period === u.period).sort((a, b) => lastFirst(a.full).localeCompare(lastFirst(b.full))).map((r) => el('option', { value: r.full }, r.full)));
+        if (u.picked) sel.value = u.picked;
+        const msg = el('div', { class: 'small', style: 'margin-top:4px' }, u.status && !/^Pick the student/.test(u.status) ? u.status : '');
+        sel.onchange = async () => {
+          if (!sel.value) return; sel.disabled = true; msg.textContent = 'Posting…';
+          let r; try { r = await setupPost('unmatchedPick', { row: u.row, name: sel.value }); } catch { r = { ok: false, error: 'Couldn’t reach your script.' }; }
+          if (!r.ok) { sel.disabled = false; msg.textContent = r.error || 'Something went wrong.'; return; }
+          drawUn(r);
+        };
+        tb.append(el('tr', {}, td(u.when ? new Date(u.when).toLocaleDateString() : ''), td(u.period), td(u.typed), td(u.title), td(u.percent === '' ? '' : `${Math.round(+u.percent)}%`), td(sel, msg)));
+      });
+      box.append(el('div', { style: 'overflow-x:auto' }, tb));
+    };
+    drawUn(un); app.append(box); }
+
+  // 5. settings
+  { const out = el('div', {}), out2 = el('div', {});
+    const p1 = el('input', { type: 'password', placeholder: 'New password', autocomplete: 'new-password' }), p2 = el('input', { type: 'password', placeholder: 'Type it again', autocomplete: 'new-password' });
+    const pbtn = el('button', { class: 'btn', type: 'button' }, 'Change password');
+    pbtn.onclick = async () => {
+      if (p1.value.length < 6) return note(out, false, 'Use at least 6 characters.');
+      if (p1.value !== p2.value) return note(out, false, 'The two passwords don’t match.');
+      let r; try { r = await setupPost('password', { newPassword: p1.value }); } catch { r = { ok: false, error: 'Couldn’t reach your script.' }; }
+      if (!r.ok) return note(out, false, r.error || 'Something went wrong.');
+      dashPw.set(p1.value); p1.value = p2.value = '';
+      note(out, true, '✅ Password changed. On other computers, you’ll be asked for the new one.');
+    };
+    const k = el('input', { type: 'password', placeholder: 'sk-ant-…', autocomplete: 'off' });
+    const kstat = el('span', {}, st.ok ? (st.aiKey ? '✅ A key is saved.' : 'No key saved, so trig-identity proofs aren’t graded by AI.') : '');
+    const kbtn = el('button', { class: 'btn', type: 'button', style: 'margin-top:0' }, 'Save key'), krm = el('button', { class: 'btn secondary', type: 'button', style: 'margin-top:0' }, 'Remove key');
+    const sendKey = async (remove) => {
+      if (!remove && !k.value.trim()) return note(out2, false, 'Paste the key first.');
+      if (remove && !confirm('Remove the AI grading key? Proofs will be graded only by the computer check.')) return;
+      let r; try { r = await setupPost('aiKey', remove ? { remove: true } : { key: k.value.trim() }); } catch { r = { ok: false, error: 'Couldn’t reach your script.' }; }
+      if (!r.ok) return note(out2, false, r.error || 'Something went wrong.');
+      k.value = ''; kstat.textContent = r.aiKey ? '✅ A key is saved.' : 'No key saved.'; note(out2, true, remove ? 'Key removed.' : '✅ Key saved.');
+    };
+    kbtn.onclick = () => sendKey(false); krm.onclick = () => sendKey(true);
+    app.append(card('🔑 Settings',
+      el('div', { style: 'font-weight:600;margin-top:4px' }, 'Dashboard password'),
+      el('p', { class: 'small', style: 'margin:2px 0 6px' }, 'The password for the Results dashboard and this page.'),
+      el('div', { style: 'display:grid;gap:8px;max-width:360px' }, p1, p2), pbtn, out,
+      el('div', { style: 'font-weight:600;margin-top:18px' }, 'AI grading key (for trig-identity proofs)'),
+      el('p', { class: 'small', style: 'margin:2px 0 6px' }, kstat, ' The key is saved in your Sheet’s script and never shown again.'),
+      k, el('div', { style: 'display:flex;gap:8px;margin-top:8px;flex-wrap:wrap' }, kbtn, st.aiKey ? krm : ''), out2)); }
+
+  // 6. end of the year
   app.append(dashYearCard());
 }
 // 🗓 End of the school year: archive copy of the Sheet, then clear the student data for next year
@@ -37940,13 +38096,13 @@ function dashYearCard() {
     let r; try { const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'newYear', password: dashPw.get(), confirm: 'NEW YEAR', label: label.value.trim() }) }); r = await res.json(); }
     catch (e) { r = { ok: false, error: 'Couldn’t reach your script.' }; }
     btn.disabled = false; btn.textContent = 'Archive and start a new year';
-    if (!r.ok) return out.append(el('div', { class: 'err', style: 'margin-top:8px' }, /unknown action/i.test(r.error || '') ? 'Your Sheet’s script hasn’t picked up this feature yet. It updates itself within about 10 minutes; or in the Sheet use Practice > Check for updates now.' : String(r.error || 'Something went wrong.')));
+    if (!r.ok) return out.append(el('div', { class: 'err', style: 'margin-top:8px' }, /unknown action/i.test(r.error || '') ? 'Your Sheet’s script hasn’t picked up this feature yet. It updates itself within about 10 minutes, so try again then.' : String(r.error || 'Something went wrong.')));
     conf.value = '';
     const ok = el('div', { class: 'small', style: 'margin-top:8px;padding:8px 10px;border-radius:8px;background:#e6f4ea' }, `✅ Saved “${r.archive}” in your Google Drive and cleared ${r.results} result${r.results === 1 ? '' : 's'} from your Sheet. `);
     if (r.url) ok.append(el('a', { href: r.url, target: '_blank', rel: 'noopener' }, 'Open the archive'), '. ');
-    ok.append('Next: archive last year’s classes in Google Classroom. When your new classes are made, in the Sheet use Practice > Set up Classroom, type each class’s period, then Practice > Refresh roster from Classroom.');
+    ok.append('Next: archive last year’s classes in Google Classroom. When your new classes are made, come back to this page: match each class to its period at the top, then click Refresh roster from Classroom.');
     out.append(ok);
-    setTimeout(dashboard, 4000);
+    setTimeout(() => classesScreen(), 6000);
   };
   d.append(el('div', { style: 'margin-top:8px' },
     el('p', { class: 'small', style: 'margin-top:0' }, 'When the year is over: this saves a copy of your whole Sheet in your Google Drive, named for the school year (“… — 2025–26 archive”), then empties the Sheet for next year: scores, saved work, the roster, the period-to-Classroom links, posted assignments, and catch-up visits. Your lesson plans, saved assignments, and settings (like this password) are kept. Open the copy in Drive any time to look up last year’s scores.'),
@@ -37958,8 +38114,8 @@ function dashYearCard() {
   return d;
 }
 // 👥 Add a student to a period, or move one to another period (Classroom invite + the Roster tab on the Sheet)
-function dashRosterCard() {
-  const d = el('details', { class: 'card' }, el('summary', { style: 'cursor:pointer' }, el('strong', {}, '👥 Add or move a student')));
+function dashRosterCard(roster) {
+  const d = el('details', { class: 'card' }, el('summary', { style: 'cursor:pointer' }, el('strong', {}, '➕ Add or move a student')));
   if (DASH.rosOpen) d.open = true;
   const body = el('div', { style: 'margin-top:8px' }, el('p', { class: 'small' }, 'Loading your periods…'));
   d.append(body);
@@ -37971,7 +38127,7 @@ function dashRosterCard() {
     if (loaded) return; loaded = true;
     let g; try { g = await post({ action: 'rosterPeriods' }); } catch (e) { g = { ok: false, error: 'Couldn’t reach your script.' }; }
     body.innerHTML = '';
-    if (!g.ok) { loaded = false; body.append(el('p', { class: 'err' }, g.error && /action|unknown/i.test(g.error) ? 'Your Sheet’s script hasn’t picked up this feature yet. It updates itself within about 10 minutes; or in the Sheet use Practice > Check for updates now.' : String(g.error || 'Something went wrong.'))); return; }
+    if (!g.ok) { loaded = false; body.append(el('p', { class: 'err' }, g.error && /action|unknown/i.test(g.error) ? 'Your Sheet’s script hasn’t picked up this feature yet. It updates itself within about 10 minutes, so try again then.' : String(g.error || 'Something went wrong.'))); return; }
     const periods = g.periods.slice().sort((a, b) => (parseInt(a, 10) || 99) - (parseInt(b, 10) || 99));
     const popts = periods.map((p) => [p, perName(p)]);
     const msg = (box, ok, text) => { box.innerHTML = ''; box.append(el('div', { class: ok ? 'small' : 'err', style: ok ? 'margin-top:8px;padding:8px 10px;border-radius:8px;background:#e6f4ea' : 'margin-top:8px' }, text)); };
@@ -37987,10 +38143,10 @@ function dashRosterCard() {
       addBtn.disabled = false; addBtn.textContent = 'Add student';
       if (!r.ok) return msg(addOut, false, String(r.error || 'Something went wrong.'));
       msg(addOut, true, `✅ ${r.name} is on your roster in ${perName(r.period)} and can sign in to the practice site now. ${classroomLine(r)}`);
-      email.value = ''; DASH.data.roster.push({ period: r.period, full: r.name, aliases: '', group: '' });
+      email.value = ''; roster.push({ period: r.period, full: r.name, aliases: '', group: '' });
     };
     // move
-    const studs = DASH.data.roster.filter((s) => s.id).slice().sort((a, b) => (parseInt(a.period, 10) || 99) - (parseInt(b.period, 10) || 99) || lastFirst(a.full).localeCompare(lastFirst(b.full)));
+    const studs = roster.filter((s) => s.id).slice().sort((a, b) => (parseInt(a.period, 10) || 99) - (parseInt(b.period, 10) || 99) || lastFirst(a.full).localeCompare(lastFirst(b.full)));
     const pick = sel(studs.map((s, i) => [String(i), `${s.full} (${perName(s.period)})`]), 'Student…');
     const toP = sel(popts, 'New period…'), moveOut = el('div', {});
     const rm = el('input', { type: 'checkbox' });
@@ -38268,7 +38424,7 @@ function classroomAssignBox(getLink, getTitle, onPosted) {
     body.innerHTML = '';
     if (g.wrong) { dashPw.set(''); return load(); }
     if (!g.ok) { body.append(el('p', { class: 'small' }, g.error === 'unknown action' ? 'To assign from here, update the Apps Script in your Practice Results sheet to the new PracticeResults.gs (version 11), then Deploy > Manage deployments > Edit > New version > Deploy.' : g.setup ? 'Set DASHBOARD_PASSWORD in the Apps Script’s Script properties first.' : 'Problem: ' + (g.error || 'unknown'))); return; }
-    if (!g.periods.length) { body.append(el('p', { class: 'small' }, 'No periods yet. In your Practice Results sheet, run Practice > Set up Classroom and fill in the Period column on the Classroom tab.')); return; }
+    if (!g.periods.length) { body.append(el('p', { class: 'small' }, 'No periods yet. On the Classes & roster page, match your Classroom classes to periods.')); return; }
     loaded = true;
     const title = el('input', { type: 'text', value: getTitle(), style: 'font-size:15px' });
     title.addEventListener('input', () => (title.dataset.typed = '1'));
@@ -38289,7 +38445,7 @@ function classroomAssignBox(getLink, getTitle, onPosted) {
       studs.innerHTML = ''; studs.style.display = modeSel.value === 'all' ? 'none' : '';
       const ps = pds.filter((p) => p.c.checked).map((p) => p.x.p), list = g.roster.filter((r) => ps.includes(r.p));
       if (!ps.length) { studs.append(el('div', { class: 'small' }, 'Check a period to see its students.')); return; }
-      if (!g.roster.length) { studs.append(el('div', { class: 'small' }, 'No roster yet: in your Sheet, run Practice > Refresh roster from Classroom.')); return; }
+      if (!g.roster.length) { studs.append(el('div', { class: 'small' }, 'No roster yet: on the Classes & roster page, click Refresh roster from Classroom.')); return; }
       let last = null;
       list.forEach((r) => {
         if (r.p !== last) { studs.append(el('div', { style: 'font-weight:700;margin-top:6px' }, `${r.p} period`)); last = r.p; }
@@ -38397,6 +38553,7 @@ function teacherNav(active) {
     ['key', 'Look up an answer key', go(() => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); })],
     ['print', 'Print', go(() => printScreen())],
     ['lesson', 'Lesson plans', go(() => lessonScreen())],
+    ['classes', 'Classes & roster', go(() => classesScreen())],
     ['crossword', 'Crossword', () => { location.href = 'crossword.html?t=' + TEACHER_ID; }],
   ];
   nav.innerHTML = '';

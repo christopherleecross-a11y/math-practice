@@ -453,6 +453,7 @@ osmosis: Movement of water across a membrane"></textarea>
       <button type="button" role="tab" data-tab="make">Make a puzzle</button>
       <button type="button" role="tab" data-tab="mine">My assignments</button>
       <button type="button" role="tab" data-tab="results">Results</button>
+      <button type="button" role="tab" data-tab="roster">Roster</button>
       <button type="button" role="tab" data-tab="lists">Word lists</button>
     </nav>
     <div id="tpNote" class="tp-note" hidden></div>
@@ -520,6 +521,12 @@ osmosis: Movement of water across a membrane"></textarea>
       </div>
       <p id="rsSum" class="rs-sum"></p>
       <div class="tp-tablewrap"><table id="rsTable" class="tp-table"></table></div>
+    </section>
+
+    <section class="tp-panel" data-panel="roster" hidden>
+      <p>Students on this list pick or type their name to get a crossword. A ✓ in <b>Word bank</b> gives that student a word bank on every puzzle. Students who sign in with Google and are in your Classroom class are added by themselves. If the list is empty, any name is accepted.</p>
+      <div class="cp-row"><label>Period <select id="roPer"></select></label> <button class="btn" id="roAdd" type="button">+ Add a student</button> <button class="btn primary" id="roSave" type="button">Save roster</button> <span id="roMsg" class="muted"></span></div>
+      <div class="tp-tablewrap"><table id="roTable" class="tp-table"></table></div>
     </section>
 
     <section class="tp-panel" data-panel="lists" hidden>
@@ -2479,11 +2486,54 @@ function showTab(t) {
   if (t === 'make' && cpSel.dataset.for !== teacher.key) cpInit();
   if (t === 'mine') renderMine();
   if (t === 'results') loadResults(false);
+  if (t === 'roster') roLoad();
 }
+/* ---- Roster tab: edit the Sheet's Roster here (period, name, word bank) ---- */
+let RO = null;
+function roLoad() {
+  if (!sheetReady()) { $('#roTable').innerHTML = ''; $('#roMsg').textContent = TP.loading ? 'Loading…' : 'Your class Sheet isn’t connected.'; TP.loading && TP.loading.then(() => TP.tab === 'roster' && roLoad()); return; }
+  RO = (TP.data.roster || []).map(([p, n, wb]) => ({ p, n, wb: !!wb }));
+  $('#roMsg').textContent = '';
+  roDraw();
+}
+function roDraw() {
+  const ps = $('#roPer'), keep = ps.value;
+  const pers = [...new Set([...(TP.data.periods || []), ...RO.map(r => r.p)].filter(Boolean))].sort((a, b) => (parseFloat(nPer(a)) || 99) - (parseFloat(nPer(b)) || 99));
+  ps.innerHTML = ''; ps.add(new Option('All periods', ''));
+  pers.forEach(p => ps.add(new Option(perLabel(p) + ' (' + RO.filter(r => nPer(r.p) === nPer(p) && r.n).length + ')', p)));
+  if ([...ps.options].some(o => o.value === keep)) ps.value = keep;
+  const tbl = $('#roTable'); tbl.innerHTML = '<thead><tr><th>Period</th><th>Student name</th><th>Word bank</th><th></th></tr></thead>';
+  const tb = document.createElement('tbody');
+  RO.forEach((r, i) => {
+    if (ps.value && nPer(r.p) !== nPer(ps.value) && r.n) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td><input type="text" style="width:80px"></td><td><input type="text" style="width:100%;min-width:200px"></td><td style="text-align:center"><input type="checkbox"></td><td><button class="btn" type="button" title="Take off the roster">✕</button></td>';
+    const [pi, ni, wi] = tr.querySelectorAll('input');
+    pi.value = r.p; ni.value = r.n; wi.checked = r.wb;
+    pi.oninput = () => { r.p = pi.value; $('#roMsg').textContent = 'Not saved yet'; };
+    ni.oninput = () => { r.n = ni.value; $('#roMsg').textContent = 'Not saved yet'; };
+    wi.onchange = () => { r.wb = wi.checked; $('#roMsg').textContent = 'Not saved yet'; };
+    tr.querySelector('button').onclick = () => { RO.splice(i, 1); roDraw(); $('#roMsg').textContent = 'Not saved yet'; };
+    tb.appendChild(tr);
+  });
+  tbl.appendChild(tb);
+  if (!RO.length) $('#roMsg').textContent = 'The roster is empty, so any name is accepted.';
+}
+$('#roPer').addEventListener('change', roDraw);
+$('#roAdd').addEventListener('click', () => { RO.push({ p: $('#roPer').value || '', n: '', wb: false }); roDraw(); const ins = $('#roTable').querySelectorAll('tbody tr:last-child input'); if (ins[1]) ins[ins[0].value ? 1 : 0].focus(); });
+$('#roSave').addEventListener('click', async () => {
+  const rows = RO.filter(r => String(r.n).trim());
+  if (rows.some(r => !String(r.p).trim())) { $('#roMsg').textContent = 'Every student needs a period.'; return; }
+  const btn = $('#roSave'); btn.disabled = true; $('#roMsg').textContent = 'Saving…';
+  const r = await tApi('rosterSave', { rows: rows.map(x => [String(x.p).trim(), String(x.n).trim(), !!x.wb]) });
+  btn.disabled = false;
+  if (r.ok) { $('#roMsg').textContent = '✓ Saved'; roLoad(); $('#roMsg').textContent = '✓ Saved (' + RO.length + ' student' + (RO.length === 1 ? '' : 's') + ')'; }
+  else $('#roMsg').textContent = 'Not saved. ' + (r.error || '');
+});
 
 /* ---- the teacher's class Sheet ---- */
 const TP_NOTES = {
-  update: 'To see your assignments and results here, your class Sheet needs the newest Code.gs. In the Sheet: <b>Extensions › Apps Script</b>, paste the new Code.gs over the old one, click Save, then <b>Deploy › Manage deployments › ✏️ › Version: New version › Deploy</b>. Then reload the Sheet and choose <b>Crossword › Connect the teacher page…</b>',
+  update: 'Your class Sheet’s script hasn’t picked up this feature yet. It updates itself within about 10 minutes, so click <b>Refresh</b> then.',
   setup: 'One more step: open your class Sheet, reload it, and choose <b>Crossword › Connect the teacher page…</b> Type the same password you use here, then click <b>Refresh</b>.',
   badkey: 'Your class Sheet is connected with a different password. In the Sheet, choose <b>Crossword › Connect the teacher page…</b> and type the password you used here. Then click <b>Refresh</b>.',
   offline: 'Couldn’t reach your class Sheet. Check your internet connection, then click <b>Refresh</b>.',
@@ -2503,7 +2553,7 @@ async function tApi(op, extra) {
   if (r && r.ok) { TP.data = r; tpNote(''); }
   else if (r && r.needSetup) tpNote('setup');
   else if (r && r.badKey) tpNote('badkey');
-  else if (r && /Unknown action/i.test(r.error || '')) tpNote('update');
+  else if (r && /Unknown (teacher )?action/i.test(r.error || '')) tpNote('update');
   else tpNote((r && r.error) || 'Your class Sheet didn’t answer. Try again.');
   return r || { ok: false };
 }
@@ -2511,6 +2561,7 @@ async function loadOverview() {
   $('#mineMsg').textContent = 'Loading…';
   TP.loading = tApi('overview');
   const r = await TP.loading; TP.loading = null;
+  if (TP.tab === 'roster') roLoad();
   if (r.ok) for (const e of libLocal()) { const s = await tApi('save', { entry: e }); if (s.ok) libDelLocal(e.id); } // saved here while offline
   if (r.ok) { const mine = Object.assign({}, store.get(clueKey()) || {}); // the Sheet's clue edits win
     (TP.data.library || []).filter(isClueRow).forEach(e => { try { const o = dec(e.share); if (o && o.ce && teacher.answers[e.list]) mine[e.list] = o.ce; } catch {} });
@@ -2794,7 +2845,7 @@ async function classLoad() {
   body.innerHTML = '';
   if (g.wrong) { dashPwSet(''); return classLoad(); }
   if (!g.ok) { body.append(mk('p', { class: 'muted' }, g.error === 'unknown action' ? 'Update the Apps Script in your Practice Results sheet to the newest PracticeResults.gs (version 12), then Deploy > Manage deployments > Edit > New version > Deploy.' : 'Problem: ' + (g.error || 'unknown'))); return; }
-  if (!g.periods.length) { body.append(mk('p', { class: 'muted' }, 'No periods yet: in your Practice Results sheet, run Practice > Set up Classroom and fill in the Period column on the Classroom tab.')); return; }
+  if (!g.periods.length) { body.append(mk('p', { class: 'muted' }, 'No periods yet: on the practice site’s Classes & roster page, match your Classroom classes to periods.')); return; }
   classLoaded = true;
   const title = mk('input', { type: 'text', value: 'Crossword: ' + ($('#cpLabel').value.trim() || (TP.built && TP.built.list) || '') });
   title.addEventListener('input', () => (title.dataset.typed = '1'));
@@ -2893,7 +2944,7 @@ function renderMine() {
   }
   mine.forEach(e => box.appendChild(mineCard(e)));
   if (extras.length) {
-    const h = document.createElement('h3'); h.className = 'tp-h'; h.textContent = 'Turned on in your Sheet’s Assignments tab'; box.appendChild(h);
+    const h = document.createElement('h3'); h.className = 'tp-h'; h.textContent = 'Assigned by list name (not built here)'; box.appendChild(h);
     extras.forEach(e => box.appendChild(mineCard(e)));
   }
 }
@@ -2981,6 +3032,28 @@ function assignBox(card, e, whole) {
   });
   const note = document.createElement('span'); note.className = 'muted'; note.textContent = 'A period gets one crossword at a time; assigning this turns off its previous one.';
   row.append(go, off, note);
+  // or just some students (a make-up, or a different puzzle for a few): their periods' crosswords stay as they are
+  const some = document.createElement('details'); some.className = 'tp-more';
+  some.innerHTML = '<summary>Or assign to just some students</summary><div class="cp-row"><label>Period <select></select></label></div><div class="tp-pers"></div><div class="row left"><button class="btn" type="button">Assign to these students</button><span class="muted">Their period’s crossword stays on for everyone else.</span></div>';
+  const sp = some.querySelector('select'), sbox = some.querySelectorAll('.tp-pers')[0], sgo = some.querySelector('.row button');
+  (TP.data.periods || []).forEach(p => sp.add(new Option(perLabel(p), p)));
+  const fillStud = () => {
+    sbox.innerHTML = '';
+    const names = (TP.data.roster || []).filter(([p]) => nPer(p) === nPer(sp.value)).map(([, n]) => n).sort((a, b) => a.localeCompare(b));
+    if (!names.length) { sbox.innerHTML = '<span class="muted">No students on the roster for this period yet (see the Roster tab).</span>'; return; }
+    names.forEach(n => { const l = document.createElement('label'); l.innerHTML = '<input type="checkbox"> <span></span>'; l.firstChild.value = n; l.lastChild.textContent = n; sbox.appendChild(l); });
+  };
+  sp.addEventListener('change', fillStud); fillStud();
+  sgo.addEventListener('click', async () => {
+    const names = [...sbox.querySelectorAll('input:checked')].map(b => b.value);
+    if (!names.length) { toast('Tick the students to assign it to.'); return; }
+    sgo.disabled = true;
+    if (e.local) await saveEntry(e);
+    const r = await tApi('assignStudents', { share: e.share || '', list: e.list, diff: e.diff, label: e.label || e.list, students: names.map(n => ({ period: sp.value, name: n })) });
+    if (r.ok) toast('Assigned to ' + names.join(', ') + '.', 5000);
+    renderMine();
+  });
+  box.appendChild(some);
   card.appendChild(box);
 }
 async function openEntry(e) {
@@ -3051,7 +3124,7 @@ function fillResults() {
 }
 async function renderResults() {
   const sum = $('#rsSum'), tbl = $('#rsTable'), R = TP.res.results, pick = TP.rsPick, per = TP.rsPer;
-  tbl.innerHTML = ''; { const o = document.getElementById('rsSylo'); if (o) o.remove(); }
+  tbl.innerHTML = ''; { const o = document.getElementById('rsSylo'); if (o) o.remove(); } { const o = document.getElementById('rsMissed'); if (o) o.remove(); }
   // results columns: 0 Submitted, 1 Period, 2 Student, 3 Assignment, 4 Puzzle, 5 Score, 6 Grade, 7 Difficulty, 8 Puzzle code, 9 Time, 10 Left page, 11 Status, 12 Version, 13 Teacher mode used
   if (pick === 'all') {
     const rows = R.filter(r => !per || nPer(r[1]) === nPer(per)).slice(-300).reverse();
@@ -3104,6 +3177,16 @@ async function renderResults() {
   });
   tbl.appendChild(tb);
   sortableTable(tbl, 'one');
+  // the most-missed words on this crossword (every period; from the latest try of each student)
+  const miss = new Map();
+  (TP.res.missed || []).filter(w => codes.includes(String(w[1]))).forEach(w => { const k = String(w[2]); const o = miss.get(k) || { w: k, m: 0, n: 0 }; o.m += +w[3] || 0; o.n += +w[4] || 0; miss.set(k, o); });
+  if (miss.size) {
+    const top = [...miss.values()].sort((a, b) => b.m / b.n - a.m / a.n || b.m - a.m).slice(0, 10);
+    const mw = document.createElement('div'); mw.id = 'rsMissed'; mw.style.marginTop = '16px';
+    mw.innerHTML = '<h3 class="tp-h">Most-missed words</h3><div class="tp-tablewrap"><table class="tp-table"><thead><tr><th>Word</th><th>Missed</th><th>% missed</th></tr></thead><tbody>' +
+      top.map(o => `<tr><td>${hx(o.w)}</td><td class="num">${o.m} of ${o.n}</td><td class="num">${Math.round(o.m / o.n * 100)}%</td></tr>`).join('') + '</tbody></table></div>';
+    tbl.closest('.tp-tablewrap').after(mw);
+  }
   // putting the grades in Sylogist
   let sy = document.getElementById('rsSylo'); if (sy) sy.remove();
   if (window.SYLOGIST && list.length) {

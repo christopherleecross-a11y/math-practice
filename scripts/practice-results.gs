@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-21.2'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-21.3'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -142,6 +142,12 @@ function doPost(e) {
   if (d.action === 'override') { // the teacher marks a question right (or undoes it) on the Results dashboard
     let out;
     try { out = overrideQuestion_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'setup') { // the website's Classes & roster page (everything the Practice menu does, without opening the Sheet)
+    let out;
+    try { const bad = teacherAuth_(d); out = bad || setupOp_(d); }
+    catch (err) { out = { ok: false, error: String(err && err.message || err) }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'newYear') { // the dashboard's "End of the school year"
@@ -858,6 +864,81 @@ function rosterName_(d) {
   if (!d || !d.rid) return;
   const hit = rosterRows_().filter(function (r) { return r.id === String(d.rid) && (!d.period || r.period === String(d.period)); })[0];
   if (hit) { d.name = String(hit.full); d.rosterStudent = { id: hit.id, full: String(hit.full) }; }
+}
+
+/* ---------- Classes & roster page on the website ----------
+   op: classes | classesSave | refresh | roster | rosterEdit | unmatched | unmatchedPick | settings | password | aiKey */
+function setupOp_(d) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet(), props = PropertiesService.getScriptProperties(), op = String(d.op || '');
+  const rosterList = function () { return rosterRows_().map(function (r) { return { id: r.id, period: r.period, full: String(r.full), aliases: r.aliases, group: r.group }; }); };
+  if (op === 'classes') { // the teacher's active Classroom classes, with the period each is matched to
+    const saved = {}, sh = ss.getSheetByName(CLASSROOM_TAB);
+    if (sh) sh.getDataRange().getValues().slice(1).forEach(function (r) { if (r[2]) saved[String(r[2])] = String(r[0] || '').trim(); });
+    const list = listCourses_().map(function (c) {
+      const id = String(c.id), has = Object.prototype.hasOwnProperty.call(saved, id);
+      return { id: id, name: c.name + (c.section ? ' — ' + c.section : ''), period: has ? saved[id] : guessPeriod_([c.name, c.section || ''].join(' ')), saved: has };
+    });
+    return { ok: true, classes: list, linked: Object.keys(saved).length };
+  }
+  if (op === 'classesSave') {
+    const rows = (Array.isArray(d.classes) ? d.classes : []).slice(0, 60).map(function (c) { return [String(c.period || '').trim().slice(0, 20), String(c.name || '').slice(0, 200), String(c.id || '')]; }).filter(function (r) { return r[2]; });
+    let sh = ss.getSheetByName(CLASSROOM_TAB); if (!sh) sh = ss.insertSheet(CLASSROOM_TAB);
+    sh.clear();
+    sh.getRange(1, 1, 1, 3).setValues([['Period (as students choose it)', 'Classroom class', 'Course ID']]).setFontWeight('bold');
+    if (rows.length) sh.getRange(2, 1, rows.length, 3).setValues(rows);
+    sh.setColumnWidth(1, 210); sh.setColumnWidth(2, 320); sh.setColumnWidth(3, 160); sh.setFrozenRows(1);
+    CacheService.getScriptCache().remove('rosterPub');
+    return { ok: true, linked: rows.filter(function (r) { return r[0]; }).length };
+  }
+  if (op === 'refresh') {
+    if (!Object.keys(periodCourses_()).length) return { ok: false, error: 'First match your Classroom classes to periods (above), then refresh the roster.' };
+    refreshRoster();
+    return { ok: true, roster: rosterList() };
+  }
+  if (op === 'roster') return { ok: true, roster: rosterList() };
+  if (op === 'rosterEdit') {
+    const sh = ss.getSheetByName(ROSTER_TAB); if (!sh) return { ok: false, error: 'No roster yet. Refresh the roster from Classroom first.' };
+    const r = rosterRows_().filter(function (x) { return x.id === String(d.id) && x.period === String(d.period); })[0];
+    if (!r) return { ok: false, error: 'That student isn’t on the roster anymore. Reload the page.' };
+    const H = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    const g = H.findIndex(function (h) { return /^Group/.test(h); });
+    const clean = function (v) { return String(v == null ? '' : v).replace(/[\r\n]+/g, ' ').trim().slice(0, 200); };
+    if (d.aliases != null && r.aliasCol > 0) sh.getRange(r.row, r.aliasCol).setValue(clean(d.aliases));
+    if (d.group != null && g >= 0) sh.getRange(r.row, g + 1).setValue(clean(d.group));
+    CacheService.getScriptCache().remove('rosterPub');
+    return { ok: true };
+  }
+  if (op === 'unmatched' || op === 'unmatchedPick') {
+    const sh = ss.getSheetByName(UNMATCHED_TAB);
+    if (op === 'unmatchedPick') {
+      if (!sh) return { ok: false, error: 'Nothing to match.' };
+      const row = Number(d.row);
+      if (!(row >= 2 && row <= sh.getLastRow())) return { ok: false, error: 'That name has changed. Reload the page.' };
+      sh.getRange(row, 6).setValue(String(d.name || '').slice(0, 200));
+      applyPickedNames();
+    }
+    const out = [];
+    if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach(function (r, i) {
+      if (/^(posted|kept best)/.test(String(r[6]))) return;
+      out.push({ row: i + 2, when: r[0] instanceof Date ? r[0].getTime() : 0, period: String(r[1]), typed: String(r[2]), title: String(r[3]), percent: r[4], picked: String(r[5] || ''), status: String(r[6] || '') });
+    });
+    return { ok: true, unmatched: out, roster: rosterList() };
+  }
+  if (op === 'settings') return { ok: true, aiKey: !!props.getProperty('ANTHROPIC_API_KEY'), build: SCRIPT_BUILD };
+  if (op === 'password') {
+    const np = String(d.newPassword || '');
+    if (np.length < 6) return { ok: false, error: 'Use at least 6 characters.' };
+    props.setProperty('DASHBOARD_PASSWORD', np);
+    return { ok: true };
+  }
+  if (op === 'aiKey') {
+    const k = String(d.key || '').trim();
+    if (d.remove) props.deleteProperty('ANTHROPIC_API_KEY');
+    else if (!/^sk-ant-[\w-]{20,}$/.test(k)) return { ok: false, error: 'That doesn’t look like an Anthropic API key (it starts with sk-ant-).' };
+    else props.setProperty('ANTHROPIC_API_KEY', k);
+    return { ok: true, aiKey: !d.remove };
+  }
+  return { ok: false, error: 'unknown action' };
 }
 
 /* ---------- End of the school year (from the Results dashboard) ----------

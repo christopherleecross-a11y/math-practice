@@ -41,7 +41,7 @@
  * Privacy: students only ever receive the list of period names and their own puzzle.
  * The roster, assignments and results are never sent to a student's browser.
  */
-var SCRIPT_BUILD = '2026-11-21.2'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-21.3'; // which copy this is (Check for updates now shows it)
 
 
 var TABS = {
@@ -180,6 +180,14 @@ function teacherPost_(d) {
     ash.getRange(x[0], 5).insertCheckboxes().setValue(x[1][4] === true);
   });
   (w.assignActive || []).forEach(function (x) { ash.getRange(x[0], 5).setValue(x[1]); });
+  if (w.roster) {
+    var rsh = sheet_('roster'), last = Math.max(rsh.getLastRow(), 2);
+    rsh.getRange(2, 1, last - 1, 3).clearContent();
+    if (db.roster.length) {
+      rsh.getRange(2, 1, db.roster.length, 2).setValues(db.roster.map(function (r) { return [r[0], r[1]]; }));
+      rsh.getRange(2, 3, db.roster.length, 1).insertCheckboxes().setValues(db.roster.map(function (r) { return [r[2] === true]; }));
+    }
+  }
   if (w.library) {
     var lsh = sheet_('library'), n = TABS.library.headers.length;
     if (lsh.getLastRow() > 1) lsh.getRange(2, 1, lsh.getLastRow() - 1, n).clearContent();
@@ -190,7 +198,7 @@ function teacherPost_(d) {
 
 // pure: works on the tabs' rows (db.roster, db.assign, db.library, db.results, db.progress) and says what to write back
 function teacherRun(d, db, now) {
-  var writes = { assignRows: [], assignActive: [], library: false };
+  var writes = { assignRows: [], assignActive: [], library: false, roster: false };
   var DIFF_LABEL = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
   var str = function (v) { return v instanceof Date ? v.toISOString() : String(v == null ? '' : v); };
   var codeOf = function (r) { var p = parsePuzzleCell(r[2]); return p && p.code ? p.code : ''; };
@@ -205,7 +213,7 @@ function teacherRun(d, db, now) {
     return {
       ok: true,
       periods: periodsFrom(db.roster, db.assign),
-      roster: db.roster.filter(function (r) { return String(r[1]).trim(); }).map(function (r) { return [String(r[0]).trim(), String(r[1]).trim()]; }),
+      roster: db.roster.filter(function (r) { return String(r[1]).trim(); }).map(function (r) { return [String(r[0]).trim(), String(r[1]).trim(), isActive(r[2])]; }),
       assign: db.assign.map(function (r, i) {
         var p = parsePuzzleCell(r[2]); if (!p) return null;
         return { row: i + 2, period: String(r[0]).trim(), student: String(r[1]).trim(), code: p.code || '', list: p.list || '',
@@ -225,6 +233,7 @@ function teacherRun(d, db, now) {
              'Left page (times)', 'Status', 'Version', 'Teacher mode used'].map(rc_);
     var out = overview();
     out.results = db.results.slice(-3000).map(function (r) { return C.map(function (c) { return str(r[c]); }); });
+    try { out.missed = summaryData(db.results).wordRows; } catch (e) { out.missed = []; }
     out.progress = db.progress.map(function (r) { return [str(r[1]), str(r[2]), str(r[3]), r[9] === true || /^(true|yes)$/i.test(String(r[9])), str(r[11]), str(r[0])]; });
     return { out: out, writes: writes };
   }
@@ -265,6 +274,36 @@ function teacherRun(d, db, now) {
       if (empty < 0) { empty = db.assign.length; db.assign.push(row); } else db.assign[empty] = row;
       writes.assignRows.push([empty + 2, row]);
     });
+    return { out: overview(), writes: writes };
+  }
+  if (op === 'assignStudents') { // just some students: one row each (a student row doesn't turn off the period's crossword)
+    var code2 = String(d.share || '').replace(/[^\w-]/g, ''), list2 = String(d.list || '').trim();
+    var cell2 = code2 ? String(d.site || '').replace(/[#?].*$/, '').slice(0, 300) + '#p=' + code2 : list2;
+    if (!cell2) return { out: { ok: false, error: 'Nothing to assign.' }, writes: writes };
+    (Array.isArray(d.students) ? d.students : []).slice(0, 200).forEach(function (st) {
+      var period = String(st && st.period || '').trim(), name = safeCell(st && st.name, 60);
+      if (!period || !name) return;
+      var found = -1;
+      db.assign.forEach(function (r, i) {
+        if (normName(r[1]) !== normName(name) || normPeriod(r[0]) !== normPeriod(period)) return;
+        var p = parsePuzzleCell(r[2]); if (!p) return;
+        if (code2 ? p.code === code2 : (p.list || '').toLowerCase() === list2.toLowerCase() && normDiff(r[3]) === normDiff(d.diff)) found = i;
+      });
+      if (found >= 0) { if (!isActive(db.assign[found][4])) setActive(found, true); return; }
+      var row = [period, name, cell2, DIFF_LABEL[normDiff(d.diff)], true, safeCell(d.label, 80)];
+      var empty = -1;
+      for (var i = 0; i < db.assign.length; i++) { var r = db.assign[i]; if (!String(r[0]).trim() && !String(r[1]).trim() && !String(r[2]).trim()) { empty = i; break; } }
+      if (empty < 0) { empty = db.assign.length; db.assign.push(row); } else db.assign[empty] = row;
+      writes.assignRows.push([empty + 2, row]);
+    });
+    return { out: overview(), writes: writes };
+  }
+  if (op === 'rosterSave') { // the whole Roster tab from the teacher page: [period, name, word bank]
+    var seen = {};
+    db.roster = (Array.isArray(d.rows) ? d.rows : []).slice(0, 600).map(function (r) {
+      return [safeCell(String(r && r[0] || '').trim(), 20), safeCell(String(r && r[1] || '').trim(), 60), !!(r && r[2])];
+    }).filter(function (r) { var k = normPeriod(r[0]) + '|' + normName(r[1]); if (!r[0] || !r[1] || seen[k]) return false; seen[k] = 1; return true; });
+    writes.roster = true;
     return { out: overview(), writes: writes };
   }
   if (op === 'active') {
