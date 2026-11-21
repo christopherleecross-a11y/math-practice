@@ -31,4 +31,4 @@ missing=[k for k,v in stems.items() if v not in out]
 print('walkthroughs:',len(out),'of',len(allstems),'examples', '| errors:',len(errs))
 for e in errs[:20]: print(' ',e)
 if '-v' in sys.argv:
-    chs=sorted({int(k.split('-')[1]) for k,_ in missing}); print('chapters still missing:',chs)
+    print('still missing:', sorted({k for k,_ in missing}))
