@@ -41,7 +41,7 @@
  * Privacy: students only ever receive the list of period names and their own puzzle.
  * The roster, assignments and results are never sent to a student's browser.
  */
-var SCRIPT_BUILD = '2026-11-21.1'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-21.2'; // which copy this is (Check for updates now shows it)
 
 
 var TABS = {
@@ -139,6 +139,7 @@ function doPost(e) {
 // The crossword's teacher page sends a key made from the teacher password. The Sheet keeps only that key
 // (Crossword menu > Connect the teacher page), never the password. Students never have it.
 function onOpen() {
+  if (SpreadsheetApp.getActive().getSheetByName(ARCHIVE_TAB)) { SpreadsheetApp.getUi().createMenu('Crossword').addItem('Check for updates now', 'checkForUpdatesNow').addToUi(); return; }
   SpreadsheetApp.getUi().createMenu('Crossword')
     .addItem('Connect the teacher page…', 'connectTeacherPage')
     .addItem('Redraw the Summary tab', 'refreshSummary')
@@ -164,6 +165,7 @@ function teacherPost_(d) {
   var cache = CacheService.getScriptCache(), fails = Number(cache.get('tfail') || 0);
   if (fails >= 20) return { ok: false, error: 'Too many wrong tries. Wait 10 minutes and try again.' };
   if (String(d.key || '') !== want) { cache.put('tfail', String(fails + 1), 600); return { ok: false, badKey: true }; }
+  if (d.op === 'newYear') return newSchoolYear_(d);
   // the teacher page says where this teacher's Practice Results sheet is (used to check Google sign-in passes)
   var pr = String(d.results || '');
   if (/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(pr) && PropertiesService.getScriptProperties().getProperty('PRACTICE_URL') !== pr)
@@ -311,6 +313,36 @@ function updateSummary_() {
   if (s.wordRows.length) sh.getRange(r + 1, 1, s.wordRows.length, s.wordHeaders.length).setValues(s.wordRows);
   [220, 220, 95, 80, 110, 110, 150, 100, 420].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
   sh.setFrozenRows(0);
+}
+
+/* End of the school year (crossword teacher page › My assignments › End of the school year):
+   saves a copy of this whole Sheet named for the school year, then empties the student data for next year
+   (Results, Progress, Roster, Assignments, Summary). The Puzzles tab (your saved puzzles) and settings are kept. */
+var ARCHIVE_TAB = 'About this archive';
+function schoolYearLabel_(now) { var y = now.getFullYear(), a = now.getMonth() < 7 ? y - 1 : y; return a + '–' + String(a + 1).slice(2); }
+function newSchoolYear_(d) {
+  var ss = SpreadsheetApp.getActive();
+  if (ss.getSheetByName(ARCHIVE_TAB)) return { ok: false, error: 'This Sheet is an archive copy, so it can’t start a new year.' };
+  if (String(d.confirm || '') !== 'NEW YEAR') return { ok: false, error: 'Type NEW YEAR to confirm.' };
+  var label = String(d.label || '').trim() || schoolYearLabel_(new Date());
+  var name = ss.getName() + ' — ' + label + ' archive', copy = ss.copy(name), url = '';
+  try {
+    var note = copy.insertSheet(ARCHIVE_TAB, 0);
+    note.getRange(1, 1, 3, 1).setValues([['Archive: ' + label + ' school year'], ['Saved ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMMM d, yyyy') + ' from “' + ss.getName() + '”.'],
+      ['This copy is for looking things up. The crossword site doesn’t use it: new results go to the original Sheet.']]);
+    note.getRange(1, 1).setFontWeight('bold').setFontSize(14); note.setColumnWidth(1, 720);
+    url = copy.getUrl();
+  } catch (e) {}
+  var n = 0;
+  ['results', 'progress', 'roster', 'assign'].forEach(function (k) {
+    var sh = sheet_(k); if (!sh || sh.getLastRow() < 2) return;
+    var body = sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(1, sh.getLastColumn()));
+    if (k === 'results') n = sh.getLastRow() - 1;
+    body.clearContent(); // keeps the checkboxes
+    body.setFontColor(null);
+  });
+  try { updateSummary_(); } catch (e) {}
+  return { ok: true, archive: name, url: url, results: n };
 }
 
 function ensureTabs_() {

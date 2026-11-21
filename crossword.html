@@ -503,6 +503,13 @@ osmosis: Movement of water across a membrane"></textarea>
     <section class="tp-panel" data-panel="mine" hidden>
       <div class="row left tp-bar"><button class="btn" id="mineRefresh" type="button">Refresh</button><span id="mineMsg" class="muted"></span></div>
       <div id="mineList"></div>
+      <details class="tp-more" id="nyBox" style="margin-top:24px"><summary>🗓 End of the school year</summary>
+        <p>When the year is over, this saves a copy of your whole class Sheet in your Google Drive, named for the school year (like “… — 2025–26 archive”), then empties the Sheet for next year: results, the roster, and period assignments. Your saved puzzles and word-list clue edits are kept. Open the copy in Drive any time to look up last year's scores.</p>
+        <div class="cp-row"><label>School year <input type="text" id="nyLabel" maxlength="20" style="width:110px"></label>
+          <label>Type <b>NEW YEAR</b> to confirm <input type="text" id="nyConfirm" maxlength="20" style="width:130px" autocomplete="off"></label>
+          <button class="btn" id="nyGo" type="button">Archive and start a new year</button></div>
+        <p id="nyMsg" class="muted"></p>
+      </details>
     </section>
 
     <section class="tp-panel" data-panel="results" hidden>
@@ -2514,6 +2521,19 @@ async function loadOverview() {
   return r;
 }
 $('#mineRefresh').addEventListener('click', async () => { await loadOverview(); renderMine(); });
+{ const d = new Date(), y = d.getMonth() < 7 ? d.getFullYear() - 1 : d.getFullYear(); $('#nyLabel').value = `${y}–${String(y + 1).slice(2)}`; }
+$('#nyGo').addEventListener('click', async () => {
+  const msg = $('#nyMsg'), btn = $('#nyGo'), o = teacher.owner;
+  if ($('#nyConfirm').value.trim().toUpperCase() !== 'NEW YEAR') { msg.textContent = 'Type NEW YEAR in the box to confirm.'; return; }
+  if (!o || !hasSheet(o)) { msg.textContent = 'You don’t have a class Sheet connected.'; return; }
+  btn.disabled = true; msg.textContent = 'Saving the archive copy and clearing the Sheet… (this can take a minute)';
+  let r; try { r = await sheetPost(o.sheet, { action: 'teacher', op: 'newYear', key: teacher.key, site: siteURL(), results: o.results || '', confirm: 'NEW YEAR', label: $('#nyLabel').value.trim() }); } catch { r = { ok: false, error: 'Couldn’t reach your class Sheet.' }; }
+  btn.disabled = false;
+  if (!r || !r.ok) { msg.textContent = r && r.badKey ? 'Your class Sheet is connected with a different password.' : (r && /Unknown action/i.test(r.error || '')) || (r && r.ok === undefined) ? 'Your Sheet’s script hasn’t picked this up yet. Try again in 10 minutes.' : String((r && r.error) || 'Something went wrong.'); return; }
+  $('#nyConfirm').value = '';
+  msg.innerHTML = `✅ Saved <b>${hx(r.archive)}</b> in your Google Drive${r.url ? ` (<a href="${hx(r.url)}" target="_blank" rel="noopener">open it</a>)` : ''} and cleared ${r.results} result${r.results === 1 ? '' : 's'} from your class Sheet. The Roster tab is empty now, so student names aren't checked until you add next year's students to it.`;
+  await loadOverview(); renderMine();
+});
 
 /* ---- saved puzzles: in the Sheet's Puzzles tab, or on this computer when the Sheet can't be reached ---- */
 const libKey = () => 'crossword-lib-' + (teacher.owner ? teacher.owner.name : 'me');

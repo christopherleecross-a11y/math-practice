@@ -37923,6 +37923,39 @@ function dashOverview(titles) {
   } else app.append(el('p', { class: 'small', style: 'margin:0 4px 16px' }, 'Tip: pick a period above to print progress reports for the whole class, or click a student for one report.'));
   const vis = dashVisits(); if (vis) app.append(vis);
   app.append(dashRosterCard());
+  app.append(dashYearCard());
+}
+// 🗓 End of the school year: archive copy of the Sheet, then clear the student data for next year
+function dashYearCard() {
+  const d = el('details', { class: 'card' }, el('summary', { style: 'cursor:pointer' }, el('strong', {}, '🗓 End of the school year')));
+  const now = new Date(), y = now.getMonth() < 7 ? now.getFullYear() - 1 : now.getFullYear();
+  const label = el('input', { type: 'text', value: `${y}–${String(y + 1).slice(2)}`, style: 'width:120px' });
+  const conf = el('input', { type: 'text', autocomplete: 'off', placeholder: 'NEW YEAR', style: 'width:150px' });
+  const out = el('div', {});
+  const btn = el('button', { class: 'btn', type: 'button', style: 'margin-top:0' }, 'Archive and start a new year');
+  btn.onclick = async () => {
+    out.innerHTML = '';
+    if (conf.value.trim().toUpperCase() !== 'NEW YEAR') return out.append(el('div', { class: 'err', style: 'margin-top:8px' }, 'Type NEW YEAR in the box to confirm.'));
+    btn.disabled = true; btn.textContent = 'Working… (this can take a minute)';
+    let r; try { const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'newYear', password: dashPw.get(), confirm: 'NEW YEAR', label: label.value.trim() }) }); r = await res.json(); }
+    catch (e) { r = { ok: false, error: 'Couldn’t reach your script.' }; }
+    btn.disabled = false; btn.textContent = 'Archive and start a new year';
+    if (!r.ok) return out.append(el('div', { class: 'err', style: 'margin-top:8px' }, /unknown action/i.test(r.error || '') ? 'Your Sheet’s script hasn’t picked up this feature yet. It updates itself within about 10 minutes; or in the Sheet use Practice > Check for updates now.' : String(r.error || 'Something went wrong.')));
+    conf.value = '';
+    const ok = el('div', { class: 'small', style: 'margin-top:8px;padding:8px 10px;border-radius:8px;background:#e6f4ea' }, `✅ Saved “${r.archive}” in your Google Drive and cleared ${r.results} result${r.results === 1 ? '' : 's'} from your Sheet. `);
+    if (r.url) ok.append(el('a', { href: r.url, target: '_blank', rel: 'noopener' }, 'Open the archive'), '. ');
+    ok.append('Next: archive last year’s classes in Google Classroom. When your new classes are made, in the Sheet use Practice > Set up Classroom, type each class’s period, then Practice > Refresh roster from Classroom.');
+    out.append(ok);
+    setTimeout(dashboard, 4000);
+  };
+  d.append(el('div', { style: 'margin-top:8px' },
+    el('p', { class: 'small', style: 'margin-top:0' }, 'When the year is over: this saves a copy of your whole Sheet in your Google Drive, named for the school year (“… — 2025–26 archive”), then empties the Sheet for next year: scores, saved work, the roster, the period-to-Classroom links, posted assignments, and catch-up visits. Your lesson plans, saved assignments, and settings (like this password) are kept. Open the copy in Drive any time to look up last year’s scores.'),
+    el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:end' },
+      el('label', { style: 'display:flex;flex-direction:column;gap:4px;font-weight:400' }, 'School year', label),
+      el('label', { style: 'display:flex;flex-direction:column;gap:4px;font-weight:400' }, el('span', {}, 'Type ', el('b', {}, 'NEW YEAR'), ' to confirm'), conf),
+      btn),
+    out));
+  return d;
 }
 // 👥 Add a student to a period, or move one to another period (Classroom invite + the Roster tab on the Sheet)
 function dashRosterCard() {

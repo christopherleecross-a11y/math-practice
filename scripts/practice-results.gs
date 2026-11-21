@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-21.1'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-21.2'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -142,6 +142,12 @@ function doPost(e) {
   if (d.action === 'override') { // the teacher marks a question right (or undoes it) on the Results dashboard
     let out;
     try { out = overrideQuestion_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'newYear') { // the dashboard's "End of the school year"
+    let out;
+    try { const bad = teacherAuth_(d); out = bad || newSchoolYear_(d); }
+    catch (err) { out = { ok: false, error: String(err && err.message || err) }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'rosterAdd' || d.action === 'rosterMove' || d.action === 'rosterPeriods') { // the dashboard's "Add or move a student"
@@ -440,6 +446,9 @@ function testProofGrader() {
 
 /* ---------- Google Classroom ---------- */
 function onOpen() {
+  if (SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ARCHIVE_TAB)) { // an end-of-year archive copy: look-up only
+    SpreadsheetApp.getUi().createMenu('Practice').addItem('Check for updates now', 'checkForUpdatesNow').addToUi(); return;
+  }
   SpreadsheetApp.getUi().createMenu('Practice')
     .addItem('Post an assignment to Classroom', 'postAssignmentToClassroom')
     .addItem('Refresh roster from Classroom', 'refreshRoster')
@@ -849,6 +858,55 @@ function rosterName_(d) {
   if (!d || !d.rid) return;
   const hit = rosterRows_().filter(function (r) { return r.id === String(d.rid) && (!d.period || r.period === String(d.period)); })[0];
   if (hit) { d.name = String(hit.full); d.rosterStudent = { id: hit.id, full: String(hit.full) }; }
+}
+
+/* ---------- End of the school year (from the Results dashboard) ----------
+   Saves a copy of this whole Sheet (named for the school year) in the teacher's Google Drive, then empties this Sheet's
+   student data for next year: results, saved work, the roster, the period ↔ Classroom class links, posted assignments,
+   catch-up visits and unmatched names. Kept: lesson plans, saved assignments (the builder's list), settings and passwords.
+   The copy is the archive: open it in Drive any time to look up last year's scores. */
+const ARCHIVE_TAB = 'About this archive';
+function schoolYearLabel_(now) { // May 2026 → 2025–26; September 2026 → 2026–27
+  const y = now.getFullYear(), a = now.getMonth() < 7 ? y - 1 : y;
+  return a + '–' + String(a + 1).slice(2);
+}
+function newSchoolYear_(d) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss.getSheetByName(ARCHIVE_TAB)) return { ok: false, error: 'This Sheet is an archive copy, so it can’t start a new year.' };
+  const label = String(d.label || '').trim() || schoolYearLabel_(new Date());
+  if (String(d.confirm || '') !== 'NEW YEAR') return { ok: false, error: 'Type NEW YEAR to confirm.' };
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    // 1. the archive copy, with a note on its first tab
+    const name = ss.getName() + ' — ' + label + ' archive';
+    const copy = ss.copy(name);
+    try {
+      const note = copy.insertSheet(ARCHIVE_TAB, 0);
+      note.getRange(1, 1, 4, 1).setValues([['Archive: ' + label + ' school year'], ['Saved ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMMM d, yyyy') + ' from “' + ss.getName() + '”.'],
+        ['This copy is for looking things up. The practice site doesn’t use it: new results go to the original Sheet.'], ['Results are on the subject tabs (Results, Geometry, …). Hidden tabs (Progress, Assignments, Lesson Plans) are under View › Hidden sheets.']]);
+      note.getRange(1, 1).setFontWeight('bold').setFontSize(14); note.setColumnWidth(1, 720);
+    } catch (e) {}
+    let url = ''; try { url = copy.getUrl(); } catch (e) {}
+    // 2. empty this year's student data (keeping each tab's header row)
+    const clearBody = function (sh) { if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(1, sh.getLastColumn())).clear(); };
+    let cleared = 0;
+    ss.getSheets().forEach(function (sh) {
+      if (sh.getLastRow() < 2 || sh.getLastColumn() < 12) return;
+      const head = sh.getRange(1, 1, 1, 12).getValues()[0];
+      if (head[0] === 'Timestamp' && head[11] === 'Set key') { cleared += sh.getLastRow() - 1; clearBody(sh); }
+    });
+    ['Progress', POSTED_TAB, MOVED_TAB, UNMATCHED_TAB, VISIT_TAB].forEach(function (n) { clearBody(ss.getSheetByName(n)); });
+    // the Assignments tab keeps the builder's saved assignments, minus an unfinished draft
+    const a = ss.getSheetByName('Assignments');
+    if (a && a.getLastRow() > 1) { const v = a.getRange(2, 1, a.getLastRow() - 1, 1).getValues(); for (let i = v.length - 1; i >= 0; i--) if (String(v[i][0]) === '_draft') a.getRange(i + 2, 1, 1, a.getLastColumn()).clearContent(); }
+    // the roster and the period ↔ class links are rebuilt for the new classes
+    [ROSTER_TAB, CLASSROOM_TAB].forEach(function (n) { const sh = ss.getSheetByName(n); if (sh) { if (ss.getSheets().length > 1) ss.deleteSheet(sh); else sh.clear(); } });
+    // 3. forget last year's students' saved emails and IDs, and anything cached
+    const props = PropertiesService.getScriptProperties();
+    Object.keys(props.getProperties()).forEach(function (k) { if (/^(email|uid):/.test(k)) props.deleteProperty(k); });
+    const cache = CacheService.getScriptCache(); cache.remove('rosterPub');
+    return { ok: true, archive: name, url: url, results: cleared };
+  } finally { lock.releaseLock(); }
 }
 
 /* ---------- Add or move a student from the Results dashboard ----------
