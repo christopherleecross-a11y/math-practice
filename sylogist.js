@@ -55,7 +55,13 @@
       const filled = [], noScore = [];
       rows.forEach((tr, i) => {
         const nm = names[i]; if (!nm) return;
-        const p = parts(nm), hit = list.find((r) => !r.used && same(p, r.p));
+        const p = parts(nm);
+        let hit = list.find((r) => !r.used && same(p, r.p));
+        if (!hit) { // a shortened name like "Betty S": same first name, and the last name starts with what was typed (only if just one fits)
+          const fa = (p.first.split(' ')[0] || '');
+          const c = list.filter((r) => !r.used && r.p.last && p.last.startsWith(r.p.last) && (r.p.first.split(' ')[0] || '') === fa);
+          if (c.length === 1 && !rows.some((t2, j) => j !== i && names[j] && parts(names[j]).last.startsWith(c[0].p.last) && (parts(names[j]).first.split(' ')[0] || '') === fa)) hit = c[0];
+        }
         if (!hit || hit.score === '' || hit.score == null) { noScore.push(nm); return; }
         hit.used = true;
         const input = boxesIn(tr)[col], v = String(hit.score);
@@ -94,7 +100,7 @@
         <li>One time: drag this button to your Chrome bookmarks bar → <a class="sylo-bm" style="display:inline-block;padding:4px 12px;border-radius:8px;background:#692b31;color:#fff;text-decoration:none;font-weight:700;cursor:grab" title="Drag me to the bookmarks bar" onclick="alert('Drag this button to your bookmarks bar. Then use it on the Sylogist gradebook page.');return false">Fill Sylogist</a>
           <span style="opacity:.75">(If the bookmarks bar is hidden: View → Always Show Bookmarks Bar.)</span></li>
         <li>Pick the assignment (and period) here and click <strong>📋 Copy for Sylogist</strong>.</li>
-        <li>In Sylogist, open that period's gradebook. Click the score box for any student in the assignment's column.</li>
+        <li>Switch to your Sylogist tab and open that period’s gradebook. Click the white score box in the assignment’s column for any student (for example, the box where you’d type Sarah Barton’s score). The bookmark only works on the Sylogist page, not here.</li>
         <li>Click <strong>Fill Sylogist</strong> on your bookmarks bar. If Chrome asks to see what you copied, click Allow.</li>
         <li>The filled scores are outlined in green, and a message lists anyone it skipped. Look them over, then save in Sylogist as usual.</li>
       </ol></details>`;
