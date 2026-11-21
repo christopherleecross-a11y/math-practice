@@ -23063,7 +23063,7 @@ TEMPLATES.b81Sigma = (r) => {
   const W = G.k === Infinity ? [b8sig('i', 1, 4, G.body), b8sig('i', 0, Infinity, G.body)] : [b8sig('i', 1, G.k + 1, G.body), b8sig('i', 0, G.k, G.body), b8sig('i', 1, Infinity, G.body)];
   return { topic: 'Summation notation', stem: `Write the series using summation notation.   ${seriesT}`, ...buildChoices(r, c, W.filter((w) => w !== c), () => null),
     fr: { frStem: 'Enter the lower limit of the index, the upper limit, and the expression for the ith term.', fields: [{ kind: 'expr', keys: 'sig', label: 'Lower limit:  i =' }, { kind: 'expr', keys: 'sig', label: 'Upper limit:' }, { kind: 'expr', keys: 'sig', label: 'ith term:' }], key: ['1', hiT, G.L], display: c, check },
-    solution: `${G.alt ? 'The signs alternate, so use a power of −1 (or of a negative base). ' : ''}The ith term is ${G.body.replace(/^\((.*)\)$/, '$1')}, starting with i = 1${G.k === Infinity ? ' and continuing without end' : ` and ending with i = ${G.k}`}.\n${c}` };
+    solution: `${G.alt ? 'The signs alternate, so use a power of −1 (or of a negative base). ' : ''}The ith term is ${((t) => { if (!/^\(.*\)$/.test(t)) return t; let d = 0; for (let i = 0; i < t.length; i++) { if (t[i] === '(') d++; else if (t[i] === ')') { d--; if (!d && i < t.length - 1) return t; } } return t.slice(1, -1); })(G.body)}, starting with i = 1${G.k === Infinity ? ' and continuing without end' : ` and ending with i = ${G.k}`}.\n${c}` };
 };
 TEMPLATES.b81Sum = (r) => {
   const G = pick(r, [
@@ -23091,7 +23091,7 @@ TEMPLATES.b81Word = (r) => {
       solution: `1 table: ${f(1)}, 2 tables: ${f(2)}, 3 tables: ${f(3)}, … Each table adds ${2 * per} seats along the sides, and there are always 2 seats at the ends.\naₙ = ${2 * per}n + 2, so a${b8sub(k)} = ${2 * per}(${k}) + 2 = ${f(k)}.` }); }
   if (kind === 'salary') { const s = pick(r, [33000, 41000, 38500]), d = pick(r, [2400, 1800, 1500]), k = ri(r, 5, 10), f = (n) => s + d * (n - 1);
     return b8ruleQ(r, { topic: 'Sequences in real life', stem: `An employee at a company earns $${s.toLocaleString('en-US')} for the first year of employment. Employees receive raises of $${d.toLocaleString('en-US')} each year. Write a rule for the salary aₙ (in dollars) of the employee in year n. Then find the salary in year ${k}.`,
-      f, ruleT: `${d}n + ${s - d}`, ruleL: `${d}n+${s - d}`, extra: { label: `a${b8sub(k)} = $`, text: `$${f(k).toLocaleString('en-US')}`, latex: String(f(k)), check: (raw) => b8numOk(String(raw || '').replace(/,|\\\$|\$/g, ''), f(k)) },
+      f, ruleT: `${d}n + ${s - d}`, ruleL: `${d}n+${s - d}`, extra: { label: `a${b8sub(k)} =`, text: `$${f(k).toLocaleString('en-US')}`, latex: String(f(k)), check: (raw) => b8numOk(String(raw || '').replace(/,|\\\$|\$/g, ''), f(k)) },
       wrongs: [`aₙ = ${d}n + ${s};  a${b8sub(k)} = $${(s + d * k).toLocaleString('en-US')}`, `aₙ = ${s}n + ${d};  a${b8sub(k)} = $${(s * k + d).toLocaleString('en-US')}`, `aₙ = ${d}n + ${s - d};  a${b8sub(k)} = $${(s + d * k).toLocaleString('en-US')}`],
       solution: `aₙ = ${s} + ${d}(n − 1) = ${d}n + ${s - d}\na${b8sub(k)} = ${d}(${k}) + ${s - d} = ${f(k)}, so the salary is $${f(k).toLocaleString('en-US')}.` }); }
   if (kind === 'squares') { const f = (n) => (n * (n + 1)) / 2;
@@ -23151,7 +23151,7 @@ TEMPLATES.b82Sum = (r) => {
 TEMPLATES.b82SumSeq = (r) => {
   const a = ri(r, -5, 20), d = pick(r, [-7, -8, 3, 5, -3, 4]), N = pick(r, [19, 22, 15, 25, 30]), f = b8arith(a, d), S = (N * (a + f(N))) / 2;
   return a1numQ(r, { topic: 'Arithmetic series', stem: `Find the sum of the first ${N} terms of the arithmetic sequence ${b8list(b8seqVals(f, 4))}`, val: S, wrongs: [N * (a + f(N)), ((N - 1) * (a + f(N - 1))) / 2, (N * (a + f(N + 1))) / 2],
-    solution: `a₁ = ${fracT(a)}, d = ${fracT(d)}, so a${b8sub(N)} = ${fracT(a)} + ${N - 1}(${fracT(d)}) = ${fracT(f(N))}.\nS${b8sub(N)} = ${N}((${fracT(a)} + ${fracT(f(N))})/2) = ${fracT(S)}` });
+    solution: `a₁ = ${fracT(a)}, d = ${fracT(d)}, so a${b8sub(N)} = ${fracT(a)} + ${N - 1}(${fracT(d)}) = ${fracT(f(N))}.\nS${b8sub(N)} = ${N}((${fracT(a)} ${f(N) < 0 ? '−' : '+'} ${fracT(Math.abs(f(N)))})/2) = ${fracT(S)}` });
 };
 TEMPLATES.b82Word = (r) => {
   const kind = pick(r, ['band', 'honey', 'theater']);
@@ -23212,7 +23212,7 @@ TEMPLATES.b83Sum = (r) => {
   const ex = lo === 0 ? 'i' : 'i−1', f = (i) => a * q ** (lo === 0 ? i : i - 1); let S = 0; for (let i = lo; i <= N; i++) S += f(i); S = b8r(S);
   const n = N - lo + 1, a1 = f(lo);
   return b8exQ(r, { topic: 'Geometric series', stem: `Find the sum. Give an exact answer or round to three decimal places.   ${b8sig('i', lo, N, `${a}(${fracT(q)})${b8sup(ex)}`)}`, val: S,
-    wrongs: [S - f(N), S + f(N + 1), b8r((a1 * (1 - q ** (n + 1))) / (1 - q))], solution: `a₁ = ${fracT(a1)}, r = ${fracT(q)}, and there are ${n} terms.\nS${b8sub(n)} = a₁(1 − rⁿ)/(1 − r) = ${fracT(a1)}(1 − (${fracT(q)})${b8sup(n)})/(1 − ${fracT(q)}) ${fracParts(S) && fracParts(S)[1] <= 400 ? '=' : '≈'} ${b8exT(S).replace('≈ ', '')}` });
+    wrongs: [S - f(N), S + f(N + 1), b8r((a1 * (1 - q ** (n + 1))) / (1 - q))], solution: `a₁ = ${fracT(a1)}, r = ${fracT(q)}, and there are ${n} terms.\nS${b8sub(n)} = a₁(1 − rⁿ)/(1 − r) = ${fracT(a1)}(1 − (${fracT(q)})${b8sup(n)})/(1 ${q < 0 ? '+' : '−'} ${fracT(Math.abs(q))}) ${fracParts(S) && fracParts(S)[1] <= 400 ? '=' : '≈'} ${b8exT(S).replace('≈ ', '')}` });
 };
 TEMPLATES.b83SumSeq = (r) => {
   const [a, q, N] = pick(r, [[-12, 4, 8], [-14, 3, 9], [3, 2, 10], [5, 3, 7], [64, 1 / 2, 8], [2, -2, 9]]), f = b8geo(a, q), S = b8r((a * (1 - q ** N)) / (1 - q));
