@@ -36995,7 +36995,7 @@ function hintBar(q, i) {
     const row = el('span', { style: 'display:inline-flex;gap:0;flex-wrap:wrap;vertical-align:middle' });
     if (on('e') && twinable(q)) row.append(el('button', { class: 'btn secondary' + (H.ex ? ' on' : ''), type: 'button', style: sm, title: 'See a problem like this one solved step by step',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); if (h.ex) { h.ex = 0; } else { h.ex = (h.n || 0) + 1; h.n = h.ex; h.step = 0; if (!state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } } rerenderAt(i); } }, H.ex ? '📘 Hide example' : '📘 Worked example'));
-    if (on('e') && practiceVideo(q)) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
+    if (on('e') && practiceVideos(q).length) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.vid = !h.vid; if (h.vid && !state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } rerenderAt(i); } }, H.vid ? '🎬 Hide video' : '🎬 Video'));
     if (on('n') && lessonFor(q.tpl)) row.append(el('button', { class: 'btn secondary', type: 'button', style: sm, title: 'Review the notes and class examples for this section',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.notes = !h.notes; rerenderAt(i); } }, H.notes ? '📖 Hide notes' : '📖 Notes'));
@@ -37098,9 +37098,12 @@ function helpPanel(q, i) {
     wrap.append(box);
   }
   if (H.vid) {
-    const v = practiceVideo(q);
+    const vs = practiceVideos(q), v = vs[Math.min(H.vk || 0, vs.length - 1)];
     if (v) { const P = walkPlayer(v.steps, v.fig); P.wrap.style.display = ''; P.wrap.style.marginTop = '4px';
-      wrap.append(el('div', { class: 'helpbox' }, el('div', { class: 'helphead' }, `🎬 Video: ${v.title} (a problem like yours, different numbers)`), P.wrap)); }
+      // more than one kind of answer: the student picks which example to watch (never chosen from their own answer)
+      const pick = vs.length > 1 ? el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 6px' }, el('span', { class: 'small' }, 'Pick an example:'),
+        ...vs.map((x, k) => el('button', { class: 'btn secondary' + (x === v ? ' on' : ''), type: 'button', style: 'margin:0;padding:4px 12px;font-size:14px' + (x === v ? ';background:#692b31;color:#fff' : ''), onclick: () => { H.vk = k; rerenderAt(i); } }, x.pick || String(k + 1)))) : '';
+      wrap.append(el('div', { class: 'helpbox' }, el('div', { class: 'helphead' }, `🎬 Video: ${v.title} (a problem like yours, different numbers)`), pick, P.wrap)); }
   }
   if (H.notes) {
     const k = lessonFor(q.tpl), L = k && LESSONS[k], box = el('div', { class: 'helpbox notes' });
@@ -40876,9 +40879,13 @@ const PV_WXYZ = { kind: 'polys', size: [440, 300], polys: [{ pts: [[0, 0], [5, 0
 const PV_ABCD_SQ = { kind: 'polys', size: [380, 320], polys: [{ pts: [[0, 0], [4, 0], [4, 4], [0, 4]], names: ['A', 'B', 'C', 'D'], right: [1, 1, 1, 1], ticks: [1, 1, 1, 1] }, { pts: [[0, 0], [4, 4]], names: ['', ''] }, { pts: [[4, 0], [0, 4]], names: ['', ''] }],
   texts: [{ p: [2, 1.55], t: 'E' }, { p: [1.45, 0.95], t: '7' }] };
 const PV_PQRS_RECT = { kind: 'polys', size: [440, 280], polys: [{ pts: [[0, 0], [6, 0], [6, 3.2], [0, 3.2]], names: ['P', 'Q', 'R', 'S'], right: [1, 1, 1, 1] }, { pts: [[0, 0], [6, 3.2]], names: ['', ''] }, { pts: [[6, 0], [0, 3.2]], names: ['', ''] }] };
-const PV_GRID = (diag) => ({ kind: 'grid', size: [400, 420], xr: [-6, 2], yr: [-3, 6], step: 1, polys: [
-  { pts: [[-3, -2], [0, -1], [-2, 5], [-5, 4]], names: ['A', 'B', 'C', 'D'], color: '#692b31', fill: 'rgba(105,43,49,0.08)' },
-  ...(diag ? [{ pts: [[-3, -2], [-2, 5]], closed: false, dash: true, color: '#1f5fa8' }, { pts: [[0, -1], [-5, 4]], closed: false, dash: true, color: '#1f5fa8' }] : [])] });
+const PV_GRID_FIG = (P, diag, xr, yr, size) => ({ kind: 'grid', size, xr, yr, step: 1, polys: [
+  { pts: P, names: ['A', 'B', 'C', 'D'], color: '#692b31', fill: 'rgba(105,43,49,0.08)' },
+  ...(diag ? [{ pts: [P[0], P[2]], closed: false, dash: true, color: '#1f5fa8' }, { pts: [P[1], P[3]], closed: false, dash: true, color: '#1f5fa8' }] : [])] });
+const PV_GRID = (diag) => PV_GRID_FIG([[-3, -2], [0, -1], [-2, 5], [-5, 4]], diag, [-6, 2], [-3, 6], [400, 420]);
+const PV_GRID_SQ = (diag) => PV_GRID_FIG([[-2, -1], [1, 0], [0, 3], [-3, 2]], diag, [-4, 2], [-2, 4], [400, 380]);
+const PV_GRID_RH = (diag) => PV_GRID_FIG([[-3, -2], [0, -1], [1, 2], [-2, 1]], diag, [-4, 2], [-3, 3], [400, 380]);
+const PV_GRID_NO = (diag) => PV_GRID_FIG([[-3, -1], [1, -1], [2, 1], [-2, 1]], diag, [-4, 3], [-2, 2], [440, 300]);
 const PV_CHALL = { kind: 'polys', size: [460, 260], polys: [{ pts: [[-6, 0], [0, -2.5], [6, 0], [0, 2.5]], names: ['A', 'B', 'C', 'D'], ticks: [1, 1, 1, 1] }, { pts: [[-6, 0], [6, 0]], names: ['', ''] }, { pts: [[0, -2.5], [0, 2.5]], names: ['', ''] }],
   texts: [{ p: [0.35, -0.4], t: 'E' }] };
 const PRACTICE_VIDS = [
@@ -40947,16 +40954,46 @@ const PRACTICE_VIDS = [
     ['PR = 5(7) − 8 = 27', 'Don’t stop at x. The question asks for the lengths. Put 7 into P R: 35 minus 8 is 27.'],
     ['QS = 3(7) + 6 = 27 ✓', 'Check with Q S: 21 plus 6 is 27. They match.'],
     ['Each diagonal is 27.', 'So each diagonal is 27 units long.']] },
-  { tpl: 'g74Coord', title: 'Rectangle, rhombus, or square? (coordinates)', fig: PV_GRID(false), steps: [
-    ['A(−3, −2),  B(0, −1),  C(−2, 5),  D(−5, 4)', 'Decide whether parallelogram A B C D is a rectangle, a rhombus, or a square. Here it is on the grid.'],
-    ['Rectangle test: are the diagonals congruent?', 'Use the diagonals for two tests. First, the rectangle test: are the diagonals congruent?', PV_GRID(true)],
-    ['AC = √(1² + 7²) = √50', 'From A to C, go 1 right and 7 up. By the distance formula, A C is the square root of 1 plus 49, which is root 50.'],
-    ['BD = √((−5)² + 5²) = √50', 'From B to D, go 5 left and 5 up. B D is the square root of 25 plus 25, which is also root 50.'],
+  { tpl: 'g74Coord', pick: 'Square', title: 'Rectangle, rhombus, or square? Example: square', fig: PV_GRID_SQ(false), steps: [
+    ['A(−2, −1),  B(1, 0),  C(0, 3),  D(−3, 2)', 'Decide whether parallelogram A B C D is a rectangle, a rhombus, or a square. Here it is on the grid.'],
+    ['Rectangle test: are the diagonals congruent?', 'Use the diagonals for two tests. First, the rectangle test: are the diagonals congruent? If they are, it is a rectangle.', PV_GRID_SQ(true)],
+    ['AC = √(2² + 4²) = √20', 'From A to C, go 2 right and 4 up. A C is the square root of 4 plus 16, which is root 20.'],
+    ['BD = √((−4)² + 2²) = √20', 'From B to D, go 4 left and 2 up. B D is the square root of 16 plus 4, also root 20.'],
     ['AC = BD, so it is a rectangle.', 'The diagonals are congruent, so it is a rectangle.'],
-    ['Rhombus test: are the diagonals perpendicular?', 'Second, the rhombus test: are the diagonals perpendicular?'],
+    ['Rhombus test: are the diagonals perpendicular?', 'Second, the rhombus test: are the diagonals perpendicular? If they are, it is a rhombus. Perpendicular slopes multiply to negative 1.'],
+    ['slope AC = 4/2 = 2,   slope BD = 2/(−4) = −1/2', 'The slope of A C is 4 over 2, which is 2. The slope of B D is 2 over negative 4, which is negative one half.'],
+    ['2 · (−1/2) = −1: perpendicular, so it is a rhombus.', '2 times negative one half is negative 1. The diagonals are perpendicular, so it is a rhombus too.'],
+    ['Both tests pass: rectangle, rhombus, and square', 'It passed both tests. Something that is a rectangle and a rhombus is a square. So the answer is rectangle, rhombus, and square.']] },
+  { tpl: 'g74Coord', pick: 'Rectangle only', title: 'Rectangle, rhombus, or square? Example: rectangle only', fig: PV_GRID(false), steps: [
+    ['A(−3, −2),  B(0, −1),  C(−2, 5),  D(−5, 4)', 'Decide whether parallelogram A B C D is a rectangle, a rhombus, or a square. Here it is on the grid.'],
+    ['Rectangle test: are the diagonals congruent?', 'Use the diagonals for two tests. First, the rectangle test: are the diagonals congruent? If they are, it is a rectangle.', PV_GRID(true)],
+    ['AC = √(1² + 7²) = √50', 'From A to C, go 1 right and 7 up. A C is the square root of 1 plus 49, which is root 50.'],
+    ['BD = √((−5)² + 5²) = √50', 'From B to D, go 5 left and 5 up. B D is the square root of 25 plus 25, also root 50.'],
+    ['AC = BD, so it is a rectangle.', 'The diagonals are congruent, so it is a rectangle.'],
+    ['Rhombus test: are the diagonals perpendicular?', 'Second, the rhombus test: are the diagonals perpendicular? If they are, it is a rhombus. Perpendicular slopes multiply to negative 1.'],
     ['slope AC = 7/1 = 7,   slope BD = 5/(−5) = −1', 'The slope of A C is 7 over 1, which is 7. The slope of B D is 5 over negative 5, which is negative 1.'],
-    ['7 · (−1) = −7, not −1: not perpendicular, so not a rhombus.', 'Perpendicular slopes multiply to negative 1. These multiply to negative 7, so the diagonals are not perpendicular. It is not a rhombus.'],
-    ['Answer: rectangle only', 'So the answer is rectangle only. If both tests pass, it is a square, and that means rectangle, rhombus, and square. If only the perpendicular test passes, it is a rhombus only. If neither passes, it is just a parallelogram.']] },
+    ['7 · (−1) = −7, not −1: not perpendicular, so not a rhombus.', '7 times negative 1 is negative 7, not negative 1. The diagonals are not perpendicular, so it is not a rhombus.'],
+    ['Only the rectangle test passes: rectangle only', 'Only the rectangle test passed. It is not a rhombus, so it can’t be a square. The answer is rectangle only.']] },
+  { tpl: 'g74Coord', pick: 'Rhombus only', title: 'Rectangle, rhombus, or square? Example: rhombus only', fig: PV_GRID_RH(false), steps: [
+    ['A(−3, −2),  B(0, −1),  C(1, 2),  D(−2, 1)', 'Decide whether parallelogram A B C D is a rectangle, a rhombus, or a square. Here it is on the grid.'],
+    ['Rectangle test: are the diagonals congruent?', 'Use the diagonals for two tests. First, the rectangle test: are the diagonals congruent? If they are, it is a rectangle.', PV_GRID_RH(true)],
+    ['AC = √(4² + 4²) = √32', 'From A to C, go 4 right and 4 up. A C is the square root of 16 plus 16, which is root 32.'],
+    ['BD = √((−2)² + 2²) = √8', 'From B to D, go 2 left and 2 up. B D is the square root of 4 plus 4, which is root 8.'],
+    ['AC ≠ BD, so it is not a rectangle.', 'Root 32 and root 8 are not equal. The diagonals are not congruent, so it is not a rectangle.'],
+    ['Rhombus test: are the diagonals perpendicular?', 'Second, the rhombus test: are the diagonals perpendicular? If they are, it is a rhombus. Perpendicular slopes multiply to negative 1.'],
+    ['slope AC = 4/4 = 1,   slope BD = 2/(−2) = −1', 'The slope of A C is 4 over 4, which is 1. The slope of B D is 2 over negative 2, which is negative 1.'],
+    ['1 · (−1) = −1: perpendicular, so it is a rhombus.', '1 times negative 1 is negative 1. The diagonals are perpendicular, so it is a rhombus.'],
+    ['Only the rhombus test passes: rhombus only', 'Only the rhombus test passed. It is not a rectangle, so it can’t be a square. The answer is rhombus only.']] },
+  { tpl: 'g74Coord', pick: 'Neither', title: 'Rectangle, rhombus, or square? Example: neither', fig: PV_GRID_NO(false), steps: [
+    ['A(−3, −1),  B(1, −1),  C(2, 1),  D(−2, 1)', 'Decide whether parallelogram A B C D is a rectangle, a rhombus, or a square. Here it is on the grid.'],
+    ['Rectangle test: are the diagonals congruent?', 'Use the diagonals for two tests. First, the rectangle test: are the diagonals congruent? If they are, it is a rectangle.', PV_GRID_NO(true)],
+    ['AC = √(5² + 2²) = √29', 'From A to C, go 5 right and 2 up. A C is the square root of 25 plus 4, which is root 29.'],
+    ['BD = √((−3)² + 2²) = √13', 'From B to D, go 3 left and 2 up. B D is the square root of 9 plus 4, which is root 13.'],
+    ['AC ≠ BD, so it is not a rectangle.', 'Root 29 and root 13 are not equal, so it is not a rectangle.'],
+    ['Rhombus test: are the diagonals perpendicular?', 'Second, the rhombus test: are the diagonals perpendicular? If they are, it is a rhombus. Perpendicular slopes multiply to negative 1.'],
+    ['slope AC = 2/5,   slope BD = 2/(−3) = −2/3', 'The slope of A C is 2 over 5. The slope of B D is 2 over negative 3, which is negative 2 thirds.'],
+    ['(2/5)(−2/3) = −4/15, not −1: not a rhombus.', '2 fifths times negative 2 thirds is negative 4 fifteenths, not negative 1. The diagonals are not perpendicular, so it is not a rhombus.'],
+    ['Neither test passes: none of these (just a parallelogram)', 'Neither test passed. It is not a rectangle, a rhombus, or a square. It is just a parallelogram.']] },
   { tpl: 'g74Challenge', title: 'Challenge: rhombus from its perimeter and a diagonal', fig: PV_CHALL, steps: [
     ['Rhombus ABCD:  perimeter 52,  AC = 24', 'Rhombus A B C D has a perimeter of 52, and diagonal A C is 24. Find the side length and the length of diagonal B D.'],
     ['side = 52 ÷ 4 = 13', 'All four sides of a rhombus are congruent, so each side is 52 divided by 4, which is 13.'],
@@ -40967,7 +41004,7 @@ const PRACTICE_VIDS = [
     ['BD = 2(5) = 10', 'B D is twice B E: 10.'],
     ['Answer: side 13,  BD = 10', 'So the side length is 13, and diagonal B D is 10.']] },
 ];
-const practiceVideo = (q) => (q && q.tpl ? PRACTICE_VIDS.find((v) => v.tpl === q.tpl && (!v.when || v.when(q))) || null : null);
+const practiceVideos = (q) => (q && q.tpl ? PRACTICE_VIDS.filter((v) => v.tpl === q.tpl && (!v.when || v.when(q))) : []);
 // walkthroughs for every lesson, kept in walks/<subject>.json and loaded when a catch-up page opens
 const WALK_FILES = {};
 function walkLoad(subject) {
