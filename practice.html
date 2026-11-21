@@ -2548,7 +2548,7 @@ TEMPLATES.p10Verify = (r) => {
 };
 TEMPLATES.p10Table = (r) => {
   for (let t = 0; t < 100; t++) {
-    const m = nz(r, -5, 5), b = ri(r, -6, 6), xs = [-1, 0, 1, 2, 3, 4].slice(0, ri(r, 5, 6)).map((x) => x + ri(r, -2, 0)), ys = xs.map((x) => m * x + b);
+    const m = nz(r, -5, 5), b = ri(r, -6, 6), xs = [-1, 0, 1, 2, 3, 4].slice(0, ri(r, 5, 6)).map((x) => x + ri(r, -2, 0)), ys = xs.map((x) => m * x + b); if (new Set(xs).size < xs.length) continue;
     const ask = shuffle(r, ys.map((y, i) => i)).slice(0, 3).sort((p, q) => ys[p] - ys[q]);
     const T = (I) => I.map((i) => `f⁻¹(${fmt(ys[i])}) = ${fmt(xs[i])}`).join(',  '), correct = T(ask);
     const wrongT = ask.map((i) => `f⁻¹(${fmt(ys[i])}) = ${fmt(m * ys[i] + b)}`).join(',  ');
@@ -18862,7 +18862,7 @@ TEMPLATES.b57Word = (r) => {
   const fig = a6tex(`r(x)=${a6aL(m)}x-${b}`);
   return { topic: 'Inverse functions in real life', stem: `The resistance (in pounds) of an elastic exercise band can be modeled by the function below, where x is the total length (in inches) of the stretched band. Find and interpret r⁻¹(${y}).`, draw: fig.draw, size: fig.size,
     ...buildChoices(r, `${fmt(x)} in.: the length of the band when the resistance is ${y} pounds`, [`${fmt(m * y - b)} lb: the resistance when the band is ${y} inches long`, `${fmt((y - b) / m)} in.: the length of the band when the resistance is ${y} pounds`, `${fmt(y / m)} in.: the length of the band when the resistance is ${y} pounds`], () => null),
-    fr: FR.num(`r⁻¹(${y}) =`, x, { suffix: ' in.' }), solution: `r⁻¹(x) = (x + ${b})/${fracT(m)}\nr⁻¹(${y}) = (${y} + ${b})/${fracT(m)} = ${fmt(x)}: the band is stretched to ${fmt(x)} inches when the resistance is ${y} pounds.` };
+    fr: FR.num(`r⁻¹(${y}) =`, x, { suffix: ' in.' }), solution: `r⁻¹(x) = (x + ${b})/(${fracT(m)})\nr⁻¹(${y}) = (${y} + ${b})/(${fracT(m)}) = ${fmt(x)}: the band is stretched to ${fmt(x)} inches when the resistance is ${y} pounds.` };
 };
 // #53: f⁻¹(value) from a table
 TEMPLATES.b57FromTable = (r) => {
@@ -23354,6 +23354,7 @@ const B9BAND = [0.0015, 0.0235, 0.135, 0.34, 0.34, 0.135, 0.0235, 0.0015]; // (�
 // area between a and b (in standard deviations; ±Infinity allowed)
 const b9area = (a, b) => { let s = 0; for (let k = -4; k <= 3; k++) { const lo = k === -4 ? -Infinity : k, hi = k === 3 ? Infinity : k + 1; if (lo >= a && hi <= b) s += B9BAND[k + 4]; } return Math.round(s * 10000) / 10000; };
 const b9pct = (p) => `${fmt(Math.round(p * 10000) / 100)}%`;
+const b9bands = (A, B) => { const out = []; for (let k = -4; k <= 3; k++) { const lo = k === -4 ? -Infinity : k, hi = k === 3 ? Infinity : k + 1; if (lo >= A && hi <= B) out.push(B9BAND[k + 4]); } return out; };
 const b9sig = (k) => (k === 0 ? 'μ' : `μ ${k < 0 ? '−' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}σ`);
 // a probability typed as a decimal, a fraction, or a percent
 const b9probOk = (raw, p, tol = 0.0006) => { const s = String(raw || '').replace(/^[^=]*=/, ''), pc = /%/.test(s), v = pxConst(s.replace(/\\%|%/g, '')); return isFinite(v) && Math.abs((pc ? v / 100 : v) - p) <= tol; };
@@ -23435,14 +23436,14 @@ TEMPLATES.b91Prob = (r) => {
   const C = pick(r, [[-Infinity, -1, 'P(x ≤ μ − σ)'], [-1, Infinity, 'P(x ≥ μ − σ)'], [2, Infinity, 'P(x ≥ μ + 2σ)'], [-Infinity, 1, 'P(x ≤ μ + σ)'], [-1, 1, 'P(μ − σ ≤ x ≤ μ + σ)'], [-3, 0, 'P(μ − 3σ ≤ x ≤ μ)'], [-2, 1, 'P(μ − 2σ ≤ x ≤ μ + σ)'], [-Infinity, -2, 'P(x ≤ μ − 2σ)'], [0, 2, 'P(μ ≤ x ≤ μ + 2σ)'], [1, Infinity, 'P(x ≥ μ + σ)']]);
   const [a, b, t] = C, p = b9area(a, b);
   return b9probQ(r, { topic: 'Normal distributions', stem: `A normal distribution has mean μ and standard deviation σ. Find the indicated probability for a randomly selected x-value from the distribution.   ${t}`, p, wrongs: [1 - p, p / 2, p + 0.135, Math.round((p - 0.135) * 10000) / 10000],
-    solution: `Add the areas of the bands in the interval (0.34, 0.135, 0.0235, 0.0015 moving away from the mean).\n${t} = ${fmt(p)}` });
+    solution: `Add the areas of the bands in the interval (0.34, 0.135, 0.0235, 0.0015 moving away from the mean).\n${t} = ${b9bands(a, b).join(' + ')} = ${+p.toFixed(4)}` });
 };
 TEMPLATES.b91Interval = (r) => {
   const mu = pick(r, [33, 25, 50, 80, 12]), sd = pick(r, [4, 2, 5, 3]), C = pick(r, [() => { const a = pick(r, [-1, -2, 0]), b = pick(r, [1, 2, 3]); return [a, b, `between ${mu + a * sd} and ${mu + b * sd}`]; },
     () => { const a = pick(r, [-2, -1, 1, 2]); return [a, Infinity, `at least ${mu + a * sd}`]; }, () => { const b = pick(r, [-3, -2, 1, 2]); return [-Infinity, b, `at most ${mu + b * sd}`]; }])();
   const [a, b, t] = C, p = b9area(a, b);
   return b9probQ(r, { topic: 'Normal distributions', stem: `A normal distribution has a mean of ${mu} and a standard deviation of ${sd}. Find the probability that a randomly selected x-value from the distribution is ${t}.`, p, wrongs: [1 - p, p / 2, p + 0.135, Math.round((p - 0.0235) * 10000) / 10000],
-    solution: `${t.replace(/^\w+/, (w) => w[0].toUpperCase() + w.slice(1))}: ${a === -Infinity ? '' : `${mu + a * sd} is ${a === 0 ? 'the mean' : `${b9sig(a)}`}`}${a !== -Infinity && b !== Infinity ? ' and ' : ''}${b === Infinity ? '' : `${mu + b * sd} is ${b9sig(b)}`}.\nAdd the bands in that interval: P = ${fmt(p)}` });
+    solution: `${t.replace(/^\w+/, (w) => w[0].toUpperCase() + w.slice(1))}: ${a === -Infinity ? '' : `${mu + a * sd} is ${a === 0 ? 'the mean' : `${b9sig(a)}`}`}${a !== -Infinity && b !== Infinity ? ' and ' : ''}${b === Infinity ? '' : `${mu + b * sd} is ${b9sig(b)}`}.\nAdd the bands in that interval: P = ${b9bands(a, b).join(' + ')} = ${+p.toFixed(4)}` });
 };
 TEMPLATES.b91Word = (r) => {
   const C = pick(r, [() => { const mu = pick(r, [142, 120, 95]), sd = pick(r, [32, 20, 15]), k = pick(r, [1, 2, 3]); return [`The daily amounts of time Internet users spend on social networking platforms are normally distributed with a mean of ${mu} minutes and a standard deviation of ${sd} minutes. About what percent of Internet users spend more than ${mu + k * sd} minutes on social networking platforms each day?`, k, Infinity]; },
@@ -23450,7 +23451,7 @@ TEMPLATES.b91Word = (r) => {
     () => { const mu = pick(r, [64, 70, 66]), sd = pick(r, [2.5, 3, 2]), k = pick(r, [1, 2]); return [`The heights of adult women in a region are normally distributed with a mean of ${mu} inches and a standard deviation of ${sd} inches. About what percent of the women are between ${fmt(mu - k * sd)} and ${fmt(mu + k * sd)} inches tall?`, -k, k]; },
     () => { const mu = pick(r, [500, 1000]), sd = pick(r, [100, 50]), k = pick(r, [-1, -2]); return [`The scores on a test are normally distributed with a mean of ${mu} and a standard deviation of ${sd}. About what percent of the test takers scored at least ${mu + k * sd}?`, k, Infinity]; }])();
   const [stem, a, b] = C, p = b9area(a, b);
-  return b9pctQ(r, { topic: 'Normal distributions', stem, p, wrongs: [1 - p, p / 2, p + 0.135, p - 0.135], solution: `Locate the value(s) in standard deviations from the mean, then add the bands in the interval.\nPercent ≈ ${b9pct(p)}` });
+  return b9pctQ(r, { topic: 'Normal distributions', stem, p, wrongs: [1 - p, p / 2, p + 0.135, p - 0.135], solution: `Locate the value(s) in standard deviations from the mean: the interval runs from ${a === -Infinity ? 'the far left' : b9sig(a)} to ${b === Infinity ? 'the far right' : b9sig(b)}.\nAdd the bands in the interval: ${b9bands(a, b).map(b9pct).join(' + ')} ≈ ${b9pct(p)}` });
 };
 TEMPLATES.b91Hist = (r) => {
   const yes = r() < 0.5, k = pick(r, [10, 11, 9]), lo = pick(r, [40, 20, 60]);
@@ -23630,7 +23631,7 @@ TEMPLATES.b95Claim = (r) => {
   if (ph <= 0 || ph >= 1) return TEMPLATES.b95Claim(r);
   const k = Math.round(ph * n), lo = ph - E, hi = ph + E, inside = p >= lo && p <= hi, ans = inside ? 'The claim is plausible' : 'The claim is probably not accurate';
   return b6sel(r, 'Testing claims with surveys', `A national polling company claims that ${Math.round(p * 100)}% of a population has a certain trait. You survey a random sample of ${n} people and ${k} of them have the trait. Using the margin of error, what can you conclude about the accuracy of the claim?`, ['The claim is plausible', 'The claim is probably not accurate'], ans,
-    `p̂ = ${k}/${n} = ${fmt(Math.round(ph * 1000) / 1000)}. Margin of error = ±1/√${n} = ±${fmt(Math.round(E * 1000) / 1000)}.\nInterval: ${fmt(Math.round(lo * 1000) / 1000)} to ${fmt(Math.round(hi * 1000) / 1000)}. The claimed ${p} is ${inside ? 'inside' : 'outside'} this interval, so ${inside ? 'the claim is plausible' : 'the claim is probably not accurate'}.`);
+    `p̂ = ${k}/${n} ≈ ${String(Math.round(ph * 1000) / 1000)}. Margin of error = ±1/√${n} ≈ ±${String(Math.round(E * 1000) / 1000)}.\nInterval: about ${String(Math.round(lo * 1000) / 1000)} to ${String(Math.round(hi * 1000) / 1000)}. The claimed ${p} is ${inside ? 'inside' : 'outside'} this interval, so ${inside ? 'the claim is plausible' : 'the claim is probably not accurate'}.`);
 };
 
 // ---------- 9.6 Making Inferences from Experiments ----------
