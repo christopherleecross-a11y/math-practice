@@ -40839,9 +40839,9 @@ IX.circleAngles = {
       return avoid.some(inside) ? { m: 360 - ccw, from: b, sweep: 360 - ccw } : { m: ccw, from: a, sweep: ccw }; };
     const drawArc = (arc, color, w = 7) => { ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = 0.55; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); const s = arc.from * Math.PI / 180;
       ctx.arc(C[0], C[1], R, -s, -(s + arc.sweep * Math.PI / 180), true); ctx.stroke(); ctx.restore();
-      const m = (arc.from + arc.sweep / 2) * Math.PI / 180; ixLabel(ctx, `${Math.round(arc.m)}°`, C[0] + (R + 30) * Math.cos(m), C[1] - (R + 30) * Math.sin(m), 19, 'center', color, 'middle'); };
+      const m = (arc.from + arc.sweep / 2) * Math.PI / 180; ixLabel(ctx, `${ixN(arc.m, 2)}°`, C[0] + (R + 30) * Math.cos(m), C[1] - (R + 30) * Math.sin(m), 19, 'center', color, 'middle'); };
     const seg = (p, q, c = IXC.ink, w = 2.6) => ixLine(ctx, p, q, c, w);
-    const r = (v) => Math.round(v);
+    const r = (v) => ixN(v, 2); // decimals when it isn't whole (60.5°, 30.25°)
     function draw() {
       ctx.clearRect(0, 0, cv._w, cv._h);
       if (S.mode === 'semi') { S.deg.A = 180; S.deg.B = 0; }
@@ -40856,7 +40856,7 @@ IX.circleAngles = {
         if (S.mode === 'inscribed') { seg(P.C, P.A); seg(P.C, P.B); ixAngMark(ctx, P.C, P.A, P.B, 40, IXC.purple, `${r(ixAng(P.C, P.A, P.B))}°`); }
         ixDot(ctx, C[0], C[1], IXC.ink, 4); ixLabel(ctx, 'P', C[0] - 16, C[1] + 4, 20, 'center');
         if (S.mode === 'central') L.push({ h: 'Central angle ∠APB' }, `m∠APB = ${r(ixAng(C, P.A, P.B))}°`, `m(arc AB) = ${r(arc.m)}°`, { note: big ? 'This is a major arc (more than 180°): its measure is 360° minus the central angle.' : 'A minor arc has the same measure as its central angle.', good: true });
-        else L.push({ h: 'Inscribed angle ∠ACB' }, `m∠ACB = ${r(ixAng(P.C, P.A, P.B))}°`, `Intercepted arc AB = ${r(arc.m)}°`, `1/2 · ${r(arc.m)}° = ${ixN(arc.m / 2, 1)}°`, { note: 'An inscribed angle is half its intercepted arc (and half the central angle).', good: true });
+        else L.push({ h: 'Inscribed angle ∠ACB' }, `m∠ACB = ${r(ixAng(P.C, P.A, P.B))}°`, `Intercepted arc AB = ${r(arc.m)}°`, `1/2 · ${r(arc.m)}° = ${ixN(arc.m / 2, 2)}°`, { note: 'An inscribed angle is half its intercepted arc (and half the central angle).', good: true });
       } else if (S.mode === 'same') {
         const arc = arcAvoid('A', 'B', ['C', 'D']); drawArc(arc, IXC.orange);
         const sideOK = norm(S.deg.C - S.deg.A) > norm(S.deg.B - S.deg.A) === norm(S.deg.D - S.deg.A) > norm(S.deg.B - S.deg.A);
@@ -40885,13 +40885,13 @@ IX.circleAngles = {
           if (inside) { // ∠AEC and its vertical angle ∠BED
             const a1 = arcAvoid('A', 'C', ['B', 'D']), a2 = arcAvoid('B', 'D', ['A', 'C']);
             drawArc(a1, IXC.orange); drawArc(a2, IXC.purple); const m = ixAng(X, P.A, P.C); ixAngMark(ctx, X, P.A, P.C, 30, IXC.red, `${r(m)}°`);
-            L.push({ h: 'Chords meet inside the circle' }, `m∠AEC = ${r(m)}°`, `1/2 (${r(a1.m)}° + ${r(a2.m)}°) = ${ixN((a1.m + a2.m) / 2, 1)}°`, { note: 'Inside: the angle is half the SUM of the two intercepted arcs.', good: true });
+            L.push({ h: 'Chords meet inside the circle' }, `m∠AEC = ${r(m)}°`, `1/2 (${r(a1.m)}° + ${r(a2.m)}°) = ${ixN((a1.m + a2.m) / 2, 2)}°`, { note: 'Inside: the angle is half the SUM of the two intercepted arcs.', good: true });
           } else { // secants from E: near and far points on each line
             const nearAB = ixV.dist(X, P.A) < ixV.dist(X, P.B) ? ['A', 'B'] : ['B', 'A'], nearCD = ixV.dist(X, P.C) < ixV.dist(X, P.D) ? ['C', 'D'] : ['D', 'C'];
             const far = arcAvoid(nearAB[1], nearCD[1], [nearAB[0], nearCD[0]]), near = arcAvoid(nearAB[0], nearCD[0], [nearAB[1], nearCD[1]]);
             drawArc(far, IXC.orange); drawArc(near, IXC.purple); const m = ixAng(X, P[nearAB[1]], P[nearCD[1]]);
             if (ixV.dist(X, C) < 1400) ixAngMark(ctx, X, P[nearAB[1]], P[nearCD[1]], 30, IXC.red, `${r(m)}°`);
-            L.push({ h: 'Secants meet outside the circle' }, `m∠E = ${r(m)}°`, `1/2 (${r(far.m)}° − ${r(near.m)}°) = ${ixN((far.m - near.m) / 2, 1)}°`, { note: 'Outside: the angle is half the DIFFERENCE of the far arc and the near arc.', good: true });
+            L.push({ h: 'Secants meet outside the circle' }, `m∠E = ${r(m)}°`, `1/2 (${r(far.m)}° − ${r(near.m)}°) = ${ixN((far.m - near.m) / 2, 2)}°`, { note: 'Outside: the angle is half the DIFFERENCE of the far arc and the near arc.', good: true });
           }
         }
       }
@@ -40899,7 +40899,7 @@ IX.circleAngles = {
       ixRead(read, L);
     }
     ixDrag(cv, (x, y) => { let best = null, bd = 40; MODES[S.mode].forEach((n) => { if (S.mode === 'semi' && n !== 'C') return; const p = pt(n), d = Math.hypot(x - p[0], y - p[1]); if (d < bd) { bd = d; best = n; } }); return best; },
-      (n, x, y) => { let d = Math.round(Math.atan2(C[1] - y, x - C[0]) * 180 / Math.PI); const others = MODES[S.mode].filter((m) => m !== n);
+      (n, x, y) => { let d = Math.round(Math.atan2(C[1] - y, x - C[0]) * 360 / Math.PI) / 2; /* half-degree steps */ const others = MODES[S.mode].filter((m) => m !== n);
         if (others.some((m) => Math.abs(norm(S.deg[m] - d + 180) - 180) < 4)) return; S.deg[n] = d; draw(); });
     const modes = (o.modes || 'central,inscribed,same,semi,quad,lines').split(',').filter((m) => MODES[m]);
     const names = { central: 'Central angle', inscribed: 'Inscribed angle', same: 'Same arc', semi: 'Semicircle', quad: 'Inscribed quadrilateral', lines: 'Chords and secants' };
