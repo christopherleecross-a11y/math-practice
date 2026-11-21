@@ -18679,9 +18679,10 @@ TEMPLATES.b56Compose = (r) => {
     const [A, B] = which === 'fg' ? [f, g] : which === 'gf' ? [g, f] : [f, f], name = which === 'fg' ? 'f(g(x))' : which === 'gf' ? 'g(f(x))' : 'f(f(x))';
     const H = (x) => A.f(B.f(x));
     // expanded form when both are polynomials
-    let disp, key;
+    let disp, key, simp = null;
     if (A.kind !== 'sqrt' && B.kind !== 'sqrt') { const inner = B.kind === 'lin' ? B.co : [B.co[0], 0, B.co[2]]; let co = [0]; const outer = A.kind === 'lin' ? A.co : [A.co[0], 0, A.co[2]]; for (const c of outer) co = b4add(pMul(co, inner), [c]); co = b4trim(co); disp = b4T(co); key = b4L(co); }
     else if (A.kind === 'sqrt') { const inner = b4add(B.kind === 'lin' ? B.co : [B.co[0], 0, B.co[2]], [A.h]); disp = `√(${b4T(inner)})`; key = `\\sqrt{${b4L(inner)}}`; }
+    else if (A.kind === 'quad' && B.kind === 'sqrt') { const sl = Math.round(H(101) - H(100)), b0 = Math.round(H(100) - 100 * sl), co = b4trim([sl, b0]); simp = co; disp = b4T(co); key = b4L(co); }
     else { disp = A.T(B.T('x')); key = A.L(B.L('x')); }
     if (disp.length > 60) continue;
     const swap = (x) => B.f(A.f(x));
@@ -18689,13 +18690,13 @@ TEMPLATES.b56Compose = (r) => {
     // domain
     const dom = A.kind !== 'sqrt' && B.kind !== 'sqrt' ? 'all real numbers' : null;
     const wrongText = (F) => { if (A.kind !== 'sqrt' && B.kind !== 'sqrt') { const co = b4fit(F, 4); return co ? b4T(co) : null; } return null; };
-    const wr = [wrongText(swap), wrongText((x) => A.f(x) * B.f(x)), wrongText((x) => A.f(x) + B.f(x)), A.kind === 'sqrt' || B.kind === 'sqrt' ? B.T(A.T('x')) : null, A.kind === 'sqrt' ? A.T(`${B.T('x')} + 1`) : null].filter(Boolean);
+    const wr = [wrongText(swap), wrongText((x) => A.f(x) * B.f(x)), wrongText((x) => A.f(x) + B.f(x)), A.kind === 'sqrt' || B.kind === 'sqrt' ? B.T(A.T('x')) : null, A.kind === 'sqrt' ? A.T(`${B.T('x')} + 1`) : null, simp ? b4T(b4trim([simp[0], Math.round(A.f(0))])) : null].filter(Boolean);
     const defN = [...Array(61)].filter((_, j) => isFinite(H(-20 + (80 * (j + 0.37)) / 61))).length; if (defN < 8) continue;
     const chk = (x) => { const s = String(x[0]).replace(/^\s*[a-z]\(.*?\)\s*=\s*/i, ''); return pxEquiv(s, H, { lo: -20, hi: 60, need: 6 }); };
     return { topic: 'Composition of functions', stem: `Find ${name}.${dom ? '' : ' (Use x-values where it is defined.)'}`, draw: fig.draw, size: fig.size,
-      ...buildChoices(r, disp, [...new Set(wr)].filter((w) => w !== disp), (i) => (A.kind !== 'sqrt' && B.kind !== 'sqrt' ? b4T(b4fit((x) => H(x) + i + 1, 4)) : `${disp} + ${i + 1}`)),
+      ...buildChoices(r, disp, [...new Set(wr)].filter((w) => w !== disp), (i) => (simp ? b4T(b4add(simp, [i + 1])) : A.kind !== 'sqrt' && B.kind !== 'sqrt' ? b4T(b4fit((x) => H(x) + i + 1, 4)) : `${disp} + ${i + 1}`)),
       fr: { fields: [{ kind: 'expr', keys: 'fn5', label: `${name} =` }], key: [key], display: disp, check: chk },
-      solution: `Substitute ${which === 'fg' ? 'g(x)' : which === 'gf' ? 'f(x)' : 'f(x)'} for x in ${which === 'gf' ? 'g' : 'f'}:\n${name} = ${A.T(`(${B.T('x')})`).replace('((', '(').replace('))', ')')}\n= ${disp}` };
+      solution: `Substitute ${which === 'fg' ? 'g(x)' : which === 'gf' ? 'f(x)' : 'f(x)'} for x in ${which === 'gf' ? 'g' : 'f'}:\n${name} = ${A.T(`(${B.T('x')})`).replace('((', '(').replace('))', ')')}${A.kind === 'quad' && B.kind === 'sqrt' ? `\nSquaring undoes the square root: (${B.T('x')})² = ${B.T('x').slice(2, -1)} (for x where it is defined)` : ''}${A.T(`(${B.T('x')})`).replace('((', '(').replace('))', ')') === disp ? '' : `\n= ${disp}`}` };
   }
 };
 // #5–8: evaluate a composition
