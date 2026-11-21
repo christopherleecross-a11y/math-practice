@@ -36376,16 +36376,18 @@ function startScreen0(teacher = false) {
   const err = el('div', { class: 'err' });
   const clear = () => (err.textContent = '');
   [per, nm, setSel, nameSel].forEach((x) => x && x.addEventListener('input', clear));
-  card.append(el('label', { for: 'period' }, teacher ? "Student's class period" : 'Class period'), per, nmLabel, nameSel, nm, typedNote);
+  const pv = PREVIEW && !teacher; // the teacher trying it as a student: no class period or name to fill in
+  if (!pv) card.append(el('label', { for: 'period' }, teacher ? "Student's class period" : 'Class period'), per, nmLabel, nameSel, nm, typedNote);
   const attSel = el('select', { id: 'attempt' }, ...Array.from({ length: 10 }, (_, n) => el('option', { value: String(n + 1) }, `Attempt ${n + 1}`)));
   if (teacher) card.append(el('label', { for: 'attempt' }, 'Which attempt'), attSel,
     el('p', { class: 'small' }, 'Shows the first version of each question. If retries are on, later versions are listed in the student’s work Doc.'));
   const hintP = teacher ? null : el('p', { class: 'small' }, setKey && setting(setKey, 'same') ? 'Type your full name exactly the same way every time.'
     : 'Type your full name exactly the same way every time. Your questions are made just for you, so your answers won’t match anyone else’s.');
-  if (hintP) card.append(hintP);
+  if (hintP && !pv) card.append(hintP);
   card.append(el('button', { class: 'btn', onclick: () => {
     const sk = pickedSet(setSel, setKey);
     if (!sk) return (err.textContent = 'Choose an assignment first.');
+    if (pv) return begin(sk, 'Preview', 'Teacher Preview', false, 1);
     if (!per.value) return (err.textContent = 'Choose your class period.');
     if (roster && nameSel.value && nameSel.value !== '__typed') {
       const s = (roster[per.value] || []).find((x) => x.id === nameSel.value);
@@ -36402,7 +36404,7 @@ function startScreen0(teacher = false) {
 async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = null, noCloud = false) {
   if (!mathReady) { app.innerHTML = '<div class="card">Loading…</div>'; await mathLoading; }
   document.getElementById('title').textContent = SETS[setKey].title;
-  document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name} · ${period} period` + (PREVIEW ? ' · preview, not saved' : '');
+  document.getElementById('subtitle').textContent = `${SUBJECTS[SETS[setKey].subject] || ''} · ${name}${PREVIEW && period === 'Preview' ? '' : ` · ${period} period`}` + (PREVIEW ? ' · preview, not saved' : '');
   if (PREVIEW && !teacher) document.getElementById('subtitle').append(' ', el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:4px 12px;font-size:14px', title: 'Start over with a different set of numbers',
     onclick: () => { if (setting(setKey, 'same') && SETS[setKey].custom && state && state.setKey === setKey) { state.qs.forEach((_, i) => previewNewQ(i, true)); pickBar(); window.scrollTo(0, 0); return; } // same for everyone: a new version of every question
       if (((store.get(`practice:${CONFIG.SALT}:${setKey}:${period}:${PREVIEW_ID}`) || {}).answers || []).some((a) => a != null && a !== '' && !(Array.isArray(a) && !a.some((x) => x != null && x !== ''))) && !confirm('Start over with new questions? Your answers on this page will be cleared.')) return; PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); window.scrollTo(0, 0); begin(setKey, period, name, false, 1, null, true); } }, '🔄 New questions'), el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:4px 12px;font-size:14px', title: 'Show the questions one at a time, large, for the TV', onclick: () => previewTV(0) }, '📺 Show on the TV'),
@@ -36482,7 +36484,7 @@ function remapSaved(key, saved, sig) {
 
 function watermarkCss() {
   const d = new Date();
-  const text = `${state.name} · ${state.period} period · ${d.getMonth() + 1}/${d.getDate()}`;
+  const text = `${state.name}${state.period === 'Preview' ? '' : ` · ${state.period} period`} · ${d.getMonth() + 1}/${d.getDate()}`;
   const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const L = text.length * 8.4;                                   // approx. width of the text line in px
   const w = Math.round(L * 0.94 + 56), h = Math.round(L * 0.34 + 48); // tile just fits the slanted line
