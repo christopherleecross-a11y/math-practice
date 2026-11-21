@@ -1,7 +1,7 @@
 # build walks/geometry.json from walks/src/*.txt and report coverage
 import re,json,glob,sys
 PRE=sys.argv[1] if len(sys.argv)>1 and not sys.argv[1].startswith('-') else 'geo'
-OUT={'geo':'geometry','alg1':'algebra1','alg2':'algebra2','precalc':'precalc'}[PRE]
+OUT={'geo':'geometry','alg1':'algebra1','alg2':'algebra2','precalc':'precalc','calc':'apcalc'}[PRE]
 s=open('/home/claude/math-practice/practice.html').read()
 stems={}; allstems=set()
 for m in re.finditer(r"^  '("+PRE+r"-[\w-]+)': (\{\"minutes\".*?)(,?)$", s, re.M):
