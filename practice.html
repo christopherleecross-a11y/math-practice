@@ -22582,7 +22582,7 @@ const b7val = (p, x) => p.reduce((s, c) => s * x + c, 0);
 const b7divLin = (p, r0) => { const out = []; let acc = 0; p.forEach((c) => { acc = acc * r0 + c; out.push(acc); }); out.pop(); return out; }; // p ÷ (x − r0), remainder dropped
 // a linear factor [m, a] as text: (mx + a)
 const b7fT = ([m, a], v = 'x', bare = false) => { const t = polyT([m, a], v); return bare || (a === 0 && m === 1) ? t : `(${t})`; };
-const b7facT = (k, F, v = 'x') => { const fs = F.map((f) => b7fT(f, v, F.length === 1 && k === 1)); const body = fs.join(''); return k === 1 ? body || '1' : k === -1 ? `${MINUS}${body}` : `${fmt(k)}${body}`; };
+const b7facT = (k, F, v = 'x') => { const fs = F.map((f) => b7fT(f, v, F.length === 1 && k === 1)); const body = fs.reduce((acc, f) => acc + (acc && /[a-z]$/.test(acc) && /^[a-z]/.test(f) ? '·' : '') + f, ''); return k === 1 ? body || '1' : k === -1 ? `${MINUS}${body}` : `${fmt(k)}${body}`; };
 const b7prodLike = (t) => /^−?[\dx]*(\([^()]*\))+$/.test(t);
 const b7fracT = (nT, dT) => (dT === '1' ? nT : `${/[ +−]/.test(nT.replace(/^−/, '')) && !/^\(.*\)$/.test(nT) && !b7prodLike(nT) ? `(${nT})` : nT}/${/[ +−]|\)\(|\d[a-z(]/.test(dT) && !/^\([^()]*\)$/.test(dT) ? `(${dT})` : dT}`);
 // ---- answer reader: one fraction, equivalent, and fully simplified (same degrees as the answer) ----
@@ -22642,7 +22642,7 @@ TEMPLATES.b71Write = (r) => {
   return { topic: 'Inverse variation', stem: `The variables x and y vary inversely. Use the given values to write an equation relating x and y. Then find y when x = 3.   x = ${fracT(x0)}, y = ${fracT(y0)}`,
     ...buildChoices(r, `y = ${fracT(a)}/x; y = ${fracT(y3)}`, [`y = ${fracT(y0 / x0)}x; y = ${fracT(y0 / x0 * 3)}`, `y = ${fracT(a)}/x; y = ${fracT(a * 3)}`, `y = ${fracT(-a)}/x; y = ${fracT(-y3)}`].filter((t, i, A) => A.indexOf(t) === i), () => null),
     fr: { fields: [{ kind: 'expr', keys: 'func', label: 'y =' }, { kind: 'expr', keys: 'num', label: 'y when x = 3:' }], key: [`\\frac{${fracL(a)}}{x}`, fracL(y3)], display: `y = ${fracT(a)}/x; y = ${fracT(y3)}`, check: (v) => okEq(v[0]) && numOk(v[1], y3), score: (v) => ((okEq(v[0]) ? 1 : 0) + (numOk(v[1], y3) ? 1 : 0)) / 2 },
-    solution: `a = xy = (${fracT(x0)})(${fracT(y0)}) = ${fracT(a)}, so y = ${fracT(a)}/x.\nWhen x = 3: y = ${fracT(a)}/3 = ${fracT(y3)}.` };
+    solution: `a = xy = (${fracT(x0)})(${fracT(y0)}) = ${fracT(a)}, so y = ${fracT(a)}/x.\nWhen x = 3: y = ${fracT(a)}/3${fracT(a) + '/3' === fracT(y3) ? '' : ` = ${fracT(y3)}`}.` };
 };
 TEMPLATES.b71Word = (r) => {
   const kind = pick(r, ['apps', 'snow', 'struct', 'chips']);
