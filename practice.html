@@ -17420,7 +17420,7 @@ TEMPLATES.cj68Def = (r) => {
     [`∫ from 0 to ${a} of dx/√(${A} − x²)`, Math.PI / 2, 'π/2', ['π/4', '1', 'π'], `x = ${a} sin θ: [sin⁻¹(x/${a})] from 0 to ${a} = π/2`],
     [`∫ from 0 to ${a} of dx/(x² + ${A})`, Math.PI / (4 * a), a === 1 ? 'π/4' : `π/${4 * a}`, [a === 1 ? 'π/2' : `π/${2 * a}`, 'π/4' === (a === 1 ? 'π/4' : '') ? 'π/8' : 'π/4', `1/${2 * A}`], `x = ${a} tan θ: [(1/${a})tan⁻¹(x/${a})] from 0 to ${a} = (1/${a})(π/4)`],
     [`∫ from 0 to ${a % 2 ? `${a}/2` : a / 2} of dx/√(${A} − x²)`, Math.PI / 6, 'π/6', ['π/3', '1/2', 'π/4'], `[sin⁻¹(x/${a})] from 0 to ${a}/2 = sin⁻¹(1/2) = π/6`]][kind];
-  return cdExactQ(r, { topic: 'Trigonometric substitution', stem: `Evaluate ${Q[0]}.`, val: Q[1], text: Q[2], wrongs: Q[3], label: 'Value =', solution: `${Q[4]}.` });
+  return cdExactQ(r, { topic: 'Trigonometric substitution', stem: `Evaluate ${Q[0]}.`, val: Q[1], text: Q[2], wrongs: Q[3], label: 'Value =', solution: `${Q[4]}.`.replace(/x = 1 (sin|tan) θ/g, 'x = $1 θ').replace(/x\/1\)/g, 'x)').replace(/\(1\/1\)/g, '') });
 };
 TEMPLATES.cj68Formula = (r) => {
   const a = ri(r, 2, 6), A = a * a, kind = ri(r, 0, 2);
@@ -17436,7 +17436,7 @@ TEMPLATES.cj69Square = (r) => {
   const h = nz(r, -4, 4), k = ri(r, 1, 3), q = cdP([1, 2 * h, h * h + k * k]), u = `x ${h < 0 ? MINUS : '+'} ${Math.abs(h)}`;
   const ans = `${cjK(k)}tan⁻¹(${k === 1 ? u : `(${u})/${k}`}) + C`;
   return ccFormQ(r, { topic: 'Completing the square', stem: `Find ∫ dx/(${q}).`, ans, wrongs: [`tan⁻¹(${u}) + C`, `ln|${q}| + C`, `${cjK(k)}tan⁻¹(x/${k}) + C`, `(1/${2 * k})tan⁻¹(${k === 1 ? u : `(${u})/${k}`}) + C`].filter((w) => w !== ans), label: '∫ =',
-    solution: `Complete the square: ${q} = (${u})² + ${k * k}.\nLet u = ${u}: ∫ du/(u² + ${k * k}) = ${cjK(k)}tan⁻¹(u/${k}) + C, so ∫ = ${ans}` });
+    solution: `Complete the square: ${q} = (${u})² + ${k * k}.\nLet u = ${u}: ∫ du/(u² + ${k * k}) = ${cjK(k)}tan⁻¹(${k === 1 ? 'u' : `u/${k}`}) + C, so ∫ = ${ans}` });
 };
 TEMPLATES.cj69Divide = (r) => {
   for (let t = 0; t < 100; t++) { const d = nz(r, -4, 4), b = ri(r, -5, 5), c = ri(r, -6, 6), q = b - d, R = c - d * q; if (!R) continue;
@@ -17448,7 +17448,7 @@ TEMPLATES.cj69Divide = (r) => {
 TEMPLATES.cj69Def = (r) => {
   const h = nz(r, -3, 3), k = ri(r, 1, 3), q = cdP([1, 2 * h, h * h + k * k]);
   return cdExactQ(r, { topic: 'Completing the square', stem: `Evaluate ∫ from ${fmt(-h)} to ${fmt(-h + k)} of dx/(${q}).`, val: Math.PI / (4 * k), text: k === 1 ? 'π/4' : `π/${4 * k}`, wrongs: [k === 1 ? 'π/2' : `π/${2 * k}`, 'π', `1/${2 * k * k}`].filter((w) => w !== (k === 1 ? 'π/4' : `π/${4 * k}`)), label: 'Value =',
-    solution: `${q} = (x ${h < 0 ? MINUS : '+'} ${Math.abs(h)})² + ${k * k}. With u = x ${h < 0 ? MINUS : '+'} ${Math.abs(h)}, u goes from 0 to ${k}: ${cjK(k)}[tan⁻¹(u/${k})] = ${cjK(k)}(π/4).` });
+    solution: `${q} = (x ${h < 0 ? MINUS : '+'} ${Math.abs(h)})² + ${k * k}. With u = x ${h < 0 ? MINUS : '+'} ${Math.abs(h)}, u goes from 0 to ${k}: ${cjK(k)}[tan⁻¹(${k === 1 ? 'u' : `u/${k}`})] = ${k === 1 ? 'π/4' : `${cjK(k)}(π/4)`}.` });
 };
 TEMPLATES.cAP69 = (r) => clAP(apPick(r, ['cj69Square', 'cj69Divide', 'cj69Def']), 'Quadratics and long division');
 
@@ -17477,14 +17477,14 @@ TEMPLATES.cj611Trap = (r) => {
   const T = (d / 2) * (ys[0] + ys[n] + 2 * ys.slice(1, n).reduce((s, v) => s + v, 0)), val = Math.round(T * 1000) / 1000;
   return cjDec(clValQ(r, { topic: 'Trapezoidal sums', stem: `Approximate ∫ from ${a} to ${b} of ${ft} dx with a trapezoidal sum using n = ${n} subintervals of equal width.${ft === '1/x' ? ' Round to three decimal places.' : ''}`, val,
     wrongs: [Math.round(ciRS(f, a, b, n, 'L') * 1000) / 1000, Math.round(ciRS(f, a, b, n, 'R') * 1000) / 1000, Math.round(T * 2000) / 1000], label: 'Trapezoidal sum ≈',
-    solution: `Δx = ${fracT(d)}. T = (Δx/2)[f(x₀) + 2f(x₁) + … + 2f(x${'₀₁₂₃₄'[n - 1]}) + f(x${'₀₁₂₃₄'[n]})]\n= (${fracT(d)}/2)[${ys.map((y, i) => (i && i < n ? `2(${fracT(y)})` : fracT(y))).join(' + ')}] ≈ ${fmt3(T)}  (the average of the left and right sums)` }), 'Trapezoidal sum ≈', val);
+    solution: `Δx = ${fracT(d)}. T = (Δx/2)[${n === 2 ? 'f(x₀) + 2f(x₁) + f(x₂)' : 'f(x₀) + 2f(x₁) + 2f(x₂) + 2f(x₃) + f(x₄)'}]\n= (${fracT(d / 2)})[${ys.map((y, i) => (i && i < n ? `2(${fracT(y)})` : fracT(y))).join(' + ')}] ${Number.isInteger(T) ? '=' : '≈'} ${fmt3(T)}  (the average of the left and right sums)` }), 'Trapezoidal sum ≈', val);
 };
 TEMPLATES.cj611Simpson = (r) => {
   const [f, ft] = cjFn(r), a = ft === '1/x' ? 1 : ri(r, 0, 1), n = 4, w = pick(r, [2, 4]), b = a + w, d = w / n, ys = Array.from({ length: 5 }, (_, i) => f(a + i * d)), co = [1, 4, 2, 4, 1];
   const S = (d / 3) * ys.reduce((s, y, i) => s + co[i] * y, 0), val = Math.round(S * 1000) / 1000;
   return cjDec(clValQ(r, { topic: 'Simpson’s Rule', stem: `Approximate ∫ from ${a} to ${b} of ${ft} dx with Simpson’s Rule using n = 4.${ft === '1/x' ? ' Round to three decimal places.' : ''}`, val,
     wrongs: [Math.round((d / 2) * ys.reduce((s, y, i) => s + (i % 4 ? 2 : 1) * y, 0) * 1000) / 1000, Math.round(ciRS(f, a, b, n, 'M') * 1000) / 1000, Math.round(S * 1500) / 1000], label: 'Simpson ≈',
-    solution: `Δx = ${fracT(d)}. S = (Δx/3)[f(x₀) + 4f(x₁) + 2f(x₂) + 4f(x₃) + f(x₄)]\n= (${fracT(d)}/3)[${ys.map((y, i) => `${co[i] === 1 ? '' : co[i]}(${fracT(y)})`).join(' + ')}] ≈ ${fmt3(S)}${/x³|x²|x \+|2x/.test(ft) ? '  (exact for polynomials of degree 3 or less)' : ''}` }), 'Simpson ≈', val);
+    solution: `Δx = ${fracT(d)}. S = (Δx/3)[f(x₀) + 4f(x₁) + 2f(x₂) + 4f(x₃) + f(x₄)]\n= (${fracT(d / 3)})[${ys.map((y, i) => `${co[i] === 1 ? '' : co[i]}(${fracT(y)})`).join(' + ')}] ${Number.isInteger(S) ? '=' : '≈'} ${fmt3(S)}${/x³|x²|x \+|2x/.test(ft) ? '  (exact for polynomials of degree 3 or less)' : ''}` }), 'Simpson ≈', val);
 };
 TEMPLATES.cj611Table = (r) => {
   const xs = pick(r, [[0, 2, 5, 7, 10], [0, 1, 3, 6, 8], [1, 3, 4, 7, 9]]), ys = xs.map(() => ri(r, 1, 12)), T = xs.slice(1).reduce((S, x, i) => S + (x - xs[i]) * (ys[i] + ys[i + 1]) / 2, 0);
