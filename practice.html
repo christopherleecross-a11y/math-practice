@@ -18524,12 +18524,12 @@ TEMPLATES.cl12Factor = (r) => {
 TEMPLATES.cl12Conj = (r) => {
   const b = ri(r, 1, 5), c = ri(r, -3, 6), a = b * b - c;
   const stem = `Find the limit as x → ${fmt(c)}:   (√(${clP([1, a])}) ${MINUS} ${b}) / (${clP([1, -c])})`;
-  return clValQ(r, { topic: 'Rationalize', stem, val: 1 / (2 * b), wrongs: [1 / b, 2 * b, 0, clDNE], solution: `Multiply the top and bottom by the conjugate √(${clP([1, a])}) + ${b}:\n(x + ${a} − ${b * b}) / ((${clP([1, -c])})(√(${clP([1, a])}) + ${b})) = 1/(√(${clP([1, a])}) + ${b}) → 1/(${b} + ${b}) = ${fracT(1 / (2 * b))}` });
+  return clValQ(r, { topic: 'Rationalize', stem, val: 1 / (2 * b), wrongs: [1 / b, 2 * b, 0, clDNE], solution: `Multiply the top and bottom by the conjugate √(${clP([1, a])}) + ${b}:\n(${clP([1, a])} − ${b * b}) / ((${clP([1, -c])})(√(${clP([1, a])}) + ${b})) = 1/(√(${clP([1, a])}) + ${b}) → 1/(${b} + ${b}) = ${fracT(1 / (2 * b))}` });
 };
 TEMPLATES.cl12DiffQ = (r) => {
   const a = nz(r, -3, 4), b = ri(r, -6, 6), k = ri(r, -5, 5), c = ri(r, -3, 3), L = 2 * a * c + b;
   return clValQ(r, { topic: 'Limit of a difference quotient', stem: `f(x) = ${clP([a, b, k])}. Find the limit as h → 0 of (f(${fmt(c)} + h) ${MINUS} f(${fmt(c)})) / h.`, val: L, wrongs: [a * c * c + b * c + k, 2 * a * c, clDNE],
-    solution: `f(${fmt(c)} + h) − f(${fmt(c)}) = ${fmt(2 * a * c + b)}h ${a < 0 ? MINUS : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h².\nDivide by h: ${fmt(2 * a * c + b)} ${a < 0 ? MINUS : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h → ${fmt(L)} as h → 0. (This is the slope of the tangent line at x = ${fmt(c)}.)` });
+    solution: `f(${fmt(c)} + h) − f(${fmt(c)}) = ${clP([a, 2 * a * c + b, 0]).replace(/x/g, 'h')}.\nDivide by h: ${clP([a, 2 * a * c + b]).replace(/x/g, 'h')} → ${fmt(L)} as h → 0. (This is the slope of the tangent line at x = ${fmt(c)}.)` });
 };
 TEMPLATES.cAP12 = (r) => clAP(TEMPLATES[pick(r, ['cl12Factor', 'cl12Conj', 'cl12DiffQ'])](r), 'Limits');
 
@@ -18548,7 +18548,7 @@ TEMPLATES.cl13FindK = (r) => {
     const c = nz(r, -3, 3), a = nz(r, -4, 4), b = ri(r, -6, 6), d = ri(r, -6, 6), num = a * c + b - d;
     if (num % (c * c)) continue; const k = num / (c * c); if (!k) continue;
     return clValQ(r, { topic: 'Make a function continuous', stem: `f(x) = ${clP([a, b])} if x ≤ ${fmt(c)};   kx²${d ? ` ${d < 0 ? MINUS : '+'} ${Math.abs(d)}` : ''} if x > ${fmt(c)}.\nFor what value of k is f continuous at x = ${fmt(c)}?`, val: k, wrongs: [-k, (a * c + b + d) / (c * c), num], label: 'k =',
-      solution: `The pieces must meet at x = ${fmt(c)}: ${fmt(a * c + b)} = k(${fmt(c * c)})${d ? ` ${d < 0 ? MINUS : '+'} ${Math.abs(d)}` : ''}, so ${fmt(c * c)}k = ${fmt(num)} and k = ${fmt(k)}.` });
+      solution: `The pieces must meet at x = ${fmt(c)}: ${fmt(a * c + b)} = k(${fmt(c * c)})${d ? ` ${d < 0 ? MINUS : '+'} ${Math.abs(d)}` : ''}, so ${c * c === 1 ? `k = ${fmt(num)}` : `${fmt(c * c)}k = ${fmt(num)} and k = ${fmt(k)}`}.` });
   }
 };
 TEMPLATES.cl13Remove = (r) => {
@@ -18573,8 +18573,9 @@ TEMPLATES.cAP13 = (r) => clAP(TEMPLATES[pick(r, ['cl13FindK', 'cl13IVT', 'cl13Pi
 TEMPLATES.cl14Trig = (r) => {
   const a = ri(r, 2, 9), b = ri(r, 2, 9), kind = ri(r, 0, 3);
   if (a === b) return TEMPLATES.cl14Trig(r);
-  const S = [[`sin(${a}x) / (${b}x)`, a / b, `= (${a}/${b}) · sin(${a}x)/(${a}x) → (${a}/${b})(1)`], [`tan(${a}x) / (${b}x)`, a / b, `= (${a}/${b}) · sin(${a}x)/(${a}x) · 1/cos(${a}x) → (${a}/${b})(1)(1)`],
-    [`sin(${a}x) / sin(${b}x)`, a / b, `= [sin(${a}x)/(${a}x)] · [(${b}x)/sin(${b}x)] · (${a}/${b}) → ${a}/${b}`], [`(1 ${MINUS} cos(${a}x)) / (${b}x)`, 0, `= (${a}/${b}) · (1 − cos(${a}x))/(${a}x) → (${a}/${b})(0)`]][kind];
+  const K = `(${fracT(a / b)})`;
+  const S = [[`sin(${a}x) / (${b}x)`, a / b, `= ${K} · sin(${a}x)/(${a}x) → ${K}(1)`], [`tan(${a}x) / (${b}x)`, a / b, `= ${K} · sin(${a}x)/(${a}x) · 1/cos(${a}x) → ${K}(1)(1)`],
+    [`sin(${a}x) / sin(${b}x)`, a / b, `= ${K} · [sin(${a}x)/(${a}x)] · [(${b}x)/sin(${b}x)] → ${K}(1)(1)`], [`(1 ${MINUS} cos(${a}x)) / (${b}x)`, 0, `= ${K} · (1 − cos(${a}x))/(${a}x) → ${K}(0)`]][kind];
   return clValQ(r, { topic: 'Trigonometric limits', stem: `Find the limit as x → 0:   ${S[0]}`, val: S[1], wrongs: [b / a, 1, kind === 3 ? a / b : 0, clDNE], solution: `Use the limits of sin θ/θ → 1 and (1 − cos θ)/θ → 0 as θ → 0:\n${S[0]} ${S[2]} = ${fracT(S[1])}` });
 };
 TEMPLATES.cl14Squeeze = (r) => {
@@ -18585,7 +18586,7 @@ TEMPLATES.cl14Squeeze = (r) => {
 };
 TEMPLATES.cl14ExpLog = (r) => {
   const c = ri(r, 1, 4), kind = ri(r, 0, 2);
-  if (kind === 0) { const k = nz(r, -3, 3); return clValQ(r, { topic: 'Exponential and log limits', stem: `Find the limit as x → ${c}:   ln(e^(${k}x))`, val: k * c, wrongs: [k, c, Math.exp(k * c) > 1e6 ? 0 : k * c + 1], solution: `ln and eˣ are inverses and continuous: ln(e^(${k}x)) = ${k}x → ${fmt(k * c)}.` }); }
+  if (kind === 0) { const k = nz(r, -3, 3); return clValQ(r, { topic: 'Exponential and log limits', stem: `Find the limit as x → ${c}:   ln(e^(${fmt(k)}x))`, val: k * c, wrongs: [k, c, Math.exp(k * c) > 1e6 ? 0 : k * c + 1], solution: `ln and eˣ are inverses and continuous: ln(e^(${fmt(k)}x)) = ${fmt(k)}x → ${fmt(k * c)}.` }); }
   if (kind === 1) { const m = ri(r, 2, 5); return clValQ(r, { topic: 'Exponential and log limits', stem: `Find the limit as x → ${c}:   (x² + ${m}) · e^(x ${MINUS} ${c})`, val: c * c + m, wrongs: [(c * c + m) * Math.E, c * c, 0], solution: `Continuous, so substitute: (${c * c} + ${m}) · e⁰ = ${c * c + m}.` }); }
   const b = pick(r, [2, 3, 10]), p = ri(r, 1, 3), v = b ** p - c; if (v <= 0) return TEMPLATES.cl14ExpLog(r);
   return clValQ(r, { topic: 'Exponential and log limits', stem: `Find the limit as x → ${c}:   log${b === 10 ? '' : b === 2 ? '₂' : '₃'}(x + ${v})`, val: p, wrongs: [b ** p, p + 1, 0], solution: `log is continuous on its domain: log${b === 10 ? '' : b === 2 ? '₂' : '₃'}(${c} + ${v}) = log${b === 10 ? '' : b === 2 ? '₂' : '₃'} ${b ** p} = ${p}.` });
@@ -18604,7 +18605,7 @@ TEMPLATES.cl15AtInf = (r) => {
   const num = [a, ...Array(n).fill(0).map(() => ri(r, -6, 6))], den = [b, ...Array(m).fill(0).map(() => ri(r, -6, 6))];
   let val; if (n < m) val = 0; else if (n === m) val = a / b; else { const s = Math.sign(a / b) * (dir === '∞' ? 1 : (n - m) % 2 ? -1 : 1); val = s > 0 ? Infinity : -Infinity; }
   return clValQ(r, { topic: 'Limits at infinity', stem: `Find the limit as x → ${dir}:   (${clP(num)}) / (${clP(den)})`, val, wrongs: [n === m ? 0 : a / b, b / a, typeof val === 'number' && !isFinite(val) ? -val : Infinity], label: 'Limit:',
-    solution: `Divide the top and bottom by x${m > 1 ? SUP[m] : ''} (the highest power in the denominator). ${n < m ? 'The top → 0 and the bottom → ' + fmt(b) + ', so the limit is 0.' : n === m ? `Only the leading coefficients remain: ${fracT(a / b)}.` : `The top grows without bound: it behaves like ${fracT(a / b)}x${n - m > 1 ? SUP[n - m] : ''}, so the limit is ${val > 0 ? '∞' : '−∞'}.`}` });
+    solution: `Divide the top and bottom by x${m > 1 ? SUP[m] : ''} (the highest power in the denominator). ${n < m ? 'The top → 0 and the bottom → ' + fmt(b) + ', so the limit is 0.' : n === m ? `Only the leading coefficients remain: ${fracT(a / b)}.` : `The top grows without bound: it behaves like ${Number.isInteger(a / b) ? (a / b === 1 ? '' : a / b === -1 ? MINUS : fmt(a / b)) : `(${fracT(a / b)})`}x${n - m > 1 ? SUP[n - m] : ''}, so the limit is ${val > 0 ? '∞' : '−∞'}.`}` });
 };
 TEMPLATES.cl15Asym = (r) => {
   const a = nz(r, -4, 4), b = ri(r, -6, 6), c = nz(r, -5, 5), d = ri(r, 1, 4), kind = ri(r, 0, 1);
@@ -18622,7 +18623,8 @@ TEMPLATES.cl16Delta = (r) => {
   const m = pick(r, [1, 2, 3, 6, -1, -2, -3, -6]), b = ri(r, -8, 8), c = ri(r, -3, 4), eps = pick(r, [0.06, 0.12, 0.3, 0.6, 0.012]), L = m * c + b, d = eps / Math.abs(m);
   return { topic: 'ε-δ: finding δ', stem: `The limit of ${clP([m, b])} as x → ${fmt(c)} is ${fmt(L)}. Find the largest δ that works for ε = ${eps}: if 0 < |x ${c < 0 ? '+' : MINUS} ${Math.abs(c)}| < δ, then |(${clP([m, b])}) ${L < 0 ? '+' : MINUS} ${Math.abs(L)}| < ${eps}.`.replace('|x − 0|', '|x|'),
     ...buildChoices(r, `δ = ${fmt3(d)}`, [`δ = ${fmt3(eps * Math.abs(m))}`, `δ = ${eps}`, `δ = ${fmt3(eps / (Math.abs(m) + 1))}`], (i) => `δ = ${fmt3(eps * (i + 2))}`), fr: FR.nums(['δ ='], [d], `δ = ${fmt3(d)}`),
-    solution: `|(${clP([m, b])}) − ${fmt(L)}| = |${fmt(m)}(x − ${fmt(c)})| = ${Math.abs(m)}|x − ${fmt(c)}| < ${eps} exactly when |x − ${fmt(c)}| < ${eps}/${Math.abs(m)}, so δ = ${fmt3(d)}.` };
+    solution: (() => { const xc = c === 0 ? 'x' : c < 0 ? `x + ${-c}` : `x ${MINUS} ${c}`, mm = Math.abs(m) === 1 ? '' : String(Math.abs(m));
+      return `|(${clP([m, b])}) ${L < 0 ? '+' : MINUS} ${Math.abs(L)}| = ${m === 1 ? '' : `|${m === -1 ? MINUS : fmt(m)}(${xc})| = `}${mm}|${xc}| < ${eps} exactly when |${xc}| < ${eps}${mm ? '/' + mm : ''}, so δ = ${fmt3(d)}.`; })() };
 };
 /* ----- AP Calculus, Chapter P (Sullivan & Miranda) ----- */
 const cpLin = (p, v = 'x') => (p === 0 ? v : p > 0 ? `${v} ${MINUS} ${p}` : `${v} + ${-p}`);
