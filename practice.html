@@ -16608,7 +16608,7 @@ TEMPLATES.co101Lim = (r) => coList(r, CO101_L, 'Limits of sequences (BC)', 'Limi
 const CO101_M = [['2/(3n + 1)', 'Decreasing and bounded'], ['n/(n + 1)', 'Increasing and bounded'], ['n²', 'Increasing and not bounded'], ['1 − 1/n', 'Increasing and bounded'], ['3ⁿ', 'Increasing and not bounded'], ['1/n!', 'Decreasing and bounded'], ['(−1)ⁿ/n', 'Not monotonic, but bounded']];
 TEMPLATES.co101Mono = (r) => { const [s, ans] = pick(r, CO101_M), all = ['Decreasing and bounded', 'Increasing and bounded', 'Increasing and not bounded', 'Decreasing and not bounded', 'Not monotonic, but bounded'];
   return ccFormQ(r, { topic: 'Monotonic and bounded sequences (BC)', stem: `The sequence {${s}}, n ≥ 1, can be described as`, ans, wrongs: shuffle(r, all.filter((a) => a !== ans)).slice(0, 3), label: 'It is', solution: `Compare consecutive terms (or the derivative of the related function) and look for upper and lower bounds.\n${ans}` }); };
-TEMPLATES.cAP101 = (r) => clAP(TEMPLATES[pick(r, ['co101Lim', 'co101Mono'])](r), 'Sequences (BC)');
+TEMPLATES.cAP101 = (r) => clAP(apPick(r, ['co101Lim', 'co101Mono']), 'Sequences (BC)');
 
 /* --- 10.2 infinite series --- */
 TEMPLATES.co102Geo = (r) => {
@@ -16623,7 +16623,7 @@ TEMPLATES.co102Tel = (r) => {
   return ccFormQ(r, { topic: 'Telescoping series (BC)', stem: `Find the sum of the telescoping series ${coS()}${t}.`, ans: coFr(1, a + 1), wrongs: [coFr(1, a + 2), '1', 'The series diverges', a ? coFr(1, a) : '2', '0'].filter((w) => w !== coFr(1, a + 1)), label: 'Sum:',
     solution: `${kind ? '' : `Partial fractions: 1/((k + ${a})(k + ${a + 1})) = 1/(k + ${a}) − 1/(k + ${a + 1}). `.replace(/\(k \+ 0\)|k \+ 0/g, 'k')}The partial sums collapse: Sₙ = 1/${a + 1} − 1/(n + ${a + 1}) → ${coFr(1, a + 1)}` });
 };
-TEMPLATES.cAP102 = (r) => clAP(TEMPLATES[pick(r, ['co102Geo', 'co102Tel', 'c112Decimal'])](r), 'Infinite series (BC)');
+TEMPLATES.cAP102 = (r) => clAP(apPick(r, ['co102Geo', 'co102Tel', 'c112Decimal']), 'Infinite series (BC)');
 
 /* --- 10.3 nth term test; integral test; p-series --- */
 const CO103_P = [['1/k²', 'Converges: a p-series with p = 2 > 1'], ['1/√k', 'Diverges: a p-series with p = 1/2 ≤ 1'], ['1/k^(3/2)', 'Converges: a p-series with p = 3/2 > 1'], ['1/k^0.9', 'Diverges: a p-series with p = 0.9 ≤ 1'], ['1/k^1.01', 'Converges: a p-series with p = 1.01 > 1'], ['1/k', 'Diverges: a p-series with p = 1 (the harmonic series)'], ['1/∛k', 'Diverges: a p-series with p = 1/3 ≤ 1'], ['1/k^π', 'Converges: a p-series with p = π > 1']];
@@ -16638,7 +16638,7 @@ const CO103_I = [['1/(k ln k), starting at k = 2', 'Diverges: ∫ dx/(x ln x) = 
 TEMPLATES.co103Int = (r) => { const [s, ans] = pick(r, CO103_I), conv = ans.startsWith('Conv');
   return ccFormQ(r, { topic: 'The Integral Test (BC)', stem: `Use the Integral Test to decide whether the series with terms ${s} converges.`, ans, wrongs: [conv ? 'Diverges: the integral is infinite' : 'Converges: the integral is finite', 'Converges, because the terms approach 0', 'The Integral Test does not apply'], label: 'Conclusion:',
     solution: `f is positive, continuous, and decreasing, so the series and the integral either both converge or both diverge.\n${ans}` }); };
-TEMPLATES.cAP103 = (r) => clAP(TEMPLATES[pick(r, ['co103P', 'co103Div', 'co103Int'])](r), 'Integral Test and p-series (BC)');
+TEMPLATES.cAP103 = (r) => clAP(apPick(r, ['co103P', 'co103Div', 'co103Int']), 'Integral Test and p-series (BC)');
 
 /* --- 10.4 comparison tests --- */
 const CO104 = [['1/(k² + 1)', 'Converges: compare with Σ 1/k²', ['Diverges: compare with Σ 1/k', 'Converges: compare with Σ 1/k', 'Diverges by the nth Term Test']],
@@ -16650,7 +16650,7 @@ const CO104 = [['1/(k² + 1)', 'Converges: compare with Σ 1/k²', ['Diverges: c
   ['(2k² − 1)/(k(k² + 3))', 'Diverges: limit comparison with Σ 1/k', ['Converges: limit comparison with Σ 1/k²', 'Converges: compare with Σ 1/k³', 'Diverges by the nth Term Test']]];
 TEMPLATES.co104Comp = (r) => { const [s, ans, W] = pick(r, CO104);
   return ccFormQ(r, { topic: 'Comparison tests (BC)', stem: `Determine whether ${coS()}${s} converges or diverges.`, ans, wrongs: W, label: 'Conclusion:', solution: `For large k, the terms behave like those of the comparison series (check the limit of their ratio, or the inequality).\n${ans}` }); };
-TEMPLATES.cAP104 = (r) => clAP(TEMPLATES.co104Comp(r), 'Comparison tests (BC)');
+TEMPLATES.cAP104 = (r) => clAP(apPick(r, ['co104Comp']), 'Comparison tests (BC)');
 
 /* --- 10.5 alternating series; absolute convergence --- */
 const CO105 = [['(−1)^(k+1)/k', 'Conditionally convergent'], ['(−1)^(k+1)/k²', 'Absolutely convergent'], ['(−1)^k·k/(k + 1)', 'Divergent'], ['(−1)^(k+1)/√k', 'Conditionally convergent'], ['(−1)^k/3^k', 'Absolutely convergent'], ['(−1)^k/(k ln k), starting at k = 2', 'Conditionally convergent'], ['(−1)^k (5/3)^k', 'Divergent'], ['(−1)^(k+1)/k!', 'Absolutely convergent']];
@@ -16666,7 +16666,7 @@ TEMPLATES.co105Err = (r) => {
   return cmValQ(r, { topic: 'Alternating series error (BC)', stem: `The sum of ${coS()}(−1)^(k+1)/k² is approximated by its first ${n} terms. What is the alternating series error bound?`, val: v, wrongs: [1 / (n * n), 1 / (n + 2) ** 2, 1 / (n + 1)], label: '|Error| ≤',
     solution: `The error is at most the first omitted term: 1/(${n + 1})² = ${fracT(v)}` });
 };
-TEMPLATES.cAP105 = (r) => clAP(TEMPLATES[pick(r, ['co105Class', 'co105Err'])](r), 'Alternating series (BC)');
+TEMPLATES.cAP105 = (r) => clAP(apPick(r, ['co105Class', 'co105Err']), 'Alternating series (BC)');
 
 /* --- 10.6 ratio test; root test --- */
 const CO106_R = [['k/3^k', '1/3', 'Converges'], ['2^k/k!', '0', 'Converges'], ['k!/5^k', '∞', 'Diverges'], ['k²/2^k', '1/2', 'Converges'], ['3^k/k³', '3', 'Diverges'], ['(k + 1)/k²', '1', 'No information'], ['5^k/(k·4^k)', '5/4', 'Diverges'], ['k^k/k!', 'e', 'Diverges']];
@@ -16679,14 +16679,14 @@ const CO106_T = [['((2k + 1)/(5k + 1))^k', '2/5', 'converges'], ['(k/(3k + 1))^k
 TEMPLATES.co106Root = (r) => { const [s, L, c] = pick(r, CO106_T), ans = `L = ${L}: the series ${c}`;
   return ccFormQ(r, { topic: 'The Root Test (BC)', stem: `Apply the Root Test to ${coS()}${s}.`, ans, wrongs: [`L = ${L}: the series ${c === 'converges' ? 'diverges' : 'converges'}`, `L = 1: the test gives no information`, `L = ${L === '0' ? '1/2' : '0'}: the series converges`], label: 'Result:',
     solution: `L = lim ᵏ√|aₖ|. The kth root removes the outer power k.\n${ans}.` }); };
-TEMPLATES.cAP106 = (r) => clAP(TEMPLATES[pick(r, ['co106Ratio', 'co106Root'])](r), 'Ratio and Root Tests (BC)');
+TEMPLATES.cAP106 = (r) => clAP(apPick(r, ['co106Ratio', 'co106Root']), 'Ratio and Root Tests (BC)');
 
 /* --- 10.7 summary of tests --- */
 const CO107 = [['k/(k + 1)', 'The nth Term Test'], ['1/k³', 'The p-series test'], ['(2/3)^k', 'The geometric series test'], ['(−1)^k/k', 'The Alternating Series Test'], ['k!/10^k', 'The Ratio Test'], ['(k/(2k + 1))^k', 'The Root Test'], ['1/(k² + 5)', 'The Comparison Test'], ['1/(k ln k), starting at k = 2', 'The Integral Test']];
 TEMPLATES.co107Test = (r) => { const [s, ans] = pick(r, CO107), all = CO107.map((q) => q[1]);
   return ccFormQ(r, { topic: 'Choosing a test (BC)', stem: `Which test is the most direct way to decide whether ${coS()}${s} converges?`, ans, wrongs: shuffle(r, all.filter((a) => a !== ans)).slice(0, 3), label: 'Use',
     solution: `Look at the form: limits that are not 0 (nth Term), 1/kᵖ (p-series), rᵏ (geometric), (−1)ᵏ (alternating), factorials (Ratio), kth powers (Root), close to a known series (Comparison), an integrable f (Integral).\n${ans}` }); };
-TEMPLATES.cAP107 = (r) => clAP(TEMPLATES[pick(r, ['co107Test', 'co104Comp', 'co105Class', 'co106Ratio'])](r), 'Choosing a test (BC)');
+TEMPLATES.cAP107 = (r) => clAP(apPick(r, ['co107Test', 'co104Comp', 'co105Class', 'co106Ratio']), 'Choosing a test (BC)');
 
 /* --- 10.8 power series --- */
 TEMPLATES.co108Rad = (r) => {
@@ -16705,7 +16705,7 @@ const CO108_G = [['1/(1 + x²)', `${'Σ from k = 0 to ∞ of '}(−1)^k x^(2k)`,
   ['1/(2 − x)', 'Σ from k = 0 to ∞ of x^k/2^(k+1)', ['Σ from k = 0 to ∞ of x^k/2^k', 'Σ from k = 0 to ∞ of 2^k x^k', 'Σ from k = 0 to ∞ of (−1)^k x^k/2^(k+1)'], '1/(2 − x) = (1/2) · 1/(1 − x/2).'],
   ['ln(1 + x)', 'Σ from k = 1 to ∞ of (−1)^(k+1) x^k/k', ['Σ from k = 1 to ∞ of x^k/k', 'Σ from k = 0 to ∞ of (−1)^k x^k', 'Σ from k = 1 to ∞ of (−1)^(k+1) x^k/k!'], 'Integrate 1/(1 + x) = Σ (−1)ᵏxᵏ term by term.']];
 TEMPLATES.co108Geo = (r) => coList(r, CO108_G, 'Power series from geometric series (BC)', 'Series:', (s) => `Which power series represents ${s}?`);
-TEMPLATES.cAP108 = (r) => clAP(TEMPLATES[pick(r, ['co108Rad', 'co108Geo'])](r), 'Power series (BC)');
+TEMPLATES.cAP108 = (r) => clAP(apPick(r, ['co108Rad', 'co108Geo']), 'Power series (BC)');
 
 /* --- 10.9 Taylor and Maclaurin series --- */
 const CO109_S = [['eˣ', 'Σ from k = 0 to ∞ of x^k/k!', ['Σ from k = 0 to ∞ of x^k', 'Σ from k = 1 to ∞ of x^k/k', 'Σ from k = 0 to ∞ of (−1)^k x^k/k!']],
@@ -16728,7 +16728,7 @@ TEMPLATES.co109Taylor = (r) => {
   return ccFormQ(r, { topic: 'Taylor coefficients (BC)', stem: `If f⁽${n}⁾(${fmt(c)}) = ${fmt(d)}, what is the coefficient of ${cx}${SUP[n]} in the Taylor series for f about x = ${fmt(c)}?`, ans: coFr(d, coFact(n)), wrongs: [coFr(d, n), fmt(d), coFr(d, coFact(n + 1))].filter((w) => w !== coFr(d, coFact(n))), label: 'Coefficient:',
     solution: `The coefficient of ${cx}ⁿ is f⁽ⁿ⁾(${fmt(c)})/n! = ${fmt(d)}/${n}! = ${coFr(d, coFact(n))}` });
 };
-TEMPLATES.cAP109 = (r) => clAP(TEMPLATES[pick(r, ['co109Series', 'co109Coef', 'co109Taylor'])](r), 'Taylor and Maclaurin series (BC)');
+TEMPLATES.cAP109 = (r) => clAP(apPick(r, ['co109Series', 'co109Coef', 'co109Taylor']), 'Taylor and Maclaurin series (BC)');
 
 /* --- 10.10 Taylor polynomials; Lagrange error bound --- */
 const CO1010_A = [['Use the Taylor polynomial P₄(x) of y = cos x at 0 to approximate cos 0.2.', 0.980067, '0.980', ['1', '0.803', '0.801'], 'P₄(x) = 1 − x²/2 + x⁴/24: 1 − 0.02 + 0.0000667'],
@@ -16749,7 +16749,7 @@ TEMPLATES.co1010Deriv = (r) => {
   return cmValQ(r, { topic: 'Derivatives from a Taylor polynomial (BC)', stem: `The third-degree Taylor polynomial for f about x = ${fmt(c)} is P₃(x) = ${P}. Find f${ask === 2 ? '″' : '‴'}(${fmt(c)}).`, val, wrongs: [a[ask], a[ask] * ask, a[ask] / coFact(ask)], label: `f${ask === 2 ? '″' : '‴'}(${fmt(c)}) =`,
     solution: `The coefficient of ${cx}${ask === 2 ? '²' : '³'} is f${ask === 2 ? '″' : '‴'}(${fmt(c)})/${ask}!, so f${ask === 2 ? '″' : '‴'}(${fmt(c)}) = ${ask}! · ${cgP(a[ask])} = ${fmt(val)}` });
 };
-TEMPLATES.cAP1010 = (r) => clAP(TEMPLATES[pick(r, ['co1010Approx', 'co1010Lag', 'co1010Deriv'])](r), 'Taylor polynomials (BC)');
+TEMPLATES.cAP1010 = (r) => clAP(apPick(r, ['co1010Approx', 'co1010Lag', 'co1010Deriv']), 'Taylor polynomials (BC)');
 
 /* --- Chapter 10 free response (BC) --- */
 TEMPLATES.cf10Taylor = (r) => {
@@ -16808,7 +16808,7 @@ TEMPLATES.cn91Orient = (r) => {
   return ccFormQ(r, { topic: 'Orientation of a parametric curve (BC)', stem: `For ${Q[0]}, 0 ≤ t ≤ 2π, how is the circle traced?`, ans, wrongs: [`${other}, starting at ${Q[2]}`, `${Q[1]}, starting at ${Q[2] === `(${A}, 0)` ? `(0, ${A})` : `(${A}, 0)`}`, `${other}, starting at ${Q[2] === `(${A}, 0)` ? `(0, ${A})` : `(${A}, 0)`}`], label: 'Traced:',
     solution: `At t = 0 the point is ${Q[2]}. Check t = π/2 to see which way it moves: ${Q[1].toLowerCase()}.` });
 };
-TEMPLATES.cAP91 = (r) => clAP(TEMPLATES[pick(r, ['cn91Rect', 'cn91Point', 'cn91Orient'])](r), 'Parametric equations (BC)');
+TEMPLATES.cAP91 = (r) => clAP(apPick(r, ['cn91Rect', 'cn91Point', 'cn91Orient']), 'Parametric equations (BC)');
 
 /* --- 9.2 tangent lines; arc length --- */
 TEMPLATES.cn92Slope = (r) => {
@@ -16840,7 +16840,7 @@ const CN92_A = () => [['x = 3 cos t, y = 3 sin t, 0 ≤ t ≤ π', 3 * Math.PI, 
   ['x = 3t, y = 4t, 0 ≤ t ≤ 2', 10, '10', ['14', '7', '5'], 'Speed = √(9 + 16) = 5, so L = 10.'],
   ['x = 2 + 4t³, y = 1 + 6t², 0 ≤ t ≤ 1', 8 * Math.SQRT2 - 4, '8√2 − 4', ['16√2 − 8', '2^(7/2) − 1', '4'], 'Speed = √(144t⁴ + 144t²) = 12t√(t² + 1); L = 4(t² + 1)^(3/2) from 0 to 1 = 4(2√2 − 1).']];
 TEMPLATES.cn92Arc = (r) => cnExact(r, CN92_A().map(([s, v, t, W, why]) => [`Find the length of the curve ${s}.`, v, t, W, why]), 'Arc length of a parametric curve (BC)', 'L =');
-TEMPLATES.cAP92 = (r) => clAP(TEMPLATES[pick(r, ['cn92Slope', 'cn92HV', 'cn92Second', 'cn92ArcSetup', 'cn92Arc'])](r), 'Parametric derivatives and arc length (BC)');
+TEMPLATES.cAP92 = (r) => clAP(apPick(r, ['cn92Slope', 'cn92HV', 'cn92Second', 'cn92ArcSetup', 'cn92Arc']), 'Parametric derivatives and arc length (BC)');
 
 /* --- 9.3 polar equations --- */
 const CN_ANG = [[1, 6], [1, 4], [1, 3], [1, 2], [2, 3], [3, 4], [5, 6], [1, 1], [7, 6], [5, 4], [4, 3], [3, 2], [5, 3], [7, 4], [11, 6]];
@@ -16871,7 +16871,7 @@ const CN93_A = () => [['r = 3 from θ = 0 to θ = 2π', 6 * Math.PI, '6π', ['3�
   ['r = e^θ from θ = 0 to θ = 1', Math.SQRT2 * (Math.E - 1), '√2(e − 1)', ['e − 1', '√2 e', '2(e − 1)'], 'r² + r′² = 2e^(2θ): ∫₀¹ √2 e^θ dθ'],
   ['r = e^(θ/2) from θ = 0 to θ = 2', Math.sqrt(5) * (Math.E - 1), '√5(e − 1)', ['(√5/2)(e − 1)', '2(e − 1)', '√5 e'], 'r² + r′² = (5/4)e^θ: ∫₀² (√5/2)e^(θ/2) dθ = √5(e − 1)']];
 TEMPLATES.cn93Arc = (r) => cnExact(r, CN93_A().map(([s, v, t, W, why]) => [`Find the arc length of the polar curve ${s}.`, v, t, W, `s = ∫ √(r² + (dr/dθ)²) dθ. ${why}`]), 'Arc length of polar curves (BC)', 's =');
-TEMPLATES.cAP93 = (r) => clAP(TEMPLATES[pick(r, ['cn93Conv', 'cn93Ident', 'cn93Slope', 'cn93Arc'])](r), 'Polar equations (BC)');
+TEMPLATES.cAP93 = (r) => clAP(apPick(r, ['cn93Conv', 'cn93Ident', 'cn93Slope', 'cn93Arc']), 'Polar equations (BC)');
 
 /* --- 9.4 area in polar coordinates --- */
 TEMPLATES.cn94Area = (r) => {
@@ -16896,7 +16896,7 @@ const CN94_S = [['inside r = 2 sin θ and outside r = 1', '(1/2)∫ from π/6 to
   ['inside r = 4 cos θ and outside r = 2', '(1/2)∫ from −π/3 to π/3 of (16cos² θ − 4) dθ', ['(1/2)∫ from −π/3 to π/3 of (4 cos θ − 2)² dθ', '(1/2)∫ from 0 to π of (16cos² θ − 4) dθ', '∫ from −π/3 to π/3 of (4 cos θ − 2) dθ']]];
 TEMPLATES.cn94Setup = (r) => { const [reg, ans, W] = pick(r, CN94_S);
   return ccFormQ(r, { topic: 'Area between polar curves (BC)', stem: `Which integral gives the area of the region ${reg}?`, ans, wrongs: W, label: 'Area =', solution: `Find where the curves meet for the limits, then A = (1/2)∫ (R² − r²) dθ: square each radius separately.\n${ans}` }); };
-TEMPLATES.cAP94 = (r) => clAP(TEMPLATES[pick(r, ['cn94Area', 'cn94Inter', 'cn94Setup'])](r), 'Area in polar coordinates (BC)');
+TEMPLATES.cAP94 = (r) => clAP(apPick(r, ['cn94Area', 'cn94Inter', 'cn94Setup']), 'Area in polar coordinates (BC)');
 
 /* --- 9.5 derivatives of vector functions; arc length --- */
 TEMPLATES.cn95Deriv = (r) => {
@@ -16922,7 +16922,7 @@ const CN95_A = () => [['⟨3 cos t, 3 sin t⟩ from t = 0 to t = π', 3 * Math.P
   ['⟨eᵗ cos t, eᵗ sin t⟩ from t = 0 to t = 1', Math.SQRT2 * (Math.E - 1), '√2(e − 1)', ['e − 1', '√2 e', '2(e − 1)'], '‖r′(t)‖ = √2 eᵗ'],
   ['⟨t², t³⟩ from t = 0 to t = 1', (13 * Math.sqrt(13) - 8) / 27, '(13√13 − 8)/27', ['(13√13 − 1)/27', '√13/3', '2'], '‖r′(t)‖ = t√(4 + 9t²): L = (1/27)(4 + 9t²)^(3/2) from 0 to 1']];
 TEMPLATES.cn95Arc = (r) => cnExact(r, CN95_A().map(([s, v, t, W, why]) => [`Find the arc length of r(t) = ${s}.`, v, t, W, `L = ∫ ‖r′(t)‖ dt. ${why}`]), 'Arc length of a vector function (BC)', 'L =');
-TEMPLATES.cAP95 = (r) => clAP(TEMPLATES[pick(r, ['cn95Deriv', 'cn95Lim', 'cn95Domain', 'cn95Arc'])](r), 'Vector functions (BC)');
+TEMPLATES.cAP95 = (r) => clAP(apPick(r, ['cn95Deriv', 'cn95Lim', 'cn95Domain', 'cn95Arc']), 'Vector functions (BC)');
 
 /* --- 9.6 velocity and acceleration --- */
 TEMPLATES.cn96VA = (r) => {
@@ -16945,7 +16945,7 @@ TEMPLATES.cn96Force = (r) => {
   return cmValQ(r, { topic: 'Newton’s Second Law (BC)', stem: `An object of mass ${m} kg moves along r(t) = ${cnV(`${R} cos(${w === 1 ? '' : w}t)`, `${R} sin(${w === 1 ? '' : w}t)`)} (meters, seconds). Find the magnitude of the force acting on it, in newtons.`, val,
     wrongs: [m * R * w, R * w * w, m * R], label: '‖F‖ =', solution: `a(t) = −${w * w === 1 ? '' : w * w}r(t), so ‖a‖ = ${R}(${w})² = ${R * w * w} m/s².\n‖F‖ = m‖a‖ = ${m} · ${R * w * w} = ${val} N` });
 };
-TEMPLATES.cAP96 = (r) => clAP(TEMPLATES[pick(r, ['cn96VA', 'cn96Speed', 'cn96Force'])](r), 'Velocity and acceleration (BC)');
+TEMPLATES.cAP96 = (r) => clAP(apPick(r, ['cn96VA', 'cn96Speed', 'cn96Force']), 'Velocity and acceleration (BC)');
 
 /* --- 9.7 integrals of vector functions; projectile motion --- */
 TEMPLATES.cn97Def = (r) => {
@@ -16967,7 +16967,7 @@ TEMPLATES.cn97Proj = (r) => {
   return cdExactQ(r, { topic: 'Projectile motion (BC)', stem: `A projectile is fired from ground level at ${v0} ft/s at an angle of ${deg}° to the horizontal (g = 32 ft/s²). ${['How long is it in the air (in seconds)?', 'What is its maximum height (in feet)?', 'What is its range (in feet)?'][ask]}`, val, text, wrongs: W, label,
     solution: `r(t) = ⟨(${v0} cos ${deg}°)t, (${v0} sin ${deg}°)t − 16t²⟩.\n${sol}` });
 };
-TEMPLATES.cAP97 = (r) => clAP(TEMPLATES[pick(r, ['cn97Def', 'cn97IVP', 'cn97Proj'])](r), 'Integrals of vector functions (BC)');
+TEMPLATES.cAP97 = (r) => clAP(apPick(r, ['cn97Def', 'cn97IVP', 'cn97Proj']), 'Integrals of vector functions (BC)');
 
 /* --- Chapter 9 free response (BC) --- */
 TEMPLATES.cf9Param = (r) => {
@@ -17049,7 +17049,7 @@ const CM81_S = () => [['y = √x and y = x²', ciInt(0, 1, '(√x − x²)'), [c
   ['y = x² − 4 and y = 0', ciInt(-2, 2, '(4 − x²)'), [ciInt(-2, 2, '(x² − 4)'), ciInt(0, 2, '(4 − x²)'), ciInt(-4, 4, '(4 − x²)')], 'The parabola is below the x-axis on [−2, 2], so the top is y = 0.']];
 TEMPLATES.cm81Setup = (r) => { const [reg, ans, W, why] = pick(r, CM81_S());
   return ccFormQ(r, { topic: 'Setting up an area integral', stem: `Which integral gives the area of the region bounded by ${reg}?`, ans, wrongs: W, label: 'Area =', solution: `${why}\nArea = ${ans}` }); };
-TEMPLATES.cAP81 = (r) => clAP(TEMPLATES[pick(r, ['cm81Poly', 'cm81Y', 'cm81Trans', 'cm81Setup'])](r), 'Area between graphs');
+TEMPLATES.cAP81 = (r) => clAP(apPick(r, ['cm81Poly', 'cm81Y', 'cm81Trans', 'cm81Setup']), 'Area between graphs');
 
 /* --- 8.2 disks and washers --- */
 TEMPLATES.cm82Disk = (r) => {
@@ -17087,7 +17087,7 @@ TEMPLATES.cm82Line = (r) => {
     draw: cmRegion({ xr: [-1, 2], yr: below ? [-c - 1, 2] : [-1, c + 1], curves: [{ f: (x) => x * x }] }, { a: 0, b: 1, top: (x) => x * x, bot: () => 0, axis: ['y', below ? -c : c] }), size: [360, 360],
     solution: below ? `Distances to y = −${c}: outer radius x² + ${c} (to the curve), inner radius ${c} (to the x-axis).\nV = ${ans}` : `Distances to y = ${c}: outer radius ${c} (to the x-axis), inner radius ${c} − x² (to the curve).\nV = ${ans}` });
 };
-TEMPLATES.cAP82 = (r) => clAP(TEMPLATES[pick(r, ['cm82Disk', 'cm82Washer', 'cm82YAxis', 'cm82Line'])](r), 'Disks and washers');
+TEMPLATES.cAP82 = (r) => clAP(apPick(r, ['cm82Disk', 'cm82Washer', 'cm82YAxis', 'cm82Line']), 'Disks and washers');
 
 /* --- 8.3 cylindrical shells --- */
 TEMPLATES.cm83Shell = (r) => {
@@ -17115,7 +17115,7 @@ TEMPLATES.cm83Setup = (r) => {
     draw: cmRegion({ xr: [Math.min(-1, c - 1), Math.max(3, c + 1)], yr: [-1, 2], curves: [{ f: (x) => 2 * x - x * x }] }, { a: 0, b: 2, top: (x) => 2 * x - x * x, bot: () => 0, axis: ['x', c] }), size: [360, 360],
     solution: `Shell radius = distance from x to the line x = ${fmt(c)}: ${rad.slice(1, -1)}. Height = 2x − x².\nV = ${ans}` });
 };
-TEMPLATES.cAP83 = (r) => clAP(TEMPLATES[pick(r, ['cm83Shell', 'cm83Radius', 'cm83Setup'])](r), 'Cylindrical shells');
+TEMPLATES.cAP83 = (r) => clAP(apPick(r, ['cm83Shell', 'cm83Radius', 'cm83Setup']), 'Cylindrical shells');
 
 /* --- 8.4 slicing --- */
 const cmBase = (r) => pick(r, [
@@ -17136,7 +17136,7 @@ TEMPLATES.cm84Area = (r) => {
   return ccFormQ(r, { topic: 'Cross-sectional area', stem: `Cross sections of a solid are ${CM84_S[i][0]}, where s is the width of the base at x. Which gives the area A(x) of a cross section?`, ans, wrongs: shuffle(r, opts.filter((o) => o !== ans)).slice(0, 3), label: 'A(x) =',
     solution: ['A square with side s has area s².', 'A semicircle with diameter s has radius s/2: A = (1/2)π(s/2)² = (π/8)s².', 'An equilateral triangle with side s has area (√3/4)s².', 'An isosceles right triangle with legs s has area (1/2)s².'][i] });
 };
-TEMPLATES.cAP84 = (r) => clAP(TEMPLATES[pick(r, ['cm84Vol', 'cm84Vol', 'cm84Area'])](r), 'Volume by slicing');
+TEMPLATES.cAP84 = (r) => clAP(apPick(r, ['cm84Vol', 'cm84Vol', 'cm84Area']), 'Volume by slicing');
 
 /* --- 8.5 arc length (BC) --- */
 const CM85_T = [['ln x', '√(1 + 1/x²)', ['√(1 + 1/x)', '√(1 + (ln x)²)', '√(1 − 1/x²)']], ['sin x', '√(1 + cos² x)', ['√(1 + sin² x)', '√(1 − cos² x)', '√(1 + cos x)']], ['eˣ', '√(1 + e^(2x))', ['√(1 + eˣ)', '√(1 + e^(x²))', '√(1 − e^(2x))']], ['tan x', '√(1 + sec⁴ x)', ['√(1 + sec² x)', '√(1 + tan² x)', '√(1 + sec x tan x)']]];
@@ -17154,7 +17154,7 @@ const CM85_E = () => [...[[3, 14 / 3, '14/3'], [8, 52 / 3, '52/3'], [15, 42, '42
   ['y = 3x − 1 from x = 1 to x = 2', Math.sqrt(10), '√10', ['3', '4', '√8'], 'f′ = 3: s = ∫₁² √10 dx = √10 (the distance from (1, 2) to (2, 5))'],
   ['y = x²/4 − (ln x)/2 from x = 1 to x = e', (Math.E ** 2 + 1) / 4, '(e² + 1)/4', ['(e² − 1)/4', 'e²/4', '(e + 1)/2'], '1 + (f′)² = (x/2 + 1/(2x))², so s = [x²/4 + (ln x)/2] from 1 to e = (e² + 1)/4']];
 TEMPLATES.cm85Exact = (r) => cmExact(r, CM85_E().map(([s, v, t, W, why]) => [`Find the arc length of the graph of ${s}.`, v, t, W, why]), 'Arc length (BC)', 's =');
-TEMPLATES.cAP85 = (r) => clAP(TEMPLATES[pick(r, ['cm85Setup', 'cm85Exact'])](r), 'Arc length (BC)');
+TEMPLATES.cAP85 = (r) => clAP(apPick(r, ['cm85Setup', 'cm85Exact']), 'Arc length (BC)');
 
 /* --- 8.6 work --- */
 TEMPLATES.cm86Spring = (r) => {
@@ -17249,7 +17249,7 @@ TEMPLATES.ck71Particular = (r) => {
       solution: `General solution: y = eˣ − ${k / 2 === 1 ? '' : k / 2}cos(2x) + C.\ny(0) = 1 − ${k / 2} + C = ${fmt(y0)}, so C = ${fmt(C2)}: ${ans}` }); }
   return TEMPLATES.ce56IVP(r);
 };
-TEMPLATES.cAP71 = (r) => clAP(TEMPLATES[pick(r, ['ck71Class', 'ck71Verify', 'ck71Particular'])](r), 'Differential equations');
+TEMPLATES.cAP71 = (r) => clAP(apPick(r, ['ck71Class', 'ck71Verify', 'ck71Particular']), 'Differential equations');
 
 /* --- 7.2 separable equations; growth and decay --- */
 TEMPLATES.ck72Sep = (r) => {
@@ -17280,7 +17280,7 @@ TEMPLATES.ck72Cool = (r) => {
   return clValQ(r, { topic: 'Newton’s Law of Cooling', stem: `An object at ${R + D0}° is placed in a room at ${R}°. By Newton’s Law of Cooling, the difference between its temperature and the room’s halves every ${h} minutes. What is its temperature after ${n * h} minutes?`, val,
     wrongs: [(R + D0) / 2 ** n, R + D0 / (2 * n), D0 / 2 ** n].filter((w) => w !== val), label: 'Temperature =', solution: `u(t) = ${R} + ${D0}e^(kt), with the difference ${D0} halving every ${h} min.\nAfter ${n * h} min: ${R} + ${D0}(1/2)${n > 1 ? SUP[n] : ''} = ${fmt(val)}°` });
 };
-TEMPLATES.cAP72 = (r) => clAP(TEMPLATES[pick(r, ['ck72Sep', 'ck72Growth', 'ck72K', 'ck72Cool'])](r), 'Separable equations and growth');
+TEMPLATES.cAP72 = (r) => clAP(apPick(r, ['ck72Sep', 'ck72Growth', 'ck72K', 'ck72Cool']), 'Separable equations and growth');
 
 /* --- 7.3 slope fields --- */
 TEMPLATES.ck73Match = (r) => {
@@ -17298,7 +17298,7 @@ TEMPLATES.ck73Slope = (r) => {
 const CK73_Z = [['x − y', 'Along the line y = x'], ['x + y', 'Along the line y = −x'], ['xy', 'Along both axes'], ['y − 2x', 'Along the line y = 2x'], ['x² − y', 'Along the parabola y = x²'], ['y(y − 2)', 'Along the lines y = 0 and y = 2']];
 TEMPLATES.ck73Zero = (r) => { const [f, ans] = pick(r, CK73_Z), all = CK73_Z.map((q) => q[1]);
   return ccFormQ(r, { topic: 'Slope fields: horizontal segments', stem: `Where are the segments in the slope field for dy/dx = ${f} horizontal?`, ans, wrongs: shuffle(r, all.filter((a) => a !== ans)).slice(0, 3), label: 'Horizontal:', solution: `Horizontal segments have slope 0: set ${f} = 0. ${ans}.` }); };
-TEMPLATES.cAP73 = (r) => clAP(TEMPLATES[pick(r, ['ck73Match', 'ck73Slope', 'ck73Zero'])](r), 'Slope fields');
+TEMPLATES.cAP73 = (r) => clAP(apPick(r, ['ck73Match', 'ck73Slope', 'ck73Zero']), 'Slope fields');
 
 /* --- 7.4 Euler's Method --- */
 TEMPLATES.ck74Euler = (r) => {
@@ -17310,7 +17310,7 @@ TEMPLATES.ck74Euler = (r) => {
     solution: `yₙ₊₁ = yₙ + h · f(xₙ, yₙ), starting at (${x0}, ${y0}):\n${rows.join('\n')}` });
   return cjDec(q, `y(${fmt(x0 + 2 * h)}) ≈`, val);
 };
-TEMPLATES.cAP74 = (r) => clAP(TEMPLATES.ck74Euler(r), 'Euler’s Method (BC)');
+TEMPLATES.cAP74 = (r) => clAP(apPick(r, ['ck74Euler']), 'Euler’s Method (BC)');
 
 /* --- 7.5 the logistic model --- */
 TEMPLATES.ck75Cap = (r) => {
@@ -17327,7 +17327,7 @@ TEMPLATES.ck75Func = (r) => {
   return clValQ(r, { topic: 'The logistic function', stem: `${txt}. ${ask ? 'What is the initial population P(0)?' : 'What is the limit of P(t) as t → ∞ (the carrying capacity)?'}`, val, wrongs: ask ? [M, M / A, M / 2] : [M / (1 + A), M / 2, A], label: ask ? 'P(0) =' : 'Carrying capacity =',
     solution: ask ? `P(0) = ${M}/(1 + ${A}) = ${fracT(val)}` : `As t → ∞, e^(−${k}t) → 0, so P → ${M}.` });
 };
-TEMPLATES.cAP75 = (r) => clAP(TEMPLATES[pick(r, ['ck75Cap', 'ck75Func'])](r), 'The logistic model (BC)');
+TEMPLATES.cAP75 = (r) => clAP(apPick(r, ['ck75Cap', 'ck75Func']), 'The logistic model (BC)');
 
 /* --- Chapter 7 free response --- */
 TEMPLATES.cf7Sep = (r) => {
@@ -17387,7 +17387,7 @@ const CJ66_C = [['xe^(3x)', 'u = x, dv = e^(3x) dx'], ['x² ln x', 'u = ln x, dv
 TEMPLATES.cj66Choose = (r) => { const [f, ans] = pick(r, CJ66_C), [u, dv] = ans.split(', '), sw = `u = ${dv.replace('dv = ', '').replace(' dx', '')}, dv = ${u.replace('u = ', '')} dx`;
   return ccFormQ(r, { topic: 'Choosing u and dv', stem: `To find ∫ ${f} dx by parts, which choice of u and dv works best?`, ans, wrongs: [sw, `u = ${f}, dv = dx`, `u = 1, dv = ${f} dx`].filter((w) => w !== ans), label: 'Choose:',
     solution: `Pick u so that du is simpler (logs and inverse trig first, then powers of x), and dv so that v is easy to find: ${ans}.` }); };
-TEMPLATES.cAP66 = (r) => clAP(TEMPLATES[pick(r, ['cj66Indef', 'cj66Def', 'cj66Choose'])](r), 'Integration by parts (BC)');
+TEMPLATES.cAP66 = (r) => clAP(apPick(r, ['cj66Indef', 'cj66Def', 'cj66Choose']), 'Integration by parts (BC)');
 
 /* --- 6.7 integrals containing trigonometric functions --- */
 const CJ67_I = [['sin³ x', '−cos x + (1/3)cos³ x + C', ['cos x − (1/3)cos³ x + C', '(1/4)sin⁴ x + C', '−(1/4)cos⁴ x + C'], 'sin³ x = (1 − cos² x)sin x; let u = cos x.'],
@@ -17406,7 +17406,7 @@ const CJ67_D = [['∫₀^π sin² x dx', Math.PI / 2, 'π/2', ['π', '1', '0'], 
   ['∫₀^(π/4) tan² x dx', 1 - Math.PI / 4, '1 − π/4', ['1', 'π/4', '1 + π/4'], '[tan x − x] from 0 to π/4'],
   ['∫₀^(π/2) sin x cos² x dx', 1 / 3, '1/3', ['2/3', '1', '−1/3'], '[−cos³ x/3] from 0 to π/2 = 0 − (−1/3)']];
 TEMPLATES.cj67Def = (r) => cjExact(r, CJ67_D, 'Definite trigonometric integrals');
-TEMPLATES.cAP67 = (r) => clAP(TEMPLATES[pick(r, ['cj67Indef', 'cj67Def'])](r), 'Trigonometric integrals');
+TEMPLATES.cAP67 = (r) => clAP(apPick(r, ['cj67Indef', 'cj67Def']), 'Trigonometric integrals');
 
 /* --- 6.8 trigonometric substitution --- */
 TEMPLATES.cj68Which = (r) => {
@@ -17429,7 +17429,7 @@ TEMPLATES.cj68Formula = (r) => {
     [`1/√(x² + ${A})`, `ln|x + √(x² + ${A})| + C`, [`sin⁻¹(x/${a}) + C`, `(1/${a})tan⁻¹(x/${a}) + C`, `2√(x² + ${A}) + C`], `x = ${a} tan θ: ∫ sec θ dθ = ln|sec θ + tan θ|, then return to x`]][kind];
   return ccFormQ(r, { topic: 'Trigonometric substitution', stem: `Find ∫ ${Q[0]} dx.`, ans: Q[1], wrongs: Q[2], label: '∫ =', solution: `${Q[3]}.\n∫ ${Q[0]} dx = ${Q[1]}` });
 };
-TEMPLATES.cAP68 = (r) => clAP(TEMPLATES[pick(r, ['cj68Which', 'cj68Def', 'cj68Formula'])](r), 'Trigonometric substitution');
+TEMPLATES.cAP68 = (r) => clAP(apPick(r, ['cj68Which', 'cj68Def', 'cj68Formula']), 'Trigonometric substitution');
 
 /* --- 6.9 integrands containing ax² + bx + c; long division --- */
 TEMPLATES.cj69Square = (r) => {
@@ -17450,7 +17450,7 @@ TEMPLATES.cj69Def = (r) => {
   return cdExactQ(r, { topic: 'Completing the square', stem: `Evaluate ∫ from ${fmt(-h)} to ${fmt(-h + k)} of dx/(${q}).`, val: Math.PI / (4 * k), text: k === 1 ? 'π/4' : `π/${4 * k}`, wrongs: [k === 1 ? 'π/2' : `π/${2 * k}`, 'π', `1/${2 * k * k}`].filter((w) => w !== (k === 1 ? 'π/4' : `π/${4 * k}`)), label: 'Value =',
     solution: `${q} = (x ${h < 0 ? MINUS : '+'} ${Math.abs(h)})² + ${k * k}. With u = x ${h < 0 ? MINUS : '+'} ${Math.abs(h)}, u goes from 0 to ${k}: ${cjK(k)}[tan⁻¹(u/${k})] = ${cjK(k)}(π/4).` });
 };
-TEMPLATES.cAP69 = (r) => clAP(TEMPLATES[pick(r, ['cj69Square', 'cj69Divide', 'cj69Def'])](r), 'Quadratics and long division');
+TEMPLATES.cAP69 = (r) => clAP(apPick(r, ['cj69Square', 'cj69Divide', 'cj69Def']), 'Quadratics and long division');
 
 /* --- 6.10 partial fractions --- */
 function cjPF(r) { for (;;) { const a = ri(r, -4, 4), b = ri(r, -4, 4); if (a === b) continue; const A = nz(r, -4, 4), B = nz(r, -4, 4), p = A + B, q = -(A * b + B * a); if (!p && !q) continue; // (px + q)/((x − a)(x − b)) = A/(x − a) + B/(x − b)
@@ -17467,7 +17467,7 @@ TEMPLATES.cj610Def = (r) => {
   return cdExactQ(r, { topic: 'Integrating with partial fractions', stem: `Evaluate ∫ from ${c} to ${d} of dx/(x(x + ${k})).`, val: Math.log(ratio) / k, text: txt, wrongs: [`ln(${n1}/${d1})`.replace('ln(' + n1 + '/' + d1 + ')', k === 1 ? `ln(${d1}/${n1})` : `ln(${n1}/${d1})`), `${cjK(k)}ln(${d1}/${n1})`, `ln(${d}/${c})`].filter((w) => w !== txt), label: 'Value =',
     solution: `1/(x(x + ${k})) = ${cjK(k)}[1/x − 1/(x + ${k})].\n∫ = ${cjK(k)}[ln|x| − ln|x + ${k}|] from ${c} to ${d} = ${cjK(k)}ln(x/(x + ${k})) from ${c} to ${d} = ${txt}` });
 };
-TEMPLATES.cAP610 = (r) => clAP(TEMPLATES[pick(r, ['cj610Decomp', 'cj610Indef', 'cj610Def'])](r), 'Partial fractions (BC)');
+TEMPLATES.cAP610 = (r) => clAP(apPick(r, ['cj610Decomp', 'cj610Indef', 'cj610Def']), 'Partial fractions (BC)');
 
 /* --- 6.11 approximating integrals --- */
 const cjFn = (r) => pick(r, [[(x) => x * x, 'x²'], [(x) => x * x + 1, 'x² + 1'], [(x) => x ** 3, 'x³'], [(x) => 2 * x + 1, '2x + 1'], [(x) => 1 / x, '1/x']]);
@@ -17501,7 +17501,7 @@ TEMPLATES.cj611Over = (r) => {
   return { topic: 'Overestimate or underestimate?', stem: `f is ${inc ? 'increasing' : 'decreasing'} and its graph is concave ${up ? 'up' : 'down'} on [a, b]. Is a ${name} for ∫ from a to b of f(x) dx an overestimate or an underestimate?`,
     ...buildChoices(r, ans, opts.filter((o) => o !== ans), () => null), fr: FR.select('It is', opts, ans), solution: `${ans}: ${why}.` };
 };
-TEMPLATES.cAP611 = (r) => clAP(TEMPLATES[pick(r, ['cj611Trap', 'cj611Table', 'cj611Over', 'cj611Simpson'])](r), 'Approximating integrals');
+TEMPLATES.cAP611 = (r) => clAP(apPick(r, ['cj611Trap', 'cj611Table', 'cj611Over', 'cj611Simpson']), 'Approximating integrals');
 
 /* --- 6.12 improper integrals --- */
 TEMPLATES.cj612Power = (r) => {
@@ -17520,7 +17520,7 @@ TEMPLATES.cj612Exp = (r) => {
 const CJ612_T = [['∫ from −∞ to ∞ of dx/(1 + x²)', Math.PI, 'π', ['π/2', 'diverges', '2π'], 'Split at 0: each half is lim tan⁻¹ → π/2'], ['∫ from 0 to ∞ of dx/(1 + x²)', Math.PI / 2, 'π/2', ['π', 'diverges', '1'], 'lim (b → ∞) tan⁻¹ b − tan⁻¹ 0 = π/2'],
   ['∫ from 1 to ∞ of dx/(x(x + 1))', Math.log(2), 'ln 2', ['1', 'diverges', '1/2'], '[ln(x/(x + 1))] from 1 to b → 0 − ln(1/2) = ln 2'], ['∫ from 0 to 1 of ln x dx', -1, '−1', ['diverges', '1', '0'], '[x ln x − x] from a to 1 as a → 0⁺: (−1) − 0 = −1']];
 TEMPLATES.cj612Exact = (r) => cjExact(r, CJ612_T, 'Improper integrals');
-TEMPLATES.cAP612 = (r) => clAP(TEMPLATES[pick(r, ['cj612Power', 'cj612Exp', 'cj612Exact'])](r), 'Improper integrals (BC)');
+TEMPLATES.cAP612 = (r) => clAP(apPick(r, ['cj612Power', 'cj612Exp', 'cj612Exact']), 'Improper integrals (BC)');
 
 /* --- 6.14 mixed practice: recognize the form --- */
 const CJ614 = [['x cos x', 'Integration by parts'], ['x(x² + 1)⁵', 'u-substitution'], ['1/(x² − 1)', 'Partial fractions'], ['√(9 − x²)', 'Trigonometric substitution'], ['sin² x', 'A trigonometric identity (power-reducing)'], ['(x² + 1)/(x + 1)', 'Long division first'],
@@ -17528,7 +17528,7 @@ const CJ614 = [['x cos x', 'Integration by parts'], ['x(x² + 1)⁵', 'u-substit
 TEMPLATES.cj614Form = (r) => { const [f, ans] = pick(r, CJ614), all = [...new Set(CJ614.map((q) => q[1]))];
   return { topic: 'Recognize the form', stem: `Which technique should you try first to find ∫ ${f} dx?`, ...buildChoices(r, ans, shuffle(r, all.filter((x) => x !== ans)).slice(0, 3), () => null), fr: FR.select('Technique:', all, ans),
     solution: `Look at the form of the integrand first. For ∫ ${f} dx: ${ans}.` }; };
-TEMPLATES.cAP614 = (r) => clAP(TEMPLATES[pick(r, ['cj66Indef', 'cj67Indef', 'cj69Square', 'cj610Indef', 'cj611Trap'])](r), 'Mixed practice');
+TEMPLATES.cAP614 = (r) => clAP(apPick(r, ['cj66Indef', 'cj67Indef', 'cj69Square', 'cj610Indef', 'cj611Trap']), 'Mixed practice');
 
 /* --- Chapter 6 Part 2 free response --- */
 const apNx = (label, v, key) => ({ kind: 'number', label, _v: v, _k: key });
@@ -17578,7 +17578,7 @@ TEMPLATES.ci61Exact = (r) => {
   return clValQ(r, { topic: 'Exact area by geometry', stem: `Find the exact area under the graph of f(x) = ${cdP([m, k])} from x = ${a} to x = ${b}. (The region is a trapezoid.)`, val, wrongs: [f(b) * (b - a), f(a) * (b - a), val / 2], label: 'Area =',
     solution: `Trapezoid with parallel sides f(${a}) = ${fmt(f(a))} and f(${b}) = ${fmt(f(b))} and width ${b - a}:\nA = (1/2)(${fmt(f(a))} + ${fmt(f(b))})(${b - a}) = ${fracT(val)}` });
 };
-TEMPLATES.cAP61 = (r) => clAP(TEMPLATES[pick(r, ['ci61Riemann', 'ci61Exact'])](r), 'Area');
+TEMPLATES.cAP61 = (r) => clAP(apPick(r, ['ci61Riemann', 'ci61Exact']), 'Area');
 
 /* --- 6.2 the definite integral --- */
 TEMPLATES.ci62Table = (r) => {
@@ -17605,7 +17605,7 @@ TEMPLATES.ci62Limit = (r) => {
   return ccFormQ(r, { topic: 'Riemann sums and definite integrals', stem, ans, wrongs: [ciInt(0, w, `x${SUP[p]}`), ciInt(a, a + 1, `x${SUP[p]}`), ciInt(a, b, `x${SUP[p + 1]}`), ciInt(0, 1, `(${inner.replace('i/n', 'x').replace(/(\d)i\/n/, '$1x')})${SUP[p]}`)].filter((x) => x !== ans), label: 'Integral:',
     solution: `Δx = ${wt}, so the interval has width ${w}; xᵢ = ${a} + iΔx starts at a = ${a}, so b = ${b}. The function is x${SUP[p]}: ${ans}.` });
 };
-TEMPLATES.cAP62 = (r) => clAP(TEMPLATES[pick(r, ['ci62Table', 'ci62Geom', 'ci62Limit'])](r), 'The definite integral');
+TEMPLATES.cAP62 = (r) => clAP(apPick(r, ['ci62Table', 'ci62Geom', 'ci62Limit']), 'The definite integral');
 
 /* --- 6.3 the Fundamental Theorem of Calculus --- */
 TEMPLATES.ci63Eval = (r) => {
@@ -17634,7 +17634,7 @@ TEMPLATES.ci63Accum = (r) => {
   return clValQ(r, { topic: 'Interpreting the integral of a rate', stem: `Water flows into a tank at r(t) = ${a === 1 ? '' : a}t + ${b} liters per minute. At t = 0 the tank holds ${W0} liters. How much water is in the tank at t = ${T} minutes?`, val, wrongs: [val - W0, a * T + b, W0 + (a * T + b) * T], label: 'Liters =',
     solution: `Amount = ${W0} + ${ciInt(0, T, `(${a === 1 ? '' : a}t + ${b})`, 't')} = ${W0} + [${a === 2 ? '' : a % 2 ? `(${a}/2)` : a / 2}t² + ${b}t] from 0 to ${T} = ${W0} + ${fmt(a * T * T / 2 + b * T)} = ${fmt(val)} L` });
 };
-TEMPLATES.cAP63 = (r) => clAP(TEMPLATES[pick(r, ['ci63Eval', 'ci63Exact', 'ci63Deriv', 'ci63Accum'])](r), 'Fundamental Theorem of Calculus');
+TEMPLATES.cAP63 = (r) => clAP(apPick(r, ['ci63Eval', 'ci63Exact', 'ci63Deriv', 'ci63Accum']), 'Fundamental Theorem of Calculus');
 
 /* --- 6.4 properties of the definite integral --- */
 TEMPLATES.ci64Props = (r) => {
@@ -17659,7 +17659,7 @@ TEMPLATES.ci64Motion = (r) => {
   return clValQ(r, { topic: 'Displacement and total distance', stem: `An object moves along a line with velocity v(t) = t − ${c} m/s. Find the ${ask ? 'total distance traveled' : 'displacement (net change in position)'} from t = 0 to t = ${T}.`, val: ask ? dist : disp, wrongs: ask ? [disp, Math.abs(disp) === dist ? -dist : Math.abs(disp), T - c] : [dist, -disp || 1, T - c], label: ask ? 'Distance (m) =' : 'Displacement (m) =',
     solution: `Displacement = ${ciInt(0, T, `(t − ${c})`, 't')} = ${fracT(disp)} m.\nTotal distance = ${ciInt(0, T, `|t − ${c}|`, 't')} = ${fracT(c * c / 2)} + ${fracT((T - c) ** 2 / 2)} = ${fracT(dist)} m (the object reverses at t = ${c}).` });
 };
-TEMPLATES.cAP64 = (r) => clAP(TEMPLATES[pick(r, ['ci64Props', 'ci64Avg', 'ci64Abs', 'ci64Motion'])](r), 'Properties of the integral');
+TEMPLATES.cAP64 = (r) => clAP(apPick(r, ['ci64Props', 'ci64Avg', 'ci64Abs', 'ci64Motion']), 'Properties of the integral');
 
 /* --- 6.5 the indefinite integral; substitution --- */
 TEMPLATES.ci65Indef = (r) => {
@@ -17682,7 +17682,7 @@ TEMPLATES.ci65EvenOdd = (r) => {
   return clValQ(r, { topic: 'Integrals of even and odd functions', stem: `f is ${even ? 'even' : 'odd'} and ${ciInt(0, a, 'f(x)')} = ${fmt(A)}. Find ${ciInt(-a, a, 'f(x)')}.`, val, wrongs: even ? [A, 0, -2 * A] : [2 * A, A, -A], label: 'Value =',
     solution: even ? `An even function is symmetric about the y-axis, so the two halves are equal: 2(${fmt(A)}) = ${fmt(2 * A)}.` : `An odd function is symmetric about the origin, so the two halves cancel: 0.` });
 };
-TEMPLATES.cAP65 = (r) => clAP(TEMPLATES[pick(r, ['ci65Indef', 'ci65Def', 'ci65EvenOdd'])](r), 'Substitution');
+TEMPLATES.cAP65 = (r) => clAP(apPick(r, ['ci65Indef', 'ci65Def', 'ci65EvenOdd']), 'Substitution');
 
 /* --- Chapter 6 free response --- */
 TEMPLATES.cf6Rate = (r) => {
@@ -17743,7 +17743,7 @@ const CE51_T = [['sin x + cos x', 'π/4 and 5π/4', ['π/4 only', '3π/4 and 7π
   ['x^(1/3)(x − 4)', '0 and 1', ['1 only', '0 and 4', '4 only'], 'f′(x) = (4/3)x^(1/3) − (4/3)x^(−2/3) = (4/3)(x − 1)/x^(2/3): zero at 1, does not exist at 0']];
 TEMPLATES.ce51CritTrig = (r) => { const [f, ans, W, why] = pick(r, CE51_T), trig = /sin|cos/.test(f);
   return ccFormQ(r, { topic: 'Critical numbers', stem: `Find the critical numbers of f(x) = ${f}${trig ? ' on the open interval (0, 2π)' : ''}.`, ans, wrongs: W, label: 'Critical numbers:', solution: `${why}. Critical numbers: ${ans}.` }); };
-TEMPLATES.cAP51 = (r) => clAP(TEMPLATES[pick(r, ['ce51Crit', 'ce51Abs', 'ce51CritTrig'])](r), 'Extreme values');
+TEMPLATES.cAP51 = (r) => clAP(apPick(r, ['ce51Crit', 'ce51Abs', 'ce51CritTrig']), 'Extreme values');
 
 /* --- 5.2 the Mean Value Theorem --- */
 TEMPLATES.ce52MVT = (r) => {
@@ -17770,7 +17770,7 @@ TEMPLATES.ce52Table = (r) => {
   return clValQ(r, { topic: 'Mean Value Theorem from values', stem: `f is continuous on [${a}, ${b}] and differentiable on (${a}, ${b}), with f(${a}) = ${fmt(fa)} and f(${b}) = ${fmt(fb)}. The Mean Value Theorem guarantees a number c in (${a}, ${b}) with f′(c) equal to what?`, val: m, wrongs: [fb - fa, (fa + fb) / 2, -m], label: 'f′(c) =',
     solution: `f′(c) = (f(${b}) − f(${a}))/(${b} − ${a}) = (${fmt(fb)} − ${cgP(fa)})/${b - a} = ${fmt(m)}` });
 };
-TEMPLATES.cAP52 = (r) => clAP(TEMPLATES[pick(r, ['ce52MVT', 'ce52Rolle', 'ce52Incr', 'ce52Table'])](r), 'Mean Value Theorem');
+TEMPLATES.cAP52 = (r) => clAP(apPick(r, ['ce52MVT', 'ce52Rolle', 'ce52Incr', 'ce52Table']), 'Mean Value Theorem');
 
 /* --- 5.3 local extrema and concavity --- */
 TEMPLATES.ce53First = (r) => {
@@ -17802,7 +17802,7 @@ TEMPLATES.ce53Sign = (r) => {
       fr: FR.select('f has', [ans, `a local maximum at x = ${fmt(single)} only`, `local minima at x = ${fmt(a)} and x = ${fmt(b)}`, `a local maximum at x = ${fmt(dbl)} and a local minimum at x = ${fmt(single)}`], ans),
       solution: `The squared factor (${cpLin(dbl)})² is never negative, so f′ does not change sign at x = ${fmt(dbl)}: no extremum there.\nAt x = ${fmt(single)}, f′ changes from − to +: ${ans}.` }; }
 };
-TEMPLATES.cAP53 = (r) => clAP(TEMPLATES[pick(r, ['ce53First', 'ce53Inflect', 'ce53Second', 'ce53Sign'])](r), 'Local extrema and concavity');
+TEMPLATES.cAP53 = (r) => clAP(apPick(r, ['ce53First', 'ce53Inflect', 'ce53Second', 'ce53Sign']), 'Local extrema and concavity');
 
 /* --- 5.4 using calculus to graph functions --- */
 TEMPLATES.ce54Asym = (r) => {
@@ -17812,9 +17812,9 @@ TEMPLATES.ce54Asym = (r) => {
       fr: FR.nums(['Vertical asymptote x =', 'Horizontal asymptote y ='], [c, a], ans), solution: `The denominator is 0 at x = ${fmt(c)} (the numerator is not), so x = ${fmt(c)} is a vertical asymptote.\nThe degrees are equal, so y = (leading coefficients) = ${fmt(a)}.` }; }
 };
 TEMPLATES.ce54XExp = (r) => {
-  const k = pick(r, [1, -1, 2, -2]), ask = r() < 0.5, val = ask ? -1 / k : -2 / k, ek = k === 1 ? 'x' : k === -1 ? `${MINUS}x` : `${fmt(k)}x`, kx = ek;
-  return clValQ(r, { topic: 'Graphing with derivatives', stem: `f(x) = xe^(${ek}). Find the x-coordinate of ${ask ? 'the local extremum' : 'the inflection point'} of f.`, val, wrongs: [ask ? -2 / k : -1 / k, 1 / k, 0], label: 'x =',
-    solution: (ask ? `f′(x) = e^(${ek})(1 + ${kx}) = 0 at x = ${fracT(-1 / k)}, and f′ changes sign there.` : `f′(x) = e^(${ek})(1 + ${kx}),  f″(x) = ${k === 1 ? '' : k === -1 ? MINUS : fmt(k)}e^(${ek})(2 + ${kx}) = 0 at x = ${fracT(-2 / k)}, and f″ changes sign there.`).replace(/\+ −/g, '− ') });
+  const k = pick(r, [1, -1, 2, -2]), ask = r() < 0.5, val = ask ? -1 / k : -2 / k, ek = k === 1 ? 'x' : k === -1 ? `${MINUS}x` : `${fmt(k)}x`, kx = ek, E = k === 1 ? 'eˣ' : `e^(${ek})`;
+  return clValQ(r, { topic: 'Graphing with derivatives', stem: `f(x) = x${E}. Find the x-coordinate of ${ask ? 'the local extremum' : 'the inflection point'} of f.`, val, wrongs: [ask ? -2 / k : -1 / k, 1 / k, 0], label: 'x =',
+    solution: (ask ? `f′(x) = ${E}(1 + ${kx}) = 0 at x = ${fracT(-1 / k)}, and f′ changes sign there.` : `f′(x) = ${E}(1 + ${kx}),  f″(x) = ${k === 1 ? '' : k === -1 ? MINUS : fmt(k)}${E}(2 + ${kx}) = 0 at x = ${fracT(-2 / k)}, and f″ changes sign there.`).replace(/\+ −/g, '− ') });
 };
 TEMPLATES.ce54Quartic = (r) => {
   const a = pick(r, [1, 2, 3]), ask = ri(r, 0, 2), P = [1, 0, -2 * a * a, 0, 0];
@@ -17827,7 +17827,7 @@ TEMPLATES.ce54Quartic = (r) => {
   return ccFormQ(r, { topic: 'Graphing with derivatives', stem: `Find the x-coordinates of the inflection points of f(x) = ${cdP(P)}.`, ans, wrongs: [`x = ±${a}`, 'x = 0 only', `x = ±${a === 1 ? '√3' : `${a}√3`}`], label: 'Inflection points:',
     solution: `f″(x) = 12x² − ${4 * a * a} = 0 when x² = ${fracT(a * a / 3)}, so ${ans}; f″ changes sign at each.` });
 };
-TEMPLATES.cAP54 = (r) => clAP(TEMPLATES[pick(r, ['ce54Asym', 'ce54XExp', 'ce54Quartic'])](r), 'Graphing');
+TEMPLATES.cAP54 = (r) => clAP(apPick(r, ['ce54Asym', 'ce54XExp', 'ce54Quartic']), 'Graphing');
 
 /* --- 5.5 optimization --- */
 TEMPLATES.ce55Fence = (r) => {
@@ -17851,7 +17851,7 @@ TEMPLATES.ce55Closest = (r) => {
   return clValQ(r, { topic: 'Optimization: closest point', stem: `Find the x-coordinate of the point on the graph of y = √x closest to the point (${a}, 0).`, val: x, wrongs: [a, a / 2, a + 0.5], label: 'x =',
     solution: `Minimize the squared distance D = (x − ${a})² + (√x)² = (x − ${a})² + x.\nD′ = 2(x − ${a}) + 1 = 0, so x = ${fmt(x)} (D″ = 2 > 0, a minimum).` });
 };
-TEMPLATES.cAP55 = (r) => clAP(TEMPLATES[pick(r, ['ce55Fence', 'ce55Numbers', 'ce55Box'])](r), 'Optimization');
+TEMPLATES.cAP55 = (r) => clAP(apPick(r, ['ce55Fence', 'ce55Numbers', 'ce55Box']), 'Optimization');
 
 /* --- 5.6 antiderivatives; differential equations --- */
 const ceTerm = (c, n) => { const k = c / (n + 1); return `${k === 1 ? '' : k === -1 ? MINUS : fracT(k).includes('/') ? `(${fracT(k)})` : fracT(k)}x${n + 1 > 1 ? SUP[n + 1] : ''}`; };
@@ -17878,10 +17878,10 @@ TEMPLATES.ce56IVP = (r) => {
 };
 TEMPLATES.ce56Motion = (r) => {
   const k = pick(r, [6, 12, -6]), v0 = ri(r, -4, 6), s0 = ri(r, 0, 10), T = ri(r, 1, 3), s = (t) => (k / 6) * t ** 3 + v0 * t + s0, val = s(T);
-  return clValQ(r, { topic: 'Rectilinear motion from acceleration', stem: `An object moves along a line with acceleration a(t) = ${k}t, initial velocity v(0) = ${fmt(v0)}, and initial position s(0) = ${s0}. Find s(${T}).`, val, wrongs: [(k / 2) * T * T + v0, s(T) - s0, (k / 6) * T ** 3], label: `s(${T}) =`,
-    solution: `v(t) = ${k / 2}t² ${v0 < 0 ? MINUS : '+'} ${Math.abs(v0)} (using v(0) = ${fmt(v0)}).\ns(t) = ${k / 6 === 1 ? '' : fmt(k / 6)}t³ ${v0 < 0 ? MINUS : '+'} ${Math.abs(v0)}t + ${s0} (using s(0) = ${s0}).\ns(${T}) = ${fmt(val)}`.replace(/ [+−] 0t/, '').replace(/ [+−] 0 \(/, ' (') });
+  return clValQ(r, { topic: 'Rectilinear motion from acceleration', stem: `An object moves along a line with acceleration a(t) = ${fmt(k)}t, initial velocity v(0) = ${fmt(v0)}, and initial position s(0) = ${s0}. Find s(${T}).`, val, wrongs: [(k / 2) * T * T + v0, s(T) - s0, (k / 6) * T ** 3], label: `s(${T}) =`,
+    solution: `v(t) = ${fmt(k / 2)}t² ${v0 < 0 ? MINUS : '+'} ${Math.abs(v0)} (using v(0) = ${fmt(v0)}).\ns(t) = ${k / 6 === 1 ? '' : k / 6 === -1 ? MINUS : fmt(k / 6)}t³ ${v0 < 0 ? MINUS : '+'} ${Math.abs(v0)}t + ${s0} (using s(0) = ${s0}).\ns(${T}) = ${fmt(val)}`.replace(/ [+−] 0t/, '').replace(/ [+−] 0 \(/, ' (') });
 };
-TEMPLATES.cAP56 = (r) => clAP(TEMPLATES[pick(r, ['ce56Poly', 'ce56Basic', 'ce56IVP', 'ce56Motion'])](r), 'Antiderivatives');
+TEMPLATES.cAP56 = (r) => clAP(apPick(r, ['ce56Poly', 'ce56Basic', 'ce56IVP', 'ce56Motion']), 'Antiderivatives');
 
 /* --- Chapter 5 free response --- */
 TEMPLATES.cf5Analysis = (r) => {
@@ -17948,7 +17948,7 @@ TEMPLATES.cg41Rate = (r) => {
   return clValQ(r, { topic: 'Marginal cost', stem: `The cost of producing x items is C(x) = ${a}x² + ${b}x + 500 dollars. Find the marginal cost C′(${x}).`, val: mc, wrongs: [a * x * x + b * x + 500, a * x + b, 2 * a * x], label: `C′(${x}) =`,
     solution: `C′(x) = ${2 * a}x + ${b}, so C′(${x}) = $${fmt(mc)} per item: the approximate cost of item ${x + 1}.` });
 };
-TEMPLATES.cAP41 = (r) => clAP(TEMPLATES[pick(r, ['cg41Accel', 'cg41Rest', 'cg41Speed'])](r), 'Motion and rates');
+TEMPLATES.cAP41 = (r) => clAP(apPick(r, ['cg41Accel', 'cg41Rest', 'cg41Speed']), 'Motion and rates');
 
 /* --- 4.2 differentials, linear approximation, Newton's Method --- */
 TEMPLATES.cg42Root = (r) => {
@@ -17985,7 +17985,7 @@ TEMPLATES.cg42Error = (r) => {
   return clValQ(r, { topic: 'Relative error', stem: `The measurement of ${shape} has a possible error of ±${p}%. Use differentials to estimate the percentage error in the computed ${what}.`, val: k * p, wrongs: [p, (k + 1) * p, p ** k], label: 'About ±',
     solution: `${what === 'volume' ? 'V = cx³' : 'A = cx²'}, so d${what === 'volume' ? 'V' : 'A'}/${what === 'volume' ? 'V' : 'A'} = ${k} · dx/x.\nRelative error ≈ ${k}(${p}%) = ${fmt(k * p)}%` });
 };
-TEMPLATES.cAP42 = (r) => clAP(TEMPLATES[pick(r, ['cg42Root', 'cg42Lin', 'cg42Newton', 'cg42Diff'])](r), 'Linear approximation');
+TEMPLATES.cAP42 = (r) => clAP(apPick(r, ['cg42Root', 'cg42Lin', 'cg42Newton', 'cg42Diff']), 'Linear approximation');
 
 /* --- 4.3 related rates --- */
 TEMPLATES.cg43Circle = (r) => {
@@ -18015,7 +18015,7 @@ TEMPLATES.cg43Implicit = (r) => {
   return clValQ(r, { topic: 'Related rates', stem: `x and y are differentiable functions of t with x² + y² = ${c * c}. Find dy/dt when x = ${a}, y = ${b}, and dx/dt = ${fmt(k)}.`, val: dy, wrongs: [-dy, -b * k / a, k], label: 'dy/dt =',
     solution: `2x·dx/dt + 2y·dy/dt = 0, so dy/dt = −(x/y)·dx/dt = −(${a}/${b})(${fmt(k)}) = ${fracT(dy)}` });
 };
-TEMPLATES.cAP43 = (r) => clAP(TEMPLATES[pick(r, ['cg43Circle', 'cg43Ladder', 'cg43Cone', 'cg43Implicit'])](r), 'Related rates');
+TEMPLATES.cAP43 = (r) => clAP(apPick(r, ['cg43Circle', 'cg43Ladder', 'cg43Cone', 'cg43Implicit']), 'Related rates');
 
 /* --- 4.4 indeterminate forms and L'Hôpital's Rule --- */
 TEMPLATES.cg44Zero = (r) => {
@@ -18056,7 +18056,7 @@ TEMPLATES.cg44Twice = (r) => {
   return clValQ(r, { topic: 'L’Hôpital’s Rule twice', stem: `Find the limit as x → 0:   ${F}`, val, wrongs: [a, a * a, a / 2, 0], label: 'Limit =',
     solution: kind === 0 ? `0/0 → ${a === 1 ? '' : a}sin(${ax})/(2x), still 0/0 → ${a * a === 1 ? '' : a * a}cos(${ax})/2 → ${fracT(val)}` : `0/0 → (${a === 1 ? '' : a}e^(${ax}) − ${a})/(2x), still 0/0 → ${a === 1 ? '' : a * a}e^(${ax})/2 → ${fracT(val)}` });
 };
-TEMPLATES.cAP44 = (r) => clAP(TEMPLATES[pick(r, ['cg44Zero', 'cg44Poly', 'cg44Inf', 'cg44Twice', 'cg44Exp'])](r), 'L’Hôpital’s Rule');
+TEMPLATES.cAP44 = (r) => clAP(apPick(r, ['cg44Zero', 'cg44Poly', 'cg44Inf', 'cg44Twice', 'cg44Exp']), 'L’Hôpital’s Rule');
 
 /* --- Chapter 4 free response --- */
 TEMPLATES.cf4Ladder = (r) => {
@@ -18140,7 +18140,7 @@ TEMPLATES.cc31Higher = (r) => {
     return clValQ(r, { topic: 'Second derivative (Chain Rule)', stem: `f(x) = (${cdP([a, b])})${SUP[n]}. Find f″(${fmt(x0)}).`, val, wrongs: [n * (n - 1) * u ** (n - 2), n * (n - 1) * a * u ** (n - 2), n * a * u ** (n - 1)], label: `f″(${fmt(x0)}) =`,
       solution: `f′(x) = ${fmt(n * a)}(${cdP([a, b])})${n - 1 > 1 ? SUP[n - 1] : ''}\nf″(x) = ${n * (n - 1) * a * a}(${cdP([a, b])})${n - 2 > 1 ? SUP[n - 2] : ''}  (each step multiplies by the inner derivative ${fmt(a)})\nf″(${fmt(x0)}) = ${fmt(val)}` }); }
 };
-TEMPLATES.cAP31 = (r) => clAP(TEMPLATES[pick(r, ['cc31Table', 'cc31Comp', 'cc31Exp', 'cc31Trig'])](r), 'Chain Rule');
+TEMPLATES.cAP31 = (r) => clAP(apPick(r, ['cc31Table', 'cc31Comp', 'cc31Exp', 'cc31Trig']), 'Chain Rule');
 
 /* --- 3.2 implicit differentiation; rational exponents --- */
 function cc32Curve(r, intSlope) {
@@ -18171,7 +18171,7 @@ TEMPLATES.cc32Second = (r) => {
   return clValQ(r, { topic: 'Second derivative (implicit)', stem: `For x² + y² = ${R}, find d²y/dx² at the point (${fmt(x0)}, ${fmt(y0)}).`, val, wrongs: [-x0 / y0, R / y0 ** 3, -1 / y0, -R / y0 ** 2], label: 'd²y/dx² =',
     solution: `y′ = −x/y.  y″ = −(y − x·y′)/y² = −(y² + x²)/y³ = −${R}/y³.\nAt y = ${fmt(y0)}: −${R}/(${fmt(y0 ** 3)}) = ${fracT(val)}` });
 };
-TEMPLATES.cAP32 = (r) => clAP(TEMPLATES[pick(r, ['cc32Slope', 'cc32Tangent', 'cc32Rational'])](r), 'Implicit differentiation');
+TEMPLATES.cAP32 = (r) => clAP(apPick(r, ['cc32Slope', 'cc32Tangent', 'cc32Rational']), 'Implicit differentiation');
 
 /* --- 3.3 inverse functions; inverse trig --- */
 TEMPLATES.cc33Inverse = (r) => {
@@ -18204,7 +18204,7 @@ const CC33_F = [
 TEMPLATES.cc33Formula = (r) => { const [f, d, W] = pick(r, CC33_F);
   return ccFormQ(r, { topic: 'Derivatives of inverse trig functions', stem: `Find the derivative of y = ${f}.`, ans: d, wrongs: W, label: 'dy/dx =',
     solution: `d/dx sin⁻¹u = u′/√(1 − u²),  d/dx cos⁻¹u = −u′/√(1 − u²),  d/dx tan⁻¹u = u′/(1 + u²),  d/dx sec⁻¹u = u′/(u√(u² − 1)) for u > 1.\ndy/dx = ${d}` }); };
-TEMPLATES.cAP33 = (r) => clAP(TEMPLATES[pick(r, ['cc33Inverse', 'cc33Arctan', 'cc33Formula'])](r), 'Inverse functions');
+TEMPLATES.cAP33 = (r) => clAP(apPick(r, ['cc33Inverse', 'cc33Arctan', 'cc33Formula']), 'Inverse functions');
 
 /* --- 3.4 logarithmic functions; logarithmic differentiation --- */
 TEMPLATES.cc34Ln = (r) => {
@@ -18248,7 +18248,7 @@ TEMPLATES.cc34Limit = (r) => {
   return ccKey(cdExactQ(r, { topic: 'e as a limit', stem: `Find the limit as n → ∞ of ${base}${pw}.`, val, text, wrongs: ['1', ccPow(1, k), ccPow(1, -p), ccPow(m, k), 'e'], label: 'Limit =',
     solution: `The limit of (1 + a/n)ⁿ as n → ∞ is eᵃ.\n${m === 1 ? `Here a = ${fmt(k)}, so ${base}ⁿ → ${text}` : `${base}${pw} = [${base}ⁿ]${SUP[m]} → (e${k === 1 ? '' : String(k).split('').map((ch) => SUP[ch === MINUS ? '-' : ch]).join('')})${SUP[m]} = ${text}`}` }));
 };
-TEMPLATES.cAP34 = (r) => clAP(TEMPLATES[pick(r, ['cc34Ln', 'cc34LnProd', 'cc34LnQuot', 'cc34Log'])](r), 'Logarithmic derivatives');
+TEMPLATES.cAP34 = (r) => clAP(apPick(r, ['cc34Ln', 'cc34LnProd', 'cc34LnQuot', 'cc34Log']), 'Logarithmic derivatives');
 
 /* ----- AP Calculus, Chapter 2: The Derivative and Its Properties (Sullivan & Miranda) ----- */
 const cdP = (c) => polyT(c);
@@ -18343,7 +18343,7 @@ TEMPLATES.cd22Recognize = (r) => {
   return clValQ(r, { topic: 'A limit that is a derivative', stem: `The limit as h → 0 of ((${c} + h)${SUP[n]} − ${c ** n}) / h is the derivative of f(x) = x${SUP[n]} at x = ${c}. Find its value.`, val, wrongs: [c ** n, n * c, 0], label: 'Limit =',
     solution: `It is f′(${c}) for f(x) = x${SUP[n]}. Expanding (${c} + h)${SUP[n]} − ${c ** n} and dividing by h leaves ${val} + (terms with h) → ${val}.` });
 };
-TEMPLATES.cAP22 = (r) => clAP(TEMPLATES[pick(r, ['cd22Diff', 'cd22Where', 'cd22Recognize'])](r), 'Differentiability');
+TEMPLATES.cAP22 = (r) => clAP(apPick(r, ['cd22Diff', 'cd22Where', 'cd22Recognize']), 'Differentiability');
 
 /* --- 2.3 polynomials and eˣ --- */
 TEMPLATES.cd23Power = (r) => {
@@ -18377,7 +18377,7 @@ TEMPLATES.cd23Velocity = (r) => {
   return clValQ(r, { topic: 'Velocity', stem: `An object’s position is s(t) = ${cdP(co).replace(/x/g, 't')} meters at t seconds. Find its velocity at t = ${t0}.`, val: v, wrongs: [cdPv(co, t0), v + co[2], -v], label: 'v =',
     solution: `v(t) = s′(t) = ${cdP(cdPd(co)).replace(/x/g, 't')}, so v(${t0}) = ${fmt(v)} m/s.` });
 };
-TEMPLATES.cAP23 = (r) => clAP(TEMPLATES[pick(r, ['cd23Power', 'cd23Tangent', 'cd23Horiz'])](r), 'Derivatives');
+TEMPLATES.cAP23 = (r) => clAP(apPick(r, ['cd23Power', 'cd23Tangent', 'cd23Horiz']), 'Derivatives');
 
 /* --- 2.4 product, quotient, higher-order --- */
 TEMPLATES.cd24Product = (r) => {
@@ -18403,7 +18403,7 @@ TEMPLATES.cd24ExpProd = (r) => {
   return cdExactQ(r, { topic: 'Product Rule with eˣ', stem: `f(x) = (${cdP([a, b])})eˣ. Find f′(${x0}).`, val, text, wrongs: x0 === 0 ? [fmt(a), fmt(b), fmt(a * b)] : [`${fmt(a)}e`, `${fmt(a + b)}`, `${fmt(2 * a + 2 * b)}e`], label: `f′(${x0}) =`,
     solution: `f′(x) = ${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}eˣ + (${cdP([a, b])})eˣ = (${cdP([a, a + b])})eˣ, so f′(${x0}) = ${text}.` });
 };
-TEMPLATES.cAP24 = (r) => clAP(TEMPLATES[pick(r, ['cd24Quotient', 'cd24Product', 'cd24Higher'])](r), 'Derivatives');
+TEMPLATES.cAP24 = (r) => clAP(apPick(r, ['cd24Quotient', 'cd24Product', 'cd24Higher']), 'Derivatives');
 
 /* --- 2.5 trigonometric functions --- */
 TEMPLATES.cd25Basic = (r) => {
@@ -18444,9 +18444,11 @@ TEMPLATES.cd25Limit = (r) => {
   return cdExactQ(r, { topic: 'A limit that is a derivative', stem: `Find the limit as h → 0 of (${fn}(${X} + h) − ${fn}(${X})) / h.`, val: d[0], text: d[1], wrongs: [cdTrig(fn, ang)[1], cdTrig(fn === 'sin' ? 'cos' : 'sin', ang)[1].replace(MINUS, '') === d[1].replace(MINUS, '') ? (d[1].startsWith(MINUS) ? d[1].slice(1) : MINUS + d[1]) : cdTrig(fn === 'sin' ? 'cos' : 'sin', ang)[1], '0'], label: 'Limit =',
     solution: `This is the derivative of ${fn} x at x = ${X}: ${fn === 'sin' ? 'cos' : '−sin'}(${X}) = ${d[1]}.` });
 };
-TEMPLATES.cAP25 = (r) => clAP(TEMPLATES[pick(r, ['cd25Basic', 'cd25Product', 'cd25Limit', 'cd25Tan'])](r), 'Derivatives of trig functions');
+TEMPLATES.cAP25 = (r) => clAP(apPick(r, ['cd25Basic', 'cd25Product', 'cd25Limit', 'cd25Tan']), 'Derivatives of trig functions');
 /* ----- AP Calculus, Chapter 1: Limits and Continuity (Sullivan & Miranda) ----- */
 // AP® Practice questions are tagged with q.ap (a badge on the question) and a topic that starts with "AP® Practice"
+// AP® Practice questions made from a section's own types remember which one (so they can use its videos)
+const apPick = (r, ids) => { const id = ids.length === 1 ? ids[0] : pick(r, ids), q = TEMPLATES[id](r); if (q) { q.baseTpl = id; q.baseTopic = q.topic; } return q; };
 const clAP = (q, topic) => Object.assign(q, { ap: true, topic: 'AP® Practice · ' + (topic || q.topic) });
 const clDNE = 'does not exist';
 const clP = (c) => polyT(c);
@@ -18537,7 +18539,7 @@ TEMPLATES.cl12DiffQ = (r) => {
   return clValQ(r, { topic: 'Limit of a difference quotient', stem: `f(x) = ${clP([a, b, k])}. Find the limit as h → 0 of (f(${fmt(c)} + h) ${MINUS} f(${fmt(c)})) / h.`, val: L, wrongs: [a * c * c + b * c + k, 2 * a * c, clDNE],
     solution: `f(${fmt(c)} + h) − f(${fmt(c)}) = ${clP([a, 2 * a * c + b, 0]).replace(/x/g, 'h')}.\nDivide by h: ${clP([a, 2 * a * c + b]).replace(/x/g, 'h')} → ${fmt(L)} as h → 0. (This is the slope of the tangent line at x = ${fmt(c)}.)` });
 };
-TEMPLATES.cAP12 = (r) => clAP(TEMPLATES[pick(r, ['cl12Factor', 'cl12Conj', 'cl12DiffQ'])](r), 'Limits');
+TEMPLATES.cAP12 = (r) => clAP(apPick(r, ['cl12Factor', 'cl12Conj', 'cl12DiffQ']), 'Limits');
 
 /* --- 1.3 continuity --- */
 TEMPLATES.cl13Piece = (r) => {
@@ -18573,7 +18575,7 @@ TEMPLATES.cl13IVT = (r) => {
       solution: `f is a polynomial, so it is continuous. f(${fmt(yes[0][0])}) = ${fmt(f(yes[0][0]))} and f(${fmt(yes[0][1])}) = ${fmt(f(yes[0][1]))} have opposite signs, so f has a zero in ${ans}.` };
   }
 };
-TEMPLATES.cAP13 = (r) => clAP(TEMPLATES[pick(r, ['cl13FindK', 'cl13IVT', 'cl13Piece'])](r), 'Continuity');
+TEMPLATES.cAP13 = (r) => clAP(apPick(r, ['cl13FindK', 'cl13IVT', 'cl13Piece']), 'Continuity');
 
 /* --- 1.4 trig, exponential, logarithmic --- */
 TEMPLATES.cl14Trig = (r) => {
@@ -18597,7 +18599,7 @@ TEMPLATES.cl14ExpLog = (r) => {
   const b = pick(r, [2, 3, 10]), p = ri(r, 1, 3), v = b ** p - c; if (v <= 0) return TEMPLATES.cl14ExpLog(r);
   return clValQ(r, { topic: 'Exponential and log limits', stem: `Find the limit as x → ${c}:   log${b === 10 ? '' : b === 2 ? '₂' : '₃'}(x + ${v})`, val: p, wrongs: [b ** p, p + 1, 0], solution: `log is continuous on its domain: log${b === 10 ? '' : b === 2 ? '₂' : '₃'}(${c} + ${v}) = log${b === 10 ? '' : b === 2 ? '₂' : '₃'} ${b ** p} = ${p}.` });
 };
-TEMPLATES.cAP14 = (r) => clAP(TEMPLATES[pick(r, ['cl14Trig', 'cl14Trig', 'cl14Squeeze'])](r), 'Limits');
+TEMPLATES.cAP14 = (r) => clAP(apPick(r, ['cl14Trig', 'cl14Trig', 'cl14Squeeze']), 'Limits');
 
 /* --- 1.5 infinite limits, limits at infinity, asymptotes --- */
 TEMPLATES.cl15Inf = (r) => {
@@ -18622,7 +18624,7 @@ TEMPLATES.cl15Asym = (r) => {
   return { topic: 'Asymptotes', stem: `Find the vertical and horizontal asymptotes of R(x) = ${fmt(a)}x / (x² ${MINUS} ${d * d}).`, ...buildChoices(r, ans, [`vertical x = ${d} only;  horizontal y = 0`, `vertical x = ±${d};  horizontal y = ${fmt(a)}`, `vertical x = ±${d * d};  horizontal y = 0`], (i) => [`vertical x = ±${d};  no horizontal asymptote`, `vertical x = 0;  horizontal y = 0`][i % 2]),
     fr: FR.nums(['Vertical asymptote (positive): x =', 'Horizontal asymptote: y ='], [d, 0], ans), solution: `x² − ${d * d} = 0 at x = ±${d}. The numerator has lower degree, so the horizontal asymptote is y = 0.` };
 };
-TEMPLATES.cAP15 = (r) => clAP(TEMPLATES[pick(r, ['cl15AtInf', 'cl15Asym', 'cl15Inf'])](r), 'Asymptotes and limits');
+TEMPLATES.cAP15 = (r) => clAP(apPick(r, ['cl15AtInf', 'cl15Asym', 'cl15Inf']), 'Asymptotes and limits');
 
 /* --- 1.6 epsilon-delta --- */
 TEMPLATES.cl16Delta = (r) => {
@@ -41337,7 +41339,11 @@ const practiceVideos = (q, onLoad) => {
   if (inline.length) return inline;
   const subj = pvSubject({ tpl }); if (!PV_FILES[subj]) { if (onLoad) pvLoad(subj, onLoad); return []; }
   const key = `${q.topic || ''} ## ${q.stem || ''}`;
-  return PV_FILES[subj].filter((v) => v.tpl === tpl && v.re.test(key) && pvInst(v));
+  const own = PV_FILES[subj].filter((v) => v.tpl === tpl && v.re.test(key) && pvInst(v));
+  if (own.length || !q.baseTpl) return own;
+  // an AP® Practice question with no video of its own: use the videos of the type it was made from
+  const bkey = `${q.baseTopic || ''} ## ${q.stem || ''}`;
+  return PV_FILES[subj].filter((v) => v.tpl === q.baseTpl && v.re.test(bkey) && pvInst(v));
 };
 // walkthroughs for every lesson, kept in walks/<subject>.json and loaded when a catch-up page opens
 const WALK_FILES = {};

@@ -36,6 +36,14 @@ with sync_playwright() as p:
           const hit = mv.filter((v, i) => mine[i].test(key)); if (hit.length > 1 && hit.some((v) => !v.pick)) { ov++; oex = oex || hit.map((v) => v.seed).join('+') + ' ' + key.slice(0, 90); } }
         if (ov) miss.push(`${t}: ${ov}/400 problems match several videos without picks, e.g. ${oex}`);
         if (bad) miss.push(`${t}: ${bad}/400 problems have no video, e.g. ${ex}`); }
+      // AP® Practice types in the same sections with no videos of their own: every problem must find a video of the type it came from
+      const secs0 = [...new Set(tpls.map((t) => (QUESTION_TYPES.find((x) => x.id === t) || {}).section))];
+      for (const t of QUESTION_TYPES.filter((x) => /^cAP/.test(x.id) && secs0.includes(x.section) && !tpls.includes(x.id)).map((x) => x.id)) {
+        let bad = 0, ex = '';
+        for (let k = 0; k < 300; k++) { let q; try { q = TEMPLATES[t](mulberry32(7000 + k)); } catch (e) { continue; } if (!q.baseTpl) { bad++; ex = 'no baseTpl'; break; }
+          const key = `${q.baseTopic || ''} ## ${q.stem}`; if (!vids.some((v) => v.tpl === q.baseTpl && new RegExp(v.kind).test(key))) { bad++; ex = ex || q.baseTpl + ': ' + key.slice(0, 90); } }
+        if (bad) miss.push(`${t} (AP, uses its base type's videos): ${bad}/300 problems have no video, e.g. ${ex}`);
+      }
       const sections = [...new Set(tpls.map((t) => (QUESTION_TYPES.find((x) => x.id === t) || {}).section))];
       const notDone = QUESTION_TYPES.filter((x) => x.subject === '""" + SUBJ + """' && sections.includes(x.section) && !tpls.includes(x.id) && !PRACTICE_VIDS.some((v) => v.tpl === x.id)).map((x) => x.id);
       return { vids, errs, miss, notDone, allTypes: QUESTION_TYPES.filter((x) => x.subject === '""" + SUBJ + """').length, doneTypes: tpls.length };
