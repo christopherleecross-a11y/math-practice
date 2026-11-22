@@ -18112,7 +18112,7 @@ TEMPLATES.cc31Table = (r) => {
 TEMPLATES.cc31Exp = (r) => {
   const A = nz(r, -3, 3), b = nz(r, -4, 4), x0 = pick(r, [0, -b]), val = A * (2 * x0 + b), u = `x²${ccS(b).replace(/ (\d+)$/, ' $1x').replace(/ 1x$/, ' x')}`;
   return clValQ(r, { topic: 'Chain Rule with eᵘ', stem: `f(x) = ${A === 1 ? '' : A === -1 ? MINUS : fmt(A)}e^(${u}). Find f′(${fmt(x0)}).`, val, wrongs: [A, A * b * b, A * 2 * x0 || -val, val + A], label: `f′(${fmt(x0)}) =`,
-    solution: `d/dx eᵘ = eᵘ · u′:  f′(x) = ${fmt(A)}(${cdP([2, b])})e^(${u}).\nAt x = ${fmt(x0)} the exponent is ${fmt(x0 * x0 + b * x0)}, so e⁰ = 1 and f′(${fmt(x0)}) = ${fmt(A)}(${fmt(2 * x0 + b)}) = ${fmt(val)}` });
+    solution: `d/dx eᵘ = eᵘ · u′:  f′(x) = ${A === 1 ? '' : A === -1 ? MINUS : fmt(A)}(${cdP([2, b])})e^(${u}).\nAt x = ${fmt(x0)} the exponent is ${fmt(x0 * x0 + b * x0)}, so e⁰ = 1 and f′(${fmt(x0)}) = ${A === 1 ? fmt(2 * x0 + b) : `${fmt(A)}(${fmt(2 * x0 + b)}) = ${fmt(val)}`}` });
 };
 TEMPLATES.cc31Trig = (r) => {
   const k = pick(r, [2, 3]), A = pick(r, [1, 1, 2, -1, 3]), fn = pick(r, ['sin', 'cos']), x0 = pick(r, [[1, 6], [1, 4], [1, 3], [1, 2], [1, 12]].filter((a) => k === 2 || a[1] !== 4)), X = cdAng(x0), ang = [k * x0[0], x0[1]];
@@ -18120,7 +18120,7 @@ TEMPLATES.cc31Trig = (r) => {
   const neg = (x) => (x === '0' ? '0' : x.startsWith(MINUS) ? x.slice(1) : MINUS + x);
   return cdExactQ(r, { topic: 'Chain Rule with trig', stem: `f(x) = ${A === 1 ? '' : A === -1 ? MINUS : A}${fn}(${k}x). Find f′(${X}).`, val, text,
     wrongs: [cdTimes((fn === 'sin' ? 1 : -1) * A, t1), neg(text), cdTimes((fn === 'sin' ? 1 : -1) * A * k, cdTrig(fn === 'sin' ? 'cos' : 'sin', x0)[1]), cdTimes(A * k, cdTrig(fn, ang)[1])], label: `f′(${X}) =`,
-    solution: `f′(x) = ${fn === 'sin' ? '' : MINUS}${A * k}${fn === 'sin' ? 'cos' : 'sin'}(${k}x)  (the inner derivative ${k} multiplies).\nf′(${X}) = ${fn === 'sin' ? '' : MINUS}${A * k}·${fn === 'sin' ? 'cos' : 'sin'}(${cdAng(ang.map((v, i, a) => v / gcd(a[0], a[1])))}) = ${text}` });
+    solution: `f′(x) = ${fmt((fn === 'sin' ? 1 : -1) * A * k)}${fn === 'sin' ? 'cos' : 'sin'}(${k}x)  (the inner derivative ${k} multiplies).\nf′(${X}) = ${fmt((fn === 'sin' ? 1 : -1) * A * k)}·${fn === 'sin' ? 'cos' : 'sin'}(${cdAng(ang.map((v, i, a) => v / gcd(a[0], a[1])))}) = ${text}` });
 };
 TEMPLATES.cc31Tangent = (r) => {
   const n = pick(r, [2, 3]), x0 = pick(r, [-1, 1, 2, -2]), k = pick(r, [-2, -1, 1, 2]), c = k - x0 * x0, y0 = k ** n, m = n * k ** (n - 1) * 2 * x0, ans = cdLine(m, x0, y0);
@@ -18142,7 +18142,7 @@ function cc32Curve(r, intSlope) {
   for (let t = 0; t < 500; t++) { const a = pick(r, [1, 1, 2]), b = pick(r, [1, 1, 2, 3]), k = pick(r, [-2, -1, 0, 1, 2, 3]), x0 = nz(r, -3, 3), y0 = nz(r, -3, 3), den = k * x0 + 2 * b * y0, num = -(2 * a * x0 + k * y0);
     if (!den || (intSlope && num % den)) continue;
     const C = a * x0 * x0 + k * x0 * y0 + b * y0 * y0, eq = `${a === 1 ? '' : a}x²${k ? ` ${k < 0 ? MINUS : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}xy` : ''} + ${b === 1 ? '' : b}y² = ${fmt(C)}`;
-    return { a, b, k, x0, y0, den, num, m: num / den, eq, dy: `dy/dx = ${MINUS}(${2 * a}x${k ? ` ${k < 0 ? MINUS : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}y` : ''}) / (${k ? `${k === 1 ? '' : k === -1 ? MINUS : k}x + ` : ''}${2 * b}y)` }; }
+    return { a, b, k, x0, y0, den, num, m: num / den, eq, dy: `dy/dx = ${MINUS}(${2 * a}x${k ? ` ${k < 0 ? MINUS : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}y` : ''}) / (${k ? `${k === 1 ? '' : k === -1 ? MINUS : fmt(k)}x + ` : ''}${2 * b}y)` }; }
 }
 TEMPLATES.cc32Slope = (r) => {
   const c = cc32Curve(r, false), P = `(${fmt(c.x0)}, ${fmt(c.y0)})`;
@@ -18180,7 +18180,7 @@ TEMPLATES.cc33Inverse = (r) => {
 TEMPLATES.cc33Arctan = (r) => {
   const k = ri(r, 1, 3), A = pick(r, [1, 1, 2, -1]), x0 = nz(r, -2, 2), val = A * k / (1 + k * k * x0 * x0), u = k === 1 ? 'x' : `${k}x`;
   return clValQ(r, { topic: 'Derivative of tan⁻¹', stem: `f(x) = ${A === 1 ? '' : A === -1 ? MINUS : A}tan⁻¹(${u}). Find f′(${fmt(x0)}).`, val, wrongs: [A / (1 + k * k * x0 * x0), A * k / (1 + k * x0 * x0), A * k / (1 + x0 * x0), -val], label: `f′(${fmt(x0)}) =`,
-    solution: `d/dx tan⁻¹u = u′/(1 + u²):  f′(x) = ${fmt(A * k)}/(1 + ${k === 1 ? 'x²' : `${k * k}x²`}).\nf′(${fmt(x0)}) = ${fmt(A * k)}/${1 + k * k * x0 * x0} = ${fracT(val)}` });
+    solution: `d/dx tan⁻¹u = u′/(1 + u²):  f′(x) = ${fmt(A * k)}/(1 + ${k === 1 ? 'x²' : `${k * k}x²`}).\nf′(${fmt(x0)}) = ${fmt(A * k)}/${1 + k * k * x0 * x0}${fracT(val) === `${fmt(A * k)}/${1 + k * k * x0 * x0}` ? '' : ` = ${fracT(val)}`}` });
 };
 TEMPLATES.cc33Arcsin = (r) => {
   const [a, x0, c] = pick(r, [[5, 3, 4], [5, 4, 3], [13, 5, 12], [13, 12, 5], [10, 6, 8], [10, 8, 6], [2, 1, 0]].slice(0, 6)), fn = pick(r, ['sin', 'cos']), s = fn === 'sin' ? 1 : -1, val = s / c;
@@ -18205,7 +18205,7 @@ TEMPLATES.cAP33 = (r) => clAP(TEMPLATES[pick(r, ['cc33Inverse', 'cc33Arctan', 'c
 TEMPLATES.cc34Ln = (r) => {
   const a = ri(r, 1, 3), b = ri(r, 1, 6), x0 = nz(r, -3, 3), D = a * x0 * x0 + b, val = 2 * a * x0 / D;
   return clValQ(r, { topic: 'Derivative of ln u', stem: `f(x) = ln(${cdP([a, 0, b])}). Find f′(${fmt(x0)}).`, val, wrongs: [1 / D, 2 * a * x0, -val, 2 * x0 / D], label: `f′(${fmt(x0)}) =`,
-    solution: `d/dx ln u = u′/u:  f′(x) = ${2 * a}x/(${cdP([a, 0, b])}).\nf′(${fmt(x0)}) = ${fmt(2 * a * x0)}/${D} = ${fracT(val)}` });
+    solution: `d/dx ln u = u′/u:  f′(x) = ${2 * a}x/(${cdP([a, 0, b])}).\nf′(${fmt(x0)}) = ${fmt(2 * a * x0)}/${D}${fracT(val) === `${fmt(2 * a * x0)}/${D}` ? '' : ` = ${fracT(val)}`}` });
 };
 TEMPLATES.cc34LnQuot = (r) => {
   for (let t = 0; t < 300; t++) { const a = nz(r, -3, 3), b = ri(r, -4, 6), c = nz(r, -3, 3), d = ri(r, -4, 6), x0 = ri(r, 0, 2), u = a * x0 + b, v = c * x0 + d;
@@ -18221,12 +18221,12 @@ TEMPLATES.cc34LnProd = (r) => {
 };
 TEMPLATES.cc34Log = (r) => {
   const b = pick(r, [2, 3, 5, 10]), x0 = ri(r, 1, 4);
-  if (r() < 0.5) { const ans = `1/(${x0} ln ${b})`;
-    return ccFormQ(r, { topic: 'Derivative of log_b x', stem: `f(x) = log${String(b).split('').map((ch) => '₀₁₂₃₄₅₆₇₈₉'[ch]).join('')} x. Find f′(${x0}).`, ans, wrongs: [fracT(1 / x0), `(ln ${b})/${x0}`.replace('/1', ''), fracT(b / x0), `1/(${x0} log ${b})`], label: `f′(${x0}) =`,
+  if (r() < 0.5) { const ans = x0 === 1 ? `1/ln ${b}` : `1/(${x0} ln ${b})`;
+    return ccFormQ(r, { topic: 'Derivative of log_b x', stem: `f(x) = log${String(b).split('').map((ch) => '₀₁₂₃₄₅₆₇₈₉'[ch]).join('')} x. Find f′(${x0}).`, ans, wrongs: [fracT(1 / x0), `(ln ${b})/${x0}`.replace('/1', ''), fracT(b / x0), x0 === 1 ? `1/log ${b}` : `1/(${x0} log ${b})`], label: `f′(${x0}) =`,
       solution: `d/dx log_b x = 1/(x ln b), so f′(${x0}) = ${ans}.` }); }
   const v = b ** x0, ans = `${v} ln ${b}`;
   return ccFormQ(r, { topic: 'Derivative of bˣ', stem: `f(x) = ${b}ˣ. Find f′(${x0}).`, ans, wrongs: [`${x0 * b ** (x0 - 1)}`, `${v}`, `${v}/ln ${b}`, `${x0} ln ${b}`], label: `f′(${x0}) =`,
-    solution: `d/dx bˣ = bˣ ln b, so f′(${x0}) = ${b}${SUP[x0]} ln ${b} = ${ans}.`.replace('¹', '') });
+    solution: `d/dx bˣ = bˣ ln b, so f′(${x0}) = ${x0 === 1 ? ans : `${b}${SUP[x0]} ln ${b} = ${ans}`}.` });
 };
 const CC34_LD = [
   ['xˣ  (x > 0)', 'xˣ(ln x + 1)', ['x · xˣ⁻¹', 'xˣ ln x', 'xˣ'], 'ln y = x ln x → y′/y = ln x + 1'],
@@ -18241,7 +18241,7 @@ TEMPLATES.cc34Limit = (r) => {
   const k = pick(r, [1, 2, 3, -1, -2]), m = pick(r, [1, 1, 2, 3]), p = k * m, text = ccPow(1, p).replace(/^e$/, 'e'), val = Math.exp(p);
   const pw = m === 1 ? 'ⁿ' : `^(${m}n)`, base = `(1 ${k < 0 ? MINUS : '+'} ${Math.abs(k)}/n)`;
   return ccKey(cdExactQ(r, { topic: 'e as a limit', stem: `Find the limit as n → ∞ of ${base}${pw}.`, val, text, wrongs: ['1', ccPow(1, k), ccPow(1, -p), ccPow(m, k), 'e'], label: 'Limit =',
-    solution: `The limit of (1 + a/n)ⁿ as n → ∞ is eᵃ.\n${base}${pw} = [${base}ⁿ]${m === 1 ? '' : SUP[m]} → (e${k === 1 ? '' : String(k).split('').map((ch) => SUP[ch === MINUS ? '-' : ch]).join('')})${m === 1 ? '' : SUP[m]} = ${text}` }));
+    solution: `The limit of (1 + a/n)ⁿ as n → ∞ is eᵃ.\n${m === 1 ? `Here a = ${fmt(k)}, so ${base}ⁿ → ${text}` : `${base}${pw} = [${base}ⁿ]${SUP[m]} → (e${k === 1 ? '' : String(k).split('').map((ch) => SUP[ch === MINUS ? '-' : ch]).join('')})${SUP[m]} = ${text}`}` }));
 };
 TEMPLATES.cAP34 = (r) => clAP(TEMPLATES[pick(r, ['cc34Ln', 'cc34LnProd', 'cc34LnQuot', 'cc34Log'])](r), 'Logarithmic derivatives');
 
