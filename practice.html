@@ -37201,7 +37201,7 @@ function hintSplit(s) {
 }
 // the first line of the worked solution, with the answer itself replaced by "?"
 function hintFor(q) {
-  if (q.hint) return q.hint;
+  if (q.hint) return hintCut(q, q.hint) || `Think about the key idea for this kind of problem: ${String(q.topic || '').toLowerCase()}.`;
   const lines = String(q.solution || '').split('\n').map((l) => l.trim()).filter(Boolean); if (!lines.length) return '';
   let s = lines[0].replace(/(.)̅/g, '$1');
   const m = /^(.+?[.!?])(?=\s+[A-Z(√∠△]|$)/.exec(s); if (m && m[1].length >= 25) s = m[1];
@@ -37220,7 +37220,48 @@ function hintFor(q) {
     const pre = /^[\w−-]/.test(t) ? '(?<![\\w./√])' : '', post = /[\wπ]$/.test(t) ? '(?![\\w/θπ√²³]|\\.\\d)' : '';
     s = s.replace(new RegExp(pre + esc + post, 'gi'), '?');
   });
-  return s.replace(/[?\s.,;:]/g, '').length < 8 ? `Think about the key idea for this kind of problem: ${q.topic.toLowerCase()}.` : s;
+  s = hintCut(q, s);
+  return s.replace(/[?\s.,;:]/g, '').length < 8 ? `Think about the key idea for this kind of problem: ${String(q.topic || '').toLowerCase()}.` : s;
+}
+// a hint never shows a number from the answer that isn't already in the question: it stops at the = (or ≈, :, →) just before it, with a ?
+function hintCut(q, s) {
+  const plain = (t) => unM(String(t || '')).replace(/(.)̅/g, '$1').replace(/(\d),(?=\d{3}\b)/g, '$1');
+  const nums = (t) => (plain(t).match(/\d+(?:\.\d+)?/g) || []);
+  const given = new Set([...nums(q.stem), ...nums(q.frStem)]);
+  const ans = [q.fr ? q.fr.display : '', Array.isArray(q.choices) ? q.choices[q.answer] : ''].filter((t) => typeof t === 'string' && t);
+  const trim0 = (n) => (n.includes('.') ? n.replace(/\.?0+$/, '') : n);
+  const all = [...new Set(ans.flatMap(nums).map(trim0))].filter((n) => !given.has(n));
+  const pat = (n) => '(?<![\\d.,])' + n.split('').map((c) => (c === '.' ? '\\.' : c)).join(',?') + (n.includes('.') ? '0*' : '(?:\\.0+)?') + '(?!\\.?\\d)';
+  let at = -1; const hit = (k) => { if (k >= 0 && (at < 0 || k < at)) at = k; };
+  // a result with 2 or more digits, anywhere
+  for (const n of all.filter((n) => n.replace('.', '').length >= 2)) { const m = new RegExp(pat(n)).exec(s); if (m) hit(m.index); }
+  // a one-digit result, as the value the hint ends on (… = 5 minutes)
+  for (const n of all.filter((n) => n.replace('.', '').length < 2)) { const m = new RegExp('[=≈<>≤≥]\\s*[−-]?(' + pat(n) + ')[^=≈<>≤≥]*$').exec(s); if (m) hit(m.index + 1); }
+  // the answer itself (or what comes after its "x ="), like −6/5 inside y = −6/5x + 12/5
+  const dash = (t) => t.replace(/-/g, '−'), S = dash(s);
+  for (const a of ans) for (const p of [plain(a), ...hintSplit(plain(a))]) {
+    const d = dash(p), c = d.replace(/^[^=<>≤≥]{1,12}[=<>≤≥]\s*/, '').trim(), k = d.search(/[−(]?\d/), c2 = k >= 0 ? d.slice(k).trim() : '';
+    for (const x of [c, c2]) if (x.length >= 3 && /\d/.test(x)) hit(S.indexOf(x));
+  }
+  // a word answer (“linear,” “a point,” “no real roots”): stop before the sentence or clause that says it
+  if (at < 0) {
+    const stemW = new Set((plain(q.stem) + ' ' + plain(q.frStem)).toLowerCase().match(/[a-z]{4,}/g) || []), L = s.toLowerCase();
+    for (const a of ans) {
+      if (/\d/.test(a) || /\b(Postulate|Theorem|Property|Test|Rule|Converse|Corollary|Law|Identity|Formula)\b/i.test(a)) continue; // a named theorem: the hint may say what it says
+      const w = (plain(a).toLowerCase().match(/[a-z]{4,}/g) || []).filter((x) => !stemW.has(x) && !/^(that|this|with|from|have|there|the|then|they|when|which|each|form|forms)$/.test(x));
+      const got = w.filter((x) => L.includes(x));
+      if (!w.length || !(got.length === w.length || (w.length >= 2 && got.length * 2 >= w.length))) continue;
+      const k = Math.min(...got.map((x) => L.indexOf(x))), head = s.slice(0, k);
+      const cuts = [[head.lastIndexOf('. '), 1], [head.lastIndexOf(': '), 1], [head.lastIndexOf(', so '), 5], [head.lastIndexOf(' so '), 4], [head.lastIndexOf(', which '), 8], [head.lastIndexOf(': '), 1]].filter(([j]) => j >= 0).sort((x, y) => y[0] - x[0]);
+      if (!cuts.length) return got.length === w.length ? '' : s;
+      const [j, n] = cuts[0];
+      return n === 1 && head[j] === '.' ? head.slice(0, j + 1) : head.slice(0, j + n).trimEnd() + ' ?';
+    }
+    return s;
+  }
+  const head = s.slice(0, at), j = Math.max(head.lastIndexOf('='), head.lastIndexOf('≈'), head.lastIndexOf(':'), head.lastIndexOf('→')), d = head.lastIndexOf('. ');
+  if (d > j) return head.slice(0, d + 1); // the sentences before the one with the answer
+  return j < 0 ? '' : head.slice(0, j + 1).trimEnd() + ' ?';
 }
 function hintBar(q, i) {
   const shown = state.teacher || state.hintUsed[i], on = (c) => String(state.hints).includes(c);
@@ -42563,6 +42604,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'Hints no longer give away the answer. A hint now stops right before the answer (with a ?) instead of showing the result, even when the answer appears in another form, like a rounded number, part of an equation, or a word answer.' },
   { date: '2026-11-22', text: 'TI-Nspire help (for the non-CAS CX II): a new 🧮 TI-Nspire Homework help choice in Build an assignment shows students the keystrokes and menus for the calculator part of a problem (trig and inverse trig, logs, square roots, regressions and r, one-variable stats, normal distributions, nPr/nCr, matrices, systems, graphing intersections, polynomial roots, and complex numbers). It is on when you check Homework help; uncheck it like the others.' },
   { date: '2026-11-22', subjects: ['geometry', 'precalc', 'apcalc', 'act'], text: 'Degree/radian check: when a student’s wrong answer is exactly what a calculator in the wrong angle mode gives, the assignment tells them to switch their TI-Nspire to Degree (or Radian) and shows where the setting is. On multiple-choice trig questions, one wrong choice is now the wrong-mode answer, so that mistake gets caught too.' },
   { date: '2026-11-22', text: 'Lesson plans: when a lesson’s examples need the calculator, an “On the TI-Nspire” slide now comes right before the first of those examples, with a matching fill-in on the student sheet (print it with 🖨 Student sheet 🧮).' },
