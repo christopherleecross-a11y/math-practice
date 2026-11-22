@@ -18279,7 +18279,7 @@ TEMPLATES.cd21Def = (r) => {
       solution: `(f(x) − f(${fmt(c)}))/(${cpLin(c)}) simplifies to ${fmt(a)}(${cpLin(-c)})${b ? ` ${b < 0 ? MINUS : '+'} ${Math.abs(b)}` : ''} (for x ≠ ${fmt(c)}) → ${fmt(m)} as x → ${fmt(c)}.` }); }
   if (kind === 1) { const k = nz(r, -6, 6), c2 = nz(r, 1, 4), m = -k / (c2 * c2);
     return clValQ(r, { topic: 'Derivative from the definition', stem: `Use the definition of the derivative to find f′(${c2}) for f(x) = ${fmt(k)}/x.`, val: m, wrongs: [k / c2, -m, k], label: `f′(${c2}) =`,
-      solution: `(f(x) − f(${c2}))/(x − ${c2}) = [${fmt(k)}(${c2} − x)/(${c2}x)] / (x − ${c2}) = ${fmt(-k)}/(${c2 === 1 ? '' : c2}x) → ${fmt(-k)}/${c2 * c2} = ${fracT(m)}` }); }
+      solution: (() => { const top = `${k === 1 ? '' : k === -1 ? MINUS : fmt(k)}(${c2} − x)`, lim = `${fmt(-k)}/${c2 * c2}`; return `(f(x) − f(${c2}))/(x − ${c2}) = [${top}/(${c2 === 1 ? '' : c2}x)] / (x − ${c2}) = ${fmt(-k)}/(${c2 === 1 ? '' : c2}x) → ${lim}${fracT(m) === lim ? '' : ` = ${fracT(m)}`}`; })() }); }
   const s = pick(r, [1, 4, 9, 16]), m = 1 / (2 * Math.sqrt(s));
   return clValQ(r, { topic: 'Derivative from the definition', stem: `Use the definition of the derivative to find f′(${s}) for f(x) = √x.`, val: m, wrongs: [Math.sqrt(s), 1 / Math.sqrt(s), 2 * Math.sqrt(s)], label: `f′(${s}) =`,
     solution: `(√x − ${Math.sqrt(s)})/(x − ${s}) = 1/(√x + ${Math.sqrt(s)}) (multiply by the conjugate) → 1/${2 * Math.sqrt(s)}` });
@@ -18312,7 +18312,7 @@ TEMPLATES.cd22Func = (r) => {
   return { topic: 'The derivative function', stem: `Use the definition f′(x) = lim (f(x + h) − f(x))/h as h → 0 to find f′(x) for f(x) = ${cdP([a, b, k])}.`,
     ...buildChoices(r, ans, [`f′(x) = ${cdP([a, b])}`, `f′(x) = ${cdP([2 * a, b, k])}`, `f′(x) = ${cdP([2 * a, 0])}`, `f′(x) = ${cdP([2 * a, -b])}`], (i) => `f′(x) = ${cdP([2 * a, b + i + 1])}`),
     fr: { fields: [{ kind: 'expr', keys: 'poly', label: 'f′(x) =' }], key: [cdP([2 * a, b]).replace(/−/g, '-')], display: ans, check: (x) => pxEquiv(String(x[0]), (t) => 2 * a * t + b) },
-    solution: `f(x + h) − f(x) = (${cdP([2 * a, b])})h ${a < 0 ? MINUS : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h².\nDivide by h: ${cdP([2 * a, b])} ${a < 0 ? MINUS : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h → ${cdP([2 * a, b])} as h → 0.` };
+    solution: `f(x + h) − f(x) = (${cdP([2 * a, b])})h ${a < 0 ? MINUS : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h².\nDivide by h: ${cdP([2 * a, b])} ${a < 0 ? MINUS : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h → ${cdP([2 * a, b])} as h → 0.`.replace(/\((−?\d*)x\)h/, (m, k) => `${k}xh`) };
 };
 TEMPLATES.cd22Diff = (r) => {
   const c = ri(r, -2, 2), m1 = nz(r, -3, 3), b1 = ri(r, -4, 4), kind = ri(r, 0, 2), y0 = m1 * c + b1; // 0 smooth, 1 corner, 2 jump
@@ -18326,7 +18326,7 @@ TEMPLATES.cd22Diff = (r) => {
     solution: `Values at c: left ${fmt(y0)}, right ${fmt(y0 + jump)}${jump ? ' (different: a jump, so not continuous)' : ' (equal: continuous)'}.\nSlopes at c: left ${fmt(m1)}, right 2(${fmt(a)})(${fmt(c)}) ${B < 0 ? MINUS : '+'} ${Math.abs(B)} = ${fmt(m2)}${kind === 0 ? ' (equal: differentiable)' : kind === 1 ? ' (different: a corner)' : ''}.` };
 };
 TEMPLATES.cd22Where = (r) => {
-  const a = ri(r, -4, 4), kind = ri(r, 0, 2), F = [`|x ${a < 0 ? '+' : MINUS} ${Math.abs(a)}|`, `∛(x ${a < 0 ? '+' : MINUS} ${Math.abs(a)})`, `(x ${a < 0 ? '+' : MINUS} ${Math.abs(a)})^(2/3)`][kind].replace(`x ${MINUS} 0`, 'x').replace('x + 0', 'x');
+  const a = ri(r, -4, 4), kind = ri(r, 0, 2), F = [`|x ${a < 0 ? '+' : MINUS} ${Math.abs(a)}|`, `∛(x ${a < 0 ? '+' : MINUS} ${Math.abs(a)})`, `(x ${a < 0 ? '+' : MINUS} ${Math.abs(a)})^(2/3)`][kind].replace(`x ${MINUS} 0`, 'x').replace('x + 0', 'x').replace('∛(x)', '∛x').replace('(x)^', 'x^');
   const why = ['a corner (the one-sided slopes are −1 and 1)', 'a vertical tangent line (the slopes → ∞)', 'a cusp (the slopes → −∞ on one side and ∞ on the other)'][kind];
   const ans = `x = ${fmt(a)}: ${why.split(' (')[0]}`;
   return { topic: 'Where f is not differentiable', stem: `f(x) = ${F} is continuous everywhere. Where is f not differentiable, and why?`,
@@ -18363,9 +18363,9 @@ TEMPLATES.cd23Horiz = (r) => {
 TEMPLATES.cd23Exp = (r) => {
   const a = nz(r, -5, 5), n = ri(r, 2, 4), b = nz(r, -4, 4), x0 = pick(r, [0, 0, 1]);
   const val = a * Math.exp(x0) + b * n * x0 ** (n - 1), text = x0 === 0 ? fmt(a) : `${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}e ${b * n < 0 ? MINUS : '+'} ${Math.abs(b * n)}`;
-  return cdExactQ(r, { topic: 'Derivative of eˣ', stem: `f(x) = ${fmt(a)}eˣ ${b < 0 ? MINUS : '+'} ${Math.abs(b)}x${SUP[n]}. Find f′(${x0}).`.replace(/^f\(x\) = 1e/, 'f(x) = e'), val, text,
+  return cdExactQ(r, { topic: 'Derivative of eˣ', stem: `f(x) = ${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}eˣ ${b < 0 ? MINUS : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}x${SUP[n]}. Find f′(${x0}).`, val, text,
     wrongs: x0 === 0 ? [fmt(a + b), '0', fmt(a * n)] : [`${fmt(a)}e`, `${fmt(a)}e ${b < 0 ? MINUS : '+'} ${Math.abs(b)}`, `${fmt(a + b * n)}e`], label: `f′(${x0}) =`,
-    solution: `d/dx eˣ = eˣ and d/dx x${SUP[n]} = ${n}x${n - 1 > 1 ? SUP[n - 1] : ''}: f′(x) = ${fmt(a)}eˣ ${b < 0 ? MINUS : '+'} ${Math.abs(b * n)}x${n - 1 > 1 ? SUP[n - 1] : ''}, so f′(${x0}) = ${text}.` });
+    solution: `d/dx eˣ = eˣ and d/dx x${SUP[n]} = ${n}x${n - 1 > 1 ? SUP[n - 1] : ''}: f′(x) = ${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}eˣ ${b < 0 ? MINUS : '+'} ${Math.abs(b * n)}x${n - 1 > 1 ? SUP[n - 1] : ''}, so f′(${x0}) = ${text}.` });
 };
 TEMPLATES.cd23Velocity = (r) => {
   const co = [ri(r, 1, 2), ri(r, -9, 0), ri(r, 0, 12), 0], t0 = ri(r, 1, 4), v = cdPv(cdPd(co), t0);
@@ -18385,7 +18385,7 @@ TEMPLATES.cd24Quotient = (r) => {
   for (let t = 0; t < 200; t++) { const a = nz(r, -4, 4), b = ri(r, -5, 5), c = nz(r, -3, 3), d = ri(r, -5, 5), x0 = ri(r, -2, 2), den = c * x0 + d; if (!den || a * d - b * c === 0) continue;
     const val = (a * d - b * c) / (den * den);
     return clValQ(r, { topic: 'Quotient Rule', stem: `f(x) = (${cdP([a, b])}) / (${cdP([c, d])}). Use the Quotient Rule to find f′(${fmt(x0)}).`, val, wrongs: [a / c, (b * c - a * d) / (den * den), (a * d - b * c) / den], label: `f′(${fmt(x0)}) =`,
-      solution: `f′(x) = [${fmt(a)}(${cdP([c, d])}) − (${cdP([a, b])})(${fmt(c)})] / (${cdP([c, d])})² = ${fmt(a * d - b * c)}/(${cdP([c, d])})².\nf′(${fmt(x0)}) = ${fmt(a * d - b * c)}/${den * den} = ${fracT(val)}` }); }
+      solution: `f′(x) = [${fmt(a)}(${cdP([c, d])}) − (${cdP([a, b])})(${fmt(c)})] / (${cdP([c, d])})² = ${fmt(a * d - b * c)}/(${cdP([c, d])})².\nf′(${fmt(x0)}) = ${fmt(a * d - b * c)}/${den * den}${fracT(val) === `${fmt(a * d - b * c)}/${den * den}` ? '' : ` = ${fracT(val)}`}` }); }
 };
 TEMPLATES.cd24Higher = (r) => {
   const co = [nz(r, -2, 3), ri(r, -4, 4), ri(r, -6, 6), ri(r, -6, 6), ri(r, -9, 9)], x0 = ri(r, -2, 2), d2 = cdPd(cdPd(co)), v = cdPv(d2, x0);
@@ -18396,7 +18396,7 @@ TEMPLATES.cd24ExpProd = (r) => {
   const a = nz(r, -3, 3), b = ri(r, -4, 4), x0 = pick(r, [0, 0, 1]), val = (a + a * x0 + b) * Math.exp(x0); // d/dx (ax + b)eˣ = (ax + a + b)eˣ
   const k = a * x0 + a + b, text = x0 === 0 ? fmt(k) : k === 0 ? '0' : `${k === 1 ? '' : k === -1 ? MINUS : fmt(k)}e`;
   return cdExactQ(r, { topic: 'Product Rule with eˣ', stem: `f(x) = (${cdP([a, b])})eˣ. Find f′(${x0}).`, val, text, wrongs: x0 === 0 ? [fmt(a), fmt(b), fmt(a * b)] : [`${fmt(a)}e`, `${fmt(a + b)}`, `${fmt(2 * a + 2 * b)}e`], label: `f′(${x0}) =`,
-    solution: `f′(x) = ${fmt(a)}eˣ + (${cdP([a, b])})eˣ = (${cdP([a, a + b])})eˣ, so f′(${x0}) = ${text}.` });
+    solution: `f′(x) = ${a === 1 ? '' : a === -1 ? MINUS : fmt(a)}eˣ + (${cdP([a, b])})eˣ = (${cdP([a, a + b])})eˣ, so f′(${x0}) = ${text}.` });
 };
 TEMPLATES.cAP24 = (r) => clAP(TEMPLATES[pick(r, ['cd24Quotient', 'cd24Product', 'cd24Higher'])](r), 'Derivatives');
 
@@ -18410,6 +18410,7 @@ TEMPLATES.cd25Basic = (r) => {
     const val = A * d1[0] + B * d2[0], p1 = cdTimes(A, d1[1]), p2 = cdTimes(B, d2[1]);
     const text = p1 === '0' ? p2 : p2 === '0' ? p1 : `${p1} ${p2.startsWith(MINUS) ? MINUS : '+'} ${p2.replace(MINUS, '')}`;
     if (Math.abs(val) < 1e-12 && text !== '0' && !/√/.test(text)) continue;
+    { const rad = (x) => (/√\d+/.exec(x) || [''])[0]; if (rad(p1) && rad(p1) === rad(p2)) continue; } // like terms (3√2/2 − √2/2) would need combining
     const fx = `${A === 1 ? '' : A === -1 ? MINUS : fmt(A)}${f1} x ${B < 0 ? MINUS : '+'} ${Math.abs(B) === 1 ? '' : Math.abs(B)}${g} x`;
     return cdExactQ(r, { topic: 'Derivatives of trig functions', stem: `f(x) = ${fx}. Find f′(${cdAng(ang)}).`, val, text, wrongs: [`${p1}`, `${p2}`, text.includes('+') ? text.replace('+', MINUS) : text.replace(` ${MINUS} `, ' + ')], label: `f′(${cdAng(ang)}) =`,
       solution: `d/dx sin x = cos x,  d/dx cos x = −sin x,  d/dx tan x = sec²x.\nf′(${cdAng(ang)}) = ${text}` }); }
