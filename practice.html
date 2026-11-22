@@ -19194,7 +19194,7 @@ TEMPLATES.skLine = (r) => {
     else if (form === 1) { const x1 = nz(r, -3, 3) * den, y1 = m * x1 + b; if (!skOk(W, [[x1, y1]])) continue; const mT = den > 1 ? `(${fracT(m)})` : m === 1 ? '' : m === -1 ? MINUS : fmt(m); eq = `${y1 ? `y ${y1 < 0 ? '+' : MINUS} ${Math.abs(y1)}` : 'y'} = ${mT}(x ${x1 < 0 ? '+' : MINUS} ${Math.abs(x1)})`; }
     else { const A = -num, B = den, C = b * den, g = gcd(gcd(Math.abs(A), B), Math.abs(C)) || 1; eq = `${lin(A / g, 0).replace(/ \+ 0$/, '')} ${B / g > 0 ? '+' : MINUS} ${Math.abs(B / g) === 1 ? '' : Math.abs(B / g)}y = ${fmt(C / g)}`; }
     return skQ({ topic: 'Graphing lines', stem: `Graph the equation by placing two points on the line.\n${eq}`, family: 'line', target: (x) => m * x + b, keyPts: [p1, p2], win: W,
-      display: `The line through ${skText([p1, p2])} (slope ${fracT(m)}, y-intercept ${b})`,
+      display: `The line through ${skText([p1, p2])} (slope ${fracT(m)}, y-intercept ${fmt(b)})`,
       solution: `${form === 0 ? `Slope ${fracT(m)}, y-intercept ${fmt(b)}.` : `Rewrite in slope-intercept form: ${skLinT(m, b)}.`}\nStart at (0, ${fmt(b)}); move ${Math.abs(num)} ${num > 0 ? 'up' : 'down'} and ${den} right to (${den}, ${fmt(b + num)}).` });
   }
 };
@@ -28433,7 +28433,7 @@ TEMPLATES.p12Challenge = (r) => {
   return { topic: 'Challenge: symmetry on the unit circle', stem: `t is a real number with sin t = ${fracT(sv)} and ${Q === 1 ? '0 < t < π/2' : 'π/2 < t < π'}. Find ${pickd.map((x) => x.t).join(', ')}.`,
     ...buildChoices(r, disp, [...new Set(wr)].filter((w) => w !== disp), (i) => pickd.map((x, j) => `${x.t} = ${fracT(j === 0 ? x.v + i + 1 : x.v)}`).join(', ')),
     fr: chNums(pickd.map((x) => ({ label: `${x.t} =`, val: x.v })), disp),
-    solution: `First find cos t: cos² t = 1 − sin² t = ${fracT(1 - sv * sv)}, and t is in Quadrant ${Q === 1 ? 'I' : 'II'}, so cos t = ${fracT(cv)}.\nUse symmetry and the period 2π:\nsin(π − t) = sin t,  cos(t + π) = −cos t,  sin(−t) = −sin t,  cos(2π − t) = cos t,  tan(t + π) = tan t,  sin(t + 2π) = sin t\n${disp}` };
+    solution: `First find cos t: cos² t = 1 − sin² t = ${T[2] ** 2 - (sw ? T[1] : T[0]) ** 2}/${T[2] ** 2}, and t is in Quadrant ${Q === 1 ? 'I' : 'II'}, so cos t = ${fracT(cv)}.\nUse symmetry and the period 2π:\nsin(π − t) = sin t,  cos(t + π) = −cos t,  sin(−t) = −sin t,  cos(2π − t) = cos t,  tan(t + π) = tan t,  sin(t + 2π) = sin t\n${disp}` };
 };
 /* 1.3: the height of an object from two angles of elevation (right triangles) */
 TEMPLATES.p13Challenge = (r) => {
@@ -28491,7 +28491,7 @@ TEMPLATES.p16Challenge = (r) => {
       key: [chPiL(...per), chPiL(...x1), chPiL(...x2)], display: disp,
       check: (v) => numOk(v[0], Math.PI * per[0] / per[1]) && numOk(v[1], Math.PI * x1[0] / x1[1]) && numOk(v[2], Math.PI * x2[0] / x2[1]),
       score: (v) => [numOk(v[0], Math.PI * per[0] / per[1]), numOk(v[1], Math.PI * x1[0] / x1[1]), numOk(v[2], Math.PI * x2[0] / x2[1])].filter(Boolean).length / 3 },
-    solution: `Period: ${f === 'tan' ? 'π' : '2π'}${b === 1 ? '' : ` ÷ ${b}`} = ${chPiT(...per)}.\n${f} has vertical asymptotes where ${f === 'csc' ? 'sin' : 'cos'} is 0, so set ${arg} = ${f === 'csc' ? 'kπ' : 'π/2 + kπ'} and solve for x:\nx = ${b === 1 ? '' : '('}${cn ? chPiT(cn, cd) + ' + ' : ''}${f === 'csc' ? 'kπ' : 'π/2 + kπ'}${b === 1 ? '' : `)/${b}`}\nThe first two positive values are x = ${chPiT(...x1)} and x = ${chPiT(...x2)} (they repeat every ${chPiT(1, b)}).` };
+    solution: `Period: ${b === 1 ? chPiT(...per) : `${f === 'tan' ? 'π' : '2π'} ÷ ${b} = ${chPiT(...per)}`}.\n${f} has vertical asymptotes where ${f === 'csc' ? 'sin' : 'cos'} is 0, so set ${arg} = ${f === 'csc' ? 'kπ' : 'π/2 + kπ'} and solve for x:\nx = ${b === 1 ? '' : '('}${cn ? chPiT(cn, cd) + ' + ' : ''}${f === 'csc' ? 'kπ' : 'π/2 + kπ'}${b === 1 ? '' : `)/${b}`}\nThe first two positive values are x = ${chPiT(...x1)} and x = ${chPiT(...x2)} (they repeat every ${chPiT(1, b)}).` };
 };
 /* 1.7: two compositions with inverse functions, added */
 TEMPLATES.p17Challenge = (r) => {
@@ -28763,7 +28763,7 @@ TEMPLATES.p51Challenge = (r) => {
     const p = S1 / n, q = -P1 / n, inner = g4Lin(p, q), zs = [r1, r2].sort((u, v) => u - v);
     const S = b3Sol(r, { zeros: zs.map((z) => ({ v: [z, 0] })), text: zs.map(fmt).join(', '), latex: zs.join(','), wrongs: [`x = ${fmt(-zs[0])}, ${fmt(-zs[1])}`, `x = ${fmt(zs[1])}`, `x = ${zs.map((z) => fmt(z * n)).join(', ')}`] });
     return { topic: 'Challenge: One-to-One Property', stem: `Solve.   ${b}^(x²) = ${B}^(${inner})`, ...S,
-      solution: `Write both sides with base ${b}: ${B} = ${b}${b3sup(n)}, so ${B}^(${inner}) = ${b}^(${n}(${inner}))\nOne-to-One Property: x² = ${n}(${inner})  →  ${b4T([1, -S1, P1])} = 0\nFactor: (${b4T([1, -zs[0]])})(${b4T([1, -zs[1]])}) = 0  →  x = ${zs.map(fmt).join(' or x = ')}` };
+      solution: `Write both sides with base ${b}: ${B} = ${b}${b3sup(n)}, so ${B}^(${inner}) = ${b}^(${n}(${inner}))\nOne-to-One Property: x² = ${n}(${inner})  →  ${b4T([1, -S1, P1])} = 0\nFactor: ${zs[0] === 0 ? 'x' : `(${b4T([1, -zs[0]])})`}(${b4T([1, -zs[1]])}) = 0  →  x = ${zs.map(fmt).join(' or x = ')}` };
   }
 };
 /* 5.2: a logarithm of a logarithm */
@@ -29137,7 +29137,7 @@ TEMPLATES.p67Challenge = (r) => {
     ...buildChoices(r, disp, [`center ${ptT([a, b])}, radius ${fmt(s)}`, `center ${ptT([-C[0], -C[1]])}, radius ${fmt(R)}`, `center ${ptT([C[1], C[0]])}, radius ${fmt(R)}`, `center ${ptT(C)}, radius ${fmt(R * R)}`].filter((w, i, Z) => Z.indexOf(w) === i && w !== disp), (i) => `center ${ptT(C)}, radius ${fmt(R + i + 1)}`),
     fr: { fields: [{ kind: 'expr', keys: 'point', label: 'Center:' }, { kind: 'expr', keys: 'num', label: 'Radius:' }], key: [`\\left(${fracL(C[0])},${fracL(C[1])}\\right)`, String(R)], display: disp,
       check: (v) => onePointOk(v[0], C) && numOk(v[1], R), score: (v) => (onePointOk(v[0], C) ? 0.5 : 0) + (numOk(v[1], R) ? 0.5 : 0) },
-    solution: `Multiply both sides by r: r² = ${a ? `${fmt(a)}r cos θ` : ''}${a && b ? ' + ' : ''}${b ? `${chP(b)}r sin θ` : ''}\nReplace: x² + y² = ${a ? `${fmt(a)}x` : ''}${a && b ? (b < 0 ? ` ${MINUS} ${-b}` : ` + ${b}`) : b ? fmt(b) : ''}${b ? 'y' : ''}\nComplete the square: ${C[0] ? `(x${chAdd(-C[0])})²` : 'x²'} + ${C[1] ? `(y${chAdd(-C[1])})²` : 'y²'} = ${fmt(C[0] ** 2 + C[1] ** 2)}\nCenter ${ptT(C)}, radius √${fmt(C[0] ** 2 + C[1] ** 2)} = ${fmt(R)}` };
+    solution: `Multiply both sides by r: r² = ${a ? `${fmt(a)}r cos θ` : ''}${b ? (a ? ` ${b < 0 ? MINUS : '+'} ${fmt(Math.abs(b))}r sin θ` : `${fmt(b)}r sin θ`) : ''}\nReplace: x² + y² = ${a ? `${fmt(a)}x` : ''}${a && b ? (b < 0 ? ` ${MINUS} ${-b}` : ` + ${b}`) : b ? fmt(b) : ''}${b ? 'y' : ''}\nComplete the square: ${C[0] ? `(x${chAdd(-C[0])})²` : 'x²'} + ${C[1] ? `(y${chAdd(-C[1])})²` : 'y²'} = ${fmt(C[0] ** 2 + C[1] ** 2)}\nCenter ${ptT(C)}, radius √${fmt(C[0] ** 2 + C[1] ** 2)} = ${fmt(R)}` };
 };
 /* 6.8: a rose curve — petals, petal length, and the first petal tip */
 TEMPLATES.p68Challenge = (r) => {
@@ -29651,7 +29651,7 @@ TEMPLATES.pP5Challenge = (r) => {
   return { topic: 'Challenge: difference quotient', stem: `Let f(x) = ${b4T([a, b, c])}. Simplify the difference quotient [f(x + h) − f(x)]/h (h ≠ 0). The result has the form px + qh + r. Find p, q, and r.`,
     ...buildChoices(r, `p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b)}`, [`p = ${fmt(a)}, q = ${fmt(a)}, r = ${fmt(b)}`, `p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b + c)}`, `p = ${fmt(2 * a)}, q = 0, r = ${fmt(b)}`, `p = ${fmt(2 * a)}, q = ${fmt(2 * a)}, r = ${fmt(b)}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== `p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b)}`), (i) => `p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b + i + 1)}`),
     fr: chNums([{ label: 'p =', val: 2 * a }, { label: 'q =', val: a }, { label: 'r =', val: b }], disp),
-    solution: `f(x + h) = ${chCo(a)}(x + h)²${b ? `${chAdd(b)}(x + h)` : ''}${chAdd(c)} = ${chCo(a)}x² + ${chP(2 * a)}xh + ${a === 1 ? '' : chP(a)}h²${b ? `${chTerm(b, 'x')}${chTerm(b, 'h')}` : ''}${chAdd(c)}\nf(x + h) − f(x) = ${chP(2 * a)}xh + ${a === 1 ? '' : chP(a)}h²${b ? chTerm(b, 'h') : ''}\nDivide by h: ${disp}, so p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b)}` };
+    solution: `f(x + h) = ${chCo(a)}(x + h)²${b ? `${chAdd(b)}(x + h)` : ''}${chAdd(c)} = ${chCo(a)}x²${chTerm(2 * a, 'xh')}${chTerm(a, 'h²')}${b ? `${chTerm(b, 'x')}${chTerm(b, 'h')}` : ''}${chAdd(c)}\nf(x + h) − f(x) = ${fmt(2 * a)}xh${chTerm(a, 'h²')}${b ? chTerm(b, 'h') : ''}\nDivide by h: ${disp}, so p = ${fmt(2 * a)}, q = ${fmt(a)}, r = ${fmt(b)}` };
 };
 /* P.6: average rate of change and where the function turns */
 TEMPLATES.pP6Challenge = (r) => {
@@ -29661,7 +29661,7 @@ TEMPLATES.pP6Challenge = (r) => {
     return { topic: 'Challenge: rate of change and turning point', stem: `For f(x) = ${b4T(co)}, find the average rate of change from x = ${fmt(x1)} to x = ${fmt(x2)}. Then find where f changes from ${a > 0 ? 'decreasing to increasing' : 'increasing to decreasing'}.`,
       ...buildChoices(r, disp, [`average rate ${fracT(-rate)}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(h)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(h)}`, `average rate ${fracT(rate)}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(-h)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(-h)}`, `average rate ${fracT(f(x2) - f(x1))}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(h)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(h)}`, `average rate ${fracT(rate)}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(k)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(k)}`].filter((x, i, Z) => Z.indexOf(x) === i && x !== disp), (i) => `average rate ${fracT(rate + i + 1)}; ${a > 0 ? 'decreasing' : 'increasing'} for x < ${fmt(h)}, ${a > 0 ? 'increasing' : 'decreasing'} for x > ${fmt(h)}`),
       fr: chNums([{ label: 'Average rate of change:', val: rate }, { label: 'x-value where it turns:', val: h }], disp),
-      solution: `Average rate = [f(${fmt(x2)}) − f(${chP(x1)})]/(${fmt(x2)} − ${chP(x1)}) = (${fmt(f(x2))} − ${chP(f(x1))})/${x2 - x1} = ${fracT(rate)}\nThe graph is a parabola opening ${a > 0 ? 'up' : 'down'} with vertex at x = −b/(2a) = ${fmt(h)}, so it turns there.` };
+      solution: `Average rate = [f(${fmt(x2)}) − f(${fmt(x1)})]/(${fmt(x2)} − ${chP(x1)}) = (${fmt(f(x2))} − ${chP(f(x1))})/${x2 - x1} = ${fracT(rate)}\nThe graph is a parabola opening ${a > 0 ? 'up' : 'down'} with vertex at x = −b/(2a) = ${fmt(h)}, so it turns there.` };
   }
 };
 /* P.7: a step function — postage */
