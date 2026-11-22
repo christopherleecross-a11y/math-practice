@@ -2,7 +2,7 @@
 # each video's seed makes a problem of its own kind, and every problem the covered types make has a video.
 from playwright.sync_api import sync_playwright
 import re, json, glob, sys
-PRE = sys.argv[1] if len(sys.argv) > 1 else 'geo'; SUBJ = {'geo': 'geometry', 'alg1': 'algebra1', 'alg2': 'algebra2', 'calc': 'apcalc'}[PRE]
+PRE = sys.argv[1] if len(sys.argv) > 1 else 'geo'; SUBJ = {'geo': 'geometry', 'alg1': 'algebra1', 'alg2': 'algebra2', 'calc': 'apcalc', 'pc': 'precalc'}[PRE]
 vids, errs = [], []
 for fn in sorted(glob.glob(f'/home/claude/math-practice/walks/pv/{PRE}-*.txt')):
     cur = None

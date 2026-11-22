@@ -2121,7 +2121,9 @@ TEMPLATES.p5DiffQuot = (r) => {
     truth = (t) => -1 / (C * t); opts = { xs: [-3.7, -1.2, 0.6, 2.3, 4.1, 5.3, C], hs: [0], at0: false };
     wrongs = [`${C > 0 ? '' : MINUS}1/${den}`, `${MINUS}1/t²`, `${MINUS}1/(${tC})`];
     const Ctt = C === 1 ? 't' : C === -1 ? `${MINUS}t` : `${Ct}t`;
-    why = `f(t) − f(${Ct}) = 1/t − 1/${C < 0 ? `(${Ct})` : Ct} = (${Ct} − t)/(${Ctt}) = −(${tC})/(${Ctt})\nDivide by (${tC}): −1/(${Ctt})${C > 0 ? '' : ` = ${ans.t}`}`;
+    const aC = Math.abs(C), aCt = aC === 1 ? 't' : `${aC}t`, aCtP = aC === 1 ? 't' : `(${aC}t)`; void Ctt;
+    why = C > 0 ? `f(t) − f(${Ct}) = 1/t − 1/${Ct} = (${Ct} − t)/${aCtP} = −(${tC})/${aCtP}\nDivide by (${tC}): ${ans.t}`
+      : `f(t) − f(${Ct}) = 1/t + ${aC === 1 ? '1' : `1/${aC}`} = (${aC} + t)/${aCtP} = (${tC})/${aCtP}\nDivide by (${tC}): ${ans.t}`; void aCt;
   } else if (k === 6) { // (f(x) − f(C))/(x − C) for x² + bx or x³
     const C = nz(r, -4, 4), cube = r() < 0.4, xC = `x ${sgn(-C)} ${Math.abs(C)}`;
     f = cube ? 'f(x) = x³' : `f(x) = ${polyT([1, b, 0])}`;
@@ -2278,7 +2280,7 @@ TEMPLATES.p6AvgRate = (r) => {
     topic: 'Average rate of change', stem: `Find the average rate of change of the function from x₁ = ${x1} to x₂ = ${x2}.   f(x) = ${polyT(co)}`,
     ...buildChoices(r, fracT(m), [fracT(-m), fracT(f(x2) - f(x1)), fracT((x2 - x1) / ((f(x2) - f(x1)) || 1))].filter((x) => x !== fracT(m)), (i) => fracT(m + i + 1)),
     fr: frNums([{ label: 'Average rate of change =', val: m }], fracT(m)),
-    solution: `(f(x₂) − f(x₁))/(x₂ − x₁) = (${fmt(f(x2))} − (${fmt(f(x1))}))/(${x2} − (${x1})) = ${fmt(f(x2) - f(x1))}/${x2 - x1} = ${fracT(m)}`,
+    solution: `(f(x₂) − f(x₁))/(x₂ − x₁) = (${fmt(f(x2))} − ${f(x1) < 0 ? `(${fmt(f(x1))})` : fmt(f(x1))})/(${x2} − ${x1 < 0 ? `(${x1})`.replace('-', MINUS) : x1}) = ${fmt(f(x2) - f(x1))}/${x2 - x1}${fracT(m) === `${fmt(f(x2) - f(x1))}/${x2 - x1}` ? '' : ` = ${fracT(m)}`}`,
   };
 };
 
@@ -2410,7 +2412,7 @@ TEMPLATES.p8FromDesc = (r) => {
     topic: 'Equations from descriptions', stem: `Write an equation for the function whose graph is described.   ${desc}.`,
     ...buildChoices(r, correct, [...new Set(wrongs)].filter((x) => x !== correct), NOT((i) => alt(a, h + i + 1, k))),
     fr: { fields: [{ kind: 'expr', keys: 'func', label: 'g(x) =' }], key: [text.replace(/−/g, '-').replace(/√\(([^)]*)\)/g, '\\sqrt{$1}').replace(/²/g, '^2').replace(/³/g, '^3').replace(/\|([^|]*)\|/g, '\\left|$1\\right|')], display: correct, check: (v) => pxEquiv(v[0], f, domain) },
-    solution: `Start with ${P.name}. ${h ? `Shift ${h > 0 ? 'right' : 'left'} ${Math.abs(h)}: replace x with x ${h > 0 ? MINUS : '+'} ${Math.abs(h)}. ` : ''}${k ? `Shift ${k > 0 ? 'up' : 'down'} ${Math.abs(k)}: add ${fmt(k)}. ` : ''}${a < 0 ? 'Reflect in the x-axis: multiply the whole function by −1. ' : ''}${sy < 0 ? 'Reflect in the y-axis: replace x with −x. ' : ''}\n${correct}`,
+    solution: `Start with ${P.name}. ${Math.abs(a) !== 1 ? `Stretch vertically by ${Math.abs(a)}: multiply by ${Math.abs(a)}. ` : ''}${h ? `Shift ${h > 0 ? 'right' : 'left'} ${Math.abs(h)}: replace x with x ${h > 0 ? MINUS : '+'} ${Math.abs(h)}. ` : ''}${k ? `Shift ${k > 0 ? 'up' : 'down'} ${Math.abs(k)}: ${k > 0 ? 'add' : 'subtract'} ${Math.abs(k)}. ` : ''}${a < 0 ? 'Reflect in the x-axis: multiply the whole function by −1. ' : ''}${sy < 0 ? 'Reflect in the y-axis: replace x with −x. ' : ''}\n${correct}`,
   };
 };
 
@@ -3448,7 +3450,7 @@ TEMPLATES.t5AmpPeriod = (r) => {
     ...buildChoices(r, correct, [...new Set(wrongs)], (i) => T(fracT(amp + i + 1), coText(P))),
     fr: { fields: [{ kind: 'expr', keys: 'trigv', label: 'Amplitude:' }, { kind: 'expr', keys: 'trigv', label: 'Period:' }], key: [fracL(amp), coLatex(P)], display: correct,
       check: (v) => ok(v).every(Boolean), score: (v) => ok(v).filter(Boolean).length / 2 },
-    solution: `For y = a ${F} bx: amplitude = |a| = ${fracT(amp)}, period = 2π/b = 2π/${b.pi ? `(${coefX(b).t.replace('x', '')})` : fracT(b.k).replace(/^(\d+\/\d+)$/, '($1)')} = ${coText(P)}.`,
+    solution: `For y = a ${F} bx: amplitude = |a| = ${fracT(amp)}, period = 2π/b = ${(() => { const d = `2π/${b.pi ? `(${coefX(b).t.replace('x', '')})` : fracT(b.k).replace(/^(\d+\/\d+)$/, '($1)')}`; return d === coText(P) ? d : `${d} = ${coText(P)}`; })()}.`,
   };
 };
 TEMPLATES.t5Relationship = (r) => {
@@ -4466,7 +4468,7 @@ TEMPLATES.e4LogEq = (r) => {
     let eq, S, why;
     const keep = (xs, test) => [...new Set(xs.map((x) => Math.round(x * 1e9) / 1e9))].filter(test).sort((a, b) => a - b);
     if (k === 0) { const c = pick(r, [-3, -1, 2, 0.5]); eq = `ln x = ${fmt(c)}`; S = [{ v: Math.exp(c), t: powT('e', fmt(c)) }]; why = `x = ${S[0].t}.`; }
-    else if (k === 1) { const a = pick(r, [6, 2, 3, 5]), c = pick(r, [2.1, 1, 3, 0.5]); eq = `${fmt(c)} = ln ${a}x`; S = [{ v: Math.exp(c) / a, t: `${powT('e', fmt(c))}/${a}` }]; why = `${a}x = ${powT('e', fmt(c))}, so x = ${S[0].t}.`; }
+    else if (k === 1) { const a = pick(r, [6, 2, 3, 5]), c = pick(r, [2.1, 1, 3, 0.5]); eq = `${fmt(c)} = ln ${a}x`; const ec = c === 1 ? 'e' : powT('e', fmt(c)); S = [{ v: Math.exp(c) / a, t: `${ec}/${a}` }]; why = `${a}x = ${ec}, so x = ${S[0].t}.`; }
     else if (k === 2) { const a = ri(r, 1, 6), kk = pick(r, [2, 4, 8]), d = a + kk * pick(r, [2, -2, 1, -1]), plus = r() < 0.5; eq = `${a} ${plus ? '+' : MINUS} ${kk} ln x = ${fmt(d)}`; const L = plus ? (d - a) / kk : (a - d) / kk; S = [{ v: Math.exp(L), t: powT('e', fracT(L)) }]; why = `${plus ? '' : MINUS}${kk} ln x = ${fmt(d - a)}, so ln x = ${fracT(L)} and x = ${S[0].t}.`; }
     else if (k === 3) { const m = pick(r, [3, 2, 4, 5]), c = pick(r, [2, 1, 3]); eq = `log ${m}z = ${c}`; S = [{ v: 10 ** c / m, t: fracT(10 ** c / m) }]; why = `${m}z = ${10 ** c}, so z = ${S[0].t}.`; }
     else if (k === 4) { const h = ri(r, 2, 8), kk = 4, d = pick(r, [11, 9, 5, 7]); eq = `${kk} log(x − ${h}) = ${d}`; S = [{ v: h + 10 ** (d / kk), t: `${h} + ${powT('10', fracT(d / kk))}` }]; why = `log(x − ${h}) = ${fracT(d / kk)}, so x − ${h} = ${powT('10', fracT(d / kk))} and x = ${S[0].t}.`; }
@@ -41326,11 +41328,13 @@ function pvLoad(subj, then) {
 const pvInst = (v) => { if (v.inst !== undefined) return v.inst; let t = null; try { t = TEMPLATES[v.tpl](mulberry32(v.seed)); if (!t || String(t.stem) !== v.stem) t = null; } catch { t = null; } v.inst = t; return t; };
 const practiceVideos = (q, onLoad) => {
   if (!q || !q.tpl) return [];
-  const inline = PRACTICE_VIDS.filter((v) => v.tpl === q.tpl && (!v.when || v.when(q)));
+  // AP Calculus borrows question types from other subjects as ap_<id>: same problems, so use that type's videos
+  const tpl = TEMPLATES[String(q.tpl).replace(/^ap_/, '')] ? String(q.tpl).replace(/^ap_/, '') : q.tpl;
+  const inline = PRACTICE_VIDS.filter((v) => v.tpl === tpl && (!v.when || v.when(q)));
   if (inline.length) return inline;
-  const subj = pvSubject(q); if (!PV_FILES[subj]) { if (onLoad) pvLoad(subj, onLoad); return []; }
+  const subj = pvSubject({ tpl }); if (!PV_FILES[subj]) { if (onLoad) pvLoad(subj, onLoad); return []; }
   const key = `${q.topic || ''} ## ${q.stem || ''}`;
-  return PV_FILES[subj].filter((v) => v.tpl === q.tpl && v.re.test(key) && pvInst(v));
+  return PV_FILES[subj].filter((v) => v.tpl === tpl && v.re.test(key) && pvInst(v));
 };
 // walkthroughs for every lesson, kept in walks/<subject>.json and loaded when a catch-up page opens
 const WALK_FILES = {};
