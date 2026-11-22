@@ -4013,7 +4013,7 @@ TEMPLATES.e1OneToOne = (r) => {
       topic: 'One-to-One Property (exponents)', stem: `Use the One-to-One Property to solve the equation for x.   ${eq}`,
       ...buildChoices(r, correct, [...new Set(wrongs)], (i) => `x = ${fracT(x + i + 2)}`),
       fr: { fields: [{ kind: 'expr', keys: 'num', label: 'x =' }], key: [fracL(x)], display: correct, check: (v) => lgOk(v[0], x) },
-      solution: `Write both sides as powers of ${B}: ${B}^(${u === 1 ? exT : `${fmt(u)}(${exT})`}) = ${B}^(${fmt(m)}). Set the exponents equal: ${u === 1 ? exT : `${fmt(u)}(${exT})`} = ${fmt(m)}, so x = ${fracT(x)}.`,
+      solution: `Write both sides as powers of ${B}: ${B}^(${u === 1 ? exT : u === -1 ? `${MINUS}(${exT})` : `${fmt(u)}(${exT})`}) = ${B}^(${fmt(m)}). Set the exponents equal: ${u === 1 ? exT : u === -1 ? `${MINUS}(${exT})` : `${fmt(u)}(${exT})`} = ${fmt(m)}, so x = ${fracT(x)}.`,
     };
   }
 };
@@ -4318,7 +4318,7 @@ TEMPLATES.e3Approx = (r) => {
       topic: 'Approximating with log properties', stem: `Approximate the logarithm using the properties of logarithms, given log_b 2 ≈ 0.3562, log_b 3 ≈ 0.5646, and log_b 5 ≈ 0.8271. Round to four decimal places.   log_b ${t}`,
       ...buildChoices(r, correct, [...new Set(wrongs)], (ii) => rT(v + ii + 1, 4)),
       fr: { fields: [{ kind: 'expr', keys: 'num', label: `log_b ${t} ≈` }], key: [correct.replace(MINUS, '-')], display: correct, check: (x) => lgOk(x[0], v, 0.00015) },
-      solution: `${t} = ${E !== 1 ? `(${core})^(${fracT(E)}), ` : ''}${[[2, i], [3, j], [5, k]].filter(([, e]) => e).map(([b, e]) => (e === 1 ? String(b) : powT(String(b), String(e)))).join(' · ')}${mb ? ` · ${mb === 1 ? 'b' : powT('b', String(mb))}` : ''}${E !== 1 ? ` (all to the ${fracT(E)})` : ''}.\nlog_b = ${E !== 1 ? `${fracT(E)}·(` : ''}${[[2, i], [3, j], [5, k]].filter(([, e]) => e).map(([b, e], n) => `${n ? (e < 0 ? ' − ' : ' + ') : e < 0 ? MINUS : ''}${Math.abs(e) === 1 ? '' : Math.abs(e)}(${L[b]})`).join('')}${mb ? ` + ${mb}` : ''}${E !== 1 ? ')' : ''} ≈ ${correct}`,
+      solution: `${t} = ${E !== 1 ? `(${core})^(${fracT(E)}), ` : ''}${[[2, i], [3, j], [5, k]].filter(([, e]) => e).map(([b, e]) => (e === 1 ? String(b) : powT(String(b), String(e)))).join(' · ')}${mb ? ` · ${mb === 1 ? 'b' : powT('b', String(mb))}` : ''}${E !== 1 ? ` (all to the ${fracT(E)})` : ''}.\nlog_b ${t} = ${E !== 1 ? `${fracT(E)}·(` : ''}${[[2, i], [3, j], [5, k]].filter(([, e]) => e).map(([b, e], n) => `${n ? (e < 0 ? ' − ' : ' + ') : e < 0 ? MINUS : ''}${Math.abs(e) === 1 ? '' : Math.abs(e)}(${L[b]})`).join('')}${mb ? ` + ${mb}` : ''}${E !== 1 ? ')' : ''} ≈ ${correct}`,
     };
   }
 };
