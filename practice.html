@@ -36173,15 +36173,89 @@ function nsMode(r) {
 
 /* ---------- More calculator checks on a wrong typed answer ----------
    exact answer wanted but the student typed the calculator's decimal; or a decimal that's off in the last place (rounded too early) */
+/* ---------- Parentheses slips: the student's answer is what the calculator gives when a pair of parentheses is left out ----------
+   (−3)² typed as −3² (= −9), 12/(2·3) typed as 12/2·3 (= 18), (8 + 4)/2 typed as 8 + 4/2, √(9 + 16) typed as √9 + 16, 2^(3+1) typed as 2^3+1.
+   The calculations come from the worked solution: each one that gives the answer is tried again with each pair of parentheses taken out. */
+function calcNorm(t) {
+  return String(t).replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/[−–]/g, '-').replace(/[·×⋅]/g, '*').replace(/÷/g, '/').replace(/²/g, '^2').replace(/³/g, '^3')
+    .replace(/(sin|cos|tan)⁻¹/g, 'a$1').replace(/√/g, 'sqrt ').replace(/π/g, ' pi ').replace(/\s+/g, ' ').trim();
+}
+// a small calculator that works like the TI-Nspire: −3^2 = −9, 1/2x = (1/2)x, tan 32° takes degrees, function names bind to the next number
+function calcEval(src) {
+  const toks = String(src).match(/\d*\.\d+|\d+|asin|acos|atan|sin|cos|tan|sqrt|ln|log|pi|[-+*/^()°!]/g); if (!toks || toks.join('') !== String(src).replace(/\s+/g, '')) return NaN;
+  let i = 0; const peek = () => toks[i], next = () => toks[i++];
+  const FN = { sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: (v) => Math.asin(v) * 180 / Math.PI, acos: (v) => Math.acos(v) * 180 / Math.PI, atan: (v) => Math.atan(v) * 180 / Math.PI, sqrt: Math.sqrt, ln: Math.log, log: Math.log10 };
+  const startsFactor = (t) => t !== undefined && (/^[\d.]/.test(t) || t === '(' || t === 'pi' || FN[t]);
+  function expr() { let v = term(); while (peek() === '+' || peek() === '-') { const o = next(), w = term(); v = o === '+' ? v + w : v - w; } return v; }
+  function term() { let v = unary(); for (;;) { const t = peek(); if (t === '*' || t === '/') { next(); const w = unary(); v = t === '*' ? v * w : v / w; } else if (startsFactor(t)) v *= unary(); else return v; } }
+  function unary() { if (peek() === '-') { next(); return -unary(); } if (peek() === '+') { next(); return unary(); } return power(); }
+  function power() { const b = postfix(); if (peek() === '^') { next(); return b ** unary(); } return b; }
+  function postfix() { let v = atom(); for (;;) { if (peek() === '°') { next(); v *= Math.PI / 180; } else if (peek() === '!') { next(); let f = 1; for (let k = 2; k <= v; k++) f *= k; v = f; } else return v; } }
+  function atom() {
+    const t = next(); if (t === undefined) throw 0;
+    if (/^[\d.]/.test(t)) return parseFloat(t);
+    if (t === 'pi') return Math.PI;
+    if (t === '(') { const v = expr(); if (next() !== ')') throw 0; return v; }
+    if (FN[t]) { const v = peek() === '(' ? atom() : power(); return FN[t](v); }
+    throw 0;
+  }
+  try { const v = expr(); return i === toks.length ? v : NaN; } catch (e) { return NaN; }
+}
+// the calculations in a worked solution (pieces between =, ≈, →, :) that have parentheses
+function calcPieces(q) {
+  const out = [];
+  for (const line of String(unM(q.solution || '')).split('\n')) for (let p of line.split(/[=≈→:;]|\bso\b|\bthen\b/)) {
+    p = calcNorm(p.replace(/\b(about|feet|ft|inches|in|meters|m|cm|units?|miles|mi|degrees|square|cubic)\b\.?/g, '').replace(/[a-zA-Z]\s*$/, ''));
+    if (!/\(/.test(p) || !/^(?:[\d.\s+\-*/^()°!]|asin|acos|atan|sin|cos|tan|sqrt|ln|log|pi)+$/.test(p)) continue;
+    out.push(p.replace(/\s+/g, ''));
+  }
+  return [...new Set(out)];
+}
+function parenTip(q, sv, kv, dpS, dpK) {
+  if (!isFinite(sv) || !isFinite(kv)) return '';
+  const close = (a, b, tol) => Math.abs(a - b) <= tol;
+  const tolK = Math.max(1e-6 * Math.max(1, Math.abs(kv)), dpK == null ? 0 : 0.5 * 10 ** -dpK + 1e-9), tolS = 0.5 * 10 ** -dpS + 1e-9;
+  for (const p of calcPieces(q)) {
+    const v = calcEval(p); if (!close(v, kv, tolK)) continue; // this calculation gives the answer
+    const st = []; const pairs = [];
+    for (let k = 0; k < p.length; k++) { if (p[k] === '(') st.push(k); else if (p[k] === ')' && st.length) pairs.push([st.pop(), k]); }
+    for (const [a, b] of pairs) {
+      if (a === 0 && b === p.length - 1) continue;
+      const inside = p.slice(a + 1, b); if (/^[\d.]+$/.test(inside)) continue; // (5): nothing changes
+      const w = calcEval(p.slice(0, a) + (/[a-z]$/.test(p.slice(0, a)) ? ' ' : '') + inside + p.slice(b + 1));
+      if (!isFinite(w) || close(w, v, 1e-9 * Math.max(1, Math.abs(v)))) continue;
+      if (dpS === 0 && dpK !== 0 && Math.abs(w - Math.round(w)) > 1e-6) continue; // a whole number typed: only a slip that really gives a whole number
+      if (close(sv, w, Math.max(tolS, 1e-6 * Math.max(1, Math.abs(w)))) && !close(sv, kv, 1e-9)) {
+        const shown = inside.replace(/\*/g, '·').replace(/-/g, '−').replace(/sqrt/g, '√').replace(/\^2/g, '²').replace(/\^3/g, '³').replace(/pi/g, 'π');
+        const before = p.slice(0, a), after = p.slice(b + 1);
+        const why = /^\^/.test(after) && /^-/.test(inside) ? 'Without them, the TI-Nspire squares only the number after the minus sign: −3² is −9, but (−3)² is 9.'
+          : /\/$/.test(before) || /^\//.test(after) ? 'Without them, the calculator divides only the number right next to ÷. Use ctrl ÷ for a fraction box, or put parentheses around the whole top or bottom.'
+          : /sqrt$/.test(before) ? 'Without them, √ covers only the first number. Press ctrl x² and type everything under the root inside it.'
+          : /(sin|cos|tan)$/.test(before) ? 'Without them, sin, cos, or tan uses only the first number. Close the parenthesis right after the angle.'
+          : /\^$/.test(before) ? 'Without them, only the first number is in the exponent. Press ▶ to come back down out of the exponent only after the whole exponent is typed.'
+          : 'The TI-Nspire does exactly what you type, in order of operations.';
+        return `🧮 Check your parentheses. Your answer is what the calculator gives when the parentheses around ${shown} are left out. ${why}`;
+      }
+    }
+  }
+  return '';
+}
 function calcTip(q, a) {
   const am = angleModeTip(q, a); if (am) return am;
+  if (q && q.mode !== 'fr' && Array.isArray(q.choices) && Number.isInteger(a) && a !== q.answer) { // multiple choice: a choice that's one number
+    const one = (t) => /^\s*(?:[a-zθ]\s*[=≈]\s*)?([−-]?\d+(?:\.(\d+))?)\s*(?:[a-z°%]+\.?[²³]?)?\s*$/i.exec(unM(String(t ?? '')).replace(/(\d),(?=\d{3}\b)/g, '$1'));
+    const A = one(q.choices[a]), K = one(q.choices[q.answer]);
+    return A && K ? parenTip(q, parseFloat(A[1].replace('−', '-')), parseFloat(K[1].replace('−', '-')), A[2] ? A[2].length : 0, K[2] ? K[2].length : 0) : '';
+  }
   if (!q || q.mode !== 'fr' || !q.fr || !Array.isArray(q.fr.key) || !Array.isArray(a)) return '';
   const strip = (t) => String(t ?? '').replace(/\\circ|°|\^\{?\\circ\}?|\\%|%|\\[,;! ]/g, '').replace(/^\s*[a-zθ]\s*(=|\\approx|≈)\s*/i, '').trim();
   const words = unM(`${q.stem || ''} ${q.frStem || ''}`);
   for (let k = 0; k < q.fr.key.length; k++) {
     const key = String(q.fr.key[k] ?? ''), s = strip(a[k]); if (!s) continue;
-    const dec = /^[−-]?\d*\.(\d+)$/.exec(s.replace('−', '-')); if (!dec) continue;
+    const num = /^[−-]?\d*(?:\.(\d+))?$/.exec(s.replace('−', '-')); if (!num || !/\d/.test(s)) continue;
     const sv = parseFloat(s.replace('−', '-')), kv = pxConst(key.replace(/^\s*[a-zθ]\s*=\s*/i, '')); if (!isFinite(sv) || !isFinite(kv) || Math.abs(sv - kv) < 1e-9) continue;
+    const kdm = /^[−-]?\d+(?:\.(\d+))?$/.exec(key.replace('−', '-').trim()), pt = parenTip(q, sv, kv, num[1] ? num[1].length : 0, kdm ? (kdm[1] || '').length : null); if (pt) return pt;
+    const dec = num[1] ? [null, num[1]] : null; if (!dec) continue; // the checks below are for decimals
     const dp = dec[1].length, diff = Math.abs(sv - kv);
     // 1. an exact answer (√, π, e, or a fraction) and the student typed its decimal
     if (/sqrt|√|pi|π|frac|\/|e\^|\\ln|\\log/.test(key) && !/\./.test(key) && diff <= 0.5 * 10 ** -dp + 1e-9 && dp >= 1)
@@ -42837,6 +42911,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'Parentheses check: when a student’s wrong answer is exactly what the calculator gives with a pair of parentheses left out (like −3² instead of (−3)², 21 + 16 ÷ 2 instead of (21 + 16) ÷ 2, or √9 + 16 instead of √(9 + 16)), the assignment tells them which parentheses they missed and how to type it on the TI-Nspire.' },
   { date: '2026-11-22', subjects: ['geometry', 'precalc', 'apcalc', 'act', 'algebra2'], text: 'TI-Nspire help now shows the quick way to switch angle mode: click DEG or RAD in the top right corner of the screen (the Settings menu is listed as the long way).' },
   { date: '2026-11-22', text: 'More TI-Nspire help: when a student types the calculator’s decimal for an exact answer (like 3.464 for 2√3), the assignment says so instead of just “Not quite.” When a rounded answer is off in the last digit, it tells them they probably rounded in the middle and to keep every digit until the end.' },
   { date: '2026-11-22', text: 'Worked examples now end with “🧮 Check it on your TI-Nspire” when there’s a good way to check: store the answer and test the equation (the calculator says true), graph both sides and find the intersection, plug an angle back in, and so on.' },
