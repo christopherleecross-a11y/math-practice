@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-22.2'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-22.3'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -122,6 +122,10 @@ function doPost(e) {
   if (d.action === 'lessonPlans' || d.action === 'saveLesson' || d.action === 'resetLesson' || d.action === 'lessonHistory') { // your edits to the lesson plans
     let out;
     try { out = d.action === 'lessonPlans' ? lessonPlans_(d) : d.action === 'saveLesson' ? saveLesson_(d) : d.action === 'lessonHistory' ? lessonHistory_(d) : resetLesson_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'myAcc') { // a student starting an assignment: their own accommodations (only theirs; with Google sign-in, only for that sign-in)
+    let out; try { out = myAcc_(d); } catch (err) { out = { ok: true, acc: {} }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'lessonDemos') { // students' notes and catch-up pages: the interactives in your edited lesson plans (nothing private)
@@ -901,6 +905,8 @@ function setupOp_(d) {
     return { ok: true, roster: rosterList() };
   }
   if (op === 'roster') return { ok: true, roster: rosterList() };
+  if (op === 'accList') return { ok: true, acc: accRows_().map(function (r) { return { id: r.id, period: r.period, name: r.name, acc: r.acc }; }) };
+  if (op === 'accSave') return accSave_(d);
   if (op === 'rosterEdit') {
     const sh = ss.getSheetByName(ROSTER_TAB); if (!sh) return { ok: false, error: 'No roster yet. Refresh the roster from Classroom first.' };
     const r = rosterRows_().filter(function (x) { return x.id === String(d.id) && x.period === String(d.period); })[0];
@@ -1854,4 +1860,60 @@ function resetStudent_(d) {
     });
     return { ok: true, cleared: n, rows: rows };
   } finally { lock.releaseLock(); }
+}
+
+
+/* ---------- Accommodations (IEP / 504): settings that apply to one student on every assignment ----------
+   Kept on a hidden "Accommodations" tab: Roster user ID | Period | Student | Settings (JSON) | Updated.
+   The teacher sets them on the Classes & roster page; a student's page asks for its own when an assignment starts. */
+const ACC_TAB = 'Accommodations';
+function accSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(ACC_TAB);
+  if (!sh) { sh = ss.insertSheet(ACC_TAB); sh.appendRow(['Roster user ID', 'Period', 'Student', 'Settings', 'Updated']); sh.getRange(1, 1, 1, 5).setFontWeight('bold'); sh.setFrozenRows(1); sh.hideSheet(); }
+  return sh;
+}
+function accRows_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACC_TAB);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues().map(function (r, i) {
+    let acc = {}; try { acc = JSON.parse(String(r[3] || '{}')) || {}; } catch (e) {}
+    return { row: i + 2, id: String(r[0] || ''), period: String(r[1] || ''), name: String(r[2] || ''), acc: acc };
+  }).filter(function (r) { return r.id || r.name; });
+}
+function accClean_(a) {
+  a = a && typeof a === 'object' ? a : {};
+  const n = function (v, hi) { v = Math.floor(Number(v) || 0); return Math.max(0, Math.min(hi, v)); }, out = {};
+  if (n(a.retries, 5)) out.retries = n(a.retries, 5);
+  if (n(a.attempts, 5)) out.attempts = n(a.attempts, 5);
+  ['three', 'read', 'big', 'help', 'desmos', 'breaks'].forEach(function (k) { if (a[k]) out[k] = true; });
+  if (a.note) out.note = String(a.note).slice(0, 200);
+  return out;
+}
+function accSave_(d) {
+  const sh = accSheet_(), id = String(d.id || ''), period = String(d.period || '').slice(0, 20), name = String(d.name || '').slice(0, 120), acc = accClean_(d.acc);
+  if (!id && !name) return { ok: false, error: 'No student.' };
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const hit = accRows_().filter(function (r) { return (id && r.id === id) || (!id && r.period === period && normName_(r.name) === normName_(name)); })[0];
+    const empty = !Object.keys(acc).filter(function (k) { return k !== 'note'; }).length;
+    if (hit && empty) sh.deleteRow(hit.row);
+    else if (hit) sh.getRange(hit.row, 1, 1, 5).setValues([[id, period, name, JSON.stringify(acc), new Date()]]);
+    else if (!empty) sh.appendRow([id, period, name, JSON.stringify(acc), new Date()]);
+  } finally { lock.releaseLock(); }
+  return { ok: true, acc: empty ? {} : acc };
+}
+function myAcc_(d) {
+  const token = d.token; signinCheck_(d);
+  if (token && !d.rid) return { ok: true, acc: {} }; // a pass that didn't check out
+  const rows = accRows_(); if (!rows.length) return { ok: true, acc: {} };
+  let hit = null;
+  if (d.rid) hit = rows.filter(function (r) { return r.id && r.id === String(d.rid); })[0];
+  if (!hit && !token) { // signed in by picking or typing a name: the roster name (or a nickname) in that period
+    const t = normName_(d.name || ''), per = String(d.period || '');
+    const ro = rosterRows_().filter(function (r) { return r.period === per && (normName_(r.full) === t || String(r.aliases || '').split(',').some(function (x) { return normName_(x) === t && t; })); })[0];
+    hit = rows.filter(function (r) { return (ro && r.id === ro.id) || (r.period === per && normName_(r.name) === t); })[0];
+  }
+  const a = hit ? accClean_(hit.acc) : {}; delete a.note; // the teacher's note stays private
+  return { ok: true, acc: a };
 }

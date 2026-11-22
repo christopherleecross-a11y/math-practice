@@ -318,6 +318,7 @@ tr.dash-late td strong { color: #b42318; }
   .yag-sec { display:inline-flex; align-items:center; padding:4px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:var(--card); }
   table.dash-std th, table.dash-std td { padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
   table.dash-std th { font-size:13px; color:#666; }
+  body.acc-big #app { font-size: 120%; } body.acc-big #app input, body.acc-big #app .mq-editable-field { font-size: 1.15em; }
 </style>
 <script src="sylogist.js"></script>
 </head>
@@ -36498,7 +36499,7 @@ function generate(setKey, period, sid, attempt = 1) {
   const gen = SETS[setKey].gen || 1, seen = {};
   for (const [tpl, count, mode, b] of SETS[setKey].items) for (let i = 0; i < count; i++) {
     const n = (seen[tpl] = (seen[tpl] || 0) + 1), rr = gen >= 2 ? mulberry32(cyrb53(`${seedStr}|${tpl}#${n}`)) : r;
-    const rec = recRng(rr), q = applyMode(TEMPLATES[tpl](rec), mode); q.tpl = tpl; q.fmt = mode; q._rv = rec.vals; modeDistractor(q); if (b === 'b') q.bonus = true; qs.push(q);
+    const rec = recRng(rr), q = applyMode(TEMPLATES[tpl](rec), mode); q.tpl = tpl; q.fmt = mode; q._rv = rec.vals; modeDistractor(q); accTrim(q); if (b === 'b') q.bonus = true; qs.push(q);
   }
   if (qs.some(isBonus)) { // bonus questions always come last (mixed up among themselves if the order is mixed)
     const reg = qs.filter((q) => !q.bonus), bon = qs.filter(isBonus);
@@ -36511,7 +36512,7 @@ function generate(setKey, period, sid, attempt = 1) {
 // a fresh version of question i for retry number t (same type and format, new numbers)
 function regenQuestion(seedStr, old, i, t) {
   const rec = recRng(mulberry32(cyrb53(`${seedStr}|q${i}|r${t}`))), q = applyMode(TEMPLATES[old.tpl](rec), old.fmt);
-  q.tpl = old.tpl; q.fmt = old.fmt; q._rv = rec.vals; modeDistractor(q); if (old.bonus) q.bonus = true;
+  q.tpl = old.tpl; q.fmt = old.fmt; q._rv = rec.vals; modeDistractor(q); accTrim(q); if (old.bonus) q.bonus = true;
   return q;
 }
 // Homework help parts: h = Hint, e = Worked example, n = Notes, v = Video, c = TI-Nspire steps. true / '1' = all of them.
@@ -36524,7 +36525,26 @@ function helpOf(v) {
   return [...'henvc'].filter((c) => v.includes(c) || (c === 'v' && old)).join('');
 }
 function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Worked example'], ['n', 'Notes'], ['v', 'Video'], ['c', 'TI-Nspire steps']].filter(([c]) => h.includes(c)).map(([, t]) => t).join(', ') : 'no'; }
-const setting = (setKey, name) => {
+/* ---------- Accommodations (IEP / 504) ----------
+   Set once for a student on Classes & roster; they apply to every assignment that student opens:
+   retries / attempts: extra tries on each question / extra attempts at the whole assignment; three: 3 answer choices instead of 4;
+   read: a 🔊 Read aloud button on each question; big: larger text; help: Homework help always on; desmos: the Desmos calculator always on;
+   breaks: leaving full screen never locks the assignment. */
+let ACC_ME = {};
+const ACC_PARTS = [['retries', 'Extra tries on each question', 'num'], ['attempts', 'Extra attempts at the assignment', 'num'], ['three', '3 answer choices instead of 4'], ['read', 'Read aloud (🔊 button)'],
+  ['big', 'Larger text'], ['help', 'Homework help always on'], ['desmos', 'Desmos calculator always on'], ['breaks', 'Breaks: leaving full screen never locks it']];
+async function accLoad(period, name, rid) {
+  const ck = TK(`acc:${period}:${norm(name)}`), ps = rid ? signinPass() : null;
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'myAcc', period, name, token: ps && ps.rid === rid ? ps.token : undefined }) });
+    clearTimeout(t);
+    const g = await res.json(); if (g && g.ok) { store.set(ck, g.acc || {}); return g.acc || {}; }
+  } catch (e) {}
+  return store.get(ck) || {}; // offline or an older script: what this Chromebook got last time
+}
+const settingBase = (setKey, name) => {
   const v = SETS[setKey][name];
   if (v !== undefined) return v;
   if (name === 'attempts') return CONFIG.ALLOW_RETAKE ? 99 : CONFIG.ATTEMPTS || 1;
@@ -36540,6 +36560,100 @@ const setting = (setKey, name) => {
   if (name === 'checks') return CONFIG.CHECKS || 1; // typed-answer questions: Checks allowed on one version before new numbers
   return CONFIG.RETRIES || 0;
 };
+// the assignment's setting, with this student's accommodations on top (ACC_ME is empty on teacher pages)
+const setting = (setKey, name) => {
+  const v = settingBase(setKey, name), A = ACC_ME || {};
+  if (name === 'retries' && A.retries) return Math.min(8, (+v || 0) + A.retries);
+  if (name === 'attempts' && A.attempts) return v >= 99 ? v : (+v || 1) + A.attempts;
+  if (name === 'hints' && A.help) return '1';
+  if (name === 'desmos' && A.desmos) return true;
+  if (name === 'leaveLimit' && A.breaks) return 0;
+  return v;
+};
+// 3 answer choices: take out one wrong choice (the same one every time this question is shown)
+function accTrim(q) {
+  if (!ACC_ME.three || !q || q.mode !== 'mc' || !Array.isArray(q.choices) || q.choices.length < 4 || q._accTrim) return q;
+  const orig = q._choices0 || q.choices.slice();
+  const wrong = q.choices.map((_, i) => i).filter((i) => i !== q.answer && (!q._choices0 || q.choices[i] === q._choices0[i])); // keep the wrong-angle-mode choice
+  if (!wrong.length) return q;
+  const k = wrong[cyrb53(unM(String(q.stem)) + '|acc') % wrong.length];
+  q._choices0 = orig; q.choices = q.choices.filter((_, i) => i !== k); if (q.answer > k) q.answer--; q._accTrim = true;
+  return q;
+}
+// read a question out loud: math symbols said as words
+function speakable(t) {
+  return unM(String(t || '')).replace(/(\w)̅(\w)̅/g, 'segment $1$2').replace(/̅/g, '')
+    .replace(/√\s*\(([^)]*)\)/g, 'the square root of $1,').replace(/√/g, 'the square root of ')
+    .replace(/²/g, ' squared').replace(/³/g, ' cubed').replace(/⁻¹/g, ' inverse').replace(/π/g, ' pi ').replace(/θ/g, ' theta ').replace(/°/g, ' degrees')
+    .replace(/(\d)\s*\/\s*(\d)/g, '$1 over $2').replace(/≈/g, ' is about ').replace(/≤/g, ' is less than or equal to ').replace(/≥/g, ' is greater than or equal to ').replace(/≠/g, ' is not equal to ')
+    .replace(/</g, ' is less than ').replace(/>/g, ' is greater than ').replace(/[·×]/g, ' times ').replace(/÷/g, ' divided by ').replace(/−/g, ' minus ').replace(/∠/g, 'angle ').replace(/△/g, 'triangle ')
+    .replace(/⊥/g, ' is perpendicular to ').replace(/∥/g, ' is parallel to ').replace(/≅/g, ' is congruent to ').replace(/~/g, ' is similar to ').replace(/\s+/g, ' ').trim();
+}
+function readAloudBtn(q) {
+  const synth = window.speechSynthesis; if (!synth) return '';
+  const b = el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:3px 10px;font-size:14px', title: 'Read this question out loud' }, '🔊 Read aloud');
+  b.onclick = () => {
+    if (synth.speaking) { synth.cancel(); b.textContent = '🔊 Read aloud'; return; }
+    const parts = [speakable(q.stem)];
+    if (q.mode === 'mc' && Array.isArray(q.choices)) q.choices.forEach((c, i) => parts.push(`Choice ${'ABCDE'[i]}: ${speakable(typeof c === 'string' ? c : '')}.`));
+    const u = new SpeechSynthesisUtterance(parts.join('. ')); u.rate = 0.9;
+    const v = synth.getVoices().find((x) => /^en(-|_)US/i.test(x.lang) && /Google US English/i.test(x.name)) || synth.getVoices().find((x) => /^en(-|_)US/i.test(x.lang)); if (v) u.voice = v;
+    u.onend = u.onerror = () => { b.textContent = '🔊 Read aloud'; };
+    synth.cancel(); synth.speak(u); b.textContent = '⏹ Stop';
+  };
+  return b;
+}
+// teacher: the Accommodations card on Classes & roster
+function accCard(roster, card, th, td, note) {
+  const out = el('div', {}), list = el('div', {}), perSel = el('select', { style: 'width:auto' }), sum = el('div', { class: 'small', style: 'margin:6px 0' });
+  let ACC = [];
+  const key = (r) => r.id || `${r.period}|${norm(r.full)}`;
+  const accOf = (r) => (ACC.find((a) => (a.id && a.id === r.id) || (!a.id && a.period === r.period && norm(a.name) === norm(r.full))) || {}).acc || {};
+  const desc = (a) => ACC_PARTS.filter(([k]) => a[k]).map(([k, t, kind]) => (kind === 'num' ? `+${a[k]} ${k === 'retries' ? 'tries' : 'attempts'}` : t.replace(/ \(.*\)$/, '').replace(/: .*$/, ''))).join(', ');
+  const drawSum = () => {
+    const withAcc = roster.filter((r) => Object.keys(accOf(r)).some((k) => k !== 'note'));
+    sum.innerHTML = '';
+    sum.append(withAcc.length ? `${withAcc.length} student${withAcc.length === 1 ? ' has' : 's have'} accommodations: ` : 'No accommodations set yet.', ...withAcc.slice(0, 40).flatMap((r, i) => [i ? '; ' : '', el('b', {}, r.full), ` (${r.period}): ${desc(accOf(r))}`]));
+  };
+  const draw = () => {
+    const pers = [...new Set(roster.map((r) => r.period))].sort((a, b) => perOrder(a) - perOrder(b)), keep = perSel.value; perSel.innerHTML = '';
+    pers.forEach((p) => perSel.append(el('option', { value: p }, `${p} period`))); if (pers.includes(keep)) perSel.value = keep;
+    list.innerHTML = '';
+    if (!roster.length) { list.append(el('p', { class: 'small' }, 'No roster yet. Refresh the roster from Classroom above first.')); return; }
+    const rows = roster.filter((r) => r.period === perSel.value).sort((a, b) => lastFirst(a.full).localeCompare(lastFirst(b.full)));
+    const tb = el('table', { style: 'width:100%;border-collapse:collapse;margin-top:8px;font-size:14px' },
+      th('Student', 'Extra tries', 'Extra attempts', '3 choices', 'Read aloud', 'Larger text', 'Help always on', 'Desmos', 'Breaks', 'Note (only you see it)', ''));
+    rows.forEach((r) => {
+      const a = { ...accOf(r) }, mark = el('span', { class: 'small', style: 'min-width:1.2em;display:inline-block' });
+      let t = null;
+      const send = async () => {
+        clearTimeout(t); mark.textContent = '…'; mark.style.color = '';
+        let g; try { g = await setupPost('accSave', { id: r.id, period: r.period, name: r.full, acc: a }); } catch { g = { ok: false }; }
+        if (g && g.ok) { ACC = ACC.filter((x) => !((x.id && x.id === r.id) || (!x.id && x.period === r.period && norm(x.name) === norm(r.full)))); if (Object.keys(g.acc || {}).length) ACC.push({ id: r.id, period: r.period, name: r.full, acc: g.acc }); mark.textContent = '✓'; mark.style.color = '#2e7d32'; drawSum(); }
+        else { mark.textContent = '✗'; mark.style.color = '#c0392b'; mark.title = (g && g.error) || 'Not saved. If your script is older than this page, use Check for updates on the dashboard.'; }
+      };
+      const later = () => { clearTimeout(t); mark.textContent = ''; t = setTimeout(send, 700); };
+      const cells = ACC_PARTS.map(([k, , kind]) => {
+        if (kind === 'num') { const s = el('select', { style: 'width:auto' }, ...[0, 1, 2, 3].map((n) => el('option', { value: String(n) }, n ? `+${n}` : '—'))); s.value = String(a[k] || 0); s.onchange = () => { if (+s.value) a[k] = +s.value; else delete a[k]; later(); }; return td(s); }
+        const c = el('input', { type: 'checkbox', style: 'width:18px;height:18px' }); c.checked = !!a[k]; c.onchange = () => { if (c.checked) a[k] = true; else delete a[k]; later(); }; return td(c);
+      });
+      const nt = el('input', { type: 'text', value: a.note || '', placeholder: 'like IEP, 504, through May', style: 'width:150px' });
+      nt.addEventListener('input', () => { if (nt.value.trim()) a.note = nt.value.trim(); else delete a.note; later(); });
+      tb.append(el('tr', {}, td(r.full), ...cells, td(nt), td(mark)));
+    });
+    list.append(el('div', { style: 'overflow-x:auto' }, tb));
+  };
+  perSel.onchange = draw;
+  const box = card('🧩 Accommodations (IEP / 504)',
+    el('p', { class: 'small', style: 'margin:0 0 8px' }, 'Set these once for a student, and they apply to every assignment that student opens, on any Chromebook. Extra tries and attempts are added to what each assignment allows. 3 choices takes out one wrong answer on multiple-choice questions. Changes save as you click and take effect the next time the student opens an assignment. Students see only their own settings, never the note.'),
+    el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, perSel), sum, out, list);
+  setupPost('accList').then((g) => {
+    if (!g || !g.ok) { note(out, false, /unknown/i.test((g && g.error) || '') ? 'Your Sheet’s script hasn’t picked up accommodations yet. It updates itself within about 10 minutes (or use Check for updates on the dashboard).' : (g && g.error) || 'Couldn’t read accommodations.'); }
+    else ACC = g.acc || [];
+    draw(); drawSum();
+  }).catch(() => { note(out, false, 'Couldn’t reach your script.'); draw(); });
+  return box;
+}
 
 /* ---------- storage (best effort) ---------- */
 const store = {
@@ -36944,6 +37058,8 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
       el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 0 8px;padding:4px 12px;font-size:14px', title: 'Show the questions on the TV and work them on an iPad from anywhere in the room', onclick: () => { previewTV(0); const b = [...document.querySelectorAll('#tvShow button')].find((x) => x.textContent.startsWith('📱')); if (b) b.click(); } }, '📱 iPad'));
   const sid = sidOf(name, rid);
   const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${sid}`;
+  ACC_ME = !teacher && !PREVIEW && CONFIG.SCRIPT_URL && !noCloud ? await accLoad(period, name, rid) : {}; // this student's accommodations
+  document.body.classList.toggle('acc-big', !!ACC_ME.big);
   if (!teacher && CONFIG.SCRIPT_URL && !noCloud) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
   // nothing saved under this sign-in yet: pick up work saved earlier under the student's typed name
   // (before the class list or Google sign-in was working), on this Chromebook or online
@@ -37039,7 +37155,7 @@ function render() {
       app.append(el('div', { class: 'card bonusintro' }, el('div', { style: 'font-size:20px;font-weight:800;color:#8a6d0f' }, `★ Bonus question${nb === 1 ? '' : 's'}`),
         el('p', { style: 'margin:6px 0 0' }, `${nb === 1 ? 'This one is' : 'These are'} extra credit. A wrong or blank answer costs you nothing. Each one you get right adds `, el('strong', {}, `+${fmt(bp)}%`), ' to your percent.'))); }
     const box = el('div', { class: 'q' + (wm ? ' wm' : '') + (q.bonus ? ' bonus' : ''), id: 'q' + i });
-    box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, q.bonus ? el('span', { class: 'bonustag' }, '★ BONUS') : '', q.ap ? el('span', { class: 'aptag', title: 'Like the AP® Practice Problems in the textbook' }, 'AP®') : '', (() => { const ct = q.tpl && QUESTION_TYPES.find((x) => x.id === q.tpl); return ct && ct.calc ? el('span', { class: 'calctag' + (ct.calc === 'yes' ? ' yes' : ''), title: ct.calc === 'yes' ? 'A calculator is allowed on this question' : 'Do this question without a calculator' }, ct.calc === 'yes' ? '🖩 Calculator' : 'No calculator') : ''; })(), `Question ${i + 1}`), el('span', { class: 'qtopic' }, q.topic,
+    box.append(el('div', { class: 'qhead' }, el('span', { class: 'qnum' }, q.bonus ? el('span', { class: 'bonustag' }, '★ BONUS') : '', q.ap ? el('span', { class: 'aptag', title: 'Like the AP® Practice Problems in the textbook' }, 'AP®') : '', (() => { const ct = q.tpl && QUESTION_TYPES.find((x) => x.id === q.tpl); return ct && ct.calc ? el('span', { class: 'calctag' + (ct.calc === 'yes' ? ' yes' : ''), title: ct.calc === 'yes' ? 'A calculator is allowed on this question' : 'Do this question without a calculator' }, ct.calc === 'yes' ? '🖩 Calculator' : 'No calculator') : ''; })(), `Question ${i + 1}`, ACC_ME.read && !state.teacher ? readAloudBtn(q) : ''), el('span', { class: 'qtopic' }, q.topic,
       PREVIEW && !teacher && !submitted ? el('button', { class: 'btn secondary', type: 'button', title: 'Show another version of this question', style: 'margin:0 0 0 10px;padding:2px 10px;font-size:13px;vertical-align:middle', onclick: () => previewNewQ(i) }, '🔄 New version') : '',
       PREVIEW && !teacher ? el('button', { class: 'btn secondary', type: 'button', title: 'Show this question large, for the TV', style: 'margin:0 0 0 6px;padding:2px 10px;font-size:13px;vertical-align:middle', onclick: () => previewTV(i) }, '📺 TV') : '')));
     if (q.bonus) { const bp = setting(state.setKey, 'bonusPct'); box.append(el('div', { class: 'bonusnote' }, `Extra credit: +${fmt(bp)}% added to your score if correct. Nothing is taken off if it’s wrong.`)); }
@@ -38617,6 +38733,9 @@ async function classesScreen() {
 
   // 3. add or move a student
   app.append(dashRosterCard(roster));
+
+  // accommodations (IEP / 504) for each student
+  app.append(accCard(roster, card, th, td, note));
 
   // 4. names that didn't match a student (from before Google sign-in, or a typed name)
   { const box = card('❓ Names to match');
@@ -42911,6 +43030,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'Accommodations (IEP / 504): on Classes & roster, set a student’s accommodations once (extra tries, extra attempts, 3 answer choices instead of 4, a 🔊 Read aloud button, larger text, Homework help always on, Desmos always on, or breaks without locking) and they apply to every assignment that student opens. Your Sheet’s script updates itself to store them within about 10 minutes.' },
   { date: '2026-11-22', text: 'Parentheses check: when a student’s wrong answer is exactly what the calculator gives with a pair of parentheses left out (like −3² instead of (−3)², 21 + 16 ÷ 2 instead of (21 + 16) ÷ 2, or √9 + 16 instead of √(9 + 16)), the assignment tells them which parentheses they missed and how to type it on the TI-Nspire.' },
   { date: '2026-11-22', subjects: ['geometry', 'precalc', 'apcalc', 'act', 'algebra2'], text: 'TI-Nspire help now shows the quick way to switch angle mode: click DEG or RAD in the top right corner of the screen (the Settings menu is listed as the long way).' },
   { date: '2026-11-22', text: 'More TI-Nspire help: when a student types the calculator’s decimal for an exact answer (like 3.464 for 2√3), the assignment says so instead of just “Not quite.” When a rounded answer is off in the last digit, it tells them they probably rounded in the middle and to keep every digit until the end.' },
@@ -43023,7 +43143,8 @@ function helpScreen(open) {
       OL(['The first time: match each Google Classroom class to its period, click ', B('Save periods'), ', then ', B('Refresh roster from Classroom'), '. Yellow boxes are guesses; check them.'],
         [B('Add a new student'), ': type their school email and pick the period. It can add them to the Classroom class too.'],
         [B('Move a student to another period'), ': pick the student and the new period. Their old scores stay with them.'],
-        ['Nicknames: if a student types a different name than Classroom has (Mike for Michael), add it so their scores still match.'])]],
+        ['Nicknames: if a student types a different name than Classroom has (Mike for Michael), add it so their scores still match.'],
+        [B('Accommodations (IEP / 504)'), ': in the 🧩 Accommodations box, pick the period and check what each student gets: extra tries on each question, extra attempts, 3 answer choices instead of 4, a 🔊 Read aloud button, larger text, Homework help always on, the Desmos calculator always on, or breaks (leaving full screen never locks the assignment). It saves as you click and applies to every assignment that student opens, on any Chromebook. The note is only for you.'])]],
     ['crossword', `${hasLessons ? 10 : 9}. Vocabulary crossword`, [
       P('Open it with the ', B('Crossword'), ' tab. Its own tabs:'),
       OL([B('Make a puzzle'), ': pick a word list and difficulty, then ', B('Build puzzle'), '. Under More options you can give everyone a word bank or set a time limit.'],
