@@ -316,6 +316,8 @@ tr.dash-late td strong { color: #b42318; }
   @media (max-width:560px) { .yag-grid { grid-template-columns:1fr; } }
   .yag-h { font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#777; }
   .yag-sec { display:inline-flex; align-items:center; padding:4px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:var(--card); }
+  table.dash-std th, table.dash-std td { padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  table.dash-std th { font-size:13px; color:#666; }
 </style>
 <script src="sylogist.js"></script>
 </head>
@@ -37405,6 +37407,11 @@ function exportWork(pts) {
   });
 }
 
+// which question type each question was, in order, so the dashboard can score by standard even when the order is mixed up
+function detailTypes(qs) {
+  const runs = []; qs.forEach((q) => { const id = String(q.tpl || ''); const last = runs[runs.length - 1]; if (last && last[0] === id) last[1]++; else runs.push([id, 1]); });
+  return runs.length ? ' · types ' + runs.map(([id, n]) => (n > 1 ? `${id}*${n}` : id)).join(',') : '';
+}
 async function send(pts, resend) {
   const sub = state.submitted;
   if (sendingFor === state.key) return; sendingFor = state.key;
@@ -37429,7 +37436,7 @@ async function sendNow(pts, resend) {
       const part = pts[i] > 0 ? `(${Math.round(100 * pts[i]) / 100} pt)` : ''; // exact partial credit, so a teacher override adds the right amount
       if (q.proofQ) return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${part}${tr}(proof${state.ai[i] && state.ai[i].ai ? ', AI' : ''})`;
       return `${i + 1}${pts[i] > 0 ? '½' : '✗'}${part}${tr}` + (q.mode === 'fr' ? '(' + a.filter((x) => x !== '').join(',').slice(0, 24) + ')' : LETTERS[a]); }).join(' ')
-      + (state.unlocks ? ` · locked ${state.unlocks}× for leaving` : ''),
+      + (state.unlocks ? ` · locked ${state.unlocks}× for leaving` : '') + detailTypes(state.qs),
     minutes: sub.minutes || 0, tabAways: state.tabAways,
     version: state.version + (state.attempts > 1 ? ` · attempt ${state.attempt} of ${state.attempts}` : ''),
     work: CONFIG.SEND_WORK ? exportWork(pts) : null,
@@ -37950,6 +37957,7 @@ function dashOverview(titles) {
   card.append(el('p', { class: 'small', style: 'margin-top:10px' }, 'Click an assignment for each student’s score and which questions the class missed. Click a column title to sort.'));
   const allRows = titles.flatMap((a) => a.rows);
   if (allRows.length) app.append(dashReteach(allRows, DASH.period ? `${DASH.period} period` : 'your students'));
+  if (allRows.length) app.append(dashStandards(allRows, DASH.period ? `${DASH.period} period` : 'your classes'));
   if (DASH.period) {
     const names = {}; allRows.filter((r) => r.period === DASH.period).forEach((r) => (names[who(r.period, r.name)] = { period: r.period, name: r.name }));
     D.roster.filter((r) => r.period === DASH.period).forEach((r) => { const kk = who(r.period, r.full); if (!names[kk] && ![r.full, ...String(r.aliases || '').split(',')].some((n) => n.trim() && names[who(r.period, n)])) names[kk] = { period: r.period, name: r.full }; });
@@ -38345,11 +38353,14 @@ function dashStudent(s) {
       { k: 'reset', t: '', sort: () => 0, show: (r) => resetBtn({ ...r, name: s.name, period: s.period }) },
     ], best) : el('p', {}, 'Nothing turned in yet.'),
     prog.length ? el('p', { class: 'small', style: 'margin-top:12px' }, 'Still working on: ' + prog.map((p) => `${p.title} (${p.answered} of ${p.total || '?'} answered${p.correct != null ? `, ${p.correct} correct` : ''}, ${dashDate(p.t)})`).join('; ')) : ''));
+  if (mine.length) app.append(dashStandards(mine, s.name));
   const vis = dashVisits(k); if (vis) app.append(vis);
 }
 /* ---------- Reteach and progress reports (built from the dashboard data) ---------- */
 // the question type of each question number on an assignment (null when the order differs from student to student)
-function dashTplIds(setCol) {
+function dashTplIds(setCol, detail) {
+  const m = / · types ([\w*,]+)/.exec(String(detail || ''));
+  if (m) return m[1].split(',').flatMap((x) => { const [id, n] = x.split('*'); return Array(+n || 1).fill(id); });
   setCol = String(setCol || ''); let items = null;
   if (setCol.startsWith('custom:')) items = setCol.slice(7).split('_').map((p) => p.split('.')).map(([id, n, m, b]) => [id, +n, m, b]);
   else if (SETS[setCol] && !SETS[setCol].shuffle) items = SETS[setCol].items;
@@ -38361,10 +38372,69 @@ function dashTplIds(setCol) {
 // how each question type went: [{ id, label, subject, n (questions answered), right (points) }], weakest first
 function dashTypeStats(rows) {
   const st = {};
-  rows.forEach((r) => { const ids = dashTplIds(r.set); if (!ids) return;
+  rows.forEach((r) => { const ids = dashTplIds(r.set, r.detail); if (!ids) return;
     parseDetail(r.detail).forEach((d) => { const id = ids[d.n - 1]; if (!id || d.bonus || !TEMPLATES[id]) return; const s = (st[id] = st[id] || { id, n: 0, right: 0 }); s.n++; s.right += d.pts; }); });
   return Object.values(st).map((s) => { const t = QUESTION_TYPES.find((q) => q.id === s.id) || {}; return { ...s, f: s.right / s.n, label: t.label || s.id, section: t.section || '', subject: t.subject || '' }; })
     .sort((a, b) => a.f - b.f || b.n - a.n);
+}
+/* ---------- Scores by standard: every turned-in question, grouped by its Oklahoma Academic Standards objective ---------- */
+// rows → { code: { pts, n, per: {period: {pts, n}}, kids: {who: {period, name, pts, n}}, types: {id: {pts, n}} } } (best try per student per assignment)
+function dashStdStats(rows) {
+  const best = Object.values(rows.reduce((m, r) => { const k = r.title + '|' + who(r.period, r.name); (m[k] = m[k] || []).push(r); return m; }, {})).map((rs) => bestRows(rs)[0]).filter(Boolean);
+  const st = {}, add = (o, pts) => { o.pts += pts; o.n++; };
+  best.forEach((r) => { const ids = dashTplIds(r.set, r.detail); if (!ids) return;
+    parseDetail(r.detail).forEach((d) => {
+      const id = ids[d.n - 1]; if (!id || d.bonus) return;
+      const t = QUESTION_TYPES.find((q) => q.id === id) || QUESTION_TYPES.find((q) => q.id === id.replace(/^ap_/, '')); if (!t) return;
+      oasForType(t).forEach((c) => {
+        const S = (st[c] = st[c] || { code: c, subject: t.subject, pts: 0, n: 0, per: {}, kids: {}, types: {} });
+        add(S, d.pts); add((S.per[r.period] = S.per[r.period] || { pts: 0, n: 0 }), d.pts);
+        const k = who(r.period, r.name); add((S.kids[k] = S.kids[k] || { period: r.period, name: r.name, pts: 0, n: 0 }), d.pts);
+        add((S.types[id] = S.types[id] || { pts: 0, n: 0 }), d.pts);
+      });
+    }); });
+  return st;
+}
+const STD_ORDER = (c) => c.split('.').map((x, i) => (i ? (/^\d+$/.test(x) ? x.padStart(3, '0') : x) : x)).join('.');
+function dashStandards(rows, where) {
+  const st = dashStdStats(rows), list = Object.values(st);
+  const card = el('div', { class: 'card' }, el('strong', {}, '📋 Scores by standard'),
+    el('p', { class: 'small', style: 'margin:4px 0 10px' }, `How ${where} did on each Oklahoma Academic Standards objective: every question turned in (each student’s best try), grouped by its standard. ★ = a priority standard in the Year at a Glance. Click a standard for its wording and the students who need help with it.`));
+  if (!list.length) { card.append(el('p', { class: 'small' }, 'No scored questions with a standard yet. (Assignments turned in before Nov 22 with mixed-up question order can’t be matched to standards.)')); return card; }
+  const periods = [...new Set(list.flatMap((S) => Object.keys(S.per)))].sort((a, b) => perOrder(a) - perOrder(b));
+  const showPer = !DASH.period && periods.length > 1;
+  const cell = (o) => (o && o.n ? el('td', { style: `text-align:center;background:${band(o.pts / o.n)}`, title: `${Math.round(o.pts * 10) / 10} of ${o.n} questions right` }, pctT(o.pts / o.n)) : el('td', { style: 'text-align:center;color:#bbb' }, '—'));
+  const bySubj = {}; list.forEach((S) => (bySubj[S.subject] = bySubj[S.subject] || []).push(S));
+  Object.entries(bySubj).forEach(([subj, L]) => {
+    L.sort((a, b) => (yagRole(subj, b.code) === 'priority') - (yagRole(subj, a.code) === 'priority') || STD_ORDER(a.code).localeCompare(STD_ORDER(b.code)));
+    const tb = el('tbody', {});
+    L.forEach((S) => {
+      const pri = yagRole(subj, S.code) === 'priority', f = S.pts / S.n;
+      const tr = el('tr', { style: 'cursor:pointer' }, el('td', { style: 'white-space:nowrap;font-weight:600' }, S.code, pri ? el('span', { style: 'color:#692b31' }, ' ★') : ''),
+        el('td', {}, el('div', { style: 'background:#eee;border-radius:6px;height:14px;overflow:hidden;min-width:80px' }, el('div', { style: `height:100%;width:${Math.round(100 * f)}%;background:${f >= 0.8 ? '#4e9a51' : f >= 0.6 ? '#c9a227' : '#c0392b'}` })),
+          el('div', { class: 'small' }, `${S.n} question${S.n === 1 ? '' : 's'}`)),
+        cell(S), ...(showPer ? periods.map((p) => cell(S.per[p])) : []));
+      const span = 3 + (showPer ? periods.length : 0);
+      const more = el('tr', { style: 'display:none' }, el('td', { colspan: String(span), style: 'background:#fafafa' }));
+      tr.addEventListener('click', () => {
+        if (more.style.display === 'none') {
+          const td = more.firstChild; td.innerHTML = '';
+          td.append(el('div', { class: 'small', style: 'margin:2px 0 8px' }, el('b', {}, S.code + ' '), OAS_TEXT[S.code] || ''));
+          const low = Object.values(S.kids).filter((k) => k.n >= 2 && k.pts / k.n < 0.7).sort((a, b) => a.pts / a.n - b.pts / b.n);
+          td.append(el('div', { class: 'small', style: 'font-weight:700' }, low.length ? `Below 70% on this standard (${low.length}):` : 'Nobody is below 70% on this standard (with at least 2 questions).'));
+          if (low.length) td.append(el('div', { class: 'small', style: 'display:flex;flex-wrap:wrap;gap:4px 14px;margin:4px 0 8px' }, ...low.map((k) => el('span', {}, linkBtn(`${k.name}`, () => { DASH.student = { period: k.period, name: k.name }; dashRender(); }), ` (${k.period}) ${pctT(k.pts / k.n)}`))));
+          const ty = Object.entries(S.types).map(([id, o]) => ({ id, f: o.pts / o.n, n: o.n, t: QUESTION_TYPES.find((q) => q.id === id) || {} })).sort((a, b) => a.f - b.f);
+          td.append(el('div', { class: 'small', style: 'font-weight:700' }, 'By question type:'), el('div', { class: 'small' }, ...ty.map((x) => el('div', {}, `${pctT(x.f)} · ${x.t.label || x.id}${x.t.section ? ' (' + x.t.section.split(' ')[0] + ')' : ''} · ${x.n} question${x.n === 1 ? '' : 's'}`))));
+          more.style.display = '';
+        } else more.style.display = 'none';
+      });
+      tb.append(tr, more);
+    });
+    card.append(el('div', { style: 'font-weight:700;margin:10px 0 4px' }, SUBJECTS[subj] || subj),
+      el('div', { style: 'overflow-x:auto' }, el('table', { class: 'dash-std', style: 'width:100%;border-collapse:collapse;font-size:15px' },
+        el('thead', {}, el('tr', {}, el('th', { style: 'text-align:left' }, 'Standard'), el('th', { style: 'text-align:left' }, ''), el('th', {}, DASH.period ? `${DASH.period} period` : 'All'), ...(showPer ? periods.map((p) => el('th', {}, p)) : []))), tb)));
+  });
+  return card;
 }
 // the reteach card: the weakest question types, a review assignment from them, or a warm-up on the TV
 function dashReteach(rows, where) {
@@ -42288,6 +42358,8 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Results dashboard: a new 📋 Scores by standard card shows how each period (and each student) is doing on every Oklahoma standard, priority standards first. Click a standard for its wording, the students below 70%, and the question types behind it.' },
+  { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Year at a glance: a 📍 Pacing check compares where each period is (its newest assignment) with where the guide says to be today.' },
   { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'New Year at a glance tab: the district’s pacing guide for each of your courses, by quarter and unit, with each unit’s priority, supporting, and recurring standards, its unit-plan Google Doc, its book sections (with lesson plans), and a 🧩 Build a unit review button. The current quarter is outlined. In Build an assignment, ★ marks a priority standard.' },
   { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Build an assignment now shows the Oklahoma Academic Standards (2022 OAS) objective under each question type, like “📋 OAS: G.2D.1.6.” Point at it or click it to read the objective.' },
   { date: '2026-11-22', text: 'Video is now its own Homework help choice in Build an assignment (Hint, Worked example, Video, Notes), so you decide whether students get the 🎬 Video button. Assignments you already posted keep working the way they did.' },
@@ -42366,6 +42438,7 @@ function helpScreen(open) {
       OL(['Open the ', B('Results dashboard'), ' tab. Search by assignment or student (for example ', el('i', {}, '7.3'), ' or ', el('i', {}, 'Smith'), ').'],
         ['Click an assignment to see each student’s score and which questions the class missed. ', B('Red bars are the ones to reteach.')],
         ['Click a student for their history and a printable progress report. Pick a period to print reports for the whole class.'],
+        [B('📋 Scores by standard'), ' (below the assignment list) shows each Oklahoma standard with the percent right, for every period side by side, priority standards (★) first. Click a standard to read it and see the students below 70% on it. Pick a student to see their own standards.'],
         ['A student locked out of a test (they left the page too many times) is unlocked from here; it takes effect on their screen within about 10 seconds.'])]],
     ['keys', '6. Answer keys and printing', [
       P(B('Look up an answer key'), ': choose the assignment and the student. Every student has different numbers, so this shows that student’s own key.'),
@@ -42376,6 +42449,7 @@ function helpScreen(open) {
     ['yag', 'Year at a glance (pacing guide)', [
       P('The ', B('Year at a glance'), ' tab shows the district’s pacing guide for each of your courses: every quarter’s units, how many days each gets, and its ', B('Priority'), ', ', B('Supporting'), ', and ', B('Recurring'), ' standards. Click a unit’s standards to read them. The current quarter is outlined.'),
       P('Each unit has a ', B('📄 Unit plan'), ' link (the district’s Google Doc; open it with your school account), its book sections with links to their lesson plans, and ', B('🧩 Build a unit review'), ', which opens Build an assignment with every section of the unit filled in so you can trim it.'),
+      P(B('📍 Pacing check'), ' (at the top) says which unit the guide has for today and, for each period, its newest assignment in that course and whether it’s on pace, behind, or ahead (in school days). It counts Monday–Friday, so holidays make a period look a little behind.'),
       P('In Build an assignment, a ', B('★'), ' after a standard means it’s a priority standard in the Year at a Glance.')]],
     ['ix', `${hasLessons ? 8 : 7}. Interactives`, [
       P('The ', B('Interactives'), ' tab opens a page of hands-on demos (the unit circle, graphs of trig functions, transformations of functions, and more) in a new tab, ready to put on the TV. Drag the points and sliders right on the touchscreen.'),
@@ -43001,6 +43075,89 @@ function yagBuild(subject, u) {
   store.set(TK('builder:last'), { counts, formats: {}, frCounts: {}, bonusCounts, bonusFormats: {}, title: `${u.name} review`, subject, t: Date.now() });
   builder(); window.scrollTo(0, 0);
 }
+/* ---------- Pacing check: where each period is (the newest section assigned) vs. where the Year at a Glance says to be today ---------- */
+const PACE = { data: null, loading: null, err: '' };
+async function paceLoad() {
+  if (DASH.data) return DASH.data;
+  if (PACE.data) return PACE.data;
+  if (!CONFIG.SCRIPT_URL || !dashPw.get()) return null;
+  PACE.loading = PACE.loading || (async () => {
+    try { const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'dashboard', password: dashPw.get(), days: 200 }) });
+      const g = await res.json(); if (g.ok) PACE.data = g; else PACE.err = g.wrong ? 'wrong' : g.error || 'error'; } catch (e) { PACE.err = 'offline'; }
+  })();
+  await PACE.loading; return PACE.data;
+}
+const secNum = (title) => (/^(?:Pre-)?([P\d]+\.\d+)/.exec(String(title || '')) || [])[1] || '';
+// the book section an assignment is about: a menu section's number, or (for one you built) the section most of its questions come from
+function paceSection(key) {
+  key = String(key || '');
+  if (SETS[key] && !SETS[key].custom) return { subject: SETS[key].subject, num: secNum(SETS[key].title) };
+  if (!key.startsWith('custom:')) return null;
+  const items = key.slice(7).split('|')[0].split('_').map((p) => p.split('.')).map(([id, n]) => [id, +n || 1]);
+  const tally = {}; let subject = '';
+  items.forEach(([id, n]) => { const t = QUESTION_TYPES.find((q) => q.id === id); if (!t) return; subject = subject || t.subject; const s = secNum(t.section); if (s) tally[s] = (tally[s] || 0) + n; });
+  const best = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
+  return best ? { subject, num: best[0] } : null;
+}
+// the units of a course in order, each with where it starts (in guide days) and its section numbers
+function paceUnits(subject) {
+  let day = 0; const out = [];
+  YAG[subject].forEach((x) => x.units.forEach((u) => { out.push({ u, q: x.q, start: day, nums: yagNums(u.secs) }); day += u.days; }));
+  return out;
+}
+// school days (Mon–Fri) from a quarter's first day through today, and that quarter
+function paceToday(subject) {
+  const now = new Date(), Y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const dateOf = (md, startYear) => { const [m, d] = md.split('/').map(Number); return new Date(m >= 7 ? startYear : startYear + 1, m - 1, d); };
+  for (const x of YAG[subject]) {
+    const [a, b] = x.dates.split('–').map((s) => dateOf(s.trim(), Y));
+    if (now >= a && now <= new Date(b.getTime() + 864e5)) { let n = 0; for (let d = new Date(a); d <= now; d.setDate(d.getDate() + 1)) if (d.getDay() % 6) n++; return { q: x.q, day: n }; }
+  }
+  return null;
+}
+async function paceCard(subject) {
+  const box = el('div', { class: 'card', style: 'border-left:4px solid var(--accent)' }, el('strong', {}, '📍 Pacing check'), el('p', { class: 'small', style: 'margin:4px 0 0' }, 'Loading where your classes are…'));
+  (async () => {
+    const units = paceUnits(subject), today = paceToday(subject);
+    const quarterStart = today ? units.filter((x) => x.q < today.q).reduce((s, x) => s + x.u.days, 0) : 0;
+    const quarterDays = today ? units.filter((x) => x.q === today.q).reduce((s, x) => s + x.u.days, 0) : 0;
+    const guideDay = today ? quarterStart + Math.min(today.day, quarterDays) : null;
+    const guideUnit = guideDay == null ? null : units.find((x) => guideDay <= x.start + x.u.days) || units[units.length - 1];
+    box.innerHTML = ''; box.append(el('strong', {}, '📍 Pacing check'));
+    box.append(el('p', { style: 'margin:6px 0' }, !today ? 'Today is between quarters in the Year at a Glance.' :
+      today.day > quarterDays ? `Quarter ${today.q}, school day ${today.day}: the guide’s units for this quarter (${quarterDays} days) are done, so this is time for review and catching up.` :
+      el('span', {}, `Quarter ${today.q}, school day ${today.day}. The guide says: `, el('b', {}, guideUnit.u.name), ` (day ${guideDay - guideUnit.start} of ${guideUnit.u.days}).`)));
+    const D = await paceLoad();
+    if (!D) {
+      box.append(el('p', { class: 'small', style: 'margin:4px 0 0' }, PACE.err === 'offline' ? 'Couldn’t reach your Practice Results sheet, so your classes’ places aren’t shown.' : 'To compare each period with the guide, connect with your dashboard password: ',
+        PACE.err === 'offline' ? '' : linkBtn('Connect', () => dashLogin('', () => { PACE.err = ''; yagScreen(subject); }))));
+      return;
+    }
+    // each period's newest assignment in this course: Classroom posts first, then turned-in work
+    const latest = {};
+    const see = (period, key, t, title) => { if (!period) return; const sec = paceSection(key); if (!sec || sec.subject !== subject || !sec.num) return; const k = period;
+      if (!latest[k] || t > latest[k].t) latest[k] = { t, num: sec.num, title }; };
+    (D.posted || []).forEach((p) => { const k = String(p.key || ''); see(p.period, k.startsWith('custom:') ? k.split('|')[0] : k, p.t, p.title); });
+    (D.results || []).forEach((r) => see(r.period, r.set, r.t, r.title));
+    const periods = Object.keys(latest).sort((a, b) => perOrder(a) - perOrder(b));
+    if (!periods.length) { box.append(el('p', { class: 'small' }, `No ${SUBJECTS[subject]} assignments in the last 200 days yet, so there’s nothing to compare.`)); return; }
+    const rows = periods.map((p) => {
+      const L = latest[p], at = units.find((x) => x.nums.includes(L.num));
+      let vs = '—', bg = '';
+      if (at && guideDay != null) {
+        const frac = (at.nums.indexOf(L.num) + 1) / at.nums.length, you = at.start + frac * at.u.days, diff = Math.round(guideDay - you);
+        vs = Math.abs(diff) <= 3 ? 'on pace' : diff > 0 ? `about ${diff} school days behind` : `about ${-diff} school days ahead`;
+        bg = Math.abs(diff) <= 3 ? '#e7f3e4' : Math.abs(diff) <= 10 ? '#fbf1dc' : '#f9e1de';
+      }
+      return el('tr', {}, el('td', { style: 'font-weight:700' }, p), el('td', {}, L.title || L.num, el('div', { class: 'small' }, dashDate(L.t))),
+        el('td', {}, at ? at.u.name : el('span', { class: 'small' }, `${L.num} isn’t in a unit`)), el('td', { style: bg ? `background:${bg}` : '' }, vs));
+    });
+    box.append(el('div', { style: 'overflow-x:auto' }, el('table', { class: 'dash-std', style: 'width:100%;border-collapse:collapse;font-size:15px;margin-top:6px' },
+      el('thead', {}, el('tr', {}, ...['Period', 'Newest assignment', 'Unit', 'Compared with the guide'].map((h) => el('th', { style: 'text-align:left' }, h)))), el('tbody', {}, ...rows))),
+      el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Where a period is comes from the newest assignment you posted to it (or it turned in) for this course, and how far into its unit that section is. School days are counted Monday–Friday, so holidays make it look a little behind. A review that covers older sections can make a period look behind until you assign the next new section.'));
+  })();
+  return box;
+}
 function yagScreen(subj) {
   document.getElementById('title').textContent = 'Year at a glance';
   teacherNav('yag');
@@ -43022,6 +43179,7 @@ function yagScreen(subj) {
       ...subjects.map((k) => el('button', { type: 'button', class: 'btn' + (k === subj ? '' : ' secondary'), style: 'margin:0', onclick: () => yagScreen(k) }, SUBJECTS[k]))),
     el('p', { class: 'small', style: 'margin:8px 0 0' }, 'The district’s Year at a Glance (2025–26). Click a unit’s standards to read them. ',
       el('span', { class: 'yag-code yag-pri' }, 'Priority'), ' ', el('span', { class: 'yag-code yag-sup' }, 'Supporting'), ' ', el('span', { class: 'yag-code yag-rec' }, 'Recurring'))));
+  const paceSlot = el('div', {}); app.append(paceSlot); paceCard(subj).then((c) => paceSlot.append(c));
   Q.forEach((x) => {
     const card = el('div', { class: 'card', style: x.q === nowQ ? 'border:2px solid var(--accent)' : '' },
       el('div', { style: 'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap' }, el('h2', { style: 'margin:0' }, `Quarter ${x.q}`), el('span', { class: 'small' }, x.dates),

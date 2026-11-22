@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-22.1'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-22.2'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -1343,7 +1343,7 @@ function overrideQuestion_(d) {
     if (k < 0) return { ok: false, error: 'question ' + n + ' is not in this submission' };
     const start = marks[k].at, end = k + 1 < marks.length ? marks[k + 1].at : detail.length;
     let seg = detail.slice(start, end);
-    const tail = seg.match(/\s·\slocked.*$/); if (tail) seg = seg.slice(0, tail.index); // keep the "locked" note outside the question
+    const tail = seg.match(/\s·\s(locked|types)\b.*$/); if (tail) seg = seg.slice(0, tail.index); // keep the "locked" and "types" notes outside the question
     const segEnd = start + seg.length, ws = seg.match(/\s*$/)[0]; seg = seg.slice(0, seg.length - ws.length); // keep the space before the next question
     if (/\(bonus\)/.test(seg)) return { ok: false, error: 'bonus questions can’t be changed here' };
     const tag = /\s?\(teacher✓ was ([✗½]) \+([\d.]+)\)/.exec(seg);
