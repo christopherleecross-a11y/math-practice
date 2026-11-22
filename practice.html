@@ -42604,6 +42604,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'Build an assignment has a search box above the list of question types. Type a topic (like “vertical and horizontal lines,” “Law of Sines,” or a section number like 9.4) to see only the question types about it. It searches the names, descriptions, sections, standards, and the wording of the questions.' },
   { date: '2026-11-22', text: 'Hints no longer give away the answer. A hint now stops right before the answer (with a ?) instead of showing the result, even when the answer appears in another form, like a rounded number, part of an equation, or a word answer.' },
   { date: '2026-11-22', text: 'TI-Nspire help (for the non-CAS CX II): a new 🧮 TI-Nspire Homework help choice in Build an assignment shows students the keystrokes and menus for the calculator part of a problem (trig and inverse trig, logs, square roots, regressions and r, one-variable stats, normal distributions, nPr/nCr, matrices, systems, graphing intersections, polynomial roots, and complex numbers). It is on when you check Homework help; uncheck it like the others.' },
   { date: '2026-11-22', subjects: ['geometry', 'precalc', 'apcalc', 'act'], text: 'Degree/radian check: when a student’s wrong answer is exactly what a calculator in the wrong angle mode gives, the assignment tells them to switch their TI-Nspire to Degree (or Radian) and shows where the setting is. On multiple-choice trig questions, one wrong choice is now the wrong-mode answer, so that mistake gets caught too.' },
@@ -42677,6 +42678,7 @@ function helpScreen(open) {
     ['build', '3. Build your own assignment (quizzes, reviews, tests)', [
       OL([B('Build an assignment'), ' tab. Type a title and pick the subject (that’s the gradebook tab the scores go to).'],
         ['Open a chapter, then a section, and type how many of each question type you want. ', B('Preview'), ' shows a sample. ', B('★ Bonus'), ' adds extra-credit questions at the end. Under each question type, ', B('📋 OAS'), ' shows its Oklahoma Academic Standards objective; click it (or point at it) to read the objective’s wording.'],
+        [B('Find a topic: '), 'type it in the search box above the list of question types (for example, “vertical and horizontal lines” or “9.4”). Only the matching question types show; clear the box to see everything again.'],
         ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints, worked examples, videos, TI-Nspire steps, and notes — pick any of them, and leave it off for tests), and the Desmos calculator.'],
         ['Click ', B('Try it as a student'), ' to see exactly what students will get. Nothing you do there is graded.'],
         ['Click ', B('Copy link'), ' or ', B('📤 Assign in Google Classroom'), ' (next step).']),
@@ -43668,19 +43670,53 @@ function builder() {
     const sum = el('summary', { style: `display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 4px;font-size:${big ? 17 : 16}px;font-weight:${big ? 700 : 600};list-style:none` }, arrow, el('span', {}, label), badge);
     const body = el('div', big ? { style: 'padding-left:22px' } : {});
     const box = el('details', { style: `border-top:${big ? '2px solid var(--line)' : '1px solid var(--line)'}` }, sum, body);
-    box.addEventListener('toggle', () => { arrow.style.transform = box.open ? 'rotate(90deg)' : ''; openSaved[key] = box.open; store.set(TK('builder:open'), openSaved); });
+    box.addEventListener('toggle', () => { arrow.style.transform = box.open ? 'rotate(90deg)' : ''; if (findIn.value.trim()) return; openSaved[key] = box.open; store.set(TK('builder:open'), openSaved); }); // a search opens sections without changing what's remembered
     secs[key] = { ids: [], badge, box };
     return { box, body };
   };
   list.append(el('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-bottom:6px' },
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px;font-size:14px', onclick: () => setAll(true) }, 'Expand all'),
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px;font-size:14px', onclick: () => setAll(false) }, 'Collapse all')));
+  // search: type a topic (“vertical and horizontal lines”) to show only the question types about it
+  const rows = [], heads = {};
+  const findIn = el('input', { type: 'search', placeholder: 'Search for a topic (for example: vertical and horizontal lines, Law of Sines, 9.4, G.RT.1.2)', 'aria-label': 'Search question types',
+    style: 'width:100%;box-sizing:border-box;padding:10px 12px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
+  const findNote = el('div', { class: 'small', style: 'margin:6px 2px 0;min-height:1em' });
+  list.prepend(el('div', { style: 'margin-bottom:10px' }, findIn, findNote));
+  const STOP = new Set(['a', 'an', 'and', 'the', 'of', 'to', 'in', 'on', 'for', 'with', 'by', 'or', 'from', 'find', 'using', 'use', 'how']);
+  const stem1 = (w) => w.replace(/(ies)$/, 'y').replace(/(ches|shes|xes|ses)$/, (m) => m.slice(0, -2)).replace(/([^s])s$/, '$1'); // lines → line, parabolas → parabola, slopes → slope
+  const words = (t) => String(t).toLowerCase().replace(/[’']/g, '').match(/[a-z0-9]+(?:\.[a-z0-9]+)*/g) || [];
+  const findText = (r) => { // label, description, section, chapter, standards, and the wording of a sample question
+    if (r.text) return r.text;
+    let x = `${r.t.label} ${r.t.desc || ''} ${r.t.section} ${r.chName} ${SUBJECTS[r.t.subject] || ''} ${(oasForType(r.t) || []).join(' ')}`;
+    try { const q = TEMPLATES[r.t.id](mulberry32(77)); x += ' ' + unM(q.stem || '') + ' ' + (q.topic || ''); } catch (e) {}
+    return (r.text = ' ' + words(x).map(stem1).join(' ') + ' ');
+  };
+  const runFind = () => {
+    const raw = findIn.value.trim(), qw = words(raw).filter((w) => !STOP.has(w)).map(stem1);
+    if (!qw.length) { // back to normal
+      rows.forEach((r) => { r.el.style.display = 'flex'; r.prev.style.display = ''; });
+      Object.values(secs).forEach((S) => { S.box.style.display = ''; });
+      Object.values(heads).forEach((h) => { h.style.display = ''; });
+      Object.entries(secs).forEach(([sec, S]) => { S.box.open = openSaved[sec] ?? S.ids.some((id) => counts[id] > 0 || bonusCounts[id] > 0); });
+      findNote.textContent = raw ? 'Type a topic word.' : ''; return;
+    }
+    // every word has to be there (a number like 9.4 matches the section; a word matches the start of a word: “perpend” finds perpendicular)
+    const hit = (r) => { const T = findText(r); return qw.every((w) => (/\d/.test(w) ? T.includes(' ' + w) : T.includes(' ' + w))); };
+    const shownSecs = new Set(), shownSubj = new Set(); let n = 0;
+    rows.forEach((r) => { const ok = hit(r); r.el.style.display = ok ? 'flex' : 'none'; r.prev.style.display = ok ? '' : 'none'; if (ok) { n++; shownSecs.add(r.sec); shownSecs.add(r.ch); shownSubj.add(r.t.subject); } });
+    Object.entries(secs).forEach(([sec, S]) => { const on = shownSecs.has(sec); S.box.style.display = on ? '' : 'none'; S.box.open = on; });
+    Object.entries(heads).forEach(([k, h]) => { h.style.display = shownSubj.has(k) ? '' : 'none'; });
+    findNote.textContent = n ? `${n} question type${n === 1 ? ' matches' : 's match'} “${raw}”. Clear the search to see everything again.` : `Nothing matches “${raw}”. Try fewer or shorter words (for example: vertical line).`;
+  };
+  let findTimer = null;
+  findIn.addEventListener('input', () => { clearTimeout(findTimer); findTimer = setTimeout(runFind, 200); });
   let section = null, secBody = null, subject = null, chapter = null, chKey = null, chBody = null;
   QUESTION_TYPES.filter((t) => SUBJECTS[t.subject]).forEach((t) => { // only this teacher's subjects
     const ch = t.ch || t.section.replace(/^Pre-/, '').split(/[. ]/)[0]; // "Pre-6.4" belongs to Chapter 6
     if (t.subject !== subject) {
       subject = t.subject; chapter = null;
-      list.append(el('h2', { style: `margin:${list.querySelector('details') ? '26px' : '6px'} 0 4px;font-size:20px;padding-bottom:6px;border-bottom:2px solid var(--ink, #1d1d1b)` }, SUBJECTS[subject] || subject));
+      list.append(heads[subject] = el('h2', { style: `margin:${list.querySelector('details') ? '26px' : '6px'} 0 4px;font-size:20px;padding-bottom:6px;border-bottom:2px solid var(--ink, #1d1d1b)` }, SUBJECTS[subject] || subject));
     }
     if (ch !== chapter) {
       chapter = ch; chKey = `chapter:${subject}:${ch}`;
@@ -43738,9 +43774,10 @@ function builder() {
     } }, '★ Bonus');
     bNum.addEventListener('input', () => { bonusCounts[t.id] = Math.max(0, Math.min(20, Math.floor(+bNum.value || 0))); if (!bonusCounts[t.id]) delete bonusCounts[t.id]; refreshBadges(); update(); });
     bFmt.addEventListener('input', () => { bonusFormats[t.id] = bFmt.value; update(); });
-    secBody.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' + (t.challenge ? ';background:#fffaf0;box-shadow:inset 3px 0 0 #c9a227;padding-left:8px' : ''), title: t.challenge ? 'A harder, multi-step question. Use ★ Bonus to add it as extra credit.' : '' },
+    const rowEl = el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' + (t.challenge ? ';background:#fffaf0;box-shadow:inset 3px 0 0 #c9a227;padding-left:8px' : ''), title: t.challenge ? 'A harder, multi-step question. Use ★ Bonus to add it as extra credit.' : '' },
       num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc), oasBadge(t)),
-      t.writtenOnly || t.sketch ? el('span', { class: 'small', style: 'padding:7px 8px' }, t.sketch ? 'Graph on a grid' : t.frq ? 'Free response, parts (a)–(d)' : 'Written proof') : fmtSel, prevBtn, hideBtn, bBtn, t.writtenOnly || t.sketch ? '' : split, bLine), prevBox);
+      t.writtenOnly || t.sketch ? el('span', { class: 'small', style: 'padding:7px 8px' }, t.sketch ? 'Graph on a grid' : t.frq ? 'Free response, parts (a)–(d)' : 'Written proof') : fmtSel, prevBtn, hideBtn, bBtn, t.writtenOnly || t.sketch ? '' : split, bLine);
+    secBody.append(rowEl, prevBox); rows.push({ el: rowEl, prev: prevBox, t, sec: section, ch: chKey, chName: (CH_TITLES[subject] || {})[ch] || '' });
     prevBtn._fmt = fmtSel;
   });
   Object.entries(secs).forEach(([sec, S]) => { S.box.open = openSaved[sec] ?? S.ids.some((id) => counts[id] > 0 || bonusCounts[id] > 0); });
