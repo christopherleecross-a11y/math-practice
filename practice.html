@@ -37026,7 +37026,7 @@ function hintBar(q, i) {
     if (on('e') && practiceVideos(q, () => rerenderAt(i)).length) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.vid = !h.vid; if (h.vid && !state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } rerenderAt(i); } }, H.vid ? '🎬 Hide video' : '🎬 Video'));
     if (on('n') && lessonFor(q.tpl)) row.append(el('button', { class: 'btn secondary', type: 'button', style: sm, title: 'Review the notes and class examples for this section',
-      onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.notes = !h.notes; rerenderAt(i); } }, H.notes ? '📖 Hide notes' : '📖 Notes'));
+      onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.notes = !h.notes; rerenderAt(i); if (h.notes && !STU_DEMOS) stuDemosLoad().then(() => { if (HELP[i] && HELP[i].notes) rerenderAt(i); }); } }, H.notes ? '📖 Hide notes' : '📖 Notes'));
     if (row.childNodes.length) bar.append(row);
   }
   return bar;
@@ -37154,6 +37154,17 @@ function helpPanel(q, i) {
           const c = fig(x.fixed); if (c) one.append(c);
           if (open) { const f = x.fixed, a = f.choices ? `${LETTERS[f.answer]}. ${f.choices[f.answer]}` : f.display; if (a) one.append(el('div', { class: 'small prevans' }, 'Answer: ', el('strong', { class: 'prevright' }, a))); if (f.solution) one.append(solNode(f.solution)); }
           one.append(el('button', { class: 'btn secondary', type: 'button', style: 'margin:6px 0 0;padding:4px 12px;font-size:13px', onclick: () => { H.open = H.open || {}; H.open[j] = !open; rerenderAt(i); } }, open ? 'Hide the solution' : 'Show how'));
+          box.append(one);
+        });
+      }
+      // the interactives in the lesson plan (the ones shown on the TV in class)
+      const D = lpDemoList(k).filter((d) => IX[d[0]]);
+      if (D.length) {
+        box.append(el('div', { style: 'font-weight:700;margin:12px 0 2px' }, 'Try it yourself'));
+        D.forEach(([id, , opts], j) => {
+          const on = H.ix && H.ix[j], one = el('div', { class: 'helpex' }, el('div', { class: 'small', style: 'font-weight:700' }, '🧭 ' + IX[id].title), IX[id].hint ? el('div', { class: 'small' }, IX[id].hint) : '');
+          if (on) one.append(el('div', { style: 'margin-top:6px' }, ixMount(id, opts || {})));
+          one.append(el('button', { class: 'btn secondary', type: 'button', style: 'margin:6px 0 0;padding:4px 12px;font-size:13px', onclick: () => { H.ix = H.ix || {}; H.ix[j] = !on; rerenderAt(i); } }, on ? 'Close it' : 'Open it'));
           box.append(one);
         });
       }
@@ -39714,6 +39725,31 @@ function lessonEdit(key, start, startNote) {
     stepsBox.append(small('+ Add a step', () => { P.steps.push({ time: '', name: 'New step', teacher: '', students: '', check: '' }); touch(); drawSteps(); }));
   };
   drawSteps();
+  // interactives: shown on the TV right before the screen you pick, and in students' Notes and catch-up page
+  if (!Array.isArray(P.demos)) P.demos = JSON.parse(JSON.stringify(lpDemoList(key)));
+  const demoBox = el('div', {});
+  const drawDemos = () => {
+    demoBox.innerHTML = '';
+    const labels = [...new Set(P.steps.flatMap((st) => (st.show || []).map((x) => x.label)).filter((x) => x && !/^Interactive: /.test(x)))];
+    P.demos.forEach((d, j) => {
+      const pick = el('select', { 'aria-label': 'Interactive' }, ...Object.entries(IX).map(([id, D]) => el('option', { value: id }, D.title)));
+      pick.value = IX[d[0]] ? d[0] : Object.keys(IX)[0]; d[0] = pick.value;
+      pick.addEventListener('change', () => { d[0] = pick.value; d[2] = {}; touch(); drawDemos(); }); // another interactive starts with its usual settings
+      const at = el('select', { 'aria-label': 'Show it right before' }, ...labels.map((l) => el('option', { value: l }, l)));
+      if (!labels.includes(d[1])) d[1] = labels.find((l) => /^Example/.test(l)) || labels[0] || '';
+      at.value = d[1]; at.addEventListener('change', () => { d[1] = at.value; touch(); });
+      const use = el('textarea', { class: 'lp-ed', rows: 2 }); use.value = d[3] || ''; use.addEventListener('input', () => { d[3] = use.value; touch(); });
+      demoBox.append(el('div', { class: 'lp-edcard', style: 'background:#fafaf7' },
+        el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, el('b', {}, '🧭'), pick,
+          el('a', { href: ixLink(d[0], d[2]), target: '_blank', rel: 'noopener', style: 'font-weight:600' }, 'Try it'),
+          small('Remove', () => { if (confirm(`Take “${IX[d[0]].title}” out of this plan?`)) { P.demos.splice(j, 1); touch(); drawDemos(); } }, true)),
+        field('Show it on the TV right before', at),
+        field('What to do with it', use, 'For you; students don’t see this.'),
+        Object.keys(d[2] || {}).length ? el('p', { class: 'small', style: 'margin:4px 0 0' }, 'It opens already set up for this lesson.') : ''));
+    });
+    demoBox.append(small('+ Add an interactive', () => { P.demos.push([Object.keys(IX)[0], labels.find((l) => /^Example/.test(l)) || labels[0] || '', {}, '']); touch(); drawDemos(); }));
+  };
+  drawDemos();
   const extra = el('div', {});
   (P.tables || []).forEach((t) => { const rows = el('textarea', { class: 'lp-ed', rows: Math.max(3, t.rows.length + 1) }); rows.value = t.rows.map((r) => r.join(' | ')).join('\n');
     rows.addEventListener('input', () => { t.rows = rows.value.split('\n').filter((x) => x.trim()).map((x) => x.split('|').map((c) => c.trim())); touch(); });
@@ -39782,7 +39818,9 @@ function lessonEdit(key, start, startNote) {
     startNote ? el('div', { class: 'err', style: 'background:#f9eff0;color:#692b31;border-color:#9bb8dc;margin:8px 0' }, startNote) : '',
     h('Note under the title'), inp(P, 'note'), h('Objective'), ta(P, 'objective', 2), h('Students will say (I can…)'), lines(P, 'iCan', 3), h('Vocabulary'), pairs(P, 'vocab', ' — ', 4),
     el('div', { class: 'small' }, 'One per line: word — meaning'), h('Materials'), ta(P, 'materials', 2), h('Builds on'), ta(P, 'prior', 2), h('Before class'), lines(P, 'before', 3),
-    h('Lesson flow'), stepsBox, extra.childNodes.length ? h('Tables, answer keys, and lists') : '', extra, panel), bar);
+    h('Lesson flow'), stepsBox,
+    h('Interactives'), el('div', { class: 'small', style: 'margin:-2px 0 6px' }, 'Each one shows on the TV right before the screen you pick. Students also get it in the 📖 Notes on their assignment (when Homework help includes Notes) and on the catch-up page.'), demoBox,
+    extra.childNodes.length ? h('Tables, answer keys, and lists') : '', extra, panel), bar);
   window.scrollTo(0, 0);
 }
 // start a fresh assignment in the builder with this section's question types
@@ -41103,9 +41141,23 @@ const LP_DEMOS = {
   'geo-10-2': [['circleAngles', 'Example 1', { mode: 'central', modes: 'central' }, 'Drag A and B: the minor arc matches the central angle. Drag past 180° to make a major arc.']],
   'geo-10-4': [['circleAngles', 'Example 1', { mode: 'inscribed', modes: 'inscribed,same,semi,quad' }, 'Drag C around the circle: the inscribed angle stays half the arc. Then try Same arc, Semicircle, and Inscribed quadrilateral.']],
   'geo-10-5': [['circleAngles', 'Example 1', { mode: 'lines', modes: 'lines,inscribed' }, 'Drag the points so E moves inside, then outside the circle. Inside: half the sum of the arcs. Outside: half the difference.']] };
+// The interactives of a plan: [[id, the TV screen it comes right before, settings, note for the teacher], …].
+// Your edited plan's list wins (on your computers), then the list your Sheet gives students (STU_DEMOS), then the built-in one.
+let STU_DEMOS = null, stuDemosP = null;
+const lpPlanDemos = (k) => { const E = LESSON_EDITS.data[k]; if (E && Array.isArray(E.demos)) return E.demos; if (STU_DEMOS && Array.isArray(STU_DEMOS[k])) return STU_DEMOS[k]; return null; };
+function lpDemoList(key) { const k = String(key || ''), base = k.replace(/-30$/, ''); return lpPlanDemos(k) || (k !== base && lpPlanDemos(base)) || LP_DEMOS[base] || []; }
+// students: ask the Sheet once which interactives the teacher added to (or took out of) a plan (no password; nothing private)
+function stuDemosLoad() {
+  if (STU_DEMOS) return Promise.resolve();
+  if (!CONFIG.SCRIPT_URL) { STU_DEMOS = {}; return Promise.resolve(); }
+  return (stuDemosP = stuDemosP || Promise.race([
+    fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'lessonDemos' }) })
+      .then((r) => r.json()).then((g) => { STU_DEMOS = (g && g.ok && g.demos) || {}; }).catch(() => { STU_DEMOS = {}; }),
+    new Promise((ok) => setTimeout(() => { STU_DEMOS = STU_DEMOS || {}; ok(); }, 6000))]));
+}
 // the interactive slides of a plan (its own or its 45-minute plan's), as TV items placed right before their example
 function lpDemos(steps, key) {
-  const base = String(key || '').replace(/-30$/, ''), D = LP_DEMOS[base]; if (!D) return steps;
+  const D = lpDemoList(key); if (!D.length) return steps;
   D.forEach(([id, before, opts, use]) => {
     if (!IX[id]) return;
     let si = steps.findIndex((s) => (s.show || []).some((x) => x.label === before)), at = before;
@@ -42221,6 +42273,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'Add interactives to a lesson plan: in Lesson plans, click ✏️ Edit this plan and use the new Interactives section (+ Add an interactive, then pick the TV screen it comes right before). Students get it in the 📖 Notes on their assignment (when Homework help includes Notes) and on the catch-up page.' },
   { date: '2026-11-22', text: 'Interactives now have their own tab at the top of every teacher page (they open in a new tab, ready for the TV). To let students use one on their Chromebooks, post its page address in Google Classroom.' },
   { date: '2026-11-22', text: 'New Help page (the Help tab at the top): step-by-step instructions for everything on this site and the crossword page. This “What’s new” box lists changes as they happen.' },
   { date: '2026-11-22', subjects: ['apcalc', 'precalc'], text: 'Every AP Calculus and Pre-Calculus question type now has a “Watch a video” walkthrough, including the FRQs, proofs, and challenge problems.' },
@@ -42300,10 +42353,11 @@ function helpScreen(open) {
       P(B('Look up an answer key'), ': choose the assignment and the student. Every student has different numbers, so this shows that student’s own key.'),
       P(B('Print'), ': paper copies of any assignment, in one or more versions, with an answer key (and worked solutions if you want them). Handy for a sub or a day without Chromebooks.')]],
     ...(hasLessons ? [['lessons', '7. Lesson plans', [
-      P('The ', B('Lesson plans'), ' tab has a 45-minute plan for each section (some also have a 30-minute version), with examples to put on the TV, printable student sheets and exit tickets, a catch-up page for students who missed class, and vocabulary flashcards. ', B('Edit lesson plan'), ' saves your changes in your Sheet, so they show on every computer.')]]] : []),
+      P('The ', B('Lesson plans'), ' tab has a 45-minute plan for each section (some also have a 30-minute version), with examples to put on the TV, printable student sheets and exit tickets, a catch-up page for students who missed class, and vocabulary flashcards. ', B('Edit lesson plan'), ' saves your changes in your Sheet, so they show on every computer.'),
+      P(B('Adding an interactive: '), 'open the plan, click ', B('✏️ Edit this plan'), ', and scroll to ', B('Interactives'), '. Click ', B('+ Add an interactive'), ', pick it, and pick the TV screen it should come right before. Save. It shows on the TV in class, in the ', B('📖 Notes'), ' on students’ assignments for that section (turn on Homework help › Notes when you build the assignment), and on the catch-up page.')]]] : []),
     ['ix', `${hasLessons ? 8 : 7}. Interactives`, [
       P('The ', B('Interactives'), ' tab opens a page of hands-on demos (the unit circle, graphs of trig functions, transformations of functions, and more) in a new tab, ready to put on the TV. Drag the points and sliders right on the touchscreen.'),
-      P('Each interactive opens on its own page. To let students explore one on their Chromebooks, copy that page’s address from the browser’s address bar and post it in Google Classroom. Nothing is graded. In a lesson plan, the interactives it uses have a ', B('🔗 Copy student link'), ' button right beside them.')]],
+      P('Each interactive opens on its own page. To let students explore one on their Chromebooks, copy that page’s address from the browser’s address bar and post it in Google Classroom. Nothing is graded. In a lesson plan, the interactives it uses have a ', B('🔗 Copy student link'), ' button right beside them. You can add interactives to any lesson plan (see Lesson plans above).')]],
     ['roster', `${hasLessons ? 9 : 8}. Classes & roster (instead of opening the Google Sheet)`, [
       OL(['The first time: match each Google Classroom class to its period, click ', B('Save periods'), ', then ', B('Refresh roster from Classroom'), '. Yellow boxes are guesses; check them.'],
         [B('Add a new student'), ': type their school email and pick the period. It can add them to the Classroom class too.'],
@@ -43108,7 +43162,7 @@ function copyIntoBuilder(link) {
   if (params.has('pad')) return padScreen(params.get('pad').replace(/\D/g, ''));
   if (params.has('demo')) return demoScreen(params.get('demo'));
   if (params.has('missed')) return missedScreen();
-  if (params.has('catchup')) return catchupScreen(params.get('catchup'));
+  if (params.has('catchup')) return stuDemosLoad().then(() => catchupScreen(params.get('catchup')));
   if (params.has('vocab')) return vocabScreen(params.get('vocab'));
   if (params.has('help')) return helpScreen(params.get('help'));
   if (viewOk()) return viewScreen();

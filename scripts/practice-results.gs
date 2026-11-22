@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-21.3'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-22.1'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -122,6 +122,11 @@ function doPost(e) {
   if (d.action === 'lessonPlans' || d.action === 'saveLesson' || d.action === 'resetLesson' || d.action === 'lessonHistory') { // your edits to the lesson plans
     let out;
     try { out = d.action === 'lessonPlans' ? lessonPlans_(d) : d.action === 'saveLesson' ? saveLesson_(d) : d.action === 'lessonHistory' ? lessonHistory_(d) : resetLesson_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'lessonDemos') { // students' notes and catch-up pages: the interactives in your edited lesson plans (nothing private)
+    let out;
+    try { out = lessonDemos_(); } catch (err) { out = { ok: false, error: String(err) }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'whereNow') { // a student opened a built assignment's link: was it replaced by a newer version?
@@ -1632,6 +1637,20 @@ function lessonPlans_(d) {
   });
   return { ok: true, plans: plans };
 }
+// Only the interactives of each edited plan ([id, show right before, settings]), for students. No password: it holds nothing private.
+function lessonDemos_() {
+  const cache = CacheService.getScriptCache(), hit = cache.get('lessonDemos');
+  if (hit) return JSON.parse(hit);
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LESSON_TAB), demos = {};
+  if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, Math.max(3, sh.getLastColumn())).getValues().forEach(function (r) {
+    if (!r[0]) return;
+    let p = null; try { p = JSON.parse(r.slice(2).map(String).join('')); } catch (e) { return; }
+    if (p && Array.isArray(p.demos)) demos[String(r[0])] = p.demos.map(function (x) { return [String(x[0] || ''), String(x[1] || ''), x[2] && typeof x[2] === 'object' ? x[2] : {}]; });
+  });
+  const out = { ok: true, demos: demos };
+  try { cache.put('lessonDemos', JSON.stringify(out), 21600); } catch (e) {}
+  return out;
+}
 // Every save (and reset) first keeps the version it replaces: the last 10 of each plan, on a hidden "Lesson Plan History" tab.
 const LESSON_HIST_TAB = 'Lesson Plan History', LESSON_HIST_KEEP = 10;
 function lessonHistSheet_() {
@@ -1671,6 +1690,7 @@ function saveLesson_(d) {
     if (old) try { lessonKeepOld_(sh, old); } catch (err) { /* saving matters more than the history */ }
     sh.getRange(row, 1, 1, Math.max(sh.getLastColumn(), chunks.length + 2)).clearContent();
     sh.getRange(row, 1, 1, chunks.length + 2).setNumberFormat('@').setValues([[key, String(Date.now())].concat(chunks)]);
+    try { CacheService.getScriptCache().remove('lessonDemos'); } catch (err) {}
     return { ok: true };
   } finally { lock.releaseLock(); }
 }
@@ -1679,7 +1699,7 @@ function resetLesson_(d) {
   const key = String(d.key || '');
   if (!/^[a-z0-9-]{1,40}$/.test(key)) return { ok: false, error: 'bad plan' };
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  try { const sh = lessonSheet_(), row = lessonRow_(sh, key); if (row) { try { lessonKeepOld_(sh, row); } catch (err) {} sh.deleteRow(row); } return { ok: true }; } finally { lock.releaseLock(); }
+  try { const sh = lessonSheet_(), row = lessonRow_(sh, key); if (row) { try { lessonKeepOld_(sh, row); } catch (err) {} sh.deleteRow(row); } try { CacheService.getScriptCache().remove('lessonDemos'); } catch (err) {} return { ok: true }; } finally { lock.releaseLock(); }
 }
 
 
