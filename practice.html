@@ -35940,6 +35940,21 @@ function registerCustomUrl(url) {
   if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1', bonusPct: bonusPctOf(q), gen: q.get('g') === '2' ? 2 : undefined , more: q.get('more') === '1', picks: q.get('same') === '1' ? picksOf(q) : undefined };
   return key;
 }
+// the TI-Nspire screen question types (their templates are further down) are registered here, before a built assignment's link is read
+[['nsLinRegA1', 'nsLinReg', 'algebra1', '4.6 Analyzing Lines of Fit', 'TI-Nspire screen: linear regression', 'Read m, b, and r from the Linear Regression results'],
+ ['nsOneVarA1', 'nsOneVar', 'algebra1', '8.1 Measures of Center and Variation', 'TI-Nspire screen: one-variable statistics', 'Read the mean, median, or standard deviation from One-Variable Statistics'],
+ ['nsLinRegA2', 'nsLinReg', 'algebra2', '1.4 Modeling with Linear Functions', 'TI-Nspire screen: linear regression', 'Read m, b, and r from the Linear Regression results'],
+ ['nsQuadRegA2', 'nsQuadReg', 'algebra2', '2.4 Modeling with Quadratic Functions', 'TI-Nspire screen: quadratic regression', 'Write the model from the Quadratic Regression results'],
+ ['nsExpRegA2', 'nsExpReg', 'algebra2', '6.7 Modeling with Exponential and Logarithmic Functions', 'TI-Nspire screen: exponential regression', 'Write the model from the Exponential Regression results'],
+ ['nsNormalA2', 'nsNormal', 'algebra2', '9.1 Using Normal Distributions', 'TI-Nspire screen: Normal Cdf', 'Read a probability from a normCdf entry'],
+ ['nsOneVarACT', 'nsOneVar', 'act', '7.3 Mean, Median, Mode, and Spread', 'TI-Nspire screen: one-variable statistics', 'Read the mean, median, or standard deviation from One-Variable Statistics'],
+ ['nsModeG', 'nsMode', 'geometry', '9.4 The Tangent Ratio', 'TI-Nspire screen: wrong angle mode', 'Spot a calculator in radian mode and find the right value'],
+].forEach(([id, f, subject, section, label, desc]) => {
+  if (TEMPLATES[id]) return;
+  TEMPLATES[id] = (r) => globalThis[f](r); // the function is in a later script on this page
+  let at = -1; QUESTION_TYPES.forEach((t, i) => { if (t.subject === subject && t.section === section) at = i; });
+  if (at >= 0) QUESTION_TYPES.splice(at + 1, 0, { id, subject, section, label, desc, nspire: true });
+});
 (function loadCustom() {
   const mix = new URLSearchParams(location.search).get('mix');
   if (!mix) return;
@@ -36155,20 +36170,6 @@ function nsMode(r) {
     solution: `The screen says RAD: the calculator used ${d} radians, so ${nsFmt(rad)} is wrong for ${d}°.\nIn Degree mode, ${fn}(${d}) ≈ ${right}.` };
 }
 // the question types: which sections they go in
-[['nsLinRegA1', nsLinReg, 'algebra1', '4.6 Analyzing Lines of Fit', 'TI-Nspire screen: linear regression', 'Read m, b, and r from the Linear Regression results'],
- ['nsOneVarA1', nsOneVar, 'algebra1', '8.1 Measures of Center and Variation', 'TI-Nspire screen: one-variable statistics', 'Read the mean, median, or standard deviation from One-Variable Statistics'],
- ['nsLinRegA2', nsLinReg, 'algebra2', '1.4 Modeling with Linear Functions', 'TI-Nspire screen: linear regression', 'Read m, b, and r from the Linear Regression results'],
- ['nsQuadRegA2', nsQuadReg, 'algebra2', '2.4 Modeling with Quadratic Functions', 'TI-Nspire screen: quadratic regression', 'Write the model from the Quadratic Regression results'],
- ['nsExpRegA2', nsExpReg, 'algebra2', '6.7 Modeling with Exponential and Logarithmic Functions', 'TI-Nspire screen: exponential regression', 'Write the model from the Exponential Regression results'],
- ['nsNormalA2', nsNormal, 'algebra2', '9.1 Using Normal Distributions', 'TI-Nspire screen: Normal Cdf', 'Read a probability from a normCdf entry'],
- ['nsOneVarACT', nsOneVar, 'act', '7.3 Mean, Median, Mode, and Spread', 'TI-Nspire screen: one-variable statistics', 'Read the mean, median, or standard deviation from One-Variable Statistics'],
- ['nsModeG', nsMode, 'geometry', '9.4 The Tangent Ratio', 'TI-Nspire screen: wrong angle mode', 'Spot a calculator in radian mode and find the right value'],
-].forEach(([id, f, subject, section, label, desc]) => {
-  if (TEMPLATES[id]) return;
-  TEMPLATES[id] = f;
-  let at = -1; QUESTION_TYPES.forEach((t, i) => { if (t.subject === subject && t.section === section) at = i; });
-  if (at >= 0) QUESTION_TYPES.splice(at + 1, 0, { id, subject, section, label, desc, nspire: true });
-});
 
 /* ---------- More calculator checks on a wrong typed answer ----------
    exact answer wanted but the student typed the calculator's decimal; or a decimal that's off in the last place (rounded too early) */
