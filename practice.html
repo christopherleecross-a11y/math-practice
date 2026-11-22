@@ -4738,7 +4738,7 @@ TEMPLATES.a1AngleLines = (r) => {
       ...incChoices(r, d, [180 - d, Math.atan(Math.abs(m2 - m1)) / D2R, Math.atan(Math.abs((m2 - m1) / (1 - m1 * m2))) / D2R, 90 - d]),
       fr: incFR(d),
       draw: dec ? undefined : plotQ({ xr: [cx - 6, cx + 6], yr: [cy - 6, cy + 6], curves: [{ f: (x) => m1 * x + L[0][2] / L[0][1] }, { f: (x) => m2 * x + L[1][2] / L[1][1], color: '#b5462f' }], pts: [{ p: [ix, iy] }] }), size: dec ? undefined : [380, 380],
-      solution: `Slopes: m₁ = ${fracT(m1)}, m₂ = ${fracT(m2)}.\ntan θ = |(m₂ − m₁)/(1 + m₁m₂)| = |(${fracT(m2)} − (${fracT(m1)}))/(1 + (${fracT(m1)})(${fracT(m2)}))| = ${tanT}\nθ = arctan(${tanT}): ${incT(d)}.`,
+      solution: `Slopes: m₁ = ${fracT(m1)}, m₂ = ${fracT(m2)}.\ntan θ = |(m₂ − m₁)/(1 + m₁m₂)| = |(${fracT(m2)} − ${pcNeg(m1)})/(1 + ${pcM(m1).startsWith('(') || m1 < 0 ? `(${fracT(m1)})` : fracT(m1)}(${fracT(m2)}))| = ${tanT}\nθ = arctan(${tanT}): ${incT(d)}.`,
     };
   }
 };
@@ -4963,7 +4963,7 @@ TEMPLATES.a2Apply = (r) => {
       ...buildChoices(r, correct, [...new Set(wrongs)].filter((w) => w !== correct), (i) => `${fracT(p + i + 1)} ${unit} from the vertex`),
       frStem: `A ${what} has a parabolic cross section. It is ${fmt(W)} ${unit} across and ${fmt(D)} ${unit} deep. The ${what === 'satellite dish' ? 'receiver' : 'bulb'} should be placed at the focus. How far from the vertex is the focus? (Exact, or round to three decimal places.)`,
       fr: { fields: [{ kind: 'expr', keys: 'num', label: 'Distance:', suffix: unit }], key: [fracL(p)], display: correct, check: (v) => exact3Ok(String(v[0]).replace(/\\text\{[^}]*\}|feet|inches|ft|in/g, ''), p) },
-      solution: `Put the vertex at the origin with the parabola opening upward: x² = 4py. The rim point (${fmt(W / 2)}, ${fmt(D)}) is on the parabola: ${fmt((W / 2) ** 2)} = 4p(${fmt(D)}), so p = ${fmt((W / 2) ** 2)}/${fmt(4 * D)} = ${val}. The focus is ${val} ${unit} from the vertex.`,
+      solution: `Put the vertex at the origin with the parabola opening upward: x² = 4py. The rim point (${fmt(W / 2)}, ${fmt(D)}) is on the parabola: ${fmt((W / 2) ** 2)} = 4p(${fmt(D)}), so p = ${fmt((W / 2) ** 2)}/${fmt(4 * D)}${`${fmt((W / 2) ** 2)}/${fmt(4 * D)}` === String(val) ? '' : ` = ${val}`}. The focus is ${val} ${unit} from the vertex.`,
     };
   }
   const L = pick(r, [400, 600, 800, 1000, 1200, 500]), H = pick(r, [40, 50, 60, 80, 100, 125]);
@@ -5297,7 +5297,7 @@ TEMPLATES.c4Asym = (r) => {
       why = `${kind === 2 ? `The center is the midpoint of the vertices, ${ptT([C.h, C.k])}. ` : ''}a = ${exactT(E.a)}. ${slopeWhy}, so b = ${exactT(E.b)}.`;
     } else {
       given = `Foci: ${kind === 1 ? pmT(E.c, C.tr) : pairT(E.F)}; asymptotes: ${asym}`;
-      why = `${kind === 3 ? `The center is the midpoint of the foci, ${ptT([C.h, C.k])}. ` : ''}c = ${exactT(E.c)}. ${slopeWhy}, so ${C.tr === 'x' ? `b = ${fracT(E.m)}a` : `a = ${fracT(E.m)}b`}. Then c² = a² + b² gives a² = ${fracT(E.a2)} and b² = ${fracT(E.b2)}.`;
+      why = `${kind === 3 ? `The center is the midpoint of the foci, ${ptT([C.h, C.k])}. ` : ''}c = ${exactT(E.c)}. ${slopeWhy}, so ${C.tr === 'x' ? `b = ${pcM(E.m)}a` : `a = ${pcM(E.m)}b`}. Then c² = a² + b² gives a² = ${fracT(E.a2)} and b² = ${fracT(E.b2)}.`;
     }
     const inv = C.tr === 'x' ? { ...C, B: C.A * C.A / C.B } : { ...C, A: C.B * C.B / C.A };
     return {
