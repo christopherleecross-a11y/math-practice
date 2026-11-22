@@ -36000,9 +36000,16 @@ function regenQuestion(seedStr, old, i, t) {
   q.tpl = old.tpl; q.fmt = old.fmt; if (old.bonus) q.bonus = true;
   return q;
 }
-// Homework help parts: h = Hint, e = Worked example, n = Notes. true / '1' (old links, hints=1) = all three.
-function helpOf(v) { return v === true || v === '1' ? 'hen' : typeof v === 'string' ? [...'hen'].filter((c) => v.includes(c)).join('') : ''; }
-function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Worked example'], ['n', 'Notes']].filter(([c]) => h.includes(c)).map(([, t]) => t).join(', ') : 'no'; }
+// Homework help parts: h = Hint, e = Worked example, n = Notes, v = Video. true / '1' = all four.
+// Links made before Video was its own choice showed the video with the Worked example, so they still do: a string with e,
+// no v, and no '-' is one of those. The builder marks newer links that have e without v with a '-'.
+function helpOf(v) {
+  if (v === true || v === '1') return 'henv';
+  if (typeof v !== 'string') return '';
+  const old = v.includes('e') && !v.includes('v') && !v.includes('-');
+  return [...'henv'].filter((c) => v.includes(c) || (c === 'v' && old)).join('');
+}
+function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Worked example'], ['n', 'Notes'], ['v', 'Video']].filter(([c]) => h.includes(c)).map(([, t]) => t).join(', ') : 'no'; }
 const setting = (setKey, name) => {
   const v = SETS[setKey][name];
   if (v !== undefined) return v;
@@ -37023,7 +37030,7 @@ function hintBar(q, i) {
     const row = el('span', { style: 'display:inline-flex;gap:0;flex-wrap:wrap;vertical-align:middle' });
     if (on('e') && twinable(q)) row.append(el('button', { class: 'btn secondary' + (H.ex ? ' on' : ''), type: 'button', style: sm, title: 'See a problem like this one solved step by step',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); if (h.ex) { h.ex = 0; } else { h.ex = (h.n || 0) + 1; h.n = h.ex; h.step = 0; if (!state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } } rerenderAt(i); } }, H.ex ? '📘 Hide example' : '📘 Worked example'));
-    if (on('e') && practiceVideos(q, () => rerenderAt(i)).length) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
+    if (on('v') && practiceVideos(q, () => rerenderAt(i)).length) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.vid = !h.vid; if (h.vid && !state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } rerenderAt(i); } }, H.vid ? '🎬 Hide video' : '🎬 Video'));
     if (on('n') && lessonFor(q.tpl)) row.append(el('button', { class: 'btn secondary', type: 'button', style: sm, title: 'Review the notes and class examples for this section',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.notes = !h.notes; rerenderAt(i); if (h.notes && !STU_DEMOS) stuDemosLoad().then(() => { if (HELP[i] && HELP[i].notes) rerenderAt(i); }); } }, H.notes ? '📖 Hide notes' : '📖 Notes'));
@@ -42273,6 +42280,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'Video is now its own Homework help choice in Build an assignment (Hint, Worked example, Video, Notes), so you decide whether students get the 🎬 Video button. Assignments you already posted keep working the way they did.' },
   { date: '2026-11-22', text: 'Add interactives to a lesson plan: in Lesson plans, click ✏️ Edit this plan and use the new Interactives section (+ Add an interactive, then pick the TV screen it comes right before). Students get it in the 📖 Notes on their assignment (when Homework help includes Notes) and on the catch-up page.' },
   { date: '2026-11-22', text: 'Interactives now have their own tab at the top of every teacher page (they open in a new tab, ready for the TV). To let students use one on their Chromebooks, post its page address in Google Classroom.' },
   { date: '2026-11-22', text: 'New Help page (the Help tab at the top): step-by-step instructions for everything on this site and the crossword page. This “What’s new” box lists changes as they happen.' },
@@ -42337,7 +42345,7 @@ function helpScreen(open) {
     ['build', '3. Build your own assignment (quizzes, reviews, tests)', [
       OL([B('Build an assignment'), ' tab. Type a title and pick the subject (that’s the gradebook tab the scores go to).'],
         ['Open a chapter, then a section, and type how many of each question type you want. ', B('Preview'), ' shows a sample. ', B('★ Bonus'), ' adds extra-credit questions at the end.'],
-        ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints and worked examples — leave it off for tests), and the Desmos calculator.'],
+        ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints, worked examples, videos, and notes — pick any of them, and leave it off for tests), and the Desmos calculator.'],
         ['Click ', B('Try it as a student'), ' to see exactly what students will get. Nothing you do there is graded.'],
         ['Click ', B('Copy link'), ' or ', B('📤 Assign in Google Classroom'), ' (next step).']),
       P('To change one later: ', B('Edit an assignment you already made'), ' at the top of the same tab.')]],
@@ -42639,10 +42647,10 @@ function builder() {
   const desmosIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   const moreIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   moreIn.checked = !!saved.more;
-  const helpIns = { h: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), e: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), n: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }) };
-  const helpNow = () => [...'hen'].filter((c) => helpIns[c].checked).join('');
-  const syncHelp = () => { const h = helpNow(); hintsIn.checked = !!h; hintsIn.indeterminate = !!h && h.length < 3; };
-  for (const c of 'hen') helpIns[c].checked = helpOf(saved.hints).includes(c);
+  const helpIns = { h: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), e: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), n: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), v: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }) };
+  const helpNow = () => [...'henv'].filter((c) => helpIns[c].checked).join('');
+  const syncHelp = () => { const h = helpNow(); hintsIn.checked = !!h; hintsIn.indeterminate = !!h && h.length < 4; };
+  for (const c of 'henv') helpIns[c].checked = helpOf(saved.hints).includes(c);
   syncHelp();
   desmosIn.checked = !!saved.desmos;
   const shareIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
@@ -42792,8 +42800,8 @@ function builder() {
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
       el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Then use Try it as a student to swap any question for a new version until it’s exactly what you want. Unchecked = a different version for each student.')),
     el('label', {}, 'Homework help'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
-      el('span', { class: 'small' }, 'Adds homework help to every question: a Hint (the first step, with the answer hidden), a Worked example (a twin problem with different numbers, solved one step at a time), and Notes (the section’s lesson notes and class examples, when there is a lesson plan). Help never changes the score; the gradebook marks each question where a hint or worked example was used. Leave it off for quizzes and tests.')),
-    el('span'), el('div', { style: 'display:flex;gap:18px;flex-wrap:wrap;margin:-4px 0 4px 30px' }, ...[['h', 'Hint'], ['e', 'Worked example'], ['n', 'Notes']].map(([c, t]) => el('label', { style: 'display:flex;gap:6px;align-items:center;font-weight:400;font-size:15px;margin:0' }, helpIns[c], t))),
+      el('span', { class: 'small' }, 'Adds homework help to every question: a Hint (the first step, with the answer hidden), a Worked example (a twin problem with different numbers, solved one step at a time), a Video (a narrated walkthrough of a problem like theirs), and Notes (the section’s lesson notes, class examples, and interactives, when there is a lesson plan). Help never changes the score; the gradebook marks each question where a hint, worked example, or video was used. Leave it off for quizzes and tests.')),
+    el('span'), el('div', { style: 'display:flex;gap:18px;flex-wrap:wrap;margin:-4px 0 4px 30px' }, ...[['h', 'Hint'], ['e', 'Worked example'], ['v', 'Video'], ['n', 'Notes']].map(([c, t]) => el('label', { style: 'display:flex;gap:6px;align-items:center;font-weight:400;font-size:15px;margin:0' }, helpIns[c], t))),
     el('label', {}, '“Try another” button'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, moreIn,
       el('span', { class: 'small' }, 'Adds a “Try another” button to every question. It gives the student a new question of the same kind, with new numbers, to practice on: they pick an answer, see if it’s right, and can see the solution. It is never graded and doesn’t change their score.')),
     el('label', {}, 'Desmos calculator'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, desmosIn,
@@ -42938,8 +42946,8 @@ function builder() {
   [titleIn, subjSel, orderSel, retriesIn, checksIn, attemptsIn, leaveIn, bonusPctIn].forEach((x) => x.addEventListener('input', update));
   lockIn.addEventListener('change', update);
   sameIn.addEventListener('change', update);
-  hintsIn.addEventListener('change', () => { for (const c of 'hen') helpIns[c].checked = hintsIn.checked; hintsIn.indeterminate = false; update(); }); // checking Homework help checks all three parts
-  for (const c of 'hen') helpIns[c].addEventListener('change', () => { syncHelp(); update(); });
+  hintsIn.addEventListener('change', () => { for (const c of 'henv') helpIns[c].checked = hintsIn.checked; hintsIn.indeterminate = false; update(); }); // checking Homework help checks all four parts
+  for (const c of 'henv') helpIns[c].addEventListener('change', () => { syncHelp(); update(); });
   desmosIn.addEventListener('change', update);
   moreIn.addEventListener('change', update);
   shareIn.addEventListener('change', update);
@@ -43033,7 +43041,7 @@ function builder() {
     if (at > 1 && redoSel.value === 'missed') q.set('redo', 'missed');
     if (!lockIn.checked) q.set('lock', '0');
     if (sameIn.checked) q.set('same', '1');
-    { const h = helpNow(); if (h) q.set('hints', h === 'hen' ? '1' : h); }
+    { const h = helpNow(); if (h) q.set('hints', h === 'henv' ? '1' : h.includes('e') && !h.includes('v') ? h + '-' : h); }
     if (desmosIn.checked) q.set('desmos', '1');
     if (moreIn.checked) q.set('more', '1');
     if (shareIn.checked) q.set('sw', '1');
@@ -43049,7 +43057,7 @@ function builder() {
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1'; shareA.value = shareLink(url, true); shareQ.value = shareLink(url, false);
     if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${[...items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`), ...bItems.map(([id, n, f]) => `['${id}', ${n}, '${f}', 'b']`)].join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${nBonus && bp !== 5 ? `, bonusPct: ${bp}` : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${helpNow() ? (helpNow() === 'hen' ? ', hints: true' : `, hints: '${helpNow()}'`) : ''}${desmosIn.checked ? ', desmos: true' : ''}${shareIn.checked ? ', shareWork: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${[...items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`), ...bItems.map(([id, n, f]) => `['${id}', ${n}, '${f}', 'b']`)].join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${nBonus && bp !== 5 ? `, bonusPct: ${bp}` : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${helpNow() ? (helpNow() === 'henv' ? ', hints: true' : `, hints: '${helpNow()}${helpNow().includes('e') && !helpNow().includes('v') ? '-' : ''}'`) : ''}${desmosIn.checked ? ', desmos: true' : ''}${shareIn.checked ? ', shareWork: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
   }
   update(); opening = false;
 }
