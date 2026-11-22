@@ -16497,9 +16497,9 @@ TEMPLATES.cf1IVT = (r) => {
     const ivt = 'Yes, by the Intermediate Value Theorem: f is continuous and the value is between the two function values';
     const opts = [ivt, 'No, because the value is not one of the values in the table', 'Yes, because f is increasing on the interval', 'No, because f might not be continuous'];
     return apFRQ(r, { topic: 'Intermediate Value Theorem from a table',
-      stem: `The function f is continuous on the closed interval [0, 8]. Selected values of f are shown.\nx:  ${xs.join('   ')}\nf(x):  ${ys.map(fmt).join('   ')}\n(a) Find the average rate of change of f on the interval [${xs[p]}, ${xs[q]}].\n(b) Must there be a value c, ${xs[i]} < c < ${xs[j]}, for which f(c) = ${fmt(K)}? Choose the correct answer and reason.\n(c) What is the least number of zeros f must have on [0, 8]?\n(d) Find the limit of (${s}f(x) ${d < 0 ? MINUS : '+'} ${Math.abs(d)}) as x → ${lx}.`.replace(` + 0)`, ')'),
+      stem: `The function f is continuous on the closed interval [0, 8]. Selected values of f are shown.\nx:  ${xs.join('   ')}\nf(x):  ${ys.map(fmt).join('   ')}\n(a) Find the average rate of change of f on the interval [${xs[p]}, ${xs[q]}].\n(b) Must there be a value c, ${xs[i]} < c < ${xs[j]}, for which f(c) = ${fmt(K)}? Choose the correct answer and reason.\n(c) What is the least number of zeros f must have on [0, 8]?\n(d) Find the limit of (${fmt(s)}f(x) ${d < 0 ? MINUS : '+'} ${Math.abs(d)}) as x → ${lx}.`.replace(` + 0)`, ')'),
       parts: [{ p: '(a)', pts: 1, f: [apN('Average rate of change =', avg)] }, { p: '(b)', pts: 2, f: [apC(r, opts, ivt)] }, { p: '(c)', pts: 1, f: [apN('Least number of zeros =', zeros)] }, { p: '(d)', pts: 1, f: [apN('Limit =', lim)] }],
-      solution: `(a) 1 pt: (f(${xs[q]}) − f(${xs[p]}))/(${xs[q]} − ${xs[p]}) = (${fmt(ys[q])} − ${apP(ys[p])})/${xs[q] - xs[p]} = ${fracT(avg)}.\n(b) 1 pt for “yes” and 1 pt for the reason: f is continuous on [${xs[i]}, ${xs[j]}] and ${fmt(K)} is between f(${xs[i]}) = ${fmt(ys[i])} and f(${xs[j]}) = ${fmt(ys[j])}, so the Intermediate Value Theorem applies.\n(c) 1 pt: f changes sign ${zeros} time${zeros > 1 ? 's' : ''} in the table, and each sign change forces a zero (IVT): at least ${zeros}.\n(d) 1 pt: f is continuous, so the limit of f(x) as x → ${lx} is f(${lx}) = ${fmt(ys[xs.indexOf(lx)])}: ${s}(${fmt(ys[xs.indexOf(lx)])}) ${d < 0 ? MINUS : '+'} ${Math.abs(d)} = ${fmt(lim)}.` }); }
+      solution: `(a) 1 pt: (f(${xs[q]}) − f(${xs[p]}))/(${xs[q]} − ${xs[p]}) = (${fmt(ys[q])} − ${apP(ys[p])})/${xs[q] - xs[p]} = ${fracT(avg)}.\n(b) 1 pt for “yes” and 1 pt for the reason: f is continuous on [${xs[i]}, ${xs[j]}] and ${fmt(K)} is between f(${xs[i]}) = ${fmt(ys[i])} and f(${xs[j]}) = ${fmt(ys[j])}, so the Intermediate Value Theorem applies.\n(c) 1 pt: f changes sign ${zeros} time${zeros > 1 ? 's' : ''} in the table, and each sign change forces a zero (IVT): at least ${zeros}.\n(d) 1 pt: f is continuous, so the limit of f(x) as x → ${lx} is f(${lx}) = ${fmt(ys[xs.indexOf(lx)])}: ${fmt(s)}(${fmt(ys[xs.indexOf(lx)])}) ${d < 0 ? MINUS : '+'} ${Math.abs(d)} = ${fmt(lim)}.` }); }
 };
 TEMPLATES.cf1Rational = (r) => {
   for (let t = 0; t < 400; t++) { const h = nz(r, -4, 4), v = nz(r, -5, 5), z = ri(r, -5, 5), A = pick(r, [1, 2, 3, -1]); if (v === h || z === h || z === v) continue;
@@ -16512,7 +16512,7 @@ TEMPLATES.cf1Rational = (r) => {
       stem: `Let R(x) = (${cdP(num)})/(${cdP(den)}).\n(a) Find the limit of R(x) as x → ${fmt(h)}.\n(b) What kind of discontinuity does R have at x = ${fmt(h)}?\n(c) Find the vertical asymptote of the graph of R and the limit of R(x) as x → ${fmt(v)}${side}.\n(d) Find the horizontal asymptote of the graph of R.`,
       parts: [{ p: '(a)', pts: 1, f: [apN('Limit =', hole)] }, { p: '(b)', pts: 1, f: [apC(r, [disc, 'Jump: the one-sided limits are different', 'Infinite: there is a vertical asymptote', 'R is continuous at that x'], disc)] },
         { p: '(c)', pts: 2, f: [apN('Vertical asymptote x =', v), apC(r, ['∞', `${MINUS}∞`, '0', 'does not exist (not ±∞)'], inf)] }, { p: '(d)', pts: 1, f: [apN('Horizontal asymptote y =', A)] }],
-      solution: `Factor: R(x) = ${fmt(A)}(${cpLin(h)})(${cpLin(z)}) / ((${cpLin(h)})(${cpLin(v)})).\n(a) 1 pt: cancel x ${h < 0 ? '+' : MINUS} ${Math.abs(h)}: ${fmt(A)}(x ${z < 0 ? '+' : MINUS} ${Math.abs(z)})/(x ${v < 0 ? '+' : MINUS} ${Math.abs(v)}) → ${fracT(hole)} as x → ${fmt(h)}.\n(b) 1 pt: the factor cancels, so the discontinuity is removable (a hole).\n(c) 1 pt: x = ${fmt(v)} (the factor that does not cancel).  1 pt: near x = ${fmt(v)}${side} the numerator ${fmt(A)}(${fmt(v)} ${z < 0 ? '+' : MINUS} ${Math.abs(z)}) is ${apSgn(A * (v - z))} and the denominator is ${side === '⁺' ? 'positive' : 'negative'} and small, so R(x) → ${inf}.\n(d) 1 pt: the degrees are equal, so y = (leading coefficients) = ${fmt(A)}.`.replace(/x [−+] 0\b/g, 'x') }); }
+      solution: `Factor: R(x) = ${A === 1 ? '' : A === -1 ? MINUS : fmt(A)}(${cpLin(h)})(${cpLin(z)}) / ((${cpLin(h)})(${cpLin(v)})).\n(a) 1 pt: cancel x ${h < 0 ? '+' : MINUS} ${Math.abs(h)}: ${A === 1 ? '' : A === -1 ? MINUS : fmt(A)}(x ${z < 0 ? '+' : MINUS} ${Math.abs(z)})/(x ${v < 0 ? '+' : MINUS} ${Math.abs(v)}) → ${fracT(hole)} as x → ${fmt(h)}.\n(b) 1 pt: the factor cancels, so the discontinuity is removable (a hole).\n(c) 1 pt: x = ${fmt(v)} (the factor that does not cancel).  1 pt: near x = ${fmt(v)}${side} the numerator ${fmt(A)}(${fmt(v)} ${z < 0 ? '+' : MINUS} ${Math.abs(z)}) is ${apSgn(A * (v - z))} and the denominator is ${side === '⁺' ? 'positive' : 'negative'} and small, so R(x) → ${inf}.\n(d) 1 pt: the degrees are equal, so y = the ratio of the leading coefficients = ${fmt(A)}.`.replace(/x [−+] 0\b/g, 'x') }); }
 };
 
 /* --- Chapter 2: the derivative --- */
@@ -16558,7 +16558,7 @@ TEMPLATES.cf3Chain = (r) => {
     return apFRQ(r, { topic: 'Chain Rule, inverse, and log from a table',
       stem: `The differentiable functions f and g have the values shown. f(x) > 0 for all x, and g is one-to-one.\nx:  1   2   3   4\n${row('f(x)', f)}\n${row('f′(x)', fd)}\n${row('g(x)', g)}\n${row('g′(x)', gd)}\n(a) Let h(x) = f(g(x)). Find h′(${a}).\n(b) Let k(x) = [g(x)]³. Find k′(${b}).\n(c) Let p be the inverse function of g. Find p′(${y0}).\n(d) Let m(x) = ln(f(x)). Find m′(${e}).`,
       parts: [{ p: '(a)', pts: 1, f: [apN(`h′(${a}) =`, h1)] }, { p: '(b)', pts: 1, f: [apN(`k′(${b}) =`, k1)] }, { p: '(c)', pts: 2, f: [apN(`p′(${y0}) =`, inv)] }, { p: '(d)', pts: 1, f: [apN(`m′(${e}) =`, m1)] }],
-      solution: `(a) 1 pt: h′(${a}) = f′(g(${a})) · g′(${a}) = f′(${g[a - 1]}) · ${gd[a - 1] < 0 ? `(${fmt(gd[a - 1])})` : gd[a - 1]} = ${fmt(fd[g[a - 1] - 1])} · ${gd[a - 1] < 0 ? `(${fmt(gd[a - 1])})` : gd[a - 1]} = ${fmt(h1)}.\n(b) 1 pt: k′(x) = 3[g(x)]² · g′(x), so k′(${b}) = 3(${g[b - 1]})² · ${gd[b - 1] < 0 ? `(${fmt(gd[b - 1])})` : gd[b - 1]} = ${fmt(k1)}.\n(c) 1 pt for p(${y0}) = ${c} (because g(${c}) = ${y0}) and 1 pt for the answer: p′(${y0}) = 1/g′(${c}) = ${fracT(inv)}.\n(d) 1 pt: m′(x) = f′(x)/f(x), so m′(${e}) = ${fmt(fd[e - 1])}/${f[e - 1]} = ${fracT(m1)}.` }); }
+      solution: `(a) 1 pt: h′(${a}) = f′(g(${a})) · g′(${a}) = f′(${g[a - 1]}) · ${gd[a - 1] < 0 ? `(${fmt(gd[a - 1])})` : gd[a - 1]} = ${fmt(fd[g[a - 1] - 1])} · ${gd[a - 1] < 0 ? `(${fmt(gd[a - 1])})` : gd[a - 1]} = ${fmt(h1)}.\n(b) 1 pt: k′(x) = 3[g(x)]² · g′(x), so k′(${b}) = 3(${g[b - 1]})² · ${gd[b - 1] < 0 ? `(${fmt(gd[b - 1])})` : gd[b - 1]} = ${fmt(k1)}.\n(c) 1 pt for p(${y0}) = ${c} (because g(${c}) = ${y0}) and 1 pt for the answer: p′(${y0}) = 1/g′(${c}) = ${fracT(inv)}.\n(d) 1 pt: m′(x) = f′(x)/f(x), so m′(${e}) = ${fmt(fd[e - 1])}/${f[e - 1]}${`${fmt(fd[e - 1])}/${f[e - 1]}` === fracT(m1) ? '' : ` = ${fracT(m1)}`}.` }); }
 };
 TEMPLATES.cf3Implicit = (r) => {
   for (let t = 0; t < 300; t++) { const c = cc32Curve(r, false); if (!c.k || c.k * c.k === 4 * c.a * c.b) continue; const y1 = -c.k * c.x0 / c.b - c.y0; if (!Number.isInteger(y1) || y1 === c.y0 || y1 === 0) continue; // the other point with x = x0
@@ -16570,7 +16570,7 @@ TEMPLATES.cf3Implicit = (r) => {
     return apFRQ(r, { topic: 'Implicit differentiation',
       stem: `Consider the curve ${c.eq}.\n(a) Which expression is dy/dx?\n(b) Find the slope of the curve at the point (${fmt(c.x0)}, ${fmt(c.y0)}).\n(c) Write an equation of the tangent line to the curve at (${fmt(c.x0)}, ${fmt(c.y0)}) in the form y = mx + b.\n(d) There is a second point on the curve with x = ${fmt(c.x0)}. Find its y-coordinate and the slope of the curve there.`,
       parts: [{ p: '(a)', pts: 2, f: [apC(r, [dy, ...wrong], dy)] }, { p: '(b)', pts: 1, f: [apN('Slope =', c.m)] }, { p: '(c)', pts: 1, f: [apN('m =', c.m), apN('b =', b0)] }, { p: '(d)', pts: 1, f: [apN('y =', y1), apN('Slope =', m1)] }],
-      solution: `(a) 1 pt for differentiating implicitly (dy/dx on each y-term, the Product Rule on xy) and 1 pt for solving: ${dy}.\n(b) 1 pt: substitute (${fmt(c.x0)}, ${fmt(c.y0)}): ${fracT(c.m)}.\n(c) 1 pt: ${cpLin(c.y0, 'y')} = ${c.m < 0 || !Number.isInteger(c.m) ? `(${fracT(c.m)})` : fracT(c.m)}(${cpLin(c.x0)}), so y = ${fracT(c.m)}x ${b0 < 0 ? MINUS : '+'} ${fracT(Math.abs(b0))}.\n(d) 1 pt: with x = ${fmt(c.x0)} the equation is a quadratic in y with roots ${fmt(c.y0)} and ${fmt(y1)} (their sum is ${fmt(-c.k * c.x0 / c.b)}). At (${fmt(c.x0)}, ${fmt(y1)}) the slope is ${fracT(m1)}.`.replace(/− −/g, '+ ') }); }
+      solution: `(a) 1 pt for differentiating implicitly (dy/dx on each y-term, the Product Rule on xy) and 1 pt for solving: ${dy}.\n(b) 1 pt: substitute (${fmt(c.x0)}, ${fmt(c.y0)}): ${fracT(c.m)}.\n(c) 1 pt: ${cpLin(c.y0, 'y')} = ${c.m < 0 || !Number.isInteger(c.m) ? `(${fracT(c.m)})` : fracT(c.m)}(${cpLin(c.x0)}), so y = ${c.m === 1 ? '' : c.m === -1 ? MINUS : Number.isInteger(c.m) ? fracT(c.m) : `(${fracT(c.m)})`}x ${b0 < 0 ? MINUS : '+'} ${fracT(Math.abs(b0))}.\n(d) 1 pt: with x = ${fmt(c.x0)} the equation is a quadratic in y with roots ${fmt(c.y0)} and ${fmt(y1)} (their sum is ${fmt(-c.k * c.x0 / c.b)}). At (${fmt(c.x0)}, ${fmt(y1)}) the slope is ${fracT(m1)}.`.replace(/− −/g, '+ ') }); }
 };
 TEMPLATES.cf3Inverse = (r) => {
   const a = ri(r, 1, 4), b = ri(r, -5, 5), c = nz(r, -2, 2), d = c ** 3 + a * c + b, fd = 3 * c * c + a, x1 = pick(r, [0, 1, -1, 2]), F = (x) => x ** 3 + a * x + b;
@@ -16990,9 +16990,9 @@ TEMPLATES.cf9Vector = (r) => {
   const p = ri(r, -2, 3), q = ri(r, -2, 3), why = 'At t = 1, because the horizontal velocity 3t² − 3 is 0 there';
   return apFRQ(r, { topic: 'Motion along a vector-valued curve (BC)',
     stem: `A particle has acceleration a(t) = ⟨6t, 2⟩ for t ≥ 0, with v(0) = ⟨−3, 1⟩ and r(0) = ${cnV(p, q)}.\n(a) Find v(2). Give the x- and y-components.\n(b) Find the position r(2).\n(c) Find the speed of the particle at t = 1.\n(d) For t > 0, when is the particle moving straight up or down?`,
-    parts: [{ p: '(a)', pts: 1, f: [apN('x-component:', 9), apN('y-component:', 5)] }, { p: '(b)', pts: 2, f: [apN('x(2) =', 3 + p), apN('y(2) =', 6 + q)] }, { p: '(c)', pts: 1, f: [apN('Speed =', 3)] },
+    parts: [{ p: '(a)', pts: 1, f: [apN('x-component:', 9), apN('y-component:', 5)] }, { p: '(b)', pts: 2, f: [apN('x(2) =', 2 + p), apN('y(2) =', 6 + q)] }, { p: '(c)', pts: 1, f: [apN('Speed =', 3)] },
       { p: '(d)', pts: 1, f: [apC(r, [why, 'At t = 1/2, because the vertical velocity is 0 there', 'Never, because the acceleration is never 0', 'At t = 0, because v(0) is given'], why)] }],
-    solution: `(a) 1 pt: v(t) = ⟨3t² − 3, 2t + 1⟩, so v(2) = ⟨9, 5⟩.\n(b) 1 pt for r(t) = ⟨t³ − 3t ${p < 0 ? MINUS : '+'} ${Math.abs(p)}, t² + t ${q < 0 ? MINUS : '+'} ${Math.abs(q)}⟩ and 1 pt for r(2) = ${cnV(3 + p, 6 + q)}.\n(c) 1 pt: v(1) = ⟨0, 3⟩, speed 3.\n(d) 1 pt: ${why.toLowerCase()} and the vertical velocity 2t + 1 is not.` });
+    solution: `(a) 1 pt: v(t) = ⟨3t² − 3, 2t + 1⟩, so v(2) = ⟨9, 5⟩.\n(b) 1 pt for r(t) = ⟨t³ − 3t${p ? ` ${p < 0 ? MINUS : '+'} ${Math.abs(p)}` : ''}, t² + t${q ? ` ${q < 0 ? MINUS : '+'} ${Math.abs(q)}` : ''}⟩ and 1 pt for r(2) = ${cnV(2 + p, 6 + q)}.\n(c) 1 pt: v(1) = ⟨0, 3⟩, speed 3.\n(d) 1 pt: ${why.toLowerCase()} and the vertical velocity 2t + 1 is not.` });
 };
 
 /* ----- AP Calculus, Chapter 8: Applications of the Integral (Sullivan & Miranda) ----- */
@@ -17194,7 +17194,7 @@ TEMPLATES.cf8Region = (r) => {
     draw: cmRegion({ xr: [-1, k + 1], yr: [-1, k * k + 1], curves: [{ f: (x) => k * x, color: '#692b31' }, { f: (x) => x * x }] }, { a: 0, b: k, top: (x) => k * x, bot: (x) => x * x }), size: [340, 340],
     parts: [{ p: '(a)', pts: 1, f: [apN('Area =', A)] }, { p: '(b)', pts: 2, f: [apNx('V =', V * Math.PI, `${fracT(V).replace('/', 'pi/')}`.replace(/^(\d+)$/, '$1pi'))] }, { p: '(c)', pts: 1, f: [apN('V =', S)] },
       { p: '(d)', pts: 1, f: [apC(r, [ans, `π${ciInt(0, k, `[(${kx} − 1)² − (x² − 1)²]`)}`, `π${ciInt(0, k, `(${kx} − x² + 1)²`)}`, `π${ciInt(0, k, `[(x² + 1)² − (${kx} + 1)²]`)}`], ans)] }],
-    solution: `(a) 1 pt: They meet at x = 0 and x = ${k}. A = ${ciInt(0, k, `(${kx} − x²)`)} = ${fracT(A)}.\n(b) 1 pt for the washer integrand π[(${kx})² − (x²)²] and 1 pt for the answer: V = π${ciInt(0, k, `(${k * k === 1 ? '' : k * k}x² − x⁴)`)} = ${cmPi(V)}.\n(c) 1 pt: V = ${ciInt(0, k, `(${kx} − x²)²`)} = ${fracT(S)}.\n(d) 1 pt: the outer radius is (${kx}) + 1 and the inner radius is x² + 1: ${ans}.` });
+    solution: `(a) 1 pt: They meet at x = 0 and x = ${k}. A = ${ciInt(0, k, `(${kx} − x²)`)} = ${fracT(A)}.\n(b) 1 pt for the washer integrand π[(${kx})² − (x²)²] and 1 pt for the answer: V = π${ciInt(0, k, `(${k * k === 1 ? '' : k * k}x² − x⁴)`)} = ${cmPi(V)}.\n(c) 1 pt: V = ${ciInt(0, k, `(${kx} − x²)²`)} = ${fracT(S)}.\n(d) 1 pt: the outer radius is ${kx} + 1 and the inner radius is x² + 1: ${ans}.` });
 };
 TEMPLATES.cf8Shell = (r) => {
   const a = pick(r, [2, 3, 4]), A = a ** 3 / 6, Vy = a ** 4 / 6, Vx = a ** 5 / 30, f = `${a}x − x²`, key = (v) => (fracParts(v)[1] === 1 ? `${fracT(v)}pi` : fracT(v).replace('/', 'pi/'));
@@ -17891,7 +17891,7 @@ TEMPLATES.cf5Analysis = (r) => {
       stem: `Let ${C.txt}.\n(a) Find the x-coordinate of each local maximum of f. Justify your answer.\n(b) On what interval is the graph of f concave up?\n(c) Find the absolute maximum value of f on the closed interval [${fmt(a)}, ${fmt(b)}].\n(d) Find the x-coordinate of the inflection point of f.`,
       parts: [{ p: '(a)', pts: 2, f: [apN('Local max at x =', C.p), apC(r, [maxWhy, minWhy, `f″(${fmt(C.p)}) > 0`, `f(${fmt(C.p)}) > 0`], maxWhy)] }, { p: '(b)', pts: 1, f: [apC(r, [ceInt(C.m, Infinity), ceInt(-Infinity, C.m), ceInt(C.p, C.q), `${ceInt(-Infinity, C.p)} and ${ceInt(C.q, Infinity)}`], ceInt(C.m, Infinity))] },
         { p: '(c)', pts: 1, f: [apN('Absolute max =', mx)] }, { p: '(d)', pts: 1, f: [apN('x =', C.m)] }],
-      solution: `${ceFd(C)};  f″(x) = 6(${cpLin(C.m)}).\n(a) 1 pt for x = ${fmt(C.p)} and 1 pt for the justification: ${maxWhy}.\n(b) 1 pt: f″ > 0 for x > ${fmt(C.m)}: ${ceInt(C.m, Infinity)}.\n(c) 1 pt: candidates ${xs.map((x, i) => `f(${fmt(x)}) = ${fmt(vs[i])}`).join(', ')}. Absolute max = ${fmt(mx)}.\n(d) 1 pt: f″ changes sign at x = ${fmt(C.m)}.` }); }
+      solution: `${ceFd(C)};  f″(x) = ${C.m === 0 ? '6x' : `6(${cpLin(C.m)})`}.\n(a) 1 pt for x = ${fmt(C.p)} and 1 pt for the justification: ${maxWhy}.\n(b) 1 pt: f″ > 0 for x > ${fmt(C.m)}: ${ceInt(C.m, Infinity)}.\n(c) 1 pt: candidates ${xs.map((x, i) => `f(${fmt(x)}) = ${fmt(vs[i])}`).join(', ')}. Absolute max = ${fmt(mx)}.\n(d) 1 pt: f″ changes sign at x = ${fmt(C.m)}.` }); }
 };
 TEMPLATES.cf5Box = (r) => {
   const s = 6 * ri(r, 1, 5), x = s / 6, V = (s - 2 * x) ** 2 * x, why = `V″(${x}) < 0, so V has a local maximum at x = ${x}, the only critical number in the domain`;
@@ -21435,7 +21435,7 @@ TEMPLATES.a18Tol = (r) => {
     fr: { fields: [{ kind: 'number', label: 'Minimum:' }, { kind: 'number', label: 'Maximum:' }], key: [String(lo), String(hi)], display: `minimum ${fmt3(lo)}, maximum ${fmt3(hi)}`, check: (v) => numOk(v[0], lo, 1e-9) && numOk(v[1], hi, 1e-9), score: (v) => ((numOk(v[0], lo, 1e-9) ? 1 : 0) + (numOk(v[1], hi, 1e-9) ? 1 : 0)) / 2 },
     solution: `|x ${MINUS} ${fmt3(c)}| = ${fmt3(t)}\nx = ${fmt3(c)} ${MINUS} ${fmt3(t)} = ${fmt3(lo)} or x = ${fmt3(c)} + ${fmt3(t)} = ${fmt3(hi)}` };
 };
-const fmt3 = (x) => String(Math.round(x * 1000) / 1000);
+const fmt3 = (x) => String(Math.round(x * 1000) / 1000).replace('-', MINUS);
 // #46: number of solutions
 TEMPLATES.a18Count = (r) => {
   const a = nz(r, -9, 9), b = nz(r, -9, 9), m = pick(r, [-ri(r, 1, 9), 0, ri(r, 1, 9), ri(r, 1, 9)]), c = m + b, ans = m < 0 ? 'No solution' : m === 0 ? 'One solution' : 'Two solutions';
@@ -41342,8 +41342,9 @@ const practiceVideos = (q, onLoad) => {
   const own = PV_FILES[subj].filter((v) => v.tpl === tpl && v.re.test(key) && pvInst(v));
   if (own.length || !q.baseTpl) return own;
   // an AP® Practice question with no video of its own: use the videos of the type it was made from
-  const bkey = `${q.baseTopic || ''} ## ${q.stem || ''}`;
-  return PV_FILES[subj].filter((v) => v.tpl === q.baseTpl && v.re.test(bkey) && pvInst(v));
+  const bkey = `${q.baseTopic || ''} ## ${q.stem || ''}`, bsubj = pvSubject({ tpl: q.baseTpl }) || subj; // the base type can belong to another subject
+  if (!PV_FILES[bsubj]) { if (onLoad) pvLoad(bsubj, onLoad); return []; }
+  return PV_FILES[bsubj].filter((v) => v.tpl === q.baseTpl && v.re.test(bkey) && pvInst(v));
 };
 // walkthroughs for every lesson, kept in walks/<subject>.json and loaded when a catch-up page opens
 const WALK_FILES = {};
