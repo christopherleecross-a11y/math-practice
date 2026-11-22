@@ -35986,6 +35986,237 @@ const sidOf = (name, rid) => (PREVIEW ? PREVIEW_ID : rid ? 'id' + rid : norm(nam
 /* ---------- TI-Nspire CX II (non-CAS) help: keystrokes for the calculator parts of a problem ----------
    NSPIRE: each skill's steps. Menus are named, not numbered (the numbers shift between OS versions).
    blank: the word left blank when a skill is a fill-in note on a lesson's student sheet. */
+/* ---------- Reading the TI-Nspire screen: questions that show a drawn TI-Nspire CX II screen ----------
+   (stat results in a Lists & Spreadsheet page, or entries on a Calculator page) and ask what it means */
+const nsFmt = (x) => { if (!isFinite(x)) return 'undef'; if (Math.abs(x) < 1e-12) return '0'; let t = (+x.toPrecision(6)).toString(); if (/e/.test(t)) t = x.toPrecision(6); return t.replace(/^-/, '⁻'); }; // the Nspire shows 6 significant digits and a small raised minus
+const nsR = (x, d) => (Math.round(x * 10 ** d) / 10 ** d).toFixed(d).replace(/^-/, '−');
+// draw the screen. S: { mode: 'DEG'|'RAD', page: 'calc'|'list', lines: [[entry, result]], cols: [[name, values]], stat: [[label, value]] }
+function nsDraw(S) {
+  return (cv) => {
+    const c = cv._ctx, W = 340, H = 250, k = Math.min(cv._w / (W + 20), cv._h / (H + 20)); c.save(); c.translate((cv._w - W * k) / 2, (cv._h - H * k) / 2); c.scale(k, k);
+    const rr = (x, y, w, h, rad) => { c.beginPath(); c.moveTo(x + rad, y); c.arcTo(x + w, y, x + w, y + h, rad); c.arcTo(x + w, y + h, x, y + h, rad); c.arcTo(x, y + h, x, y, rad); c.arcTo(x, y, x + w, y, rad); c.closePath(); };
+    c.fillStyle = '#2b2b2b'; rr(-8, -8, W + 16, H + 16, 12); c.fill(); // the calculator around the screen
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, W, H);
+    // the tab bar: ◀ 1.1 ▶ *Unsaved ▾ … DEG / RAD and the battery
+    c.fillStyle = '#e4e8ee'; c.fillRect(0, 0, W, 22); c.strokeStyle = '#9aa4b1'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, 22.5); c.lineTo(W, 22.5); c.stroke();
+    c.fillStyle = '#fff'; c.strokeStyle = '#8a94a3'; rr(6, 3, 52, 16, 3); c.fill(); c.stroke();
+    c.font = '12px Arial, sans-serif'; c.fillStyle = '#1d1d1b'; c.textBaseline = 'middle'; c.textAlign = 'center'; c.fillText('◀ 1.1 ▶', 32, 11.5);
+    c.textAlign = 'left'; c.fillText('*Unsaved ▾', 66, 11.5);
+    c.textAlign = 'right'; c.font = 'bold 12px Arial, sans-serif'; c.fillStyle = S.mode === 'RAD' ? '#b3261e' : '#1d1d1b'; c.fillText(S.mode || 'DEG', W - 34, 11.5);
+    c.strokeStyle = '#1d1d1b'; c.strokeRect(W - 28, 6, 18, 10); c.fillStyle = '#3a8a3a'; c.fillRect(W - 26, 8, 12, 6); c.fillStyle = '#1d1d1b'; c.fillRect(W - 10, 9, 2, 4);
+    c.font = '14px Arial, sans-serif'; c.fillStyle = '#1d1d1b';
+    if (S.page === 'calc') {
+      let y = 40;
+      for (const [e, v] of S.lines) {
+        c.textAlign = 'left'; c.fillText(e, 8, y); c.textAlign = 'right'; c.fillText(v, W - 8, y + 20);
+        c.strokeStyle = '#c7ccd4'; c.beginPath(); c.moveTo(4, y + 33.5); c.lineTo(W - 4, y + 33.5); c.stroke(); y += 42;
+      }
+      c.textAlign = 'left'; c.fillStyle = '#9aa4b1'; c.fillText('|', 8, y); // the cursor on the next entry line
+    } else {
+      const cols = S.cols || [], cw = [0, 52, 54, 110, 104], x0 = 20, rowH = 18, top = 23;
+      const head = ['A', 'B', 'C', 'D'], names = [...cols.map((x) => x[0]), '', ''].slice(0, 4);
+      let x = x0; c.font = '12px Arial, sans-serif';
+      c.fillStyle = '#eef1f5'; c.fillRect(0, top, W, rowH * 2); c.fillRect(0, top, x0, H - top);
+      for (let j = 0; j < 4; j++) { const w = cw[j + 1]; c.fillStyle = '#1d1d1b'; c.textAlign = 'center'; c.fillText(head[j] + (names[j] ? ' ' + names[j] : ''), x + w / 2, top + rowH / 2); x += w; }
+      // the formula row (◆): the stat command in column C
+      c.textAlign = 'left'; c.fillStyle = '#555'; c.fillText('◆', 6, top + rowH * 1.5); if (S.cmd) { c.font = '11px Arial, sans-serif'; c.fillText(S.cmd, x0 + cw[1] + cw[2] + 3, top + rowH * 1.5); c.font = '12px Arial, sans-serif'; }
+      const n = Math.floor((H - top - rowH * 2) / rowH);
+      for (let i = 0; i < n; i++) {
+        const y = top + rowH * (i + 2.5); c.fillStyle = '#555'; c.textAlign = 'center'; c.fillText(String(i + 1), x0 / 2, y);
+        x = x0; const cells = [cols[0] ? cols[0][1][i] : '', cols[1] ? cols[1][1][i] : '', S.stat && S.stat[i] ? S.stat[i][0] : '', S.stat && S.stat[i] ? S.stat[i][1] : ''];
+        cells.forEach((v, j) => { const w = cw[j + 1]; c.fillStyle = '#1d1d1b'; if (v !== undefined && v !== '') { c.textAlign = j === 2 ? 'left' : 'right'; c.fillText(String(v), j === 2 ? x + 4 : x + w - 4, y); } x += w; });
+      }
+      c.strokeStyle = '#c7ccd4'; c.lineWidth = 1;
+      for (let i = 0; i <= n + 2; i++) { const y = top + rowH * i + 0.5; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+      x = x0; for (let j = 0; j <= 4; j++) { c.beginPath(); c.moveTo(x + 0.5, top); c.lineTo(x + 0.5, H); c.stroke(); x += cw[j + 1] || 0; }
+    }
+    c.restore();
+  };
+}
+const NS_SIZE = [400, 290];
+// least squares
+function nsFit(xs, ys, deg) {
+  const n = xs.length, m = deg + 1, A = Array.from({ length: m }, () => Array(m + 1).fill(0));
+  for (let i = 0; i < n; i++) for (let a = 0; a < m; a++) { for (let b = 0; b < m; b++) A[a][b] += xs[i] ** (a + b); A[a][m] += ys[i] * xs[i] ** a; }
+  for (let p = 0; p < m; p++) { let mx = p; for (let r2 = p + 1; r2 < m; r2++) if (Math.abs(A[r2][p]) > Math.abs(A[mx][p])) mx = r2; [A[p], A[mx]] = [A[mx], A[p]];
+    for (let r2 = 0; r2 < m; r2++) if (r2 !== p) { const f = A[r2][p] / A[p][p]; for (let cc = p; cc <= m; cc++) A[r2][cc] -= f * A[p][cc]; } }
+  return A.map((row, p) => row[m] / row[p]); // [c0, c1, c2]
+}
+const nsCorr = (xs, ys) => { const n = xs.length, mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n; let sxy = 0, sxx = 0, syy = 0; xs.forEach((x, i) => { sxy += (x - mx) * (ys[i] - my); sxx += (x - mx) ** 2; syy += (ys[i] - my) ** 2; }); return sxy / Math.sqrt(sxx * syy); };
+const nsCol = (v) => v.map((x) => nsFmt(x));
+// numbers like 2.36 (to hundredths) as a typed answer
+const nsNum = (label, val, d) => ({ label, val, tol: (0.51 * 10 ** -d) / Math.max(1, Math.abs(val)), key: nsR(val, d).replace('−', '-') });
+
+function nsLinReg(r) {
+  const ctx = pick(r, [['hours studied', 'test score', 'xs', 'ys'], ['years since 2015', 'sales (thousands)', 'year', 'sales'], ['temperature (°F)', 'drinks sold', 'temp', 'drinks'], ['minutes', 'height (cm)', 'mins', 'height']]);
+  const m0 = (ri(r, 8, 45) / 10) * (r() < 0.2 ? -1 : 1), b0 = ri(r, 10, 60), xs = Array.from({ length: 6 }, (_, i) => i + 1 + (ctx[2] === 'temp' ? 60 + i * 4 : 0));
+  const ys = xs.map((x) => Math.round(m0 * x + b0 + (r() - 0.5) * 6 * Math.abs(m0) + (ctx[2] === 'temp' ? -50 * m0 : 0)));
+  const [b, m] = nsFit(xs, ys, 1), rr = nsCorr(xs, ys);
+  const scr = nsDraw({ mode: 'DEG', page: 'list', cols: [[ctx[2], xs.map(String)], [ctx[3], ys.map(String)]], cmd: `=LinRegMx(${ctx[2]},${ctx[3]},1)`,
+    stat: [['Title', 'Linear Re…'], ['RegEqn', 'm*x+b'], ['m', nsFmt(m)], ['b', nsFmt(b)], ['r²', nsFmt(rr * rr)], ['r', nsFmt(rr)], ['Resid', '{…}']] });
+  const kind = pick(r, ['eq', 'eq', 'r', 'pred']), intro = `A student typed data on ${ctx[0]} (x) and ${ctx[1]} (y) into a Lists & Spreadsheet page and ran menu › Statistics › Stat Calculations › Linear Regression (mx+b). The screen is shown.`;
+  const eqT = (mm, bb) => `y = ${nsR(mm, 2)}x ${bb < 0 ? '−' : '+'} ${nsR(Math.abs(bb), 2)}`.replace('+ −', '− ');
+  const base = { topic: 'Reading the TI-Nspire: linear regression', draw: scr, size: NS_SIZE };
+  if (kind === 'eq') { const right = eqT(m, b);
+    return { ...base, stem: `${intro} Write the equation of the line of best fit. Round to the nearest hundredth.`,
+      ...buildChoices(r, right, [eqT(b, m), eqT(rr, b), eqT(m, rr), `y = ${nsR(m, 2)}x`].filter((x) => x !== right), (i) => eqT(m + (i + 1) * 0.1, b)),
+      fr: frNums([nsNum('slope m ≈', m, 2), nsNum('y-intercept b ≈', b, 2)], right),
+      solution: `The screen gives m ≈ ${nsFmt(m)} (the slope) and b ≈ ${nsFmt(b)} (the y-intercept). RegEqn m*x+b means y = mx + b.\nRounded: ${right}` }; }
+  if (kind === 'r') { const right = nsR(rr, 2), str = Math.abs(rr) >= 0.9 ? 'strong' : Math.abs(rr) >= 0.7 ? 'fairly strong' : 'weak', dir = rr > 0 ? 'positive' : 'negative';
+    return { ...base, stem: `${intro} What is the correlation coefficient r, to the nearest hundredth?`,
+      ...buildChoices(r, `r ≈ ${right}`, [`r ≈ ${nsR(rr * rr, 2)}`, `r ≈ ${nsR(m, 2)}`, `r ≈ ${nsR(-rr, 2)}`].filter((x) => x !== `r ≈ ${right}`), (i) => `r ≈ ${nsR(rr - 0.05 * (i + 1), 2)}`),
+      fr: frNums([nsNum('r ≈', rr, 2)], `r ≈ ${right}`),
+      solution: `r is the last number in the results (r² is the one above it, the square of r).\nr ≈ ${right}: a ${str} ${dir} correlation.` }; }
+  const x1 = xs[xs.length - 1] + ri(r, 2, 4), y1 = m * x1 + b;
+  return { ...base, stem: `${intro} Use the line of best fit to predict y when x = ${x1}. Round to the nearest tenth.`,
+    ...buildChoices(r, nsR(y1, 1), [nsR(b * x1 + m, 1), nsR(m * x1, 1), nsR(rr * x1 + b, 1)].filter((x) => x !== nsR(y1, 1)), (i) => nsR(y1 + (i + 1) * 1.3, 1)),
+    fr: frNums([nsNum('y ≈', y1, 1)], nsR(y1, 1)),
+    solution: `From the screen, y = mx + b with m ≈ ${nsFmt(m)} and b ≈ ${nsFmt(b)}.\ny ≈ ${nsFmt(m)}(${x1}) + ${nsFmt(b)} ≈ ${nsR(y1, 1)}` };
+}
+function nsStats(xs) {
+  const s = [...xs].sort((a, b) => a - b), n = s.length, sum = s.reduce((a, b) => a + b), mean = sum / n;
+  const med = (a) => (a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2);
+  const lo = s.slice(0, Math.floor(n / 2)), hi = s.slice(Math.ceil(n / 2)), ss = s.reduce((a, x) => a + (x - mean) ** 2, 0);
+  return { n, sum, sum2: s.reduce((a, x) => a + x * x, 0), mean, sx: Math.sqrt(ss / (n - 1)), px: Math.sqrt(ss / n), min: s[0], q1: med(lo), med: med(s), q3: med(hi), max: s[n - 1] };
+}
+function nsOneVar(r) {
+  const n = ri(r, 7, 10), base0 = ri(r, 20, 80), xs = Array.from({ length: n }, () => base0 + ri(r, -15, 15)), S = nsStats(xs);
+  const ctx = pick(r, ['quiz scores', 'minutes spent on homework', 'heights of plants (cm)', 'points scored in each game']);
+  const scr = nsDraw({ mode: 'DEG', page: 'list', cols: [['data', xs.map(String)]], cmd: '=OneVar(data,1)',
+    stat: [['Title', 'One-Var…'], ['x̄', nsFmt(S.mean)], ['Σx', nsFmt(S.sum)], ['Σx²', nsFmt(S.sum2)], ['sx := sn…', nsFmt(S.sx)], ['σx := σn…', nsFmt(S.px)], ['n', String(S.n)], ['MinX', nsFmt(S.min)], ['Q₁X', nsFmt(S.q1)], ['MedianX', nsFmt(S.med)]] });
+  const ask = pick(r, ['mean', 'sx', 'px', 'med', 'q1']);
+  const A = { mean: ['the mean', S.mean, 'x̄ is the mean.'], sx: ['the sample standard deviation', S.sx, 'sx is the sample standard deviation (σx is for a whole population).'], px: ['the population standard deviation', S.px, 'σx is the population standard deviation (sx is for a sample).'],
+    med: ['the median', S.med, 'MedianX is the median.'], q1: ['the first quartile', S.q1, 'Q₁X is the first quartile.'] }[ask];
+  const right = nsR(A[1], 2), others = [S.mean, S.sum, S.sx, S.px, S.med, S.q1, S.sum2 / S.n].map((v) => nsR(v, 2)).filter((x) => x !== right);
+  return { topic: 'Reading the TI-Nspire: one-variable statistics', draw: scr, size: NS_SIZE,
+    stem: `A student typed ${n} ${ctx} into column A of a Lists & Spreadsheet page and ran menu › Statistics › Stat Calculations › One-Variable Statistics. The screen is shown. What is ${A[0]}? Round to the nearest hundredth.`,
+    ...buildChoices(r, right, others, (i) => nsR(A[1] + (i + 1) * 0.7, 2)),
+    fr: frNums([nsNum(`${A[0][0].toUpperCase()}${A[0].slice(1)} ≈`, A[1], 2)], right),
+    solution: `${A[2]}\nOn the screen it is ${nsFmt(A[1])}, which rounds to ${right}.` };
+}
+function nsQuadReg(r) {
+  const a0 = -ri(r, 2, 6) / 2, h0 = 3, k0 = ri(r, 35, 70), xs = [0, 1, 2, 3, 4, 5, 6].slice(0, ri(r, 6, 7));
+  const ys = xs.map((x) => Math.round((a0 * (x - h0) ** 2 + k0 + (r() - 0.5) * 3) * 10) / 10), [c, b, a] = nsFit(xs, ys, 2);
+  const ctx = pick(r, [['seconds', 'height (ft)', 'sec', 'ht'], ['speed (mph)', 'miles per gallon', 'mph', 'mpg']]);
+  const scr = nsDraw({ mode: 'DEG', page: 'list', cols: [[ctx[2], xs.map(String)], [ctx[3], ys.map(String)]], cmd: `=QuadReg(${ctx[2]},${ctx[3]},1)`,
+    stat: [['Title', 'Quadratic…'], ['RegEqn', 'a*x^2+b*x+c'], ['a', nsFmt(a)], ['b', nsFmt(b)], ['c', nsFmt(c)], ['R²', nsFmt(1 - ys.reduce((s0, y, i) => s0 + (y - (a * xs[i] ** 2 + b * xs[i] + c)) ** 2, 0) / ys.reduce((s0, y) => s0 + (y - ys.reduce((p, q) => p + q) / ys.length) ** 2, 0))], ['Resid', '{…}']] });
+  const T = (A, B, C) => `y = ${nsR(A, 2)}x² ${B < 0 ? '−' : '+'} ${nsR(Math.abs(B), 2)}x ${C < 0 ? '−' : '+'} ${nsR(Math.abs(C), 2)}`.replace(/^y = −/, 'y = −');
+  const right = T(a, b, c);
+  return { topic: 'Reading the TI-Nspire: quadratic regression', draw: scr, size: NS_SIZE,
+    stem: `A student typed data on ${ctx[0]} (x) and ${ctx[1]} (y) into a Lists & Spreadsheet page and ran menu › Statistics › Stat Calculations › Quadratic Regression. The screen is shown. Write the quadratic model. Round each coefficient to the nearest hundredth.`,
+    ...buildChoices(r, right, [T(c, b, a), T(b, a, c), T(a, c, b), T(-a, b, c)].filter((x) => x !== right), (i) => T(a, b + i + 1, c)),
+    fr: frNums([nsNum('a ≈', a, 2), nsNum('b ≈', b, 2), nsNum('c ≈', c, 2)], right),
+    solution: `RegEqn a*x^2+b*x+c means y = ax² + bx + c. The screen gives a ≈ ${nsFmt(a)}, b ≈ ${nsFmt(b)}, c ≈ ${nsFmt(c)}.\nRounded: ${right}` };
+}
+function nsExpReg(r) {
+  const a0 = ri(r, 20, 400), g = pick(r, [1.08, 1.12, 1.15, 1.2, 1.3, 0.85, 0.9]), xs = [0, 1, 2, 3, 4, 5];
+  const ys = xs.map((x) => Math.round(a0 * g ** x * (1 + (r() - 0.5) * 0.06))), [lc0, lc1] = nsFit(xs, ys.map(Math.log), 1), a = Math.exp(lc0), b = Math.exp(lc1), rr = nsCorr(xs, ys.map(Math.log));
+  const ctx = pick(r, [['years', 'population', 'yrs', 'pop'], ['hours', 'bacteria', 'hrs', 'count'], ['years', 'car value ($)', 'yrs', 'value']]);
+  const scr = nsDraw({ mode: 'DEG', page: 'list', cols: [[ctx[2], xs.map(String)], [ctx[3], ys.map(String)]], cmd: `=ExpReg(${ctx[2]},${ctx[3]},1)`,
+    stat: [['Title', 'Exponenti…'], ['RegEqn', 'a*b^x'], ['a', nsFmt(a)], ['b', nsFmt(b)], ['r²', nsFmt(rr * rr)], ['r', nsFmt(rr)], ['Resid', '{…}']] });
+  const T = (A, B) => `y = ${nsR(A, 2)}(${nsR(B, 2)})ˣ`, right = T(a, b), grow = b > 1;
+  return { topic: 'Reading the TI-Nspire: exponential regression', draw: scr, size: NS_SIZE,
+    stem: `A student typed data on ${ctx[0]} (x) and ${ctx[1]} (y) into a Lists & Spreadsheet page and ran menu › Statistics › Stat Calculations › Exponential Regression. The screen is shown. Write the exponential model. Round a and b to the nearest hundredth.`,
+    ...buildChoices(r, right, [T(b, a), T(a, rr), T(a * b, b), `y = ${nsR(a, 2)}x + ${nsR(b, 2)}`].filter((x) => x !== right), (i) => T(a + i + 1, b)),
+    fr: frNums([nsNum('a ≈', a, 2), nsNum('b ≈', b, 2)], right),
+    solution: `RegEqn a*b^x means y = a·bˣ. The screen gives a ≈ ${nsFmt(a)} and b ≈ ${nsFmt(b)}.\nRounded: ${right}. Since b ${grow ? '> 1, it is exponential growth' : '< 1, it is exponential decay'}.` };
+}
+function nsNormal(r) {
+  const mu = pick(r, [50, 70, 75, 100, 500]), sg = pick(r, [mu / 10, mu / 20, 5, 8, 12].map((x) => Math.round(x))), lo = mu - ri(r, 1, 15) * sg / 10 * 2, hi = mu + ri(r, 1, 15) * sg / 10 * 2;
+  const Lo = Math.round(lo), Hi = Math.round(hi), ctx = pick(r, ['test scores', 'heights of corn plants (in.)', 'weights of apples (g)', 'battery lives (hours)']);
+  const kind = pick(r, ['between', 'above', 'below']), z = (x) => (x - mu) / sg, Phi = (x) => 0.5 * (1 + erfJS(x / Math.SQRT2));
+  const p = kind === 'between' ? Phi(z(Hi)) - Phi(z(Lo)) : kind === 'above' ? 1 - Phi(z(Lo)) : Phi(z(Hi));
+  const entry = kind === 'between' ? `normCdf(${Lo},${Hi},${mu},${sg})` : kind === 'above' ? `normCdf(${Lo},9ᴇ999,${mu},${sg})` : `normCdf(⁻9ᴇ999,${Hi},${mu},${sg})`;
+  const scr = nsDraw({ mode: 'DEG', page: 'calc', lines: [[entry, nsFmt(p)]] });
+  const what = kind === 'between' ? `between ${Lo} and ${Hi}` : kind === 'above' ? `greater than ${Lo}` : `less than ${Hi}`;
+  const right = `${nsR(p * 100, 1)}%`;
+  return { topic: 'Reading the TI-Nspire: normal distributions', draw: scr, size: NS_SIZE,
+    stem: `The ${ctx} are normally distributed with mean ${mu} and standard deviation ${sg}. A student used menu › Probability › Distributions › Normal Cdf, and the screen is shown. What percent of the ${ctx} are ${what}? Round to the nearest tenth of a percent.`,
+    ...buildChoices(r, right, [`${nsR((1 - p) * 100, 1)}%`, `${nsR(p, 1)}%`, `${nsR(p * 10, 1)}%`].filter((x) => x !== right), (i) => `${nsR(p * 100 - 2.5 * (i + 1), 1)}%`),
+    fr: { ...frNums([nsNum('Percent ≈', p * 100, 1)], right), fields: [{ kind: 'expr', keys: 'num', label: 'Percent ≈', suffix: '%' }] },
+    solution: `normCdf(lower bound, upper bound, μ, σ) gives the probability: ${nsFmt(p)}.\nAs a percent: ${nsFmt(p)} × 100 ≈ ${right}` };
+}
+const erfJS = (x) => { const t = 1 / (1 + 0.3275911 * Math.abs(x)), y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; };
+function nsMode(r) {
+  const fn = pick(r, ['sin', 'cos', 'tan']), d = ri(r, 12, 78), f = Math[fn], rad = f(d), deg = f((d * Math.PI) / 180);
+  if (Math.abs(rad - deg) < 0.05) return nsMode(r);
+  const scr = nsDraw({ mode: 'RAD', page: 'calc', lines: [[`${fn}(${d})`, nsFmt(rad)]] });
+  const right = nsR(deg, 4), wrongWhy = ['The calculator is in radian mode', 'The calculator is in degree mode', 'The parenthesis should be closed after the function name', 'The calculator rounded too early'];
+  const kind = pick(r, ['why', 'value']);
+  const base = { topic: 'Reading the TI-Nspire: angle mode', draw: scr, size: NS_SIZE };
+  if (kind === 'why') { const c0 = `${wrongWhy[0]}. Set it to Degree; ${fn} ${d}° ≈ ${right}.`;
+    return { ...base, stem: `A student needs ${fn} ${d}° for a right-triangle problem. The TI-Nspire screen is shown. What went wrong, and what is the right value (to four decimal places)?`,
+      ...buildChoices(r, c0, [`${wrongWhy[1]}. Set it to Radian; ${fn} ${d}° ≈ ${nsR(rad, 4)}.`, `Nothing went wrong; ${fn} ${d}° ≈ ${nsR(rad, 4)}.`, `${wrongWhy[0]}. Set it to Degree; ${fn} ${d}° ≈ ${nsR(f(d * 180 / Math.PI), 4)}.`], () => null),
+      fr: frNums([nsNum(`${fn} ${d}° ≈`, deg, 4)], `${right} (the calculator was in radian mode)`),
+      solution: `The top of the screen says RAD, so the calculator took ${d} as ${d} radians, not ${d}°.\nSet ⌂ › Settings › Document Settings › Angle › Degree; then ${fn}(${d}) ≈ ${right}.` }; }
+  return { ...base, stem: `A student finding ${fn} ${d}° got the screen shown. Find the correct value of ${fn} ${d}°, rounded to four decimal places.`,
+    ...buildChoices(r, right, [nsR(rad, 4), nsR(-deg, 4), nsR(1 / deg, 4)].filter((x) => x !== right), (i) => nsR(deg + 0.01 * (i + 1), 4)),
+    fr: frNums([nsNum(`${fn} ${d}° ≈`, deg, 4)], right),
+    solution: `The screen says RAD: the calculator used ${d} radians, so ${nsFmt(rad)} is wrong for ${d}°.\nIn Degree mode, ${fn}(${d}) ≈ ${right}.` };
+}
+// the question types: which sections they go in
+[['nsLinRegA1', nsLinReg, 'algebra1', '4.6 Analyzing Lines of Fit', 'TI-Nspire screen: linear regression', 'Read m, b, and r from the Linear Regression results'],
+ ['nsOneVarA1', nsOneVar, 'algebra1', '8.1 Measures of Center and Variation', 'TI-Nspire screen: one-variable statistics', 'Read the mean, median, or standard deviation from One-Variable Statistics'],
+ ['nsLinRegA2', nsLinReg, 'algebra2', '1.4 Modeling with Linear Functions', 'TI-Nspire screen: linear regression', 'Read m, b, and r from the Linear Regression results'],
+ ['nsQuadRegA2', nsQuadReg, 'algebra2', '2.4 Modeling with Quadratic Functions', 'TI-Nspire screen: quadratic regression', 'Write the model from the Quadratic Regression results'],
+ ['nsExpRegA2', nsExpReg, 'algebra2', '6.7 Modeling with Exponential and Logarithmic Functions', 'TI-Nspire screen: exponential regression', 'Write the model from the Exponential Regression results'],
+ ['nsNormalA2', nsNormal, 'algebra2', '9.1 Using Normal Distributions', 'TI-Nspire screen: Normal Cdf', 'Read a probability from a normCdf entry'],
+ ['nsOneVarACT', nsOneVar, 'act', '7.3 Mean, Median, Mode, and Spread', 'TI-Nspire screen: one-variable statistics', 'Read the mean, median, or standard deviation from One-Variable Statistics'],
+ ['nsModeG', nsMode, 'geometry', '9.4 The Tangent Ratio', 'TI-Nspire screen: wrong angle mode', 'Spot a calculator in radian mode and find the right value'],
+].forEach(([id, f, subject, section, label, desc]) => {
+  if (TEMPLATES[id]) return;
+  TEMPLATES[id] = f;
+  let at = -1; QUESTION_TYPES.forEach((t, i) => { if (t.subject === subject && t.section === section) at = i; });
+  if (at >= 0) QUESTION_TYPES.splice(at + 1, 0, { id, subject, section, label, desc, nspire: true });
+});
+
+/* ---------- More calculator checks on a wrong typed answer ----------
+   exact answer wanted but the student typed the calculator's decimal; or a decimal that's off in the last place (rounded too early) */
+function calcTip(q, a) {
+  const am = angleModeTip(q, a); if (am) return am;
+  if (!q || q.mode !== 'fr' || !q.fr || !Array.isArray(q.fr.key) || !Array.isArray(a)) return '';
+  const strip = (t) => String(t ?? '').replace(/\\circ|°|\^\{?\\circ\}?|\\%|%|\\[,;! ]/g, '').replace(/^\s*[a-zθ]\s*(=|\\approx|≈)\s*/i, '').trim();
+  const words = unM(`${q.stem || ''} ${q.frStem || ''}`);
+  for (let k = 0; k < q.fr.key.length; k++) {
+    const key = String(q.fr.key[k] ?? ''), s = strip(a[k]); if (!s) continue;
+    const dec = /^[−-]?\d*\.(\d+)$/.exec(s.replace('−', '-')); if (!dec) continue;
+    const sv = parseFloat(s.replace('−', '-')), kv = pxConst(key.replace(/^\s*[a-zθ]\s*=\s*/i, '')); if (!isFinite(sv) || !isFinite(kv) || Math.abs(sv - kv) < 1e-9) continue;
+    const dp = dec[1].length, diff = Math.abs(sv - kv);
+    // 1. an exact answer (√, π, e, or a fraction) and the student typed its decimal
+    if (/sqrt|√|pi|π|frac|\/|e\^|\\ln|\\log/.test(key) && !/\./.test(key) && diff <= 0.5 * 10 ** -dp + 1e-9 && dp >= 1)
+      return '🧮 That’s the decimal your calculator gives, and it’s the right value. This question wants the exact answer (with √, π, or a fraction), so don’t press ctrl enter at the end. If your TI-Nspire shows a decimal, work the steps by hand to keep it exact.';
+    // 2. a rounded answer that's off by a little in the last place it asks for
+    const kd = /^[−-]?\d+\.(\d+)$/.exec(key.replace('−', '-')), kdp = kd ? kd[1].length : (/nearest (whole|foot|inch|degree|dollar|meter|mile|percent)|whole number/i.test(words) ? 0 : -1);
+    if (kdp >= 0 && dp >= kdp && diff > 0.5 * 10 ** -kdp && diff <= 3.01 * 10 ** -kdp && diff <= 0.03 * Math.max(1, Math.abs(kv)))
+      return '🧮 Very close! Being off in the last digit usually means a number was rounded in the middle of the problem. Keep every digit until the end: type the whole calculation in one line, or use the last answer (ctrl (−) pastes ans), and round only at the end.';
+    if (kdp >= 0 && dp > kdp + 1 && Math.abs(+sv.toFixed(kdp) - kv) < 1e-9)
+      return `🧮 Close! Now round to the place the question asks for (${kdp === 0 ? 'a whole number' : kdp === 1 ? 'the nearest tenth' : kdp === 2 ? 'the nearest hundredth' : kdp + ' decimal places'}).`;
+  }
+  return '';
+}
+// the last step of a worked example: how to check the answer on the TI-Nspire (non-CAS), when there's a good way
+function nspireCheck(q, t) {
+  const sk = nspireSkills(q), st = unM(`${t.stem || ''}`), disp = unM(String((t.fr && t.fr.display) || (t.choices ? t.choices[t.answer] : '') || ''));
+  const m1 = /^\s*(?:([a-zθ])\s*[=≈]\s*)?([−-]?\d+(?:\.\d+)?(?:\/\d+)?)\s*$/.exec(disp), approx = /≈|\.\d/.test(disp);
+  const vars = (st.match(/\d([a-z])\b|\b([a-z])\s*[+−=-]/g) || []).map((x) => x.replace(/[^a-z]/g, '')).filter((x) => x && x !== 'a' || /\ba\s*[+−=-]/.test(st));
+  const v = m1 && (m1[1] || (/solve for ([a-zθ])\b/i.exec(st) || [])[1] || (new Set(vars).size === 1 ? vars[0] : ''));
+  const one = v && /[=]/.test(st) ? [null, v, m1[2]] : null;
+  if (sk.includes('linreg') || sk.includes('quadreg') || sk.includes('expreg')) { const w = sk.includes('quadreg') ? 'Quadratic' : sk.includes('expreg') ? 'Exponential' : 'Linear (mx+b)';
+    return `Put the data on a Data & Statistics page (xs across, ys up), then menu › Analyze › Regression › Show ${w}. The line or curve it draws should match your equation.`; }
+  if (sk.includes('normal')) return 'Check that it makes sense with the 68-95-99.7 rule: from one standard deviation below the mean to one above should give about 0.68. Then type the normCdf entry again with the bounds in the right order (lower, upper, μ, σ).';
+  if (sk.includes('counting')) return 'menu › Probability › Permutations (nPr) or Combinations (nCr) with the same two numbers should give your answer.';
+  if (sk.includes('invtrig')) return 'Plug your angle back in: with DEG showing, take sin, cos, or tan of your angle. It should give (about) the ratio of the sides you used.';
+  if (/\bsolve\b/i.test(st) && one) {
+    if (!approx) return `Store your answer and test the equation: type ${one[2]}${/^[−-]/.test(one[2]) ? ' (use the (−) key for the negative)' : ''}, press ctrl var (sto→), type ${one[1]}, and press enter. Then type the original equation (= is ctrl =) and press enter. The TI-Nspire says true when your answer checks.`;
+    return 'Graph both sides on a Graphs page: the left side as f1(x) and the right side as f2(x). Then menu › Analyze Graph › Intersection. The x-value should round to your answer.';
+  }
+  if (sk.includes('polyroots')) return 'Graph the polynomial as f1(x), then menu › Analyze Graph › Zero for each place it crosses the x-axis. The zeros should match your answers.';
+  if (sk.includes('matrix')) return 'Store each matrix (type it with the template key, then ctrl var and a letter), then type the operation, like a·b. The result should match your answer.';
+  if (sk.includes('complex')) return 'Type the original expression with i from the π▸ key and press enter. The result should match your answer.';
+  if (sk.length && approx) return 'Type the whole calculation in one line, like the last step above, and press ctrl enter. It should round to your answer. If it doesn’t, check the mode (DEG or RAD) and the parentheses.';
+  return '';
+}
+
 const NSPIRE = {
   mode: { title: 'Set Degree or Radian mode', blank: 'Document Settings', steps: [
     'Press ⌂ (home), then choose Settings › Document Settings.',
@@ -37379,6 +37610,7 @@ function helpPanel(q, i) {
       const btns = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' });
       if (!done) btns.append(el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: () => { H.step = shown; rerenderAt(i); } }, `Next step ▸ (${shown} of ${lines.length})`));
       else btns.append(el('span', { class: 'small', style: 'align-self:center' }, 'Now try your question the same way.'));
+      const chk = done ? nspireCheck(q, t) : ''; if (chk) box.append(el('div', { class: 'small', style: 'margin-top:8px;padding:8px 10px;border-radius:8px;background:#eef4fb;border:1px solid #c9d8ea' }, el('b', {}, '🧮 Check it on your TI-Nspire: '), chk));
       btns.append(el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { H.n = (H.n || 0) + 1; H.ex = H.n; H.step = 0; rerenderAt(i); } }, '🔄 Another example'));
       box.append(btns);
     }
@@ -37461,7 +37693,7 @@ async function checkQ(i) {
   if (q.proofQ) await gradeAllProofs(i);
   const pts = scoreOf(q, a);
   state.flash[i] = '';
-  const am = pts < 1 ? angleModeTip(q, a) : ''; // the right answer, but with the calculator in the wrong angle mode
+  const am = pts < 1 ? calcTip(q, a) : ''; // a calculator slip: wrong angle mode, the decimal of an exact answer, or rounding too early
   const k = perVersion(q), m = (state.misses[i] || 0) + 1, wrong = wrongSoFar(q, i) + 1, total = state.retries + 1;
   if (pts === 1) { state.status[i] = 'correct'; }
   else if (wrong >= total) { state.status[i] = 'locked'; state.misses[i] = m; if (am) state.flash[i] = am; }
@@ -42604,6 +42836,9 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'More TI-Nspire help: when a student types the calculator’s decimal for an exact answer (like 3.464 for 2√3), the assignment says so instead of just “Not quite.” When a rounded answer is off in the last digit, it tells them they probably rounded in the middle and to keep every digit until the end.' },
+  { date: '2026-11-22', text: 'Worked examples now end with “🧮 Check it on your TI-Nspire” when there’s a good way to check: store the answer and test the equation (the calculator says true), graph both sides and find the intersection, plug an angle back in, and so on.' },
+  { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'act'], text: 'New question types that show a TI-Nspire screen and ask what it means: Linear Regression (Algebra I 4.6, Algebra II 1.4), One-Variable Statistics (Algebra I 8.1, ACT 7.3), Quadratic Regression (Algebra II 2.4), Exponential Regression (Algebra II 6.7), Normal Cdf (Algebra II 9.1), and a calculator stuck in radian mode (Geometry 9.4). Search “TI-Nspire screen” in Build an assignment.' },
   { date: '2026-11-22', text: 'Build an assignment has a search box above the list of question types. Type a topic (like “vertical and horizontal lines,” “Law of Sines,” or a section number like 9.4) to see only the question types about it. It searches the names, descriptions, sections, standards, and the wording of the questions.' },
   { date: '2026-11-22', text: 'Hints no longer give away the answer. A hint now stops right before the answer (with a ?) instead of showing the result, even when the answer appears in another form, like a rounded number, part of an equation, or a word answer.' },
   { date: '2026-11-22', text: 'TI-Nspire help (for the non-CAS CX II): a new 🧮 TI-Nspire Homework help choice in Build an assignment shows students the keystrokes and menus for the calculator part of a problem (trig and inverse trig, logs, square roots, regressions and r, one-variable stats, normal distributions, nPr/nCr, matrices, systems, graphing intersections, polynomial roots, and complex numbers). It is on when you check Homework help; uncheck it like the others.' },
