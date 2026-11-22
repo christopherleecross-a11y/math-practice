@@ -35983,6 +35983,205 @@ const norm = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
 // who a student is: their Classroom ID when they picked their name from the list, otherwise the letters of the typed name
 let PREVIEW_ID = 'preview' + Math.random().toString(36).slice(2, 8); // each preview tab starts fresh (New questions picks another)
 const sidOf = (name, rid) => (PREVIEW ? PREVIEW_ID : rid ? 'id' + rid : norm(name));
+/* ---------- TI-Nspire CX II (non-CAS) help: keystrokes for the calculator parts of a problem ----------
+   NSPIRE: each skill's steps. Menus are named, not numbered (the numbers shift between OS versions).
+   blank: the word left blank when a skill is a fill-in note on a lesson's student sheet. */
+const NSPIRE = {
+  mode: { title: 'Set Degree or Radian mode', blank: 'Document Settings', steps: [
+    'Press ⌂ (home), then choose Settings › Document Settings.',
+    'Tab to Angle and pick Degree (for angles in °) or Radian (for angles with π or no ° sign).',
+    'Tab to OK and press enter. The mode shows at the top of the screen: DEG or RAD.'] },
+  trig: { title: 'sin, cos, or tan of an angle', blank: 'trig', steps: [
+    'Check the mode first: DEG for degrees, RAD for radians.',
+    'Press the trig key and pick sin, cos, or tan, then type the angle and close the parenthesis: sin(35).',
+    'Press enter. For sec, csc, or cot, use 1 ÷ cos, 1 ÷ sin, or 1 ÷ tan (they are also in the trig menu).'] },
+  invtrig: { title: 'Find an angle with sin⁻¹, cos⁻¹, or tan⁻¹', blank: 'trig', steps: [
+    'Check the mode: DEG if you want the angle in degrees.',
+    'Press the trig key and pick sin⁻¹, cos⁻¹, or tan⁻¹ (second row of the trig menu).',
+    'Type the ratio as a fraction: press ctrl ÷ for a fraction box, like tan⁻¹(8/5). Press enter.'] },
+  decimal: { title: 'Get a decimal answer', blank: 'ctrl', steps: [
+    'Type the expression. Use ctrl ÷ for a fraction box so the whole numerator and denominator stay together.',
+    'Press ctrl enter (instead of enter) to get the decimal approximation (≈).',
+    'Round only at the end, to the place the question asks for.'] },
+  sqrt: { title: 'Square roots and powers', blank: 'x²', steps: [
+    'For √, press ctrl x² and type what goes under the root: √(5² + 12²).',
+    'For other powers, press ^ and type the exponent, then press ▶ (right arrow) to get back down out of the exponent.',
+    'Press enter, or ctrl enter for a decimal.'] },
+  log: { title: 'log, ln, and eˣ', blank: 'eˣ', steps: [
+    'log (base 10): press ctrl 10ˣ, then type the number: log(25).',
+    'ln: press ctrl eˣ for ln(. eˣ: press the eˣ key and type the exponent.',
+    'Another base: use change of base, log(x) ÷ log(b) (or ln(x) ÷ ln(b)). Press ctrl enter for a decimal.'] },
+  onevar: { title: 'Mean, median, and standard deviation', blank: 'One-Variable', steps: [
+    'Press ⌂, open a Lists & Spreadsheet page, name column A (type data in the very top cell), and type the values down the column.',
+    'Press menu › Statistics › Stat Calculations › One-Variable Statistics, keep 1 list, and pick data as the X1 List. Press enter on OK.',
+    'Read x̄ (mean), sx (sample standard deviation), σx (population), MedianX, Q₁X, Q₃X, MinX, and MaxX.'] },
+  linreg: { title: 'Line of best fit and r (linear regression)', blank: 'Linear Regression', steps: [
+    'Press ⌂, open a Lists & Spreadsheet page. Name column A xs and column B ys (top cells), then type the data.',
+    'Press menu › Statistics › Stat Calculations › Linear Regression (mx+b). Pick xs for X List and ys for Y List, then OK.',
+    'Read m (slope), b (y-intercept), and r (correlation coefficient). The equation is y = mx + b.'] },
+  quadreg: { title: 'Quadratic regression', blank: 'Quadratic Regression', steps: [
+    'Type the data in two named columns on a Lists & Spreadsheet page (xs and ys).',
+    'Press menu › Statistics › Stat Calculations › Quadratic Regression. Pick xs and ys, then OK.',
+    'Read a, b, and c: y = ax² + bx + c. R² tells how well it fits.'] },
+  expreg: { title: 'Exponential regression', blank: 'Exponential Regression', steps: [
+    'Type the data in two named columns on a Lists & Spreadsheet page (xs and ys).',
+    'Press menu › Statistics › Stat Calculations › Exponential Regression. Pick xs and ys, then OK.',
+    'Read a and b: y = a·bˣ. Use r to judge the fit.'] },
+  normal: { title: 'Normal distribution probabilities', blank: 'Normal Cdf', steps: [
+    'On a Calculator page, press menu › Probability › Distributions › Normal Cdf.',
+    'Type the Lower Bound, Upper Bound, μ (mean), and σ (standard deviation). For “no lower bound,” use −9E999; for “no upper bound,” use 9E999 (EE is ctrl EE).',
+    'Press OK. To go backward from a probability to a value, use Inverse Normal in the same menu.'] },
+  counting: { title: 'Factorials, permutations, and combinations', blank: 'Probability', steps: [
+    'On a Calculator page, press menu › Probability.',
+    'Pick Factorial (!), Permutations (nPr), or Combinations (nCr).',
+    'Type the numbers, like nCr(10,3), and press enter.'] },
+  matrix: { title: 'Enter and work with a matrix', blank: 'template', steps: [
+    'Press the template key (the key with the boxes) and pick the m×n matrix. Type the number of rows and columns, then OK.',
+    'Type each entry, pressing tab to move. Press ctrl var (sto→) to store it, like a.',
+    'Add, subtract, or multiply stored matrices with + − × (a × b). For a system, use menu › Matrix & Vector › Reduced Row-Echelon Form.'] },
+  linsys: { title: 'Solve a system of linear equations', blank: 'Solve System', steps: [
+    'On a Calculator page, press menu › Algebra › Solve System of Linear Equations.',
+    'Set the number of equations (2) and the variables (x,y), then OK.',
+    'Type each equation in its box (use = from ctrl =) and press enter. Or graph both lines and find the intersection.'] },
+  graphint: { title: 'Solve by graphing (intersection or zero)', blank: 'Analyze Graph', steps: [
+    'Press ⌂, open a Graphs page. Type the left side as f1(x) and press enter; type the right side as f2(x).',
+    'Press menu › Window/Zoom › Zoom - Fit (or Zoom - Standard) if you can’t see where they cross.',
+    'Press menu › Analyze Graph › Intersection (or Zero for a single graph). Click to the left of the point, then to the right. Read x.'] },
+  polyroots: { title: 'Zeros of a polynomial', blank: 'Polynomial Tools', steps: [
+    'On a Calculator page, press menu › Algebra › Polynomial Tools › Find Roots of Polynomial.',
+    'Set the degree, pick Real (or Complex), and type the coefficients from highest power down, using 0 for any missing power.',
+    'Press OK. Check each root by graphing: the zeros are where the graph crosses the x-axis.'] },
+  complex: { title: 'Complex numbers', blank: 'π▸', steps: [
+    'Type i by pressing the π▸ key and picking i (not the letter i).',
+    'Type the expression with parentheses, like (3 + 2i)(4 − i). Press enter.',
+    'The answer comes out in a + bi form. For division, use ctrl ÷ for a fraction box.'] },
+};
+// the one-line version for a lesson's TV slide and student sheet: [text with one ________, the missing word]
+const NSPIRE_SHEET = {
+  mode: ['Set the angle mode: ⌂ › Settings › ________ Settings › Angle › MODE. The top of the screen shows ABBR.', 'Document'],
+  trig: ['Press the ________ key for sin, cos, or tan. Type the angle, close the parenthesis, and press enter.', 'trig'],
+  invtrig: ['Press the trig key for sin⁻¹, cos⁻¹, or tan⁻¹ and type the ratio. ctrl ÷ makes a ________ box.', 'fraction'],
+  decimal: ['Press ________ enter to get a decimal (≈) instead of an exact answer. Round only at the end.', 'ctrl'],
+  sqrt: ['For a square root, press ctrl ________. For other powers, press ^, type the exponent, then ▶ to get back down.', 'x²'],
+  log: ['log is ctrl 10ˣ and ln is ctrl ________. For another base, divide: log(x) ÷ log(b).', 'eˣ'],
+  onevar: ['Type the data in a Lists & Spreadsheet column, then menu › Statistics › Stat Calculations › ________ Statistics.', 'One-Variable'],
+  linreg: ['Type x and y in two named columns, then menu › Statistics › Stat Calculations › ________ Regression (mx+b). Read m, b, and r.', 'Linear'],
+  quadreg: ['Type x and y in two named columns, then menu › Statistics › Stat Calculations › ________ Regression. Read a, b, and c.', 'Quadratic'],
+  expreg: ['Type x and y in two named columns, then menu › Statistics › Stat Calculations › ________ Regression. Read a and b.', 'Exponential'],
+  normal: ['menu › Probability › Distributions › Normal ________. Type the lower bound, upper bound, μ, and σ.', 'Cdf'],
+  counting: ['menu › ________ › Factorial (!), Permutations (nPr), or Combinations (nCr).', 'Probability'],
+  matrix: ['Press the ________ key (the boxes) and pick the matrix. ctrl var stores it with a name.', 'template'],
+  linsys: ['menu › Algebra › Solve System of ________ Equations. Type each equation in its own box.', 'Linear'],
+  graphint: ['Graph each side as f1(x) and f2(x), then menu › Analyze Graph › ________. Click left of the point, then right.', 'Intersection'],
+  polyroots: ['menu › Algebra › Polynomial Tools › Find ________ of Polynomial. Type the coefficients, with 0 for a missing power.', 'Roots'],
+  complex: ['Type i with the ________ key (not the letter i).', 'π▸'],
+};
+// a lesson plan with an "On the TI-Nspire" note right before the first example that needs the calculator
+// (a TV slide and a fill-in on the student sheet, like the other notes). Left alone if the plan already has one.
+function nspirePlan(L) {
+  if (!L || !Array.isArray(L.steps) || L._nspire !== undefined) return L;
+  const mine = L.steps.flatMap((st) => st.notes || []);
+  if (mine.some((n) => /TI-Nspire/i.test(n.t || ''))) return L;
+  for (let i = 0; i < L.steps.length; i++) {
+    const st = L.steps[i];
+    for (const x of st.show || []) {
+      if (!/^Example/.test(x.label || '') || !x.fixed) continue;
+      const f = x.fixed, txt = unM(`${f.topic || ''} ${f.stem || ''} ${f.solution || ''} ${f.display || ''}`), sk = nspireSkillsText(txt).filter((k) => NSPIRE_SHEET[k]).slice(0, 2);
+      if (!sk.length) continue;
+      const deg = /°/.test(txt) || !/π|radian/i.test(txt);
+      const lines = sk.map((k) => NSPIRE_SHEET[k][0].replace('MODE', deg ? 'Degree' : 'Radian').replace('ABBR', deg ? 'DEG' : 'RAD'));
+      const ans = sk.map((k) => NSPIRE_SHEET[k][1]), stem = lines.join('\n');
+      let full = stem; ans.forEach((a) => { full = full.replace('________', a); });
+      const note = { t: 'On the TI-Nspire', stem, ans, full, before: x.label, nspire: true };
+      const steps = L.steps.map((s, j) => (j === i ? { ...s, notes: [...(s.notes || []), note] } : s));
+      return Object.defineProperty({ ...L, steps }, '_nspire', { value: true });
+    }
+  }
+  return Object.defineProperty({ ...L }, '_nspire', { value: false });
+}
+// which skills fit a question: from the wording of a sample of the question type (cached)
+const NSPIRE_TYPE = {};
+function nspireSkills(q) {
+  const id = q && q.tpl; if (!id || !TEMPLATES[id]) return [];
+  if (NSPIRE_TYPE[id]) return NSPIRE_TYPE[id];
+  const t = QUESTION_TYPES.find((x) => x.id === id) || QUESTION_TYPES.find((x) => x.id === String(id).replace(/^ap_/, '')) || {};
+  let txt = `${t.label || ''} ${t.desc || ''} ${t.section || ''}`;
+  for (let s = 1; s <= 3; s++) { try { const x = TEMPLATES[id](mulberry32(4242 + s)); txt += ` ${unM(x.stem || '')} ${unM(x.solution || '')}`; } catch (e) {} }
+  return (NSPIRE_TYPE[id] = nspireSkillsText(txt));
+}
+function nspireSkillsText(txt) {
+  const has = (re) => re.test(txt), approx = has(/≈|nearest (tenth|hundredth|thousandth|degree|whole)|decimal|round|use (a |your )?(graphing )?calculator|technology/i);
+  const out = [];
+  if (has(/regression|line of (best )?fit|correlation coefficient|residual/i)) out.push(has(/quadratic regression|parabola of best/i) ? 'quadreg' : has(/exponential regression|exponential model.*data/i) ? 'expreg' : 'linreg');
+  if (has(/normal(ly)? distribut|z-score|standard normal|normalcdf/i)) out.push('normal');
+  if (has(/standard deviation|mean absolute|interquartile|five-number|box-and-whisker/i) && !out.includes('normal')) out.push('onevar');
+  if (has(/permutation|\bnPr\b|\bnCr\b|factorial|\b\d+!|combinations? (of|from) \d+|how many (different )?(ways|groups|committees|arrangements)/i) && !has(/combinations? of (two )?functions|linear combination/i)) out.push('counting');
+  if (has(/matri(x|ces)/i)) out.push('matrix');
+  if (has(/(sin|cos|tan|sec|csc|cot)⁻¹|arc(sin|cos|tan)|inverse (sine|cosine|tangent|trig)|find (the )?(measure of )?(the )?angle|angle of (elevation|depression)/i) && approx) out.push('mode', 'invtrig');
+  else if (has(/\b(sin|cos|tan|sec|csc|cot)\s?\(?\s?[\dθx−-]/i) && approx) out.push('mode', 'trig');
+  if (has(/\b(ln|log)\b|eˣ|e\^|\be[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]|logarithm/i) && approx) out.push('log');
+  if (has(/system of (linear )?equations|solve the system/i) && approx) out.push('linsys');
+  if (has(/complex number|imaginary|\ba \+ bi\b/i) && !has(/vector/i)) out.push('complex');
+  if (has(/graphing calculator|using technology|with technology|by graphing/i) && has(/solve|intersect|zero|solution/i) && !out.includes('matrix')) out.push('graphint');
+  if (has(/(all|real|rational) zeros|zeros of the (polynomial|function)|roots of the polynomial/i) && has(/polynomial|x[³⁴⁵]/)) out.push('polyroots');
+  if (!out.length && approx && has(/√/)) out.push('sqrt');
+  if (!out.length && approx && has(/π/)) out.push('decimal');
+  return [...new Set(out)].slice(0, 3);
+}
+// the help panel
+function nspireBox(q) {
+  const sk = nspireSkills(q); if (!sk.length) return '';
+  const qt = unM(`${q.stem || ''} ${q.solution || ''} ${q.fr && q.fr.display || ''}`), deg = /°/.test(qt) || !/π|radian/i.test(qt);
+  return el('div', { class: 'helpbox' }, el('div', { class: 'helphead' }, '🧮 On your TI-Nspire'),
+    ...sk.map((k) => el('div', { style: 'margin:6px 0' }, el('div', { style: 'font-weight:700' }, NSPIRE[k].title + (k === 'mode' ? (deg ? ': use Degree' : ': use Radian') : '')),
+      el('ol', { style: 'margin:4px 0 0;padding-left:22px' }, ...NSPIRE[k].steps.map((s) => el('li', { style: 'margin:2px 0' }, s))))),
+    el('div', { class: 'small', style: 'margin-top:4px' }, 'These are for the TI-Nspire CX II (non-CAS). The calculator finds numbers; show the setup on your paper.'));
+}
+
+/* ---------- Wrong angle mode: does the student's wrong answer match the right answer worked with the calculator in the other mode? ----------
+   Each question remembers the random numbers it was made from (q._rv), so it can be made again with sin, cos, tan and their
+   inverses switched to the other mode, and the student's answer checked against that version. */
+function recRng(rr) { const vals = []; const f = () => { const v = rr(); vals.push(v); return v; }; f.vals = vals; return f; }
+// the same question worked with the calculator in the other angle mode. dir 1: RADIAN mode on a degree problem; −1: DEGREE mode on a radian problem
+function altModeQ(q, dir) {
+  if (!q || !q._rv || !TEMPLATES[q.tpl]) return null;
+  const M = Math, real = { sin: M.sin, cos: M.cos, tan: M.tan, asin: M.asin, acos: M.acos, atan: M.atan };
+  const f = dir === 1 ? 180 / M.PI : M.PI / 180, g = 1 / f;
+  try {
+    ['sin', 'cos', 'tan'].forEach((k) => { M[k] = (x) => real[k](x * f); });
+    ['asin', 'acos', 'atan'].forEach((k) => { M[k] = (v) => real[k](v) * g; });
+    let n = 0; const rep = () => { if (n < q._rv.length) return q._rv[n++]; throw new Error('used up'); }; // never loop on made-up numbers
+    return applyMode(TEMPLATES[q.tpl](rep), q.fmt);
+  } catch (e) { return null; } finally { Object.assign(M, real); }
+}
+function angleModeTip(q, a) {
+  if (!q || !q._rv || a == null || !nspireSkills(q).includes('mode')) return '';
+  for (const dir of [1, -1]) {
+    const alt = altModeQ(q, dir); if (!alt) continue;
+    let hit = false;
+    try {
+      if (q.mode === 'fr') hit = alt.mode === 'fr' && scoreOf(alt, a) === 1;
+      else if (Array.isArray(q.choices) && Array.isArray(alt.choices)) hit = unM(q.choices[a]) === unM(alt.choices[alt.answer]) && unM(alt.choices[alt.answer]) !== unM(q.choices[q.answer]);
+    } catch (e) { hit = false; }
+    if (hit) return dir === 1 ? '🧮 Your answer is what a calculator in RADIAN mode gives. This problem uses degrees: set your TI-Nspire to Degree (⌂ › Settings › Document Settings › Angle) and try again.'
+      : '🧮 Your answer is what a calculator in DEGREE mode gives. This problem uses radians: set your TI-Nspire to Radian (⌂ › Settings › Document Settings › Angle) and try again.';
+  }
+  return '';
+}
+// multiple choice: make one wrong choice the wrong-mode answer, so a student with the calculator in the wrong mode finds their number and gets the tip
+function modeDistractor(q) {
+  if (!q || q.mode !== 'mc' || !Array.isArray(q.choices) || q.choices.length < 3 || typeof q.choices[q.answer] !== 'string' || !nspireSkills(q).includes('mode')) return q;
+  const right = unM(q.choices[q.answer]);
+  for (const dir of [1, -1]) {
+    const alt = altModeQ(q, dir), t = alt && Array.isArray(alt.choices) ? alt.choices[alt.answer] : null;
+    if (typeof t !== 'string' || /NaN|Infinity|undefined/.test(t) || unM(t) === right || q.choices.some((c) => unM(c) === unM(t))) continue;
+    if (/[−-]\s?\d/.test(t) && !/[−-]\s?\d/.test(right)) continue; // a negative length or angle would give itself away
+    const k = q.choices.findIndex((c, i) => i !== q.answer && i === (q.answer + 1) % q.choices.length);
+    if (k >= 0) { q._choices0 = q.choices.slice(); q.choices[k] = t; }
+    break;
+  }
+  return q;
+}
 function generate(setKey, period, sid, attempt = 1) {
   // same: true → one version for the whole class (retries and new attempts are also the same for everyone)
   const who = setting(setKey, 'same') ? 'everyone' : `${period}|${sid}`;
@@ -35993,7 +36192,7 @@ function generate(setKey, period, sid, attempt = 1) {
   const gen = SETS[setKey].gen || 1, seen = {};
   for (const [tpl, count, mode, b] of SETS[setKey].items) for (let i = 0; i < count; i++) {
     const n = (seen[tpl] = (seen[tpl] || 0) + 1), rr = gen >= 2 ? mulberry32(cyrb53(`${seedStr}|${tpl}#${n}`)) : r;
-    const q = applyMode(TEMPLATES[tpl](rr), mode); q.tpl = tpl; q.fmt = mode; if (b === 'b') q.bonus = true; qs.push(q);
+    const rec = recRng(rr), q = applyMode(TEMPLATES[tpl](rec), mode); q.tpl = tpl; q.fmt = mode; q._rv = rec.vals; modeDistractor(q); if (b === 'b') q.bonus = true; qs.push(q);
   }
   if (qs.some(isBonus)) { // bonus questions always come last (mixed up among themselves if the order is mixed)
     const reg = qs.filter((q) => !q.bonus), bon = qs.filter(isBonus);
@@ -36005,20 +36204,20 @@ function generate(setKey, period, sid, attempt = 1) {
 }
 // a fresh version of question i for retry number t (same type and format, new numbers)
 function regenQuestion(seedStr, old, i, t) {
-  const q = applyMode(TEMPLATES[old.tpl](mulberry32(cyrb53(`${seedStr}|q${i}|r${t}`))), old.fmt);
-  q.tpl = old.tpl; q.fmt = old.fmt; if (old.bonus) q.bonus = true;
+  const rec = recRng(mulberry32(cyrb53(`${seedStr}|q${i}|r${t}`))), q = applyMode(TEMPLATES[old.tpl](rec), old.fmt);
+  q.tpl = old.tpl; q.fmt = old.fmt; q._rv = rec.vals; modeDistractor(q); if (old.bonus) q.bonus = true;
   return q;
 }
-// Homework help parts: h = Hint, e = Worked example, n = Notes, v = Video. true / '1' = all four.
+// Homework help parts: h = Hint, e = Worked example, n = Notes, v = Video, c = TI-Nspire steps. true / '1' = all of them.
 // Links made before Video was its own choice showed the video with the Worked example, so they still do: a string with e,
 // no v, and no '-' is one of those. The builder marks newer links that have e without v with a '-'.
 function helpOf(v) {
-  if (v === true || v === '1') return 'henv';
+  if (v === true || v === '1') return 'henvc';
   if (typeof v !== 'string') return '';
   const old = v.includes('e') && !v.includes('v') && !v.includes('-');
-  return [...'henv'].filter((c) => v.includes(c) || (c === 'v' && old)).join('');
+  return [...'henvc'].filter((c) => v.includes(c) || (c === 'v' && old)).join('');
 }
-function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Worked example'], ['n', 'Notes'], ['v', 'Video']].filter(([c]) => h.includes(c)).map(([, t]) => t).join(', ') : 'no'; }
+function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Worked example'], ['n', 'Notes'], ['v', 'Video'], ['c', 'TI-Nspire steps']].filter(([c]) => h.includes(c)).map(([, t]) => t).join(', ') : 'no'; }
 const setting = (setKey, name) => {
   const v = SETS[setKey][name];
   if (v !== undefined) return v;
@@ -36488,7 +36687,7 @@ function saveState() {
     frozen: state.frozen, leaveBase: state.leaveBase, unlocks: state.unlocks, misses: state.misses });
 }
 // fingerprint of a question (before any retries), so saved work follows its question if the assignment is edited
-const qSig = (q) => q.tpl + ':' + cyrb53(unM(String(q.stem)) + '|' + unM((q.choices || []).join('|'))).toString(36);
+const qSig = (q) => q.tpl + ':' + cyrb53(unM(String(q.stem)) + '|' + unM((q._choices0 || q.choices || []).join('|'))).toString(36); // _choices0: before the wrong-mode choice, so saved work still matches
 // the assignment changed since this student saved (questions added, removed, or reordered):
 // keep each saved answer with the question it belongs to and drop answers to questions that are gone
 function remapSaved(key, saved, sig) {
@@ -37041,6 +37240,8 @@ function hintBar(q, i) {
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); if (h.ex) { h.ex = 0; } else { h.ex = (h.n || 0) + 1; h.n = h.ex; h.step = 0; if (!state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } } rerenderAt(i); } }, H.ex ? '📘 Hide example' : '📘 Worked example'));
     if (on('v') && practiceVideos(q, () => rerenderAt(i)).length) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.vid = !h.vid; if (h.vid && !state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } rerenderAt(i); } }, H.vid ? '🎬 Hide video' : '🎬 Video'));
+    if (on('c') && nspireSkills(q).length) row.append(el('button', { class: 'btn secondary' + (H.calc ? ' on' : ''), type: 'button', style: sm, title: 'The keystrokes for the calculator part of this problem',
+      onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.calc = !h.calc; rerenderAt(i); } }, H.calc ? '🧮 Hide TI-Nspire' : '🧮 TI-Nspire'));
     if (on('n') && lessonFor(q.tpl)) row.append(el('button', { class: 'btn secondary', type: 'button', style: sm, title: 'Review the notes and class examples for this section',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.notes = !h.notes; rerenderAt(i); if (h.notes && !STU_DEMOS) stuDemosLoad().then(() => { if (HELP[i] && HELP[i].notes) rerenderAt(i); }); } }, H.notes ? '📖 Hide notes' : '📖 Notes'));
     if (row.childNodes.length) bar.append(row);
@@ -37155,6 +37356,7 @@ function helpPanel(q, i) {
         ...vs.map((x, k) => el('button', { class: 'btn secondary' + (x === v ? ' on' : ''), type: 'button', style: 'margin:0;padding:4px 12px;font-size:14px' + (x === v ? ';background:#692b31;color:#fff' : ''), onclick: () => { H.vk = k; rerenderAt(i); } }, x.pick || String(k + 1)))) : '';
       wrap.append(el('div', { class: 'helpbox' }, el('div', { class: 'helphead' }, `🎬 Video: ${v.title} (a problem like yours, different numbers)`), pick, P.wrap)); }
   }
+  if (H.calc) wrap.append(nspireBox(q));
   if (H.notes) {
     const k = lessonFor(q.tpl), L = k && LESSONS[k], box = el('div', { class: 'helpbox notes' });
     if (L) {
@@ -37202,7 +37404,7 @@ function checkBar(q, i) {
   if (st === 'kept') { bar.append(el('span', { class: 'tag good' }, `✓ Correct on attempt ${state.carry && state.carry[i] ? state.carry[i].from : ''} — kept`)); return bar; }
   if (!state.retries) return el('span');
   if (st === 'correct') { const w = wrongSoFar(q, i); bar.append(el('span', { class: 'tag good' }, w ? `Correct on try ${w + 1}` : 'Correct')); }
-  else if (st === 'locked') bar.append(el('span', { class: 'tag ' + (scoreOf(q, state.answers[i]) > 0 ? 'part' : 'bad') }, scoreOf(q, state.answers[i]) > 0 ? 'Out of tries (½ credit)' : 'Out of tries'));
+  else if (st === 'locked') { bar.append(el('span', { class: 'tag ' + (scoreOf(q, state.answers[i]) > 0 ? 'part' : 'bad') }, scoreOf(q, state.answers[i]) > 0 ? 'Out of tries (½ credit)' : 'Out of tries')); if (state.flash[i]) bar.append(el('div', { class: 'flash' }, state.flash[i])); }
   else if (!state.submitted) {
     const k = perVersion(q), m = (state.misses && state.misses[i]) || 0, total = state.retries + 1 - wrongSoFar(q, i), left = total > k - m ? 1 : 0;
     const btn = el('button', { class: 'btn checkbtn', type: 'button' }, 'Check');
@@ -37218,14 +37420,15 @@ async function checkQ(i) {
   if (q.proofQ) await gradeAllProofs(i);
   const pts = scoreOf(q, a);
   state.flash[i] = '';
+  const am = pts < 1 ? angleModeTip(q, a) : ''; // the right answer, but with the calculator in the wrong angle mode
   const k = perVersion(q), m = (state.misses[i] || 0) + 1, wrong = wrongSoFar(q, i) + 1, total = state.retries + 1;
   if (pts === 1) { state.status[i] = 'correct'; }
-  else if (wrong >= total) { state.status[i] = 'locked'; state.misses[i] = m; }
+  else if (wrong >= total) { state.status[i] = 'locked'; state.misses[i] = m; if (am) state.flash[i] = am; }
   else if (m < k) { // typed answer: more Checks on this same version before new numbers
     state.misses[i] = m;
     const left = total - wrong, more = k - m < left;
     const near = q.mode === 'fr' && q.fr && q.fr.near && Array.isArray(a) ? q.fr.near(cleanAns(a)) : '';
-    state.flash[i] = `${near ? near + ' ' : ''}Not quite. Check your work and try again — ${left} ${left === 1 ? 'try' : 'tries'} left${more ? `; new numbers after ${k - m} more ${k - m === 1 ? 'miss' : 'misses'}` : ''}.`;
+    state.flash[i] = `${am ? am + ' ' : near ? near + ' ' : ''}Not quite. Check your work and try again — ${left} ${left === 1 ? 'try' : 'tries'} left${more ? `; new numbers after ${k - m} more ${k - m === 1 ? 'miss' : 'misses'}` : ''}.`;
   }
   else {
     delete state.misses[i]; state.fresh[i] = true;
@@ -37234,7 +37437,7 @@ async function checkQ(i) {
     state.qs[i] = regenQuestion(state.seedStr, q, i, state.tries[i]);
     state.answers[i] = null;
     delete state.drawings[String(i)]; delete state.drawings['L' + i]; saveDrawings();
-    state.flash[i] = `🔄 New numbers! This question just changed — solve the new version. Your last try and its worked-out solution are shown above.`;
+    state.flash[i] = `${am ? am + ' ' : ''}🔄 New numbers! This question just changed — solve the new version. Your last try and its worked-out solution are shown above.`;
   }
   saveState();
   rerenderAt(i);
@@ -39499,6 +39702,7 @@ function lpSheetPart(x) {
   return '';
 }
 function lpWithIcan(L, key) {
+  L = nspirePlan(L);
   const steps = L.steps.map((s) => ({ ...s })), bi = Math.max(0, steps.findIndex((s) => /bell ringer/i.test(s.name)));
   // a vocabulary word whose step was removed in the editor (e.g. the discovery) still gets its slide: at the start of the first later step with examples
   const covered = new Set(steps.flatMap((s) => (s.vocab || []).map((v) => v.t)));
@@ -42296,7 +42500,7 @@ async function sheetFromPlan(key, which) {
   let spec;
   try { spec = await (await fetch(`handouts/${key}/sheet.json`, { cache: 'no-cache' })).json(); }
   catch (e) { win.document.body.innerHTML = '<p style="font:16px system-ui;margin:40px">Couldn’t load this sheet’s layout. Printing the original instead…</p>'; win.location.href = `handouts/${key}/${which}.pdf`; return; }
-  const L = lessonOf(key), O = LESSONS[key] || L, all = (P) => P.steps.flatMap((st) => st.show || []);
+  const L = nspirePlan(lessonOf(key)), O = LESSONS[key] || L, all = (P) => P.steps.flatMap((st) => st.show || []);
   const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const blank = (t, d) => { const r = lpVocabBlank(t, d); return r && r.at >= 0 ? d.slice(0, r.at) + '_'.repeat(Math.max(10, r.ans.length + 3)) + d.slice(r.at + r.ans.length) : '_'.repeat(34); };
   // the original notes as printed, by title (kept word for word when you didn't change them)
@@ -42349,6 +42553,7 @@ async function sheetFromPlan(key, which) {
 function lpPrintBtn(key, x, attrs, label) {
   const m = /handouts\/([^/]+)\/(student-sheet|exit-tickets)\.pdf$/.exec(x.file || '');
   if (m && LESSON_EDITS.data[key]) return el('a', { ...attrs, href: x.file, title: 'Built from your edited plan', onclick: (e) => { e.preventDefault(); sheetFromPlan(m[1], m[2]); } }, label + ' ✏️');
+  if (m && m[2] === 'student-sheet' && nspirePlan(lessonOf(key))._nspire) return el('a', { ...attrs, href: x.file, title: 'Includes the “On the TI-Nspire” steps', onclick: (e) => { e.preventDefault(); sheetFromPlan(m[1], m[2]); } }, label + ' 🧮');
   return el('a', { ...attrs, href: x.file, target: '_blank', rel: 'noopener' }, label);
 }
 /* ==== LESSON PLANS END ==== */
@@ -42358,6 +42563,9 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'TI-Nspire help (for the non-CAS CX II): a new 🧮 TI-Nspire Homework help choice in Build an assignment shows students the keystrokes and menus for the calculator part of a problem (trig and inverse trig, logs, square roots, regressions and r, one-variable stats, normal distributions, nPr/nCr, matrices, systems, graphing intersections, polynomial roots, and complex numbers). It is on when you check Homework help; uncheck it like the others.' },
+  { date: '2026-11-22', subjects: ['geometry', 'precalc', 'apcalc', 'act'], text: 'Degree/radian check: when a student’s wrong answer is exactly what a calculator in the wrong angle mode gives, the assignment tells them to switch their TI-Nspire to Degree (or Radian) and shows where the setting is. On multiple-choice trig questions, one wrong choice is now the wrong-mode answer, so that mistake gets caught too.' },
+  { date: '2026-11-22', text: 'Lesson plans: when a lesson’s examples need the calculator, an “On the TI-Nspire” slide now comes right before the first of those examples, with a matching fill-in on the student sheet (print it with 🖨 Student sheet 🧮).' },
   { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Results dashboard: a new 📋 Scores by standard card shows how each period (and each student) is doing on every Oklahoma standard, priority standards first. Click a standard for its wording, the students below 70%, and the question types behind it.' },
   { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Year at a glance: a 📍 Pacing check compares where each period is (its newest assignment) with where the guide says to be today.' },
   { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'New Year at a glance tab: the district’s pacing guide for each of your courses, by quarter and unit, with each unit’s priority, supporting, and recurring standards, its unit-plan Google Doc, its book sections (with lesson plans), and a 🧩 Build a unit review button. The current quarter is outlined. In Build an assignment, ★ marks a priority standard.' },
@@ -42427,7 +42635,7 @@ function helpScreen(open) {
     ['build', '3. Build your own assignment (quizzes, reviews, tests)', [
       OL([B('Build an assignment'), ' tab. Type a title and pick the subject (that’s the gradebook tab the scores go to).'],
         ['Open a chapter, then a section, and type how many of each question type you want. ', B('Preview'), ' shows a sample. ', B('★ Bonus'), ' adds extra-credit questions at the end. Under each question type, ', B('📋 OAS'), ' shows its Oklahoma Academic Standards objective; click it (or point at it) to read the objective’s wording.'],
-        ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints, worked examples, videos, and notes — pick any of them, and leave it off for tests), and the Desmos calculator.'],
+        ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints, worked examples, videos, TI-Nspire steps, and notes — pick any of them, and leave it off for tests), and the Desmos calculator.'],
         ['Click ', B('Try it as a student'), ' to see exactly what students will get. Nothing you do there is graded.'],
         ['Click ', B('Copy link'), ' or ', B('📤 Assign in Google Classroom'), ' (next step).']),
       P('To change one later: ', B('Edit an assignment you already made'), ' at the top of the same tab.')]],
@@ -42445,6 +42653,7 @@ function helpScreen(open) {
       P(B('Print'), ': paper copies of any assignment, in one or more versions, with an answer key (and worked solutions if you want them). Handy for a sub or a day without Chromebooks.')]],
     ...(hasLessons ? [['lessons', '7. Lesson plans', [
       P('The ', B('Lesson plans'), ' tab has a 45-minute plan for each section (some also have a 30-minute version), with examples to put on the TV, printable student sheets and exit tickets, a catch-up page for students who missed class, and vocabulary flashcards. ', B('Edit lesson plan'), ' saves your changes in your Sheet, so they show on every computer.'),
+      P(B('🧮 TI-Nspire slides: '), 'when a lesson’s examples need the calculator (trig, logs, square roots, regression, normal distributions, matrices, and so on), the plan has an ', B('On the TI-Nspire'), ' note right before the first of those examples: a TV slide with the keystrokes and a matching fill-in on the student sheet. Those plans’ ', B('🖨 Student sheet 🧮'), ' button builds the sheet with that note in it. If your own notes already include a “TI-Nspire” note, the plan uses yours instead.'),
       P(B('Adding an interactive: '), 'open the plan, click ', B('✏️ Edit this plan'), ', and scroll to ', B('Interactives'), '. Click ', B('+ Add an interactive'), ', pick it, and pick the TV screen it should come right before. Save. It shows on the TV in class, in the ', B('📖 Notes'), ' on students’ assignments for that section (turn on Homework help › Notes when you build the assignment), and on the catch-up page.')]]] : []),
     ['yag', 'Year at a glance (pacing guide)', [
       P('The ', B('Year at a glance'), ' tab shows the district’s pacing guide for each of your courses: every quarter’s units, how many days each gets, and its ', B('Priority'), ', ', B('Supporting'), ', and ', B('Recurring'), ' standards. Click a unit’s standards to read them. The current quarter is outlined.'),
@@ -43239,10 +43448,10 @@ function builder() {
   const desmosIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   const moreIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   moreIn.checked = !!saved.more;
-  const helpIns = { h: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), e: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), n: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), v: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }) };
-  const helpNow = () => [...'henv'].filter((c) => helpIns[c].checked).join('');
-  const syncHelp = () => { const h = helpNow(); hintsIn.checked = !!h; hintsIn.indeterminate = !!h && h.length < 4; };
-  for (const c of 'henv') helpIns[c].checked = helpOf(saved.hints).includes(c);
+  const helpIns = { h: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), e: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), n: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), v: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), c: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }) };
+  const helpNow = () => [...'henvc'].filter((c) => helpIns[c].checked).join('');
+  const syncHelp = () => { const h = helpNow(); hintsIn.checked = !!h; hintsIn.indeterminate = !!h && h.length < 5; };
+  for (const c of 'henvc') helpIns[c].checked = helpOf(saved.hints).includes(c);
   syncHelp();
   desmosIn.checked = !!saved.desmos;
   const shareIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
@@ -43392,8 +43601,8 @@ function builder() {
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
       el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Then use Try it as a student to swap any question for a new version until it’s exactly what you want. Unchecked = a different version for each student.')),
     el('label', {}, 'Homework help'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
-      el('span', { class: 'small' }, 'Adds homework help to every question: a Hint (the first step, with the answer hidden), a Worked example (a twin problem with different numbers, solved one step at a time), a Video (a narrated walkthrough of a problem like theirs), and Notes (the section’s lesson notes, class examples, and interactives, when there is a lesson plan). Help never changes the score; the gradebook marks each question where a hint, worked example, or video was used. Leave it off for quizzes and tests.')),
-    el('span'), el('div', { style: 'display:flex;gap:18px;flex-wrap:wrap;margin:-4px 0 4px 30px' }, ...[['h', 'Hint'], ['e', 'Worked example'], ['v', 'Video'], ['n', 'Notes']].map(([c, t]) => el('label', { style: 'display:flex;gap:6px;align-items:center;font-weight:400;font-size:15px;margin:0' }, helpIns[c], t))),
+      el('span', { class: 'small' }, 'Adds homework help to every question: a Hint (the first step, with the answer hidden), a Worked example (a twin problem with different numbers, solved one step at a time), a Video (a narrated walkthrough of a problem like theirs), TI-Nspire steps (the keystrokes for the calculator part, when there is one), and Notes (the section’s lesson notes, class examples, and interactives, when there is a lesson plan). Help never changes the score; the gradebook marks each question where a hint, worked example, or video was used. Leave it off for quizzes and tests.')),
+    el('span'), el('div', { style: 'display:flex;gap:18px;flex-wrap:wrap;margin:-4px 0 4px 30px' }, ...[['h', 'Hint'], ['e', 'Worked example'], ['v', 'Video'], ['n', 'Notes'], ['c', 'TI-Nspire steps']].map(([c, t]) => el('label', { style: 'display:flex;gap:6px;align-items:center;font-weight:400;font-size:15px;margin:0' }, helpIns[c], t))),
     el('label', {}, '“Try another” button'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, moreIn,
       el('span', { class: 'small' }, 'Adds a “Try another” button to every question. It gives the student a new question of the same kind, with new numbers, to practice on: they pick an answer, see if it’s right, and can see the solution. It is never graded and doesn’t change their score.')),
     el('label', {}, 'Desmos calculator'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, desmosIn,
@@ -43538,8 +43747,8 @@ function builder() {
   [titleIn, subjSel, orderSel, retriesIn, checksIn, attemptsIn, leaveIn, bonusPctIn].forEach((x) => x.addEventListener('input', update));
   lockIn.addEventListener('change', update);
   sameIn.addEventListener('change', update);
-  hintsIn.addEventListener('change', () => { for (const c of 'henv') helpIns[c].checked = hintsIn.checked; hintsIn.indeterminate = false; update(); }); // checking Homework help checks all four parts
-  for (const c of 'henv') helpIns[c].addEventListener('change', () => { syncHelp(); update(); });
+  hintsIn.addEventListener('change', () => { for (const c of 'henvc') helpIns[c].checked = hintsIn.checked; hintsIn.indeterminate = false; update(); }); // checking Homework help checks all of its parts
+  for (const c of 'henvc') helpIns[c].addEventListener('change', () => { syncHelp(); update(); });
   desmosIn.addEventListener('change', update);
   moreIn.addEventListener('change', update);
   shareIn.addEventListener('change', update);
@@ -43633,7 +43842,7 @@ function builder() {
     if (at > 1 && redoSel.value === 'missed') q.set('redo', 'missed');
     if (!lockIn.checked) q.set('lock', '0');
     if (sameIn.checked) q.set('same', '1');
-    { const h = helpNow(); if (h) q.set('hints', h === 'henv' ? '1' : h.includes('e') && !h.includes('v') ? h + '-' : h); }
+    { const h = helpNow(); if (h) q.set('hints', h === 'henvc' ? '1' : h.includes('e') && !h.includes('v') ? h + '-' : h); }
     if (desmosIn.checked) q.set('desmos', '1');
     if (moreIn.checked) q.set('more', '1');
     if (shareIn.checked) q.set('sw', '1');
@@ -43649,7 +43858,7 @@ function builder() {
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1'; shareA.value = shareLink(url, true); shareQ.value = shareLink(url, false);
     if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${[...items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`), ...bItems.map(([id, n, f]) => `['${id}', ${n}, '${f}', 'b']`)].join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${nBonus && bp !== 5 ? `, bonusPct: ${bp}` : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${helpNow() ? (helpNow() === 'henv' ? ', hints: true' : `, hints: '${helpNow()}${helpNow().includes('e') && !helpNow().includes('v') ? '-' : ''}'`) : ''}${desmosIn.checked ? ', desmos: true' : ''}${shareIn.checked ? ', shareWork: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${[...items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`), ...bItems.map(([id, n, f]) => `['${id}', ${n}, '${f}', 'b']`)].join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${nBonus && bp !== 5 ? `, bonusPct: ${bp}` : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${helpNow() ? (helpNow() === 'henvc' ? ', hints: true' : `, hints: '${helpNow()}${helpNow().includes('e') && !helpNow().includes('v') ? '-' : ''}'`) : ''}${desmosIn.checked ? ', desmos: true' : ''}${shareIn.checked ? ', shareWork: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
   }
   update(); opening = false;
 }
