@@ -38566,6 +38566,7 @@ function teacherNav(active) {
     ['lesson', 'Lesson plans', go(() => lessonScreen())],
     ['classes', 'Classes & roster', go(() => classesScreen())],
     ['crossword', 'Crossword', () => { location.href = 'crossword.html?t=' + TEACHER_ID; }],
+    ['help', 'Help', go(() => helpScreen())],
   ];
   nav.innerHTML = '';
   tabs.forEach(([id, label, fn]) => nav.append(el('button', { type: 'button', onclick: fn, 'aria-current': id === active ? 'page' : 'false',
@@ -42214,6 +42215,119 @@ function lpPrintBtn(key, x, attrs, label) {
 }
 /* ==== LESSON PLANS END ==== */
 
+/* ---------- what's new + help (teacher pages) ----------
+   WHATS_NEW: add a line at the TOP whenever the site changes in a way a teacher would notice.
+   subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
+   shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
+const WHATS_NEW = [
+  { date: '2026-11-22', text: 'New Help page (the Help tab at the top): step-by-step instructions for everything on this site and the crossword page. This “What’s new” box lists changes as they happen.' },
+  { date: '2026-11-22', subjects: ['apcalc', 'precalc'], text: 'Every AP Calculus and Pre-Calculus question type now has a “Watch a video” walkthrough, including the FRQs, proofs, and challenge problems.' },
+  { date: '2026-11-21', text: 'Classes & roster tab: add a student, move a student to another period, match your Google Classroom classes to periods, set nicknames, and change your password — all without opening the Google Sheet.' },
+  { date: '2026-11-21', text: 'End of the school year: the Classes & roster tab (and the crossword page) can save an archive copy of your Sheet and empty it for next year. Type NEW YEAR to confirm.' },
+  { date: '2026-11-21', text: 'Crossword page: a new Roster tab (add students and give any student a word bank), “Assign to some students,” and a Most-missed words list on Results.' },
+];
+const wnMine = () => WHATS_NEW.filter((n) => !n.subjects || n.subjects.some((s) => CONFIG.SUBJECTS.includes(s)));
+const wnDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' });
+const wnSeen = { get: () => { try { return localStorage.getItem(TK('whatsNewSeen')) || ''; } catch { return ''; } }, set: (v) => { try { localStorage.setItem(TK('whatsNewSeen'), v); } catch {} } };
+const wnList = (items) => el('ul', { style: 'margin:6px 0 0;padding-left:20px' }, ...items.map((n) => el('li', { style: 'margin:5px 0' }, el('b', {}, wnDate(n.date) + ': '), n.text)));
+// the box on the Teacher tools home page: only notes this computer hasn't marked as seen
+function whatsNewCard() {
+  const mine = wnMine(), seen = wnSeen.get(), fresh = mine.filter((n) => n.date > seen);
+  if (!fresh.length) return '';
+  const card = el('div', { class: 'card', style: 'border-left:4px solid #c9a227;background:#fffaf0' },
+    el('strong', {}, '✨ What’s new'), wnList(fresh),
+    el('div', { style: 'margin-top:8px;display:flex;gap:8px;flex-wrap:wrap' },
+      el('button', { class: 'btn', type: 'button', onclick: () => { wnSeen.set(mine[0].date); card.remove(); } }, 'Got it'),
+      el('button', { class: 'btn secondary', type: 'button', onclick: () => helpScreen('new') }, 'See all changes')));
+  return card;
+}
+
+// the Help page: practice.html?help (no PIN needed; nothing private is on it), or the Help tab
+function helpScreen(open) {
+  document.getElementById('title').textContent = 'Help';
+  if (teacherSession()) teacherNav('help');
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '';
+  app.innerHTML = '';
+  const base = location.origin + location.pathname, tq = TEACHER_ID ? `?t=${TEACHER_ID}` : '';
+  const teacherLink = base + (tq ? tq + '&teacher=1' : '?teacher=1'), studentLink = base + tq;
+  const subjNames = Object.values(SUBJECTS).join(', ').replace(/, ([^,]*)$/, ' and $1');
+  const hasLessons = Object.keys(LESSONS).some((k) => SETS[k] && SUBJECTS[SETS[k].subject]);
+  const P = (...k) => el('p', { style: 'margin:6px 0' }, ...k);
+  const OL = (...items) => el('ol', { style: 'margin:6px 0;padding-left:22px' }, ...items.map((x) => el('li', { style: 'margin:5px 0' }, ...[].concat(x))));
+  const B = (t) => el('b', {}, t);
+  const copyBtn = (getText, label) => { const b = el('button', { type: 'button', class: 'btn secondary', style: 'margin:0' }, label);
+    b.onclick = async () => { const t = getText(); if (!t) return; try { await navigator.clipboard.writeText(t); b.textContent = '✓ Copied'; } catch { prompt('Copy this:', t); } setTimeout(() => (b.textContent = label), 2000); }; return b; };
+  const codeBox = (t) => el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0' },
+    el('code', { style: 'flex:1;min-width:220px;padding:8px;background:var(--bg,#f6f6f6);border:1px solid var(--line);border-radius:8px;word-break:break-all;font-size:14px' }, t), copyBtn(() => t, 'Copy'));
+
+  // pick a section → its student link (the section's Practice assignment)
+  const secSel = el('select', { style: 'flex:1;min-width:240px;max-width:520px' }, el('option', { value: '' }, 'Choose a section…'),
+    ...Object.keys(SUBJECTS).map((sk) => { const g = el('optgroup', { label: SUBJECTS[sk] });
+      Object.entries(SETS).filter(([, v]) => v.subject === sk && !v.hidden && !v.custom).forEach(([k, v]) => g.append(el('option', { value: k }, v.title))); return g; })
+      .filter((g) => g.children.length));
+  const secLink = () => (secSel.value ? `${base}?${TEACHER_ID ? `t=${TEACHER_ID}&` : ''}set=${encodeURIComponent(secSel.value)}` : '');
+  const secOut = el('code', { style: 'display:block;margin-top:6px;word-break:break-all;font-size:14px' });
+  secSel.addEventListener('input', () => { secOut.textContent = secLink(); });
+
+  const sections = [
+    ['start', '1. Getting in', [
+      P('Your teacher page (bookmark it on your own computer, not a student Chromebook):'), codeBox(teacherLink),
+      P('Type your ', B('teacher PIN'), ' or your ', B('Results dashboard password'), '. The dashboard password does more: once you type it on a computer, the Results dashboard, Classes & roster, and your saved assignments open there without asking again.'),
+      P('The link students use for everything is below. They open it on their Chromebooks, already signed in to their school Google accounts, so their scores land in your gradebook by themselves.'), codeBox(studentLink),
+      P(B('Wrong password too many times? '), 'Wait 15 minutes and try again.')]],
+    ['practice', '2. Assign a section’s Practice (homework)', [
+      P(`Every section of ${subjNames} already has a ready-made Practice assignment. Students can pick it from the Assignment menu on the student link, but a direct link is easier:`),
+      el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0' }, secSel, copyBtn(secLink, 'Copy student link')), secOut,
+      P('Post that link in the period’s Google Classroom class. Each student gets their own numbers, and their best score goes to your gradebook.')]],
+    ['build', '3. Build your own assignment (quizzes, reviews, tests)', [
+      OL([B('Build an assignment'), ' tab. Type a title and pick the subject (that’s the gradebook tab the scores go to).'],
+        ['Open a chapter, then a section, and type how many of each question type you want. ', B('Preview'), ' shows a sample. ', B('★ Bonus'), ' adds extra-credit questions at the end.'],
+        ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints and worked examples — leave it off for tests), and the Desmos calculator.'],
+        ['Click ', B('Try it as a student'), ' to see exactly what students will get. Nothing you do there is graded.'],
+        ['Click ', B('Copy link'), ' or ', B('📤 Assign in Google Classroom'), ' (next step).']),
+      P('To change one later: ', B('Edit an assignment you already made'), ' at the top of the same tab.')]],
+    ['classroom', '4. Post it in Google Classroom', [
+      P(B('📤 Assign in Google Classroom'), ' (under the student link) posts it for you: check the periods, pick the post time and due date, and choose everyone, only some students, or everyone except some.'),
+      P('Or click ', B('Copy link'), ' and paste it into a Classroom assignment yourself. Either way, scores come back to your gradebook and the best attempt is posted to Classroom.')]],
+    ['results', '5. See results', [
+      OL(['Open the ', B('Results dashboard'), ' tab. Search by assignment or student (for example ', el('i', {}, '7.3'), ' or ', el('i', {}, 'Smith'), ').'],
+        ['Click an assignment to see each student’s score and which questions the class missed. ', B('Red bars are the ones to reteach.')],
+        ['Click a student for their history and a printable progress report. Pick a period to print reports for the whole class.'],
+        ['A student locked out of a test (they left the page too many times) is unlocked from here; it takes effect on their screen within about 10 seconds.'])]],
+    ['keys', '6. Answer keys and printing', [
+      P(B('Look up an answer key'), ': choose the assignment and the student. Every student has different numbers, so this shows that student’s own key.'),
+      P(B('Print'), ': paper copies of any assignment, in one or more versions, with an answer key (and worked solutions if you want them). Handy for a sub or a day without Chromebooks.')]],
+    ...(hasLessons ? [['lessons', '7. Lesson plans', [
+      P('The ', B('Lesson plans'), ' tab has a 45-minute plan for each section (some also have a 30-minute version), with examples to put on the TV, printable student sheets and exit tickets, a catch-up page for students who missed class, and vocabulary flashcards. ', B('Edit lesson plan'), ' saves your changes in your Sheet, so they show on every computer.')]]] : []),
+    ['roster', `${hasLessons ? 8 : 7}. Classes & roster (instead of opening the Google Sheet)`, [
+      OL(['The first time: match each Google Classroom class to its period, click ', B('Save periods'), ', then ', B('Refresh roster from Classroom'), '. Yellow boxes are guesses; check them.'],
+        [B('Add a new student'), ': type their school email and pick the period. It can add them to the Classroom class too.'],
+        [B('Move a student to another period'), ': pick the student and the new period. Their old scores stay with them.'],
+        ['Nicknames: if a student types a different name than Classroom has (Mike for Michael), add it so their scores still match.'])]],
+    ['crossword', `${hasLessons ? 9 : 8}. Vocabulary crossword`, [
+      P('Open it with the ', B('Crossword'), ' tab. Its own tabs:'),
+      OL([B('Make a puzzle'), ': pick a word list and difficulty, then ', B('Build puzzle'), '. Under More options you can give everyone a word bank or set a time limit.'],
+        ['Assign it to periods (or only some students) and post the ', B('link for Google Classroom'), ', or use ', B('📤 Assign in Google Classroom'), '.'],
+        [B('Results'), ' shows scores and the most-missed words. ', B('Roster'), ' adds students and gives any student a word bank on every puzzle.'])]],
+    ['year', `${hasLessons ? 10 : 9}. End of the school year`, [
+      P('On the ', B('Classes & roster'), ' tab, use ', B('Archive and start a new year'), ' and type ', B('NEW YEAR'), ' to confirm. It saves a copy of your whole Sheet in your Google Drive (named for the school year), then empties it for the new year. The crossword page has the same box for its Sheet. Do both after final grades are in.')]],
+    ['trouble', 'When something doesn’t work', [
+      el('ul', { style: 'margin:6px 0;padding-left:22px' },
+        el('li', {}, B('“Your script hasn’t picked up this feature yet”'), ': your Sheet updates itself within about 10 minutes. Try again then.'),
+        el('li', {}, B('“Couldn’t reach your script”'), ': check the internet connection and click Refresh.'),
+        el('li', {}, B('A student’s score is missing'), ': make sure they used the link from your Classroom and turned it in. Check Classes & roster for a nickname mismatch.'),
+        el('li', {}, B('Still stuck?'), ' Ask Mr. Cross.'))]],
+    ['new', 'What’s new', [wnList(wnMine())]],
+  ];
+  app.append(el('div', { class: 'card' },
+    el('p', { style: 'margin:0' }, `How to use this site${TEACHER_ID || CONFIG.TEACHER_NAME ? `, ${CONFIG.TEACHER_NAME}` : ''}. Click a topic to open it. `,
+      el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); app.querySelectorAll('details').forEach((d) => (d.open = true)); } }, 'Open all'), ' · ',
+      el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); window.print(); } }, 'Print this page'))));
+  sections.forEach(([id, title, body]) => app.append(el('details', { class: 'card', id: 'help-' + id, ...(id === open ? { open: '' } : {}), style: 'padding:10px 14px' },
+    el('summary', { style: 'cursor:pointer;font-weight:700;font-size:17px;color:var(--accent)' }, title), ...body)));
+  if (open) setTimeout(() => { const d = document.getElementById('help-' + open); if (d) d.scrollIntoView({ block: 'start' }); }, 50);
+}
+
 function teacherMenu() {
   if (params.has('copy')) { const c = params.get('copy'); params.delete('copy'); if (copyIntoBuilder(c)) return builder(); }
   if (params.has('print')) return printScreen(CUSTOM_KEY || (SETS[params.get('set')] ? params.get('set') : null));
@@ -42222,6 +42336,7 @@ function teacherMenu() {
   teacherNav('');
   const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '';
   app.innerHTML = '';
+  app.append(whatsNewCard());
   app.append(el('div', { class: 'card' },
     el('p', {}, 'What would you like to do?'),
     el('button', { class: 'btn', onclick: builder }, 'Build an assignment'), ' ',
@@ -42230,7 +42345,8 @@ function teacherMenu() {
     el('button', { class: 'btn secondary', onclick: () => printScreen() }, 'Print an assignment'), ' ',
     el('button', { class: 'btn secondary', onclick: () => lessonScreen() }, 'Lesson plans'), ' ',
     el('button', { class: 'btn secondary', onclick: () => window.open(ixLink(''), '_blank') }, 'Interactives'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => { location.href = 'crossword.html?t=' + TEACHER_ID; } }, 'Vocabulary crossword')));
+    el('button', { class: 'btn secondary', onclick: () => { location.href = 'crossword.html?t=' + TEACHER_ID; } }, 'Vocabulary crossword'), ' ',
+    el('button', { class: 'btn secondary', onclick: () => helpScreen() }, 'Help')));
 }
 
 /* ---------- printing (teacher only): paper copies in one or more versions, with an answer key ---------- */
@@ -42989,6 +43105,7 @@ function copyIntoBuilder(link) {
   if (params.has('missed')) return missedScreen();
   if (params.has('catchup')) return catchupScreen(params.get('catchup'));
   if (params.has('vocab')) return vocabScreen(params.get('vocab'));
+  if (params.has('help')) return helpScreen(params.get('help'));
   if (viewOk()) return viewScreen();
   if (params.has('teacher') && teacherSession()) return teacherMenu(); // already unlocked in this tab (coming back from the crossword, for example)
   if (params.has('teacher')) {

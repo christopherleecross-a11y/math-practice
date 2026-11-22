@@ -447,7 +447,7 @@ osmosis: Movement of water across a membrane"></textarea>
   <div class="tp-wrap">
     <header class="tp-head">
       <div><h1>Crossword · Teacher</h1><p id="tpWho" class="muted"></p></div>
-      <div class="tp-acts"><a class="btn practice-link" id="tpBack" href="practice.html">← Math practice</a><button class="btn" id="tpPlay" type="button">See the puzzle</button><button class="btn" id="tpLock" type="button">Lock</button></div>
+      <div class="tp-acts"><a class="btn practice-link" id="tpBack" href="practice.html">← Math practice</a><button class="btn" id="tpPlay" type="button">See the puzzle</button><button class="btn" id="tpLock" type="button">Lock</button><a class="btn practice-link" id="tpHelp" data-help="crossword" href="practice.html?help=crossword" target="_blank" rel="noopener">Help</a></div>
     </header>
     <nav class="tp-tabs" role="tablist">
       <button type="button" role="tab" data-tab="make">Make a puzzle</button>
@@ -577,6 +577,7 @@ function practiceHref() {
   return 'practice.html' + (q.length ? '?' + q.join('&') : '');
 }
 document.querySelectorAll('a.practice-link').forEach((a) => {
+  if (a.dataset.help) { const t = new URLSearchParams(location.search).get('t'); a.href = 'practice.html?' + (t ? 't=' + encodeURIComponent(t) + '&' : '') + 'help=' + a.dataset.help; return; }
   a.href = practiceHref();
   ['mouseenter', 'focus', 'mousedown', 'touchstart'].forEach((ev) => a.addEventListener(ev, () => { a.href = practiceHref(); }, { passive: true }));
 });
