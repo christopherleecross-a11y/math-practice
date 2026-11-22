@@ -8659,7 +8659,7 @@ TEMPLATES.cxAddSub = (r) => {
       topic: 'Adding and subtracting', stem: `Perform the operation and write the result in standard form.   ${expr}`,
       ...cxMC(r, z, [wrongReal, noRad, sgn, neg]),
       fr: cxFR('=', z),
-      solution: `Write each square root of a negative number in i-form first: ${sqrtNeg(A)} = ${k1 === 1 ? '' : k1}√${m} i${asI ? '' : `, ${sqrtNeg(B)} = ${k2 === 1 ? '' : k2}√${m} i`}.\nReal parts: ${fmt(p)} ${op > 0 ? '+' : MINUS} ${q < 0 ? `(${fmt(q)})` : fmt(q)} = ${fmt(re)}.  Imaginary parts: ${fmt(imK)}√${m} i.\nResult: ${cxText(z)}`,
+      solution: `Write each square root of a negative number in i-form first: ${sqrtNeg(A)} = ${k1 === 1 ? '' : k1}√${m} i${asI ? '' : `, ${sqrtNeg(B)} = ${k2 === 1 ? '' : k2}√${m} i`}.\nReal parts: ${fmt(p)} ${op > 0 ? '+' : MINUS} ${q < 0 ? `(${fmt(q)})` : fmt(q)} = ${fmt(re)}.  Imaginary parts: ${imK === 1 ? '' : imK === -1 ? MINUS : fmt(imK)}√${m} i.\nResult: ${cxText(z)}`,
     };
   }
 };
@@ -9170,7 +9170,7 @@ TEMPLATES.tfToTrig = (r) => {
         check: (v) => tfOk(v[0], rVal, deg * D2R, exact ? 1e-6 : 0.006, exact ? 1e-6 : 0.006 * D2R) },
       draw: r() < 0.3 ? (cv) => drawCxPlane(cv, [{ z: z.v, label: 'z = ' + cxText(z) }]) : undefined, size: [380, 380], _meta: { v: z.v },
       solution: `r = √(a² + b²) = √(${fmt(Math.round(x * x * 1e6) / 1e6)} + ${fmt(Math.round(y * y * 1e6) / 1e6)}) = ${rText}\n` +
-        `tan θ = b/a, and ${cxText(z)} is ${x > 1e-9 && y >= 0 ? 'on the positive real axis or in Quadrant I' : x < -1e-9 && y >= 0 ? (Math.abs(y) < 1e-9 ? 'on the negative real axis' : 'in Quadrant II') : x < -1e-9 ? 'in Quadrant III' : x > 1e-9 ? 'in Quadrant IV' : y > 0 ? 'on the positive imaginary axis' : 'on the negative imaginary axis'}, so θ ${exact ? '=' : '≈'} ${dText}${exact && deg % 15 === 0 ? ` (${angT(deg, 'rad')} radians)` : ''}.\nz ${exact ? '=' : '≈'} ${correct}`,
+        `tan θ = b/a, and ${cxText(z)} is ${x > 1e-9 && y >= 0 ? (Math.abs(y) < 1e-9 ? 'on the positive real axis' : 'in Quadrant I') : x < -1e-9 && y >= 0 ? (Math.abs(y) < 1e-9 ? 'on the negative real axis' : 'in Quadrant II') : x < -1e-9 ? 'in Quadrant III' : x > 1e-9 ? 'in Quadrant IV' : y > 0 ? 'on the positive imaginary axis' : 'on the negative imaginary axis'}, so θ ${exact ? '=' : '≈'} ${dText}${exact && deg % 15 === 0 ? ` (${angT(deg, 'rad')} radians)` : ''}.\nz ${exact ? '=' : '≈'} ${correct}`,
     };
   }
 };
@@ -9247,7 +9247,7 @@ TEMPLATES.dmPower = (r) => {
     return {
       topic: "DeMoivre's Theorem", stem: `Use DeMoivre's Theorem to find the power. Write the result in standard form.   [${base}]${String(n).split('').map((c) => SUP[c]).join('')}`.replace(/\[\((cos.*)\)\]/, '($1)'),
       ...cxMC(r, z, wrongs), fr: cxFR('=', z),
-      solution: `[r(cos θ + i sin θ)]ⁿ = rⁿ(cos nθ + i sin nθ)\nrⁿ = ${sAbsText(rS) || '1'}${String(n).split('').map((c) => SUP[c]).join('')} = ${sAbsText(R)},  nθ = ${n} · ${angT(th, unit)} = ${angT(th * n, unit)}${th * n >= 360 ? ` (same as ${angT(T, unit)})` : ''}\n= ${tfText(R, T, unit)} = ${cxText(z)}`,
+      solution: `[r(cos θ + i sin θ)]ⁿ = rⁿ(cos nθ + i sin nθ)\nrⁿ = ${sAbsText(rS) || '1'}${String(n).split('').map((c) => SUP[c]).join('')} = ${sAbsText(R)},  nθ = ${n} · ${angT(th, unit)} = ${unit === 'rad' ? piText(frc(th * n, 180)) : `${fmt(th * n)}°`}${th * n >= 360 ? ` (same as ${angT(T, unit)})` : ''}\n= ${tfText(R, T, unit)} = ${cxText(z)}`,
     };
   }
 };
