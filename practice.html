@@ -2979,7 +2979,7 @@ TEMPLATES.t1Speed = (r) => {
     Rr = pick(r, [2, 3, 4, 5, 6, 8, 10]); const s = pick(r, [12, 15, 18, 20, 24, 30, 36, 40, 45]), t = pick(r, [2, 3, 4, 5, 6]);
     stem = `A point on the rim of a wheel with radius ${Rr} feet travels ${s} feet along the rim in ${t} seconds. Find (a) the angular speed in radians per second and (b) the linear speed in feet per second.`;
     v = s / t; w = v / Rr; wU = 'radians per second'; vU = 'feet per second';
-    why = `(b) Linear speed = s/t = ${s}/${t} = ${fracT(v)} feet per second.\n(a) In ${t} seconds the wheel turns θ = s/r = ${s}/${Rr} = ${fracT(s / Rr)} radians, so the angular speed is ${fracT(s / Rr)} ÷ ${t} = ${fracT(w)} radians per second.`;
+    why = `(b) Linear speed = s/t = ${s}/${t}${`${s}/${t}` === fracT(v) ? '' : ` = ${fracT(v)}`} feet per second.\n(a) In ${t} seconds the wheel turns θ = s/r = ${s}/${Rr} = ${fracT(s / Rr)} radians, so the angular speed is ${fracT(s / Rr)} ÷ ${t} = ${fracT(w)} radians per second.`;
   } else { // a car tire at mph
     const d = pick(r, [24, 25, 26, 28, 30]), mph = pick(r, [30, 40, 45, 50, 55, 60, 65]);
     Rr = d / 2; v = (mph * 5280 * 12) / 60; w = v / Rr; n = w / (2 * Math.PI);
@@ -3370,7 +3370,7 @@ TEMPLATES.t4RefAngle = (r) => {
     topic: 'Reference angles', stem: `Find the reference angle θ′.${kind === 'dec' ? ' Round to two decimal places.' : ''}   θ = ${text}${kind === 'dec' ? ' (radians)' : ''}`,
     ...buildChoices(r, correct, [...new Set(wrongs)], (i) => show(ref + 5 * (i + 1))),
     fr: { fields: [{ kind: 'expr', keys: 'ang', label: 'θ′ =' }], key: [kind === 'deg' ? `${fmt(ref)}^{\\circ}` : kind === 'rad' ? radL(ref) : rT(ref * D2R, 2)], display: correct, check: (v) => angOk(v[0], ref, unit, tol, kind !== 'deg') },
-    solution: `${n !== deg ? `${text} is coterminal with ${show(n)}, ` : ''}${n !== deg ? 'in' : 'In'} Quadrant ${ROMAN[Q]}: ${how} ${kind === 'dec' ? '≈' : '='} ${correct}`,
+    solution: `${n !== deg ? `${text} is coterminal with ${show(n)}, ` : ''}${n !== deg ? 'in' : 'In'} Quadrant ${ROMAN[Q]}: ${how}${how === `θ′ = ${correct}` ? '' : ` ${kind === 'dec' ? '≈' : '='} ${correct}`}`,
   };
 };
 TEMPLATES.t4UseRef = (r) => {
