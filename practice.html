@@ -1408,7 +1408,7 @@ TEMPLATES.p1Distance = (r) => {
   return {
     topic: 'Distance on the number line', stem: `Find the distance between a and b.   a = ${show(a)},  b = ${show(b)}`,
     ...buildChoices(r, show(d), [show(Math.abs(a + b)), show(-d), show(d + 1)].filter((x) => x !== show(d)), (i) => show(d + 2 + i)),
-    fr: frNums([{ label: 'Distance =', val: d }], show(d)), solution: `d(a, b) = |b − a| = |${show(b)} − (${show(a)})| = ${show(d)}`,
+    fr: frNums([{ label: 'Distance =', val: d }], show(d)), solution: `d(a, b) = |b − a| = |${show(b)} − ${a < 0 ? `(${show(a)})` : show(a)}| = ${show(d)}`,
   };
 };
 
@@ -1567,7 +1567,7 @@ TEMPLATES.p2CompleteSq = (r) => {
     const Q = cxQuadRoots(a, b, c); if (Q.kind === 'cx' || Q.kind === 'one') continue;
     const base = quadQ(r, { a, b, c }, 'x', 'Completing the square', 'Solve the quadratic equation by completing the square.');
     const hh = -b / (2 * a);
-    return { ...base, solution: `${a !== 1 ? `Divide by ${fmt(a)}: x² ${b / a < 0 ? MINUS : '+'} ${fracT(Math.abs(b / a))}x = ${fracT(-c / a)}\n` : `x² ${b < 0 ? MINUS : '+'} ${Math.abs(b)}x = ${fmt(-c)}\n`}Add (half of ${fracT(b / a)})² = ${fracT(hh * hh)} to both sides: (x ${hh > 0 ? MINUS : '+'} ${fracT(Math.abs(hh))})² = ${fracT(-c / a + hh * hh)}\nx = ${fracT(hh)} ± √${fracT(-c / a + hh * hh)}  ⇒  ${base.choices[base.answer]}` };
+    return { ...base, solution: `${a !== 1 ? `Divide by ${fmt(a)}: x² ${b / a < 0 ? MINUS : '+'} ${fracT(Math.abs(b / a))}x = ${fracT(-c / a)}\n` : `x² ${b < 0 ? MINUS : '+'} ${Math.abs(b)}x = ${fmt(-c)}\n`}Add (half of ${fracT(b / a)})² = ${fracT(hh * hh)} to both sides: (x ${hh > 0 ? MINUS : '+'} ${fracT(Math.abs(hh))})² = ${fracT(-c / a + hh * hh)}\n${((x0) => x0 === String(base.choices[base.answer]) ? x0 : `${x0}  ⇒  ${base.choices[base.answer]}`)(`x = ${fracT(hh)} ± √${fracT(-c / a + hh * hh)}`)}` };
   }
 };
 TEMPLATES.p2Quadratic = (r) => {
@@ -1795,6 +1795,7 @@ function generalText([A, B, C]) { // integer general form text
 }
 const eqLineText = (p, q) => (p[0] === q[0] ? `x = ${fracT(p[0])}` : lineText((q[1] - p[1]) / (q[0] - p[0]), p[1] - ((q[1] - p[1]) / (q[0] - p[0])) * p[0]));
 const eqLineLatex = (p, q) => (p[0] === q[0] ? `x=${fracL(p[0])}` : lineLatex((q[1] - p[1]) / (q[0] - p[0]), p[1] - ((q[1] - p[1]) / (q[0] - p[0])) * p[0]));
+const pcNeg = (v) => (v < 0 ? `(${fracT(v)})` : fracT(v)), pcM = (m) => (Number.isInteger(m) ? fracT(m) : `(${fracT(m)})`);
 TEMPLATES.p4SlopeGraph = (r) => {
   const p = [ri(r, -4, 2), ri(r, -4, 3)], dx = ri(r, 1, 5), dy = nz(r, -6, 6), q = [p[0] + dx, p[1] + dy], m = dy / dx;
   if (Math.abs(q[1]) > 7) return TEMPLATES.p4SlopeGraph(r);
@@ -1803,7 +1804,7 @@ TEMPLATES.p4SlopeGraph = (r) => {
     ...buildChoices(r, fracT(m), [fracT(-m), fracT(1 / m), fracT(-1 / m), fracT(dy)].filter((x) => x !== fracT(m)), (i) => fracT(m + i + 1)),
     fr: { fields: [{ kind: 'expr', keys: 'slope', label: 'm =' }], key: [fracL(m)], display: fracT(m), check: (v) => slopeOk(v[0], m) },
     draw: plotQ({ xr: [-8, 8], yr: [-8, 8], curves: [{ f: (x) => p[1] + m * (x - p[0]) }], pts: [{ p }, { p: q }] }), size: [380, 380],
-    solution: `The marked points are ${ptT(p)} and ${ptT(q)}. Rise ${fmt(dy)}, run ${dx}: m = ${fmt(dy)}/${dx} = ${fracT(m)}.`,
+    solution: `The marked points are ${ptT(p)} and ${ptT(q)}. Rise ${fmt(dy)}, run ${dx}: m = ${fmt(dy)}/${dx}${`${fmt(dy)}/${dx}` === fracT(m) ? '' : ` = ${fracT(m)}`}.`,
   };
 };
 TEMPLATES.p4SlopeInt = (r) => {
@@ -1838,7 +1839,7 @@ TEMPLATES.p4Slope2Pts = (r) => {
     topic: 'Slope from two points', stem: `Find the slope of the line passing through the points.   ${ptT(p)}, ${ptT(q)}`,
     ...buildChoices(r, slopeText(m), [...new Set(cands)].filter((c) => c !== slopeText(m)), (i) => fracT((m || 0) + i + 2)),
     fr: { fields: [{ kind: 'expr', keys: 'slope', label: 'm =' }], key: [slopeLatex(m)], display: slopeText(m), check: (v) => slopeOk(v[0], m) },
-    solution: `m = (y₂ − y₁)/(x₂ − x₁) = (${fracT(q[1])} − (${fracT(p[1])}))/(${fracT(q[0])} − (${fracT(p[0])})) = (${fracT(q[1] - p[1])})/(${fracT(q[0] - p[0])})${m === null ? ' — division by zero, so the slope is undefined (vertical line).' : ` = ${fracT(m)}`}`,
+    solution: `m = (y₂ − y₁)/(x₂ − x₁) = (${fracT(q[1])} − ${pcNeg(p[1])})/(${fracT(q[0])} − ${pcNeg(p[0])}) = ${fracT(q[1] - p[1])}/${pcNeg(q[0] - p[0])}${m === null ? ' — division by zero, so the slope is undefined (vertical line).' : ` = ${fracT(m)}`}`,
   };
 };
 TEMPLATES.p4ThreePoints = (r) => {
@@ -1855,7 +1856,7 @@ TEMPLATES.p4ThreePoints = (r) => {
     ...buildChoices(r, correct, [...new Set(wrongs)].filter((c) => c !== correct), NOT((i) => T(pts(m === null ? i + 1 : m + i + 1)))),
     frStem: `Use the slope and the point to find three more points the line passes through (there are many correct answers). Type them like (1, 2), (3, 4), (5, 6).   ${m === null ? 'm is undefined' : `m = ${fracT(m)}`},  ${ptT(p)}`,
     fr: { fields: [{ kind: 'expr', keys: 'point', label: 'Points:' }], key: [pts(m).map((P) => `\\left(${fracL(P[0])},${fracL(P[1])}\\right)`).join(',')], display: correct, check: (v) => ok(v[0]) },
-    solution: m === null ? `Undefined slope means a vertical line x = ${fmt(p[0])}: every point has x = ${fmt(p[0])}, like ${correct}.` : `Slope ${fracT(m)} means: move ${step || 1} right, ${fracT(m * (step || 1))} up${m < 0 ? ' (down)' : ''}. Starting at ${ptT(p)}: ${correct}.`,
+    solution: m === null ? `Undefined slope means a vertical line x = ${fmt(p[0])}: every point has x = ${fmt(p[0])}, like ${correct}.` : `Slope ${fracT(m)} means: move ${step || 1} right and ${fracT(Math.abs(m * (step || 1)))} ${m < 0 ? 'down' : 'up'}. Starting at ${ptT(p)}: ${correct}.`,
   };
 };
 TEMPLATES.p4PointSlope = (r) => {
@@ -1866,7 +1867,7 @@ TEMPLATES.p4PointSlope = (r) => {
     ...buildChoices(r, correct, [...new Set([lineText(m, p[1] + m * p[0]), lineText(m, p[1]), lineText(-m, p[1] + m * p[0]), lineText(p[1], m)])].filter((c) => c !== correct), NOT((i) => lineText(m, b + i + 1))),
     frStem: `Write the equation of the line in slope-intercept form, y = mx + b.   m = ${fracT(m)},  ${ptT(p)}`,
     fr: { fields: [{ kind: 'expr', keys: 'func', label: '' }], key: [lineLatex(m, b)], display: correct, check: (v) => lineOk(v[0], line, true) },
-    solution: `y − y₁ = m(x − x₁): y − (${fracT(p[1])}) = ${fracT(m)}(x − (${fracT(p[0])}))\nSolve for y: ${correct}`,
+    solution: `y − y₁ = m(x − x₁): y − ${pcNeg(p[1])} = ${pcM(m)}(x − ${pcNeg(p[0])})\nSolve for y: ${correct}`,
   };
 };
 TEMPLATES.p4TwoPoints = (r) => {
@@ -1880,7 +1881,7 @@ TEMPLATES.p4TwoPoints = (r) => {
     topic: 'Line through two points', stem: `Find an equation of the line passing through the points.   ${ptT(p)}, ${ptT(q)}`,
     ...buildChoices(r, correct, [...new Set(wrongs)].filter((c) => c !== correct), NOT((i) => (vert ? `x = ${fracT(p[0] + i + 1)}` : lineText(m, p[1] - m * p[0] + i + 1)))),
     fr: { fields: [{ kind: 'expr', keys: 'func', label: '' }], key: [eqLineLatex(p, q)], display: correct, check: (v) => lineOk(v[0], L) },
-    solution: vert ? `Both points have x = ${fracT(p[0])}, so the line is vertical: x = ${fracT(p[0])}.` : `m = (${fracT(q[1])} − (${fracT(p[1])}))/(${fracT(q[0])} − (${fracT(p[0])})) = ${fracT(m)}\ny − (${fracT(p[1])}) = ${fracT(m)}(x − (${fracT(p[0])}))  ⇒  ${correct}`,
+    solution: vert ? `Both points have x = ${fracT(p[0])}, so the line is vertical: x = ${fracT(p[0])}.` : `m = (${fracT(q[1])} − ${pcNeg(p[1])})/(${fracT(q[0])} − ${pcNeg(p[0])}) = ${fracT(m)}\ny − ${pcNeg(p[1])} = ${pcM(m)}(x − ${pcNeg(p[0])})  ⇒  ${correct}`,
   };
 };
 const relOf = (m1, m2) => (m1 === m2 ? 'Parallel' : (m1 === null && m2 === 0) || (m2 === null && m1 === 0) || (m1 !== null && m2 !== null && Math.abs(m1 * m2 + 1) < 1e-9) ? 'Perpendicular' : 'Neither');
@@ -2307,7 +2308,7 @@ TEMPLATES.p7LinearFn = (r) => {
       topic: 'Writing a linear function', stem: `Write the linear function f that has the given function values.   f(${fracT(x1)}) = ${fracT(y1)},   f(${fracT(x2)}) = ${fracT(y2)}`,
       ...buildChoices(r, correct, [...new Set([`f(x) = ${lineText(-m, b).replace('y = ', '')}`, `f(x) = ${lineText(m, -b).replace('y = ', '')}`, `f(x) = ${lineText(1 / m, y1 - x1 / m).replace('y = ', '')}`])].filter((x) => x !== correct), NOT((i) => `f(x) = ${lineText(m, b + i + 1).replace('y = ', '')}`)),
       fr: exprFR('f(x) =', (x) => m * x + b, correct.replace('f(x) = ', ''), lineLatex(m, b).replace('y=', '')),
-      solution: `m = (${fracT(y2)} − (${fracT(y1)}))/(${fracT(x2)} − (${fracT(x1)})) = ${fracT(m)}\nf(x) − (${fracT(y1)}) = ${fracT(m)}(x − (${fracT(x1)}))  ⇒  ${correct}`,
+      solution: `m = (${fracT(y2)} − ${pcNeg(y1)})/(${fracT(x2)} − ${pcNeg(x1)}) = ${fracT(m)}\nf(x) − ${pcNeg(y1)} = ${pcM(m)}(x − ${pcNeg(x1)})  ⇒  ${correct}`,
     };
   }
 };
