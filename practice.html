@@ -9439,7 +9439,7 @@ TEMPLATES.vecMagnitude = (r) => {
     topic: 'Magnitude', stem: `Use the dot product to find the magnitude of u.   u = ${showV(r, u)}`,
     ...buildChoices(r, e.text, [...new Set(cands)].filter((c) => c !== e.text), (i) => String(i + 3)),
     fr: { fields: [{ kind: 'number', label: '‖u‖ =' }], key: [e.latex], display: e.text, check: (vv) => !/\./.test(String(vv[0])) && numEqv(parseVecAns(vv[0]), Math.sqrt(n2)) },
-    solution: `‖u‖ = √(u · u) = √((${fmt(u[0])})² + (${fmt(u[1])})²) = √${n2} = ${e.text}`,
+    solution: `‖u‖ = √(u · u) = √((${fmt(u[0])})² + (${fmt(u[1])})²) = √${n2}${e.text === `√${n2}` ? '' : ` = ${e.text}`}`,
   };
 };
 // #29–42: angle between two vectors (radians or degrees)
@@ -9477,7 +9477,7 @@ TEMPLATES.vecAngle = (r) => {
       frStem: `Find the angle θ (in ${inDeg ? 'degrees' : 'radians'}) between the vectors.   ${show}\n(${A.exact ? 'Give the exact value' : 'Round to two decimal places'}.)`,
       fr: { fields: [{ kind: 'expr', keys: inDeg ? 'degrees' : 'angles', label: 'θ =' }], key: [A.latex], display: A.text,
         check: (vv) => numEqv(parseVecAns(inDeg ? stripDeg(vv[0]) : vv[0]), target, tol) },
-      solution: unitForm ? unitWhy : `cos θ = (u · v)/(‖u‖ ‖v‖) = ${cosT}${unitForm ? '' : ' ≈ ' + c.toFixed(4)}, so θ = arccos(${unitForm ? fmt(c) : c.toFixed(4)}) ${A.exact ? '=' : '≈'} ${A.text}.`,
+      solution: unitForm ? unitWhy : `cos θ = (u · v)/(‖u‖ ‖v‖) = ${cosT}${unitForm ? '' : ' ≈ ' + c.toFixed(4).replace('-', MINUS)}, so θ = arccos(${unitForm ? fmt(c) : c.toFixed(4).replace('-', MINUS)}) ${A.exact ? '=' : '≈'} ${A.text}.`,
     };
   }
 };
@@ -19867,7 +19867,7 @@ TEMPLATES.v33Ops = (r) => {
   return { topic: 'Vector operations', stem: `Find ${name}.   u = ${vecA(u)},   v = ${vecA(v)}`,
     ...buildChoices(r, vecA(res), [...new Set(wr)].filter((w) => w !== vecA(res)), (i) => vecA([res[0] + i + 1, res[1]])),
     fr: { fields: [{ kind: 'expr', keys: 'vector', label: `${name} =` }], key: [vecL(res)], display: vecA(res), check: (x) => v3vecOk(x[0], res) },
-    solution: `Work component by component:\n${name} = ⟨${fmt(a)}${v3pp(u[0]).startsWith('(') ? v3pp(u[0]) : `(${fmt(u[0])})`} ${b < 0 ? MINUS : '+'} ${fmt(Math.abs(b))}(${fmt(v[0])}), ${fmt(a)}(${fmt(u[1])}) ${b < 0 ? MINUS : '+'} ${fmt(Math.abs(b))}(${fmt(v[1])})⟩ = ${vecA(res)}` };
+    solution: `Work component by component:\n${name} = ⟨${a === 1 ? '' : fmt(a)}${v3pp(u[0]).startsWith('(') ? v3pp(u[0]) : `(${fmt(u[0])})`} ${b < 0 ? MINUS : '+'} ${Math.abs(b) === 1 ? '' : fmt(Math.abs(b))}(${fmt(v[0])}), ${a === 1 ? '' : fmt(a)}(${fmt(u[1])}) ${b < 0 ? MINUS : '+'} ${Math.abs(b) === 1 ? '' : fmt(Math.abs(b))}(${fmt(v[1])})⟩ = ${vecA(res)}` };
 };
 // #35–38: magnitude of a scalar multiple
 TEMPLATES.v33ScalarMag = (r) => {
@@ -19876,7 +19876,7 @@ TEMPLATES.v33ScalarMag = (r) => {
   return { topic: 'Magnitude of a scalar multiple', stem: `Find ‖${kt.includes('/') ? `(${kt})` : kt}u‖, where u = ${vecA(u)}.`,
     ...buildChoices(r, m.t, [...new Set(wr)].filter((w) => w !== m.t), (i) => v3exact(m.v + i + 1).t),
     fr: { fields: [{ kind: 'expr', keys: 'num', label: '' }], key: [m.l], display: m.t, check: (x) => v3numOk(x[0], m.v) },
-    solution: `‖cu‖ = |c| · ‖u‖. ‖u‖ = √${n2}${Number.isInteger(Math.sqrt(n2)) ? ` = ${Math.sqrt(n2)}` : ''}, so ‖${kt}u‖ = ${fracT(Math.abs(k))} · ${v3mag(n2).t} = ${m.t}` };
+    solution: `‖cu‖ = |c| · ‖u‖. ‖u‖ = √${n2}${Number.isInteger(Math.sqrt(n2)) ? ` = ${Math.sqrt(n2)}` : ''}, so ‖${Number.isInteger(k) ? kt : `(${kt})`}u‖ = ${fracT(Math.abs(k))} · ${v3mag(n2).t} = ${m.t}` };
 };
 // #39–44: unit vector in the direction of v
 TEMPLATES.v33Unit = (r) => {
