@@ -309,6 +309,13 @@ tr.dash-late td strong { color: #b42318; }
 .morebar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .morebar .btn { margin: 0; padding: 7px 14px; font-size: 14px; }
 .morebox { margin-top: 12px; padding: 12px 14px; border: 2px dashed var(--accent); border-radius: 10px; background: #fffaf3; }
+  .yag-code { display:inline-block; margin:2px 4px 2px 0; padding:2px 8px; border-radius:999px; font:600 13px system-ui,sans-serif; }
+  .yag-pri { background:#692b31; color:#fff; } .yag-sup { background:#f3e6c4; color:#5a4410; } .yag-rec { background:#e4ebf3; color:#2f4a68; }
+  .yag-unit { border-top:1px solid var(--line); padding:12px 0 10px; margin-top:10px; }
+  .yag-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:6px; }
+  @media (max-width:560px) { .yag-grid { grid-template-columns:1fr; } }
+  .yag-h { font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#777; }
+  .yag-sec { display:inline-flex; align-items:center; padding:4px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:var(--card); }
 </style>
 <script src="sylogist.js"></script>
 </head>
@@ -38582,6 +38589,7 @@ function teacherNav(active) {
     ['key', 'Look up an answer key', go(() => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); })],
     ['print', 'Print', go(() => printScreen())],
     ['lesson', 'Lesson plans', go(() => lessonScreen())],
+    ['yag', 'Year at a glance', go(() => yagScreen())],
     ['classes', 'Classes & roster', go(() => classesScreen())],
     ['crossword', 'Crossword', () => { location.href = 'crossword.html?t=' + TEACHER_ID; }],
     ['ix', 'Interactives', () => window.open(ixLink(''), '_blank')],
@@ -42280,6 +42288,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'New Year at a glance tab: the district’s pacing guide for each of your courses, by quarter and unit, with each unit’s priority, supporting, and recurring standards, its unit-plan Google Doc, its book sections (with lesson plans), and a 🧩 Build a unit review button. The current quarter is outlined. In Build an assignment, ★ marks a priority standard.' },
   { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Build an assignment now shows the Oklahoma Academic Standards (2022 OAS) objective under each question type, like “📋 OAS: G.2D.1.6.” Point at it or click it to read the objective.' },
   { date: '2026-11-22', text: 'Video is now its own Homework help choice in Build an assignment (Hint, Worked example, Video, Notes), so you decide whether students get the 🎬 Video button. Assignments you already posted keep working the way they did.' },
   { date: '2026-11-22', text: 'Add interactives to a lesson plan: in Lesson plans, click ✏️ Edit this plan and use the new Interactives section (+ Add an interactive, then pick the TV screen it comes right before). Students get it in the 📖 Notes on their assignment (when Homework help includes Notes) and on the catch-up page.' },
@@ -42364,6 +42373,10 @@ function helpScreen(open) {
     ...(hasLessons ? [['lessons', '7. Lesson plans', [
       P('The ', B('Lesson plans'), ' tab has a 45-minute plan for each section (some also have a 30-minute version), with examples to put on the TV, printable student sheets and exit tickets, a catch-up page for students who missed class, and vocabulary flashcards. ', B('Edit lesson plan'), ' saves your changes in your Sheet, so they show on every computer.'),
       P(B('Adding an interactive: '), 'open the plan, click ', B('✏️ Edit this plan'), ', and scroll to ', B('Interactives'), '. Click ', B('+ Add an interactive'), ', pick it, and pick the TV screen it should come right before. Save. It shows on the TV in class, in the ', B('📖 Notes'), ' on students’ assignments for that section (turn on Homework help › Notes when you build the assignment), and on the catch-up page.')]]] : []),
+    ['yag', 'Year at a glance (pacing guide)', [
+      P('The ', B('Year at a glance'), ' tab shows the district’s pacing guide for each of your courses: every quarter’s units, how many days each gets, and its ', B('Priority'), ', ', B('Supporting'), ', and ', B('Recurring'), ' standards. Click a unit’s standards to read them. The current quarter is outlined.'),
+      P('Each unit has a ', B('📄 Unit plan'), ' link (the district’s Google Doc; open it with your school account), its book sections with links to their lesson plans, and ', B('🧩 Build a unit review'), ', which opens Build an assignment with every section of the unit filled in so you can trim it.'),
+      P('In Build an assignment, a ', B('★'), ' after a standard means it’s a priority standard in the Year at a Glance.')]],
     ['ix', `${hasLessons ? 8 : 7}. Interactives`, [
       P('The ', B('Interactives'), ' tab opens a page of hands-on demos (the unit circle, graphs of trig functions, transformations of functions, and more) in a new tab, ready to put on the TV. Drag the points and sliders right on the touchscreen.'),
       P('Each interactive opens on its own page. To let students explore one on their Chromebooks, copy that page’s address from the browser’s address bar and post it in Google Classroom. Nothing is graded. In a lesson plan, the interactives it uses have a ', B('🔗 Copy student link'), ' button right beside them. You can add interactives to any lesson plan (see Lesson plans above).')]],
@@ -42880,9 +42893,159 @@ function oasBadge(t) {
   if (!codes.length) return t && t.subject === 'precalc' ? el('div', { class: 'small', style: 'margin-top:2px;color:#8a8f98' }, '📋 OAS: no Precalculus objective for this topic') : '';
   // point at it for the wording, or click it (touch screens) to show the wording under it
   const full = el('div', { class: 'small', style: 'display:none;margin:4px 0 2px;padding:6px 10px;background:#f4f6f9;border-left:3px solid #9bb8dc;border-radius:6px;color:#333' },
-    ...codes.map((c) => el('div', { style: 'margin:2px 0' }, el('b', {}, c + ' '), OAS_TEXT[c] || '')));
+    ...codes.map((c) => el('div', { style: 'margin:2px 0' }, el('b', {}, c + ' '), yagRole(t.subject, c) ? el('i', {}, `(${yagRole(t.subject, c)}) `) : '', OAS_TEXT[c] || '')));
   return el('div', {}, el('div', { class: 'small', title: oasTip(codes), role: 'button', tabindex: '0', style: 'margin-top:2px;color:#5b6b7f;cursor:pointer',
-    onclick: () => { full.style.display = full.style.display === 'none' ? '' : 'none'; } }, '📋 OAS: ', ...codes.flatMap((c, k) => [k ? ', ' : '', el('b', { style: 'font-weight:600' }, c)])), full);
+    onclick: () => { full.style.display = full.style.display === 'none' ? '' : 'none'; } }, '📋 OAS: ', ...codes.flatMap((c, k) => [k ? ', ' : '', el('b', { style: 'font-weight:600' }, c), yagRole(t.subject, c) === 'priority' ? el('span', { title: 'A priority standard in the Year at a Glance', style: 'color:#692b31;font-weight:700' }, ' ★') : ''])), full);
+}
+
+/* ---------- Year at a Glance: the district's pacing guides (Atoka Public Schools Curriculum Department, 2025–26 YAG) ----------
+   Each unit: name, days, its unit-plan Google Doc, and its Priority / Supporting standards; Recurring standards are per quarter.
+   secs: the book sections the unit covers (matched by hand from the unit's standards; edit freely). */
+const GDOC = (id) => `https://docs.google.com/document/d/${id}/edit?usp=sharing`;
+const YAG = {
+  geometry: [
+    { q: 1, dates: '8/6 – 10/8', rec: ['G.RL.1.3'], units: [
+      { name: 'Basics', days: 14, doc: '1da6WtbqZRps8h2Xi1pF0Ih28Gcy-zlxT8vn2xz-Fmv8', pri: ['G.2D.1.4'], sup: ['G.RL.1.1'], secs: '1.1-1.6' },
+      { name: 'Reasoning & Proof', days: 14, doc: '13T68SmliCyXgLgEefOi0gQTaLNEwZZpFO68wuHqaWIE', pri: ['G.RL.1.2'], sup: [], secs: '2.1-2.6' },
+      { name: 'Properties of Lines', days: 16, doc: '14a3zRQaUT4wU-kwgCb87ExiYauVv_bLgzHrEcwqBVLg', pri: ['G.2D.1.1', 'G.2D.1.2', 'G.2D.1.6'], sup: [], secs: '3.1-3.5' }] },
+    { q: 2, dates: '10/12 – 12/18', rec: ['G.RL.1.3'], units: [
+      { name: 'Transformations', days: 15, doc: '1JtD9AZJXqBCEsfX7hGxN1UuMjATv49swaOso9GzVwdE', pri: ['G.2D.1.11'], sup: [], secs: '4.1-4.6' },
+      { name: 'Properties of Congruent Triangles', days: 20, doc: '1MqRjU0D4ILPk1DmUguXHGMbOM-1fB4NJBeNU5QruR1c', pri: ['G.2D.1.9', 'G.2D.1.10'], sup: [], secs: '5.1-5.8' },
+      { name: 'Triangle Relationships', days: 7, doc: '1fMMavHFKRj1cSlk8g3FITEcNxYGXpzWjcy1PbFwEa2E', pri: ['G.2D.1.4'], sup: [], secs: '6.1-6.6' }] },
+    { q: 3, dates: '1/5 – 3/11', rec: ['G.RL.1.3'], units: [
+      { name: 'Quadrilaterals', days: 22, doc: '1G8PeJiww-3Pp95ms3SDOUK5uM_saa_uBKxjLaQesWYQ', pri: ['G.2D.1.3', 'G.2D.1.4', 'G.2D.1.5', 'G.2D.1.6'], sup: [], secs: '7.1-7.5' },
+      { name: 'Similar Figures', days: 10, doc: '1qsD2p4_zVP8_E7mS6Lcv1OhLEdnFFPksdEWUC8ppdKc', pri: ['G.2D.1.8', 'G.3D.1.2'], sup: [], secs: '8.1-8.4' },
+      { name: 'Right Triangles & Trig.', days: 10, doc: '1lj5TI_nnqRHpYLOUHCcabJzoMK0p0WXZXsSkUnwKq00', pri: ['G.RT.1.2', 'G.RT.1.3', 'G.RT.1.4'], sup: ['G.RT.1.1'], secs: '9.1-9.7' }] },
+    { q: 4, dates: '3/22 – 5/13', rec: ['G.RL.1.3'], units: [
+      { name: 'Circles', days: 18, doc: '1fsmjtSDCVGkzVDk9Ls6yIwgzX7pWmKBzcW0nMColrFk', pri: ['G.C.1.2', 'G.C.1.3'], sup: [], secs: '10.1-10.7' },
+      { name: 'Measuring Figures', days: 14, doc: '1hs-VEnbVS7L6kQ6bd48WWHDX_od0-8wDCHa6aM6tRXM', pri: ['G.2D.1.7', 'G.3D.1.1'], sup: ['G.C.1.1'], secs: '11.1-11.4 12.1-12.8' }] }],
+  algebra1: [
+    { q: 1, dates: '8/6 – 10/8', rec: ['A1.N.1.1', 'A1.A.1.1'], units: [
+      { name: 'Expressions, Roots, Equations, Inequalities w/ One Variable', days: 12, doc: '1JmDUgFJM-nOTVPb5MCmPEr3pdXuzEhOpQ1zNIubN0NI', pri: [], sup: ['A1.A.3.1', 'A1.A.3.4'], secs: '1.1-1.7 1.9 2.1-2.4' },
+      { name: 'Absolute Value Equations & Inequalities', days: 12, doc: '1Vx8NpIt5a9Duv7wAey0QW3c_K7vn4_IOxYjppMUQd6Q', pri: ['A1.A.1.2', 'A1.A.2.2'], sup: [], secs: '1.8 2.5-2.6' },
+      { name: 'Functions & Relations', days: 20, doc: '1XEh-z42kjrXo-ezmxkk3ofuK3EzExDJbwIAvRjWp1IE', pri: ['A1.F.1.2', 'A1.F.1.3', 'A1.F.3.2'], sup: ['A1.F.1.1', 'A1.F.1.4', 'A1.F.1.5'], secs: '3.1-3.4 3.9' }] },
+    { q: 2, dates: '10/12 – 12/18', rec: ['A1.N.1.1', 'A1.A.1.1'], units: [
+      { name: 'Graphing & Writing Linear Equations & Inequalities', days: 28, doc: '1nC1KRr3SubHPGf5DFD7KCyOtQs0XwYytkCd8tIyKa5M', pri: ['A1.A.2.1', 'A1.A.4.2', 'A1.A.4.3', 'A1.A.4.5'], sup: ['A1.A.4.1', 'A1.A.4.4', 'A1.F.3.1'], secs: '3.5-3.6 4.1-4.6 5.6' },
+      { name: 'Transformations & Parent Functions', days: 14, doc: '1OmYrv1Ql7mlFZIYnmd0lqVTsZZBSTv45dLOZLW3Mq3w', pri: ['A1.F.2.2'], sup: ['A1.F.2.1'], secs: '3.7-3.8' }] },
+    { q: 3, dates: '1/5 – 3/11', rec: ['A1.N.1.1', 'A1.A.1.1'], units: [
+      { name: 'Systems of Equations', days: 21, doc: '1uC-_1cqKwZS7j-DjPUYrRMgMwD5G3ivaFUiul7R9oMc', pri: ['A1.A.1.3'], sup: [], secs: '5.1-5.5' },
+      { name: 'Exponents & Radicals', days: 21, doc: '1sBrDkquK0D7ScW6K1EXvtZbfwxLqb2gcMTWPnEwwaiE', pri: ['A1.N.1.2'], sup: [], secs: '6.1-6.5' }] },
+    { q: 4, dates: '3/22 – 5/13', rec: ['A1.N.1.1', 'A1.A.1.1'], units: [
+      { name: 'Polynomial Operations & Factoring', days: 18, doc: '10pIVSV8r6DC0x3xZt7ak9JsMtVQl5lKty5iZrSwE9qY', pri: ['A1.A.3.2', 'A1.A.3.3'], sup: [], secs: '7.1-7.5' },
+      { name: 'Data Analysis & Probability', days: 10, doc: '1HuYbs8qwrUSE_fN9oT0t8FzE1nX7EAsWAhG4oJYwsPg', pri: ['A1.D.1.3', 'A1.D.2.2', 'A1.D.2.4'], sup: ['A1.D.1.1', 'A1.D.1.2', 'A1.D.2.1', 'A1.D.2.3'], secs: '8.1-8.4 9.1-9.7' },
+      { name: 'Operations on Functions', days: 4, doc: '1yK-thnHVwQn4vlgohKH6kaNzXTAfSNjgBGDGY03-3rQ', pri: ['A1.F.3.3'], sup: [], note: 'Sequences', secs: '' }] }],
+  algebra2: [
+    { q: 1, dates: '8/6 – 10/8', rec: [], units: [
+      { name: 'Review Linear Functions & Transformations', days: 10, doc: '1XzdGViAwExVsC6hkpUZ2s6Ef418mcURxmI3XrHzNFaE', pri: ['A2.A.2.4', 'A2.F.1.2'], sup: ['A2.F.1.1'], secs: '1.1-1.4' },
+      { name: 'Matrices', days: 5, doc: '10zwQPx5oKEya3Dp2zjFYy4W4l0WXAZfXEUYFM0G7QsU', pri: ['A2.N.2.2'], sup: ['A2.N.2.1'], secs: '1.6-1.7' },
+      { name: 'Complex Numbers', days: 6, doc: '19IwijI6nKyNlrvexO3oQ1SPUMhPztZHXjq2CI_xQePg', pri: ['A2.N.1.2'], sup: ['A2.N.1.1'], secs: '3.4' },
+      { name: 'Systems of Equations & Inequalities', days: 5, doc: '1Pz4bNKFmSPyxaG5GZtn047h_zBFakGIa6SXAvLN2bb4', pri: ['A2.A.1.7', 'A2.A.1.8', 'A2.A.1.9'], sup: ['A2.F.1.2'], secs: '1.5 1.8 3.7' },
+      { name: 'Polynomials', days: 6, doc: '1fyqF5jTHV4FgZCy1-b8BqQSBdWbz-O_FjMSHaUKq5bQ', pri: ['A2.A.2.1'], sup: [], secs: '3.1-3.2 4.2-4.4' },
+      { name: 'Quadratic Equations', days: 12, doc: '1h_BqxLt8P7tBQyUaJMe1H8z7id2JvxzcjvumvR_r5qE', pri: ['A2.A.1.1', 'A2.F.1.3'], sup: ['A2.A.2.1'], secs: '2.1-2.4 3.3 3.5-3.6' }] },
+    { q: 2, dates: '10/12 – 12/18', rec: [], units: [
+      { name: 'Polynomial & Radical Equations & Functions', days: 21, doc: '14RMc3Uq1HyaBBP5gAVHocZFwabMnGXnwqg23MW-w57c', pri: ['A2.A.1.4', 'A2.A.1.5', 'A2.F.1.5', 'A2.F.1.7'], sup: [], secs: '4.1 4.5-4.9 5.3-5.4' },
+      { name: 'Operations on Functions', days: 21, doc: '1oBtvXaZ3O0aBlrjdBdXDjWMsqxeuegn5JJQ302S1qho', pri: ['A2.F.2.1', 'A2.F.2.2', 'A2.F.2.3'], sup: [], secs: '5.5-5.7' }] },
+    { q: 3, dates: '1/5 – 3/11', rec: [], units: [
+      { name: 'Exponential & Logarithmic Expressions, Equations, & Functions', days: 21, doc: '12RxYO1ee1UmwPqiT0KiF6NPFlbFj74RylGZ68wZyD4s', pri: ['A2.N.1.3', 'A2.A.1.2', 'A2.A.1.6', 'A2.F.1.4', 'A2.F.1.8'], sup: ['A2.A.2.5', 'A2.F.2.4'], secs: '5.1-5.2 6.1-6.8' },
+      { name: 'Rational Expressions, Equations, & Functions', days: 21, doc: '1forrWTaCLjZ0OeRi9he64_WwQyFxaktJdNcwwYWhW0s', pri: ['A2.A.1.3', 'A2.A.2.3', 'A2.F.1.6'], sup: [], secs: '7.1-7.5' }] },
+    { q: 4, dates: '3/22 – 5/13', rec: [], units: [
+      { name: 'Sequences & Series', days: 8, doc: '11ttXuaq2mwXTPlBMlTEZKkdpoX0rzNgu8MVXO5Fs_t4', pri: ['A2.A.3.2', 'A2.A.3.3', 'A2.A.3.4'], sup: ['A2.A.3.1'], secs: '8.1-8.5' },
+      { name: 'Data & Probability', days: 8, doc: '1nSbNPohOe3bV0dR-qgYFLn5edt75h0gRg3Z_KzUs0WU', pri: ['A2.D.1.1', 'A2.D.1.3', 'A2.D.2.1'], sup: ['A2.D.1.2', 'A2.D.2.2', 'A2.D.2.3'], secs: '9.1-9.6' },
+      { name: 'Review', days: 16, pri: [], sup: [], note: 'Teacher determined', secs: '' }] }],
+  precalc: [
+    { q: 1, dates: '8/6 – 10/8', rec: [], units: [
+      { name: 'Review an Extension of Functions', days: 22, doc: '1vA_D80ggyIs5ndKx3ipVgA9ZFnSSFFoya9uYaMe5tYc', pri: ['PC.F.1.2', 'PC.F.1.3', 'PC.F.1.5', 'PC.F.2.1', 'PC.F.2.3', 'PC.F.2.4'], sup: ['PC.F.1.1', 'PC.F.1.4', 'PC.F.2.2'], secs: 'P.1-P.10' },
+      { name: 'Unit Circle, Angle Measures, & Right Triangles', days: 22, doc: '11y2OqD9zNW2k56WHKgCJWUgyNeTZDw89couIsGuk6h4', pri: ['PC.T.1.4', 'PC.T.1.9'], sup: ['PC.T.1.1', 'PC.T.1.2', 'PC.T.1.3', 'PC.T.1.5', 'PC.T.1.6'], secs: '1.1-1.4' }] },
+    { q: 2, dates: '10/12 – 12/18', rec: [], units: [
+      { name: 'Graphs of Trig. Functions & Inverse Trig. Functions', days: 21, doc: '18q2t8_qq4OOVq5noR5YNWv_KSl1UHETW8JnzzybVApg', pri: ['PC.T.1.8'], sup: ['PC.T.1.7'], secs: '1.5-1.7' },
+      { name: 'Trig. Identities', days: 21, doc: '1W_-yCU55VUm-4jqkXZEIPvolyEzeP7EalGTJL9GM03I', pri: ['PC.T.3.2', 'PC.T.3.3'], sup: ['PC.T.3.1'], secs: '2.1-2.5' }] },
+    { q: 3, dates: '1/5 – 3/11', rec: [], units: [
+      { name: 'Trig. Modeling', days: 27, doc: '17W5vCmXoZyHTL0Z4NpoKfTc-K6l_KMWkd8VvwSWlYFY', pri: ['PC.T.2.1', 'PC.T.2.2', 'PC.T.2.3', 'PC.T.2.4'], sup: [], secs: '1.8 3.1-3.4' },
+      { name: 'Complex Numbers', days: 15, doc: '1wWJvyJfQLLuTOrEcdWRw6M0YqThioVuMuc_DNF08q18', pri: ['PC.T.4.3'], sup: ['PC.T.4.1', 'PC.T.4.2'], secs: '4.1-4.5' }] },
+    { q: 4, dates: '3/22 – 5/13', rec: [], units: [
+      { name: 'Higher Order Functions', days: 10, doc: '1n3w4DaCRE04RLnkq7_LomgNcGbXtWusrp4MXtBAv2TQ', pri: ['PC.F.3.2', 'PC.F.3.3'], sup: ['PC.F.3.1'], secs: '5.1-5.5' },
+      { name: 'Conics', days: 20, doc: '1Oxmwn1z-a2-eWd1Pp837aOVUIsoBnu2lDrYsLTHW_7Q', pri: ['PC.F.3.2', 'PC.F.3.3', 'PC.CS.1.3', 'PC.CS.1.4'], sup: ['PC.CS.1.2'], secs: '6.1-6.9' },
+      { name: 'Review', days: 2, pri: [], sup: [], note: 'Teacher determined', secs: '' }] }],
+};
+// "1.1-1.6 2.3" → ['1.1', …, '1.6', '2.3']
+function yagNums(spec) {
+  return String(spec || '').split(/\s+/).filter(Boolean).flatMap((p) => {
+    const m = /^([P\d]+)\.(\d+)(?:-\1\.(\d+))?$/.exec(p); if (!m) return [];
+    const a = +m[2], b = m[3] ? +m[3] : a; return Array.from({ length: b - a + 1 }, (_, k) => `${m[1]}.${a + k}`);
+  });
+}
+// the menu assignments (section Practice) for a unit, in book order
+function yagSets(subject, u) {
+  const nums = yagNums(u.secs), num = (t) => (/^(?:Pre-)?([P\d]+\.\d+)/.exec(t) || [])[1];
+  return Object.entries(SETS).filter(([, S]) => S.subject === subject && !S.hidden && !S.custom && nums.includes(num(S.title)))
+    .sort((a, b) => nums.indexOf(num(a[1].title)) - nums.indexOf(num(b[1].title)));
+}
+// which quarter today is in (by the month/day ranges), or 0 between quarters
+function yagQuarter(Q) {
+  const now = new Date(), md = (now.getMonth() + 1) * 100 + now.getDate(), v = (s) => { const [m, d] = s.split('/').map(Number); return m * 100 + d; };
+  for (const x of Q) { const [a, b] = x.dates.split('–').map((s) => v(s.trim())); if (a <= b ? md >= a && md <= b : md >= a || md <= b) return x.q; }
+  return 0;
+}
+// which standards are priority / supporting / recurring in the YAG for a subject
+function yagRole(subject, code) {
+  const Q = YAG[subject]; if (!Q) return '';
+  for (const x of Q) for (const u of x.units) { if (u.pri.includes(code)) return 'priority'; }
+  for (const x of Q) for (const u of x.units) { if (u.sup.includes(code)) return 'supporting'; }
+  for (const x of Q) if (x.rec.includes(code)) return 'recurring';
+  return '';
+}
+// start a fresh assignment in the builder with every section of a unit (each section's Practice question types)
+function yagBuild(subject, u) {
+  const counts = {}, bonusCounts = {};
+  yagSets(subject, u).forEach(([, S]) => S.items.forEach(([id, n, , b]) => { if (b === 'b') return; counts[id] = Math.max(1, Math.round(n / 2)); }));
+  store.set(TK('builder:last'), { counts, formats: {}, frCounts: {}, bonusCounts, bonusFormats: {}, title: `${u.name} review`, subject, t: Date.now() });
+  builder(); window.scrollTo(0, 0);
+}
+function yagScreen(subj) {
+  document.getElementById('title').textContent = 'Year at a glance';
+  teacherNav('yag');
+  const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '1000px';
+  const subjects = Object.keys(SUBJECTS).filter((k) => YAG[k]);
+  app.innerHTML = '';
+  if (!subjects.length) { app.append(el('div', { class: 'card' }, 'There’s no Year at a Glance for your subjects yet.')); return; }
+  subj = subjects.includes(subj) ? subj : (store.get(TK('yag:subj')) && subjects.includes(store.get(TK('yag:subj'))) ? store.get(TK('yag:subj')) : subjects[0]);
+  store.set(TK('yag:subj'), subj);
+  const Q = YAG[subj], nowQ = yagQuarter(Q);
+  const codeList = (codes, kind) => {
+    if (!codes.length) return el('span', { class: 'small', style: 'color:#999' }, '—');
+    const full = el('div', { class: 'small', style: 'display:none;margin-top:4px' }, ...codes.map((c) => el('div', { style: 'margin:3px 0' }, el('b', {}, c + ' '), OAS_TEXT[c] || '')));
+    return el('div', {}, el('div', { role: 'button', tabindex: '0', title: 'Click to read the standards', style: 'cursor:pointer', onclick: () => { full.style.display = full.style.display === 'none' ? '' : 'none'; } },
+      ...codes.map((c) => el('span', { class: 'yag-code yag-' + kind }, c))), full);
+  };
+  app.append(el('div', { class: 'card' },
+    el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' },
+      ...subjects.map((k) => el('button', { type: 'button', class: 'btn' + (k === subj ? '' : ' secondary'), style: 'margin:0', onclick: () => yagScreen(k) }, SUBJECTS[k]))),
+    el('p', { class: 'small', style: 'margin:8px 0 0' }, 'The district’s Year at a Glance (2025–26). Click a unit’s standards to read them. ',
+      el('span', { class: 'yag-code yag-pri' }, 'Priority'), ' ', el('span', { class: 'yag-code yag-sup' }, 'Supporting'), ' ', el('span', { class: 'yag-code yag-rec' }, 'Recurring'))));
+  Q.forEach((x) => {
+    const card = el('div', { class: 'card', style: x.q === nowQ ? 'border:2px solid var(--accent)' : '' },
+      el('div', { style: 'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap' }, el('h2', { style: 'margin:0' }, `Quarter ${x.q}`), el('span', { class: 'small' }, x.dates),
+        x.q === nowQ ? el('span', { class: 'yag-code yag-pri', style: 'margin-left:auto' }, 'This quarter') : ''),
+      x.rec.length ? el('div', { class: 'small', style: 'margin:6px 0 0' }, 'Recurring all quarter: ', codeList(x.rec, 'rec')) : '');
+    x.units.forEach((u) => {
+      const sets = yagSets(subj, u);
+      card.append(el('div', { class: 'yag-unit' },
+        el('div', { style: 'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap' }, el('b', { style: 'font-size:17px' }, u.name), el('span', { class: 'small' }, `${u.days} days`),
+          u.doc ? el('a', { href: GDOC(u.doc), target: '_blank', rel: 'noopener', style: 'margin-left:auto;font-weight:600;color:var(--accent)' }, '📄 Unit plan') : ''),
+        el('div', { class: 'yag-grid' },
+          el('div', {}, el('div', { class: 'small yag-h' }, 'Priority'), codeList(u.pri, 'pri'), u.note ? el('div', { class: 'small', style: 'margin-top:2px' }, u.note) : ''),
+          el('div', {}, el('div', { class: 'small yag-h' }, 'Supporting'), codeList(u.sup, 'sup'))),
+        sets.length ? el('div', { style: 'margin-top:8px' }, el('div', { class: 'small yag-h' }, 'Book sections'),
+          el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:4px' }, ...sets.map(([k, S]) => {
+            const plan = LESSONS[k] ? el('a', { href: '#', class: 'small', title: 'Open the lesson plan', style: 'margin-left:6px;color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); lessonScreen(k); } }, 'plan') : '';
+            return el('span', { class: 'yag-sec' }, S.title, plan);
+          })),
+          el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' },
+            el('button', { type: 'button', class: 'btn secondary', style: 'margin:0', title: 'Opens Build an assignment with every section of this unit filled in', onclick: () => yagBuild(subj, u) }, '🧩 Build a unit review'))) : ''));
+    });
+    app.append(card);
+  });
+  app.append(el('p', { class: 'small', style: 'margin:4px 4px 12px' }, 'The book sections for each unit were matched from the unit’s standards; the unit plans are the district’s Google Docs (they open with your school account).'));
 }
 
 function builder() {
