@@ -36148,7 +36148,7 @@ function nsMode(r) {
     return { ...base, stem: `A student needs ${fn} ${d}° for a right-triangle problem. The TI-Nspire screen is shown. What went wrong, and what is the right value (to four decimal places)?`,
       ...buildChoices(r, c0, [`${wrongWhy[1]}. Set it to Radian; ${fn} ${d}° ≈ ${nsR(rad, 4)}.`, `Nothing went wrong; ${fn} ${d}° ≈ ${nsR(rad, 4)}.`, `${wrongWhy[0]}. Set it to Degree; ${fn} ${d}° ≈ ${nsR(f(d * 180 / Math.PI), 4)}.`], () => null),
       fr: frNums([nsNum(`${fn} ${d}° ≈`, deg, 4)], `${right} (the calculator was in radian mode)`),
-      solution: `The top of the screen says RAD, so the calculator took ${d} as ${d} radians, not ${d}°.\nSet ⌂ › Settings › Document Settings › Angle › Degree; then ${fn}(${d}) ≈ ${right}.` }; }
+      solution: `The top of the screen says RAD, so the calculator took ${d} as ${d} radians, not ${d}°.\nClick RAD in the top right corner to switch it to DEG; then ${fn}(${d}) ≈ ${right}.` }; }
   return { ...base, stem: `A student finding ${fn} ${d}° got the screen shown. Find the correct value of ${fn} ${d}°, rounded to four decimal places.`,
     ...buildChoices(r, right, [nsR(rad, 4), nsR(-deg, 4), nsR(1 / deg, 4)].filter((x) => x !== right), (i) => nsR(deg + 0.01 * (i + 1), 4)),
     fr: frNums([nsNum(`${fn} ${d}° ≈`, deg, 4)], right),
@@ -36218,10 +36218,10 @@ function nspireCheck(q, t) {
 }
 
 const NSPIRE = {
-  mode: { title: 'Set Degree or Radian mode', blank: 'Document Settings', steps: [
-    'Press ⌂ (home), then choose Settings › Document Settings.',
-    'Tab to Angle and pick Degree (for angles in °) or Radian (for angles with π or no ° sign).',
-    'Tab to OK and press enter. The mode shows at the top of the screen: DEG or RAD.'] },
+  mode: { title: 'Set Degree or Radian mode', blank: 'corner', steps: [
+    'Look at the top right corner of the screen: it says DEG or RAD.',
+    'To switch, move the pointer to DEG (or RAD) in the corner and click it. It changes to the other one.',
+    'Use DEG for angles in ° and RAD for angles with π or no ° sign. (The long way: ⌂ › Settings › Document Settings › Angle.)'] },
   trig: { title: 'sin, cos, or tan of an angle', blank: 'trig', steps: [
     'Check the mode first: DEG for degrees, RAD for radians.',
     'Press the trig key and pick sin, cos, or tan, then type the angle and close the parenthesis: sin(35).',
@@ -36289,7 +36289,7 @@ const NSPIRE = {
 };
 // the one-line version for a lesson's TV slide and student sheet: [text with one ________, the missing word]
 const NSPIRE_SHEET = {
-  mode: ['Set the angle mode: ⌂ › Settings › ________ Settings › Angle › MODE. The top of the screen shows ABBR.', 'Document'],
+  mode: ['Check the mode in the top right ________ of the screen. It should say ABBR; if not, click it to switch.', 'corner'],
   trig: ['Press the ________ key for sin, cos, or tan. Type the angle, close the parenthesis, and press enter.', 'trig'],
   invtrig: ['Press the trig key for sin⁻¹, cos⁻¹, or tan⁻¹ and type the ratio. ctrl ÷ makes a ________ box.', 'fraction'],
   decimal: ['Press ________ enter to get a decimal (≈) instead of an exact answer. Round only at the end.', 'ctrl'],
@@ -36394,8 +36394,8 @@ function angleModeTip(q, a) {
       if (q.mode === 'fr') hit = alt.mode === 'fr' && scoreOf(alt, a) === 1;
       else if (Array.isArray(q.choices) && Array.isArray(alt.choices)) hit = unM(q.choices[a]) === unM(alt.choices[alt.answer]) && unM(alt.choices[alt.answer]) !== unM(q.choices[q.answer]);
     } catch (e) { hit = false; }
-    if (hit) return dir === 1 ? '🧮 Your answer is what a calculator in RADIAN mode gives. This problem uses degrees: set your TI-Nspire to Degree (⌂ › Settings › Document Settings › Angle) and try again.'
-      : '🧮 Your answer is what a calculator in DEGREE mode gives. This problem uses radians: set your TI-Nspire to Radian (⌂ › Settings › Document Settings › Angle) and try again.';
+    if (hit) return dir === 1 ? '🧮 Your answer is what a calculator in RADIAN mode gives. This problem uses degrees: click RAD in the top right corner of your TI-Nspire screen so it says DEG, and try again.'
+      : '🧮 Your answer is what a calculator in DEGREE mode gives. This problem uses radians: click DEG in the top right corner of your TI-Nspire screen so it says RAD, and try again.';
   }
   return '';
 }
@@ -42836,6 +42836,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', subjects: ['geometry', 'precalc', 'apcalc', 'act', 'algebra2'], text: 'TI-Nspire help now shows the quick way to switch angle mode: click DEG or RAD in the top right corner of the screen (the Settings menu is listed as the long way).' },
   { date: '2026-11-22', text: 'More TI-Nspire help: when a student types the calculator’s decimal for an exact answer (like 3.464 for 2√3), the assignment says so instead of just “Not quite.” When a rounded answer is off in the last digit, it tells them they probably rounded in the middle and to keep every digit until the end.' },
   { date: '2026-11-22', text: 'Worked examples now end with “🧮 Check it on your TI-Nspire” when there’s a good way to check: store the answer and test the equation (the calculator says true), graph both sides and find the intersection, plug an angle back in, and so on.' },
   { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'act'], text: 'New question types that show a TI-Nspire screen and ask what it means: Linear Regression (Algebra I 4.6, Algebra II 1.4), One-Variable Statistics (Algebra I 8.1, ACT 7.3), Quadratic Regression (Algebra II 2.4), Exponential Regression (Algebra II 6.7), Normal Cdf (Algebra II 9.1), and a calculator stuck in radian mode (Geometry 9.4). Search “TI-Nspire screen” in Build an assignment.' },
