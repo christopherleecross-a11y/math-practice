@@ -42280,6 +42280,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Build an assignment now shows the Oklahoma Academic Standards (2022 OAS) objective under each question type, like “📋 OAS: G.2D.1.6.” Point at it for a short description.' },
   { date: '2026-11-22', text: 'Video is now its own Homework help choice in Build an assignment (Hint, Worked example, Video, Notes), so you decide whether students get the 🎬 Video button. Assignments you already posted keep working the way they did.' },
   { date: '2026-11-22', text: 'Add interactives to a lesson plan: in Lesson plans, click ✏️ Edit this plan and use the new Interactives section (+ Add an interactive, then pick the TV screen it comes right before). Students get it in the 📖 Notes on their assignment (when Homework help includes Notes) and on the catch-up page.' },
   { date: '2026-11-22', text: 'Interactives now have their own tab at the top of every teacher page (they open in a new tab, ready for the TV). To let students use one on their Chromebooks, post its page address in Google Classroom.' },
@@ -42344,7 +42345,7 @@ function helpScreen(open) {
       P('Post that link in the period’s Google Classroom class. Each student gets their own numbers, and their best score goes to your gradebook.')]],
     ['build', '3. Build your own assignment (quizzes, reviews, tests)', [
       OL([B('Build an assignment'), ' tab. Type a title and pick the subject (that’s the gradebook tab the scores go to).'],
-        ['Open a chapter, then a section, and type how many of each question type you want. ', B('Preview'), ' shows a sample. ', B('★ Bonus'), ' adds extra-credit questions at the end.'],
+        ['Open a chapter, then a section, and type how many of each question type you want. ', B('Preview'), ' shows a sample. ', B('★ Bonus'), ' adds extra-credit questions at the end. Under each question type, ', B('📋 OAS'), ' shows its Oklahoma Academic Standards objective; point at it for a short description.'],
         ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints, worked examples, videos, and notes — pick any of them, and leave it off for tests), and the Desmos calculator.'],
         ['Click ', B('Try it as a student'), ' to see exactly what students will get. Nothing you do there is graded.'],
         ['Click ', B('Copy link'), ' or ', B('📤 Assign in Google Classroom'), ' (next step).']),
@@ -42614,6 +42615,202 @@ function pushDraft(now) {
 function queueDraft(d) { draftPending = d; if (draftTimer) clearTimeout(draftTimer); draftTimer = setTimeout(() => pushDraft(false), 2500); }
 window.addEventListener('pagehide', () => pushDraft(true));
 document.addEventListener('visibilitychange', () => { if (document.hidden) pushDraft(true); });
+/* ---------- Oklahoma Academic Standards for Mathematics (2022), shown beside each question type in the builder ----------
+   OAS_TEXT: a short summary of each objective (not the official wording; the full text is in the 2022 OAS-M document).
+   Geometry, Algebra 1, and Algebra 2: the lessons for each objective come from Big Ideas Learning's correlations of the
+   Oklahoma editions (©2025) to the OAS. Precalculus: matched by hand to the Larson Trigonometry sections; vectors, the
+   complex plane, parametric equations, and polar coordinates aren't in the Precalculus OAS. ACT Prep and the calculus
+   courses aren't part of the OAS. */
+const OAS_TEXT = {
+  'A1.N.1.1': 'Write square roots and cube roots in simplest radical form', 'A1.N.1.2': 'Add, subtract, multiply, divide, and simplify square roots; rationalize denominators',
+  'A1.A.1.1': 'Solve linear equations to model and interpret real-world situations', 'A1.A.1.2': 'Solve absolute value equations and interpret the solutions',
+  'A1.A.1.3': 'Solve systems of linear equations by graphing, substitution, and elimination', 'A1.A.2.1': 'Model with linear inequalities; solve, graph, and interpret them',
+  'A1.A.2.2': 'Compound and absolute value inequalities: solve and graph', 'A1.A.3.1': 'Solve an equation with several variables for one of them',
+  'A1.A.3.2': 'Add, subtract, and multiply polynomials', 'A1.A.3.3': 'Factor out common monomials; factor x² + bx + c',
+  'A1.A.3.4': 'Evaluate linear, absolute value, rational, and radical expressions', 'A1.A.4.1': 'Find and interpret slope and intercepts',
+  'A1.A.4.2': 'Parallel, perpendicular, horizontal, and vertical lines', 'A1.A.4.3': 'Write the equation of a line from given information',
+  'A1.A.4.4': 'Slope-intercept, point-slope, and standard forms of a line', 'A1.A.4.5': 'Match graphs with written situations',
+  'A1.F.1.1': 'Tell relations and functions apart', 'A1.F.1.2': 'Independent and dependent variables, domain, and range',
+  'A1.F.1.3': 'Write linear functions in function notation to model situations', 'A1.F.1.4': 'Read and interpret linear piecewise graphs',
+  'A1.F.1.5': 'Discrete and continuous graphs', 'A1.F.2.1': 'Linear (arithmetic) vs. exponential (geometric) growth',
+  'A1.F.2.2': 'Parent functions and their transformations', 'A1.F.3.1': 'Move between graphs, tables, equations, and situations for linear functions',
+  'A1.F.3.2': 'Evaluate functions at given inputs', 'A1.F.3.3': 'Add, subtract, and multiply functions in function notation',
+  'A1.D.1.1': 'Display and compare data with measures of center and spread', 'A1.D.1.2': 'Scatter plots: patterns, linearity, and outliers',
+  'A1.D.1.3': 'Lines of fit, linear regression, and correlation', 'A1.D.2.1': 'Factorials, permutations, combinations, and tree diagrams',
+  'A1.D.2.2': 'Probability of unions, intersections, and complements (Venn diagrams)', 'A1.D.2.3': 'Experimental probability from simulations and experiments',
+  'A1.D.2.4': 'Use probability to make decisions',
+  'G.RL.1.1': 'Use undefined terms, definitions, postulates, and theorems in arguments and proofs', 'G.RL.1.2': 'Inductive and deductive reasoning; converse, inverse, and contrapositive',
+  'G.RL.1.3': 'Judge logical arguments; disprove with counterexamples', 'G.2D.1.1': 'Angle relationships when parallel lines are cut by a transversal',
+  'G.2D.1.2': 'Use transversal angles to decide whether lines are parallel', 'G.2D.1.3': 'Corresponding, vertical, complementary, and supplementary angles',
+  'G.2D.1.4': 'Interior and exterior angle sums of polygons', 'G.2D.1.5': 'Properties of special quadrilaterals',
+  'G.2D.1.6': 'Coordinate geometry: lengths, midpoints, and slopes', 'G.2D.1.7': 'Perimeter and area of polygons, including composite figures',
+  'G.2D.1.8': 'Congruent and similar polygons', 'G.2D.1.9': 'Prove triangles congruent (SSS, SAS, ASA, AAS, HL)',
+  'G.2D.1.10': 'Prove triangles similar (AA, SSS, SAS)', 'G.2D.1.11': 'Transformations on the coordinate plane; symmetry',
+  'G.3D.1.1': 'Surface area and volume of solids', 'G.3D.1.2': 'Similar solids: ratios of lengths, areas, and volumes',
+  'G.C.1.1': 'Circumference and area of circles', 'G.C.1.2': 'Equation of a circle from its center and radius',
+  'G.C.1.3': 'Angles, arcs, chords, secants, and tangents in circles', 'G.RT.1.1': 'Distance formula, Pythagorean Theorem and its converse',
+  'G.RT.1.2': '45°–45°–90° and 30°–60°–90° triangles', 'G.RT.1.3': 'Sine, cosine, tangent, and inverse trig to find acute angles',
+  'G.RT.1.4': 'Use trig ratios to find side lengths in right triangles',
+  'A2.N.1.1': 'Powers of i', 'A2.N.1.2': 'Operations with complex numbers', 'A2.N.1.3': 'Rational exponents, integer exponents, and radicals',
+  'A2.N.2.1': 'Organize data with matrices; order (dimensions) of a matrix', 'A2.N.2.2': 'Add, subtract, and scalar-multiply matrices',
+  'A2.A.1.1': 'Solve quadratics by factoring, completing the square, the Quadratic Formula, or graphing', 'A2.A.1.2': 'Model and solve exponential situations (interest, growth, decay)',
+  'A2.A.1.3': 'Solve rational equations; check for extraneous solutions', 'A2.A.1.4': 'Solve polynomial equations',
+  'A2.A.1.5': 'Solve square root and cube root equations; check for extraneous solutions', 'A2.A.1.6': 'Solve logarithmic equations using log properties',
+  'A2.A.1.7': 'Model and solve with systems of linear equations', 'A2.A.1.8': 'Solve a system of one linear and one quadratic equation',
+  'A2.A.1.9': 'Systems of linear inequalities in two variables', 'A2.A.2.1': 'Factor polynomials (trinomials, difference of squares, sum/difference of cubes)',
+  'A2.A.2.2': 'Add, subtract, multiply, and divide polynomials', 'A2.A.2.3': 'Add, subtract, multiply, and divide rational expressions',
+  'A2.A.2.4': 'Equivalent forms of a quadratic', 'A2.A.2.5': 'Rewrite radicals and rational exponents with exponent properties',
+  'A2.A.3.1': 'Arithmetic sequences', 'A2.A.3.2': 'Geometric sequences', 'A2.A.3.3': 'Arithmetic series', 'A2.A.3.4': 'Finite geometric series',
+  'A2.F.1.1': 'Domain and range in interval and set notation; evaluate functions', 'A2.F.1.2': 'Parent functions and transformations',
+  'A2.F.1.3': 'Graph quadratic functions; key features', 'A2.F.1.4': 'Graph exponential and logarithmic functions; asymptotes and intercepts',
+  'A2.F.1.5': 'Polynomial graphs: zeros, extrema, increasing and decreasing', 'A2.F.1.6': 'Graph rational functions: holes, asymptotes, intercepts',
+  'A2.F.1.7': 'Graph square root and cube root functions', 'A2.F.1.8': 'Graph piecewise functions', 'A2.F.1.9': 'Discrete or continuous models',
+  'A2.F.2.1': 'Add, subtract, multiply, and divide functions; domain', 'A2.F.2.2': 'Composition of functions; inverses and the identity',
+  'A2.F.2.3': 'Find and graph inverse functions', 'A2.F.2.4': 'Exponential and logarithmic forms',
+  'A2.D.1.1': 'Normal distributions with mean and standard deviation', 'A2.D.1.2': 'Scatter plots: linear, exponential, and quadratic patterns',
+  'A2.D.1.3': 'Predictions from regression; correlation', 'A2.D.2.1': 'Evaluate reports and data collection methods',
+  'A2.D.2.2': 'Misleading conclusions and graphs', 'A2.D.2.3': 'Correlation vs. causation',
+  'PC.F.1.1': 'Interpret features of a function in context', 'PC.F.1.2': 'Sketch graphs of functions and identify key features',
+  'PC.F.1.3': 'Interpret graphs and tables of functions', 'PC.F.1.4': 'End behavior, asymptotes, and discontinuities',
+  'PC.F.1.5': 'Invertibility; find inverses (restricting the domain if needed)', 'PC.F.2.1': 'Composition of functions; domain restrictions',
+  'PC.F.2.2': 'Write a function as a composition', 'PC.F.2.3': 'Interpret functions and their inverses in context', 'PC.F.2.4': 'Verify that two functions are inverses',
+  'PC.F.3.1': 'Solve polynomial, rational, exponential, and logarithmic equations', 'PC.F.3.2': 'Verify solutions graphically', 'PC.F.3.3': 'Verify solutions algebraically',
+  'PC.CS.1.1': 'Model situations with conic sections', 'PC.CS.1.2': 'Key features of conics (foci, directrix, axes, asymptotes, center)',
+  'PC.CS.1.3': 'Sketch a conic from its key features', 'PC.CS.1.4': 'Write the equation of a conic from its key features',
+  'PC.CS.1.5': 'Classify a second-degree equation as a circle, ellipse, parabola, or hyperbola',
+  'PC.T.1.1': 'Angles in standard position (radians); quadrant of the terminal side', 'PC.T.1.2': 'Convert between radians and degrees',
+  'PC.T.1.3': 'Arc length and sector area', 'PC.T.1.4': 'Sine, cosine, and tangent from special triangles and the unit circle',
+  'PC.T.1.5': 'Reference angles and points on the unit circle', 'PC.T.1.6': 'Trig values of any angle', 'PC.T.1.7': 'Odd/even symmetry and periodicity from the unit circle',
+  'PC.T.1.8': 'Graph the six trig functions; key features', 'PC.T.1.9': 'Relationships among unit circle properties',
+  'PC.T.2.1': 'Model situations with trigonometry', 'PC.T.2.2': 'Law of Sines and Law of Cosines', 'PC.T.2.3': 'Area of a triangle with trigonometry',
+  'PC.T.2.4': 'Solve trig equations with inverse functions; interpret in context', 'PC.T.3.1': 'Rewrite trig expressions with identities',
+  'PC.T.3.2': 'Equivalent forms of trig expressions', 'PC.T.3.3': 'Verify solutions of trig equations graphically and algebraically',
+  'PC.T.4.1': 'Add, subtract, and multiply complex numbers', 'PC.T.4.2': 'Conjugates and dividing complex numbers', 'PC.T.4.3': 'Quadratic equations with complex solutions',
+};
+// lessons for each objective (Big Ideas Learning's Oklahoma correlations)
+const OAS_LESSONS = {
+  algebra1: { 'A1.N.1.1': '1.2 6.3', 'A1.N.1.2': '6.2 6.3', 'A1.A.1.1': '1.3 1.4 1.5 1.6 1.7 1.9', 'A1.A.1.2': '1.8', 'A1.A.1.3': '5.1 5.2 5.3 5.4 5.5',
+    'A1.A.2.1': '2.1 2.2 2.3 2.4 5.6', 'A1.A.2.2': '2.5 2.6', 'A1.A.3.1': '1.9', 'A1.A.3.2': '6.1 7.1 7.2 7.3', 'A1.A.3.3': '7.4 7.5', 'A1.A.3.4': '1.1 1.2',
+    'A1.A.4.1': '3.5 3.6 4.4 4.5 4.6', 'A1.A.4.2': '3.5 3.6 3.9 4.4', 'A1.A.4.3': '4.1 4.2 4.4', 'A1.A.4.4': '3.6 4.1 4.2 4.3 4.4', 'A1.A.4.5': '3.2 3.9',
+    'A1.F.1.1': '3.1', 'A1.F.1.2': '3.1 3.3 3.5 3.6 3.8 6.4', 'A1.F.1.3': '4.1 4.2', 'A1.F.1.4': '3.9', 'A1.F.1.5': '3.3', 'A1.F.2.1': '3.3 6.4 6.5', 'A1.F.2.2': '3.7 3.8',
+    'A1.F.3.1': '3.3 3.4 3.5 3.6 4.1 4.2 4.4', 'A1.F.3.2': '3.4 6.4 6.5', 'A1.F.3.3': '7.2', 'A1.D.1.1': '4.5 4.6 8.1 8.2 8.3 8.4', 'A1.D.1.2': '4.5 4.6', 'A1.D.1.3': '4.6',
+    'A1.D.2.1': '9.1 9.6', 'A1.D.2.2': '9.1 9.3 9.4 9.5', 'A1.D.2.3': '9.1 9.2 9.7', 'A1.D.2.4': '9.1 9.2 9.3 9.4 9.5 9.6 9.7' },
+  geometry: { 'G.2D.1.1': '3.2 3.3 3.4', 'G.2D.1.2': '3.2 3.3 3.4', 'G.2D.1.3': '1.6 2.5 2.6 3.1 3.2 3.3 3.4', 'G.2D.1.4': '5.1 7.1', 'G.2D.1.5': '7.2 7.3 7.4 7.5',
+    'G.2D.1.6': '1.2 1.3 1.4 3.5 5.1 5.8 6.1 6.2 6.3 6.4 7.2 7.3 7.4 7.5', 'G.2D.1.7': '1.4 9.7 11.3 11.4', 'G.2D.1.8': '5.2 5.4 5.5 5.7 8.1 8.2 8.3 8.4 9.3',
+    'G.2D.1.9': '5.3 5.4 5.5 5.6 5.7 5.8', 'G.2D.1.10': '8.2 8.3', 'G.2D.1.11': '4.1 4.2 4.3 4.4 4.5 4.6', 'G.3D.1.1': '12.1 12.2 12.3 12.4 12.5 12.6 12.7 12.8',
+    'G.3D.1.2': '12.2 12.3 12.4 12.5 12.6', 'G.C.1.1': '11.1 11.2', 'G.C.1.2': '10.7', 'G.C.1.3': '10.1 10.2 10.3 10.4 10.5 10.6', 'G.RT.1.1': '1.3 9.1', 'G.RT.1.2': '9.2',
+    'G.RT.1.3': '9.4 9.5 9.6', 'G.RT.1.4': '9.4 9.5 9.6', 'G.RL.1.2': '2.1 2.2', 'G.RL.1.3': '2.1 2.2',
+    'G.RL.1.1': '1.1 1.2 1.3 1.5 1.6 2.1 2.3 2.4 2.5 2.6 3.2 3.3 3.4 4.6 5.1 5.2 5.3 5.4 5.5 5.6 5.7 5.8 6.1 6.2 6.3 6.4 6.5 6.6 7.2 7.3 7.4 7.5 8.1 8.2 8.3 9.1 10.2 10.7' },
+  algebra2: { 'A2.N.1.1': '3.4', 'A2.N.1.2': '3.4', 'A2.N.1.3': '5.1', 'A2.N.2.1': '1.6 1.7', 'A2.N.2.2': '1.7', 'A2.A.1.1': '3.1 3.2 3.3 3.5 3.6', 'A2.A.1.2': '6.1 6.6',
+    'A2.A.1.3': '7.5', 'A2.A.1.4': '4.5 4.6', 'A2.A.1.5': '5.4', 'A2.A.1.6': '6.5 6.6', 'A2.A.1.7': '1.5 1.6', 'A2.A.1.8': '3.7', 'A2.A.1.9': '1.8',
+    'A2.A.2.1': '3.1 3.2 4.4', 'A2.A.2.2': '4.2 4.3', 'A2.A.2.3': '7.3 7.4', 'A2.A.2.4': '2.1 2.2 2.4', 'A2.A.2.5': '5.1 5.2', 'A2.A.3.1': '8.1 8.2 8.5',
+    'A2.A.3.2': '8.1 8.3 8.5', 'A2.A.3.3': '8.1 8.2', 'A2.A.3.4': '8.1 8.3 8.4', 'A2.F.1.1': '1.1 1.2 2.2 4.1 4.8 5.3 5.5 5.7 6.1 6.2 6.8 7.2',
+    'A2.F.1.2': '1.2 1.3 2.1 4.7 5.3 6.1 6.3 6.4', 'A2.F.1.3': '1.2 2.1 2.2 2.3 2.4', 'A2.F.1.4': '6.1 6.2 6.3 6.4', 'A2.F.1.5': '4.8 4.9', 'A2.F.1.6': '7.1 7.2',
+    'A2.F.1.7': '5.3', 'A2.F.1.8': '6.8', 'A2.F.1.9': '2.4', 'A2.F.2.1': '5.5', 'A2.F.2.2': '5.6 5.7', 'A2.F.2.3': '5.7 6.3 7.5', 'A2.F.2.4': '6.3',
+    'A2.D.1.1': '9.1', 'A2.D.1.2': '1.2 1.4 2.4 6.7', 'A2.D.1.3': '1.4 2.4 6.7', 'A2.D.2.1': '9.2 9.3 9.4 9.5 9.6', 'A2.D.2.2': '9.2 9.3 9.4', 'A2.D.2.3': '9.2 9.4' },
+};
+// Precalculus: by section (matched by hand)
+const OAS_PRECALC = {
+  'P.2': 'PC.F.3.1 PC.F.3.3', 'P.5': 'PC.F.1.1', 'P.6': 'PC.F.1.2 PC.F.1.3', 'P.7': 'PC.F.1.2', 'P.8': 'PC.F.1.2', 'P.9': 'PC.F.2.1 PC.F.2.2', 'P.10': 'PC.F.1.5 PC.F.2.4',
+  '1.1': 'PC.T.1.1 PC.T.1.2 PC.T.1.3', '1.2': 'PC.T.1.4 PC.T.1.5 PC.T.1.7', '1.3': 'PC.T.1.4', '1.4': 'PC.T.1.5 PC.T.1.6', '1.5': 'PC.T.1.8', '1.6': 'PC.T.1.8',
+  '1.7': 'PC.T.2.4', '1.8': 'PC.T.2.1', '2.1': 'PC.T.3.1', '2.2': 'PC.T.3.1 PC.T.3.2', '2.3': 'PC.T.3.3 PC.T.2.4', '2.4': 'PC.T.3.2', '2.5': 'PC.T.3.2',
+  '3.1': 'PC.T.2.2 PC.T.2.3', '3.2': 'PC.T.2.2 PC.T.2.3', '4.1': 'PC.T.4.1 PC.T.4.2', '4.2': 'PC.T.4.3', '5.1': 'PC.F.1.2 PC.F.1.4', '5.2': 'PC.F.1.2 PC.F.1.4 PC.F.1.5',
+  '5.3': 'PC.F.3.3', '5.4': 'PC.F.3.1 PC.F.3.3', '5.5': 'PC.F.1.1 PC.F.3.1', '6.2': 'PC.CS.1.1 PC.CS.1.2 PC.CS.1.3 PC.CS.1.4', '6.3': 'PC.CS.1.1 PC.CS.1.2 PC.CS.1.3 PC.CS.1.4',
+  '6.4': 'PC.CS.1.1 PC.CS.1.2 PC.CS.1.3 PC.CS.1.4', '6.5': 'PC.CS.1.5', '6.9': 'PC.CS.1.2' };
+// Which of its section's objectives fit a question type, by the words in its name and description.
+// Only narrows the section's list (never adds an objective the section doesn't have); no match = the whole list.
+const OAS_WORDS = {
+  'G.RL.1.1': /proof|prove|postulate|theorem|definition|justify|reason|undefined term|name the|naming|collinear|coplanar|intersection of|statement/i,
+  'G.RL.1.2': /conditional|converse|inverse|contrapositive|biconditional|inductive|deductive|conjecture|syllogism|detachment|pattern/i,
+  'G.RL.1.3': /counterexample|valid|true or false/i,
+  'G.2D.1.1': /transversal|corresponding|alternate|consecutive interior|same-side/i,
+  'G.2D.1.2': /are .*parallel|parallel\?|prove.*parallel|lines? parallel|which lines/i,
+  'G.2D.1.3': /vertical|complement|supplement|linear pair|angle pair|adjacent|perpendicular/i,
+  'G.2D.1.4': /interior angle|exterior angle|angle sum|sum of the|triangle angle|angles of (a )?(triangle|polygon)/i,
+  'G.2D.1.5': /parallelogram|rhomb|rectangle|square|trapezoid|kite|quadrilateral|midsegment of a trapezoid/i,
+  'G.2D.1.6': /midpoint|distance|slope|coordinate|segment length|length|endpoint|bisector|on a number line|ruler|equation of|perpendicular line|parallel line|centroid|circumcenter|orthocenter|incenter/i,
+  'G.2D.1.7': /perimeter|area|law of sines|law of cosines|ambiguous/i,
+  'G.2D.1.8': /congruent polygon|corresponding part|similar|scale factor|proportion|isosceles|equilateral|base angle|ratio/i,
+  'G.2D.1.9': /sss|sas|asa|aas|\bhl\b|congruen/i,
+  'G.2D.1.10': /\baa\b|similar triangle|similarity/i,
+  'G.3D.1.1': /surface area|volume|cross section|net|solid|revolution|lateral/i,
+  'G.3D.1.2': /similar solid|scale factor|ratio/i,
+  'G.RT.1.1': /distance formula|pythag|right triangle\?|triple|hypotenuse/i,
+  'G.RT.1.3': /angle|inverse|arc(sin|cos|tan)|tan⁻¹|sin⁻¹|cos⁻¹/i,
+  'G.RT.1.4': /side|length|height|distance|solve the (right )?triangle/i,
+  'A1.N.1.1': /cube root|square root|radical|simplest/i, 'A1.N.1.2': /radical|root|rationaliz/i,
+  'A1.A.1.1': /equation|solve/i, 'A1.A.3.1': /formula|solve for|literal|rewrite/i, 'A1.A.3.4': /evaluate|expression/i,
+  'A1.F.1.1': /function\?|relation|is it a function|vertical line/i, 'A1.F.1.2': /domain|range|independent|dependent/i,
+  'A1.F.1.5': /discrete|continuous/i, 'A1.F.2.1': /linear or (non)?linear|arithmetic|geometric|exponential|nonlinear/i,
+  'A1.F.3.1': /table|graph|equation|represent/i, 'A1.F.3.2': /evaluate|f\(|input|output|function notation/i, 'A1.F.1.3': /function notation|f\(x\) =|write a (linear )?function/i,
+  'A1.A.4.1': /slope|intercept|rate of change/i, 'A1.A.4.2': /parallel|perpendicular|horizontal|vertical/i, 'A1.A.4.3': /write|equation of/i,
+  'A1.A.4.4': /standard form|slope-intercept|point-slope|form/i, 'A1.A.4.5': /graph.*(story|situation|describe)|sketch|increasing|decreasing|describe/i, 'A1.F.1.4': /piecewise|step/i,
+  'A1.D.1.1': /mean|median|mode|range|box|stem|histogram|dot plot|display|center|spread|deviation|quartile/i, 'A1.D.1.2': /scatter|outlier|association|trend/i,
+  'A1.D.1.3': /correlation|regression|residual|line of (best )?fit/i,
+  'A1.D.2.1': /permutation|combination|factorial|tree|arrangement|ways/i, 'A1.D.2.2': /union|intersection|complement|venn|overlapping|disjoint|independent|dependent|conditional|\band\b|\bor\b/i,
+  'A1.D.2.3': /experimental|simulation|frequency|two-way|binomial/i, 'A1.D.2.4': /decision|fair|expected/i,
+  'A1.A.3.2': /add|subtract|multiply|product|exponent|power/i, 'A1.F.3.3': /\(f [+−-] g\)|\(fg\)|f\(x\) [+−·] g\(x\)|function operation/i, 'A1.F.2.2': /transform|shift|translat|reflect|stretch|shrink/i,
+  'A2.N.2.1': /matri|dimension|order/i, 'A2.N.2.2': /add|subtract|scalar|matri/i, 'A2.A.1.7': /system|solve/i,
+  'A2.F.1.1': /domain|range|interval|set notation|evaluate/i, 'A2.F.1.2': /transform|shift|translat|reflect|stretch|shrink|parent/i,
+  'A2.F.1.3': /vertex|axis of symmetry|maximum|minimum|quadratic|parabola|focus|directrix/i, 'A2.D.1.2': /scatter|data|model/i, 'A2.D.1.3': /regression|correlation|predict|line of (best )?fit/i,
+  'A2.A.2.4': /vertex form|standard form|intercept form|form/i, 'A2.F.1.9': /discrete|continuous/i,
+  'A2.A.1.1': /solve|root|zero|solution/i, 'A2.A.2.1': /factor/i, 'A2.N.1.1': /power(s)? of i|i\^|i[²³⁴⁵⁶⁷⁸⁹]/i, 'A2.N.1.2': /complex|add|subtract|multiply|divide|conjugate|imaginary/i,
+  'A2.F.1.5': /zero|extrema|turning|increas|decreas|maximum|minimum|end behavior/i, 'A2.N.1.3': /rational exponent|nth root|radical|root/i, 'A2.A.2.5': /simplify|propert|rewrite|radical|exponent/i,
+  'A2.F.1.7': /graph|radical function|square root function|cube root function/i, 'A2.F.2.1': /\(f [+−-] g\)|\(fg\)|\(f\/g\)|operation|domain/i,
+  'A2.F.2.2': /compos|inverse/i, 'A2.F.2.3': /inverse/i, 'A2.F.2.4': /exponential form|logarithmic form|rewrite|convert/i, 'A2.F.1.4': /graph|asymptote|intercept|domain|range/i,
+  'A2.A.1.2': /interest|growth|decay|depreciat|population|model|half-life|compound/i, 'A2.A.1.6': /log/i, 'A2.F.1.8': /piecewise|step/i, 'A2.F.1.6': /graph|asymptote|hole|rational function|inverse variation|varies/i,
+  'A2.A.1.3': /solve|rational equation|extraneous/i,
+  'A2.A.3.1': /arithmetic/i, 'A2.A.3.2': /geometric/i, 'A2.A.3.3': /arithmetic (series|sum)|sum.*arithmetic|series/i, 'A2.A.3.4': /geometric (series|sum)|sum.*geometric|series|infinite/i,
+  'A2.D.2.1': /survey|study|sample|experiment|method|report|bias|population|inference|margin/i, 'A2.D.2.2': /misleading|bias|graph/i, 'A2.D.2.3': /causation|correlation|cause/i,
+  'PC.T.1.1': /quadrant|standard position|coterminal|sketch.*angle|terminal/i, 'PC.T.1.2': /radian|degree|convert|dms|minutes/i, 'PC.T.1.3': /arc length|sector|central angle|speed|area/i,
+  'PC.T.1.4': /exact|special|unit circle|30|45|60|six trig|triangle/i, 'PC.T.1.5': /reference|point on|terminal|coordinates/i, 'PC.T.1.6': /calculator|approximate|estimate|any angle|evaluate/i, 'PC.T.1.7': /even|odd|period|symmetr|negative angle/i,
+  'PC.T.3.1': /simplif|factor|rewrite|identity|prove|verify|sines and cosines/i, 'PC.T.3.2': /formula|exact value|double|half|sum|difference|product|power-reduc|equivalent|prove|verify/i,
+  'PC.T.3.3': /solve|solution|check/i, 'PC.T.2.4': /inverse|arcsin|arccos|arctan|approximat|calculator/i,
+  'PC.T.2.2': /law of sines|law of cosines|solve|ambiguous|triangle|side|angle/i, 'PC.T.2.3': /area|heron/i,
+  'PC.T.4.1': /add|subtract|multiply|equal|power|i[²³⁴]|square root of a negative|√\(−/i, 'PC.T.4.2': /conjugate|divid|quotient/i,
+  'PC.F.1.2': /graph|sketch|asymptote|intercept|match|domain|range/i, 'PC.F.1.4': /asymptote|end behavior/i, 'PC.F.1.5': /inverse|one-to-one|exponential form|logarithmic form/i,
+  'PC.F.1.1': /model|interest|growth|decay|context|population|world/i, 'PC.F.3.1': /solve|equation/i, 'PC.F.3.3': /solve|check|propert|expand|condense|exact/i,
+  'PC.F.2.1': /compos|domain|\(f ∘ g\)|f\(g/i, 'PC.F.2.2': /decompos|write .* as a composition|find f and g/i, 'PC.F.2.4': /verify|inverse/i, 'PC.F.1.3': /graph|table|increas|decreas|extrema|average rate|even|odd/i,
+  'PC.CS.1.1': /model|application|satellite|bridge|orbit|arch|reflector|dish|world/i, 'PC.CS.1.2': /focus|foci|directrix|vertex|vertices|center|asymptote|eccentric|properties|axis/i,
+  'PC.CS.1.3': /sketch|graph/i, 'PC.CS.1.4': /write|equation|standard form|find the (standard )?equation/i,
+};
+// the objectives for a question type: by its section's lesson number(s); the broad G.RL.1.1 goes last
+const OAS_SEC = {};
+function oasFor(t) {
+  if (!t || !t.section) return [];
+  const subj = t.subject, key = subj + '|' + t.section;
+  if (OAS_SEC[key]) return OAS_SEC[key];
+  let nums = [];
+  const m = /^(?:Pre-)?([P\d]+)\.(\d+)(?:\s*[–-]\s*\1?\.?(\d+))?/.exec(t.section);
+  if (m) { const a = +m[2], b = m[3] ? +m[3] : a; for (let k = a; k <= b; k++) nums.push(`${m[1]}.${k}`); }
+  if (/^Pre-6\.4/.test(t.section)) nums = ['6.4'];
+  let codes = [];
+  if (subj === 'precalc') nums.forEach((n) => { codes.push(...(OAS_PRECALC[n] || '').split(' ').filter(Boolean)); });
+  else if (OAS_LESSONS[subj]) Object.entries(OAS_LESSONS[subj]).forEach(([c, ls]) => { if (ls.split(' ').some((l) => nums.includes(l))) codes.push(c); });
+  if (/^Pre-6\.4/.test(t.section)) codes = ['G.2D.1.6', 'G.RT.1.1'];
+  codes = [...new Set(codes)].sort((x, y) => (x === 'G.RL.1.1') - (y === 'G.RL.1.1'));
+  return (OAS_SEC[key] = codes);
+}
+// this question type's objectives: the section's, narrowed by the words in the type's name and description
+const OAS_TYPE = {};
+function oasForType(t) {
+  if (!t) return [];
+  if (OAS_TYPE[t.id]) return OAS_TYPE[t.id];
+  const all = oasFor(t), words = `${t.label || ''} ${t.desc || ''}`, RL = 'G.RL.1.1';
+  const content = all.filter((c) => c !== RL), proofy = /proof|prove|postulate|justify|reasons?\b|two-column/i.test(words);
+  if (!content.length) return (OAS_TYPE[t.id] = all);
+  let hit = content.length > 1 ? content.filter((c) => OAS_WORDS[c] && OAS_WORDS[c].test(words)) : content;
+  if (!hit.length) hit = content;
+  if (all.includes(RL) && proofy) hit = [...hit, RL]; // the broad reasoning objective only for proofs and reasons
+  return (OAS_TYPE[t.id] = hit);
+}
+const oasTip = (codes) => 'Oklahoma Academic Standards:\n' + codes.map((c) => `${c}: ${OAS_TEXT[c] || ''}`).join('\n') + '\n(Short summaries. The full wording is in the 2022 Oklahoma Academic Standards for Mathematics.)';
+function oasBadge(t) {
+  const codes = oasForType(t);
+  if (!codes.length) return t && t.subject === 'precalc' ? el('div', { class: 'small', style: 'margin-top:2px;color:#8a8f98' }, '📋 OAS: no Precalculus objective for this topic') : '';
+  return el('div', { class: 'small', title: oasTip(codes), style: 'margin-top:2px;color:#5b6b7f;cursor:help' }, '📋 OAS: ', ...codes.flatMap((c, k) => [k ? ', ' : '', el('b', { style: 'font-weight:600' }, c)]));
+}
+
 function builder() {
   teacherNav('build');
   document.getElementById('title').textContent = 'Build an assignment';
@@ -42896,7 +43093,7 @@ function builder() {
     bNum.addEventListener('input', () => { bonusCounts[t.id] = Math.max(0, Math.min(20, Math.floor(+bNum.value || 0))); if (!bonusCounts[t.id]) delete bonusCounts[t.id]; refreshBadges(); update(); });
     bFmt.addEventListener('input', () => { bonusFormats[t.id] = bFmt.value; update(); });
     secBody.append(el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' + (t.challenge ? ';background:#fffaf0;box-shadow:inset 3px 0 0 #c9a227;padding-left:8px' : ''), title: t.challenge ? 'A harder, multi-step question. Use ★ Bonus to add it as extra credit.' : '' },
-      num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc)),
+      num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc), oasBadge(t)),
       t.writtenOnly || t.sketch ? el('span', { class: 'small', style: 'padding:7px 8px' }, t.sketch ? 'Graph on a grid' : t.frq ? 'Free response, parts (a)–(d)' : 'Written proof') : fmtSel, prevBtn, hideBtn, bBtn, t.writtenOnly || t.sketch ? '' : split, bLine), prevBox);
     prevBtn._fmt = fmtSel;
   });
