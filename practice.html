@@ -35941,6 +35941,35 @@ function registerCustomUrl(url) {
   if (key !== CUSTOM_KEY) SETS[key] = { subject: SUBJECTS[q.get('subject')] ? q.get('subject') : (QUESTION_TYPES.find((t) => t.id === items[0][0]) || {}).subject || 'geometry', title: (q.get('title') || 'Custom Practice').slice(0, 80), items, shuffle: q.get('order') === 'mixed', mix, custom: true, same: q.get('same') === '1', bonusPct: bonusPctOf(q), gen: q.get('g') === '2' ? 2 : undefined , more: q.get('more') === '1', picks: q.get('same') === '1' ? picksOf(q) : undefined };
   return key;
 }
+// A piecewise function written in a question as “f(x) = A if x < c;   B if x ≥ c.” is shown the usual way instead: f(x) = { A, if x < c / B, if x ≥ c } with a brace.
+function pwDrawFit(name, pieces) {
+  return (cv) => {
+    const c = cv._ctx, W = cv._w, H = cv._h, n = pieces.length, lh = 30, top = (H - n * lh) / 2;
+    c.clearRect(0, 0, W, H); c.fillStyle = '#1d1d1b'; c.textBaseline = 'middle';
+    c.font = 'italic 18px Times, serif'; const nameW = c.measureText(`${name}(x) =`).width; c.textAlign = 'left'; c.fillText(`${name}(x) =`, 8, H / 2);
+    c.font = '17px Times, serif'; const ruleW = Math.max(...pieces.map(([t]) => c.measureText(t + ',').width));
+    const bx = 8 + nameW + 14, y0 = top + 2, y1 = top + n * lh - 2, ym = H / 2;
+    c.strokeStyle = '#1d1d1b'; c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(bx + 8, y0); c.quadraticCurveTo(bx, y0, bx, y0 + 10); c.lineTo(bx, ym - 6); c.quadraticCurveTo(bx, ym, bx - 6, ym); c.quadraticCurveTo(bx, ym, bx, ym + 6); c.lineTo(bx, y1 - 10); c.quadraticCurveTo(bx, y1, bx + 8, y1); c.stroke();
+    pieces.forEach(([rule, cond], i) => { const y = top + lh * (i + 0.5); c.fillText(rule + ',', bx + 16, y); c.fillText(cond, bx + 16 + ruleW + 22, y); });
+  };
+}
+function pwStem(q) {
+  if (!q || q.draw || typeof q.stem !== 'string') return q;
+  const fix = (stem) => {
+    const m = /^([a-zA-Z])\(x\) = (.*?\bif\b[^\n]*?)\.(?=\s|$)\s*/.exec(stem); if (!m) return null;
+    const parts = m[2].split(/;\s+/).map((p) => /^(?:[a-zA-Z]\(x\) = )?(.+?) (if .+)$/.exec(p.trim()));
+    if (parts.length < 2 || parts.some((p) => !p)) return null;
+    return { name: m[1], pieces: parts.map((p) => [p[1], p[2]]), rest: stem.slice(m[0].length).trim() };
+  };
+  const a = fix(q.stem); if (!a) return q;
+  const len = (t) => unM(t).length, w = Math.min(640, 70 + Math.max(...a.pieces.map(([t]) => len(t))) * 9 + Math.max(...a.pieces.map(([, t]) => len(t))) * 8 + 50);
+  q.draw = pwDrawFit(a.name, a.pieces); q.size = [w, 26 + a.pieces.length * 30];
+  q._stem0 = q.stem; q.stem = `Use the function ${a.name} shown below.${a.rest ? '\n' + a.rest : ''}`; // _stem0: so work saved before this change still matches
+  if (typeof q.frStem === 'string') { const b = fix(q.frStem); if (b) q.frStem = b.rest || q.stem; }
+  return q;
+}
+for (const id of Object.keys(TEMPLATES)) { const make = TEMPLATES[id]; TEMPLATES[id] = (r) => pwStem(make(r)); }
 // the TI-Nspire screen question types (their templates are further down) are registered here, before a built assignment's link is read
 [['nsLinRegA1', 'nsLinReg', 'algebra1', '4.6 Analyzing Lines of Fit', 'TI-Nspire screen: linear regression', 'Read m, b, and r from the Linear Regression results'],
  ['nsOneVarA1', 'nsOneVar', 'algebra1', '8.1 Measures of Center and Variation', 'TI-Nspire screen: one-variable statistics', 'Read the mean, median, or standard deviation from One-Variable Statistics'],
@@ -37109,7 +37138,7 @@ function saveState() {
     frozen: state.frozen, leaveBase: state.leaveBase, unlocks: state.unlocks, misses: state.misses });
 }
 // fingerprint of a question (before any retries), so saved work follows its question if the assignment is edited
-const qSig = (q) => q.tpl + ':' + cyrb53(unM(String(q.stem)) + '|' + unM((q._choices0 || q.choices || []).join('|'))).toString(36); // _choices0: before the wrong-mode choice, so saved work still matches
+const qSig = (q) => q.tpl + ':' + cyrb53(unM(String(q._stem0 || q.stem)) + '|' + unM((q._choices0 || q.choices || []).join('|'))).toString(36); // _choices0: before the wrong-mode choice, so saved work still matches
 // the assignment changed since this student saved (questions added, removed, or reordered):
 // keep each saved answer with the question it belongs to and drop answers to questions that are gone
 function remapSaved(key, saved, sig) {
@@ -43030,6 +43059,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', subjects: ['apcalc', 'algebra2'], text: 'Piecewise functions in questions now appear the usual way, with a brace and each piece on its own line, instead of written out on one line with semicolons.' },
   { date: '2026-11-22', text: 'Accommodations (IEP / 504): on Classes & roster, set a student’s accommodations once (extra tries, extra attempts, 3 answer choices instead of 4, a 🔊 Read aloud button, larger text, Homework help always on, Desmos always on, or breaks without locking) and they apply to every assignment that student opens. Your Sheet’s script updates itself to store them within about 10 minutes.' },
   { date: '2026-11-22', text: 'Parentheses check: when a student’s wrong answer is exactly what the calculator gives with a pair of parentheses left out (like −3² instead of (−3)², 21 + 16 ÷ 2 instead of (21 + 16) ÷ 2, or √9 + 16 instead of √(9 + 16)), the assignment tells them which parentheses they missed and how to type it on the TI-Nspire.' },
   { date: '2026-11-22', subjects: ['geometry', 'precalc', 'apcalc', 'act', 'algebra2'], text: 'TI-Nspire help now shows the quick way to switch angle mode: click DEG or RAD in the top right corner of the screen (the Settings menu is listed as the long way).' },
