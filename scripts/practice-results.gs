@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-22.4'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-22.5'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -1991,15 +1991,22 @@ function mistakeHelp_(d) {
   const user = 'Problem:\n' + cut(d.stem, 1500) + (d.choices ? '\nChoices: ' + cut(d.choices, 600) : '') +
     '\n\nCorrect answer (do not reveal): ' + cut(d.right, 200) + '\nWorked solution (do not reveal):\n' + cut(d.solution, 1500) +
     '\n\nStudent\'s answer: ' + cut(d.answer, 300) + '\n\nStudent\'s work:\n' + (work || '(no work shown)');
-  const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
-    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    payload: JSON.stringify({ model: HELP_MODEL, max_tokens: 300, system: HELP_RULES, messages: [{ role: 'user', content: d.figure && String(d.figure).length < 400000
-      ? [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: String(d.figure) } }, { type: 'text', text: 'The figure above is part of the problem.\n\n' + user }] : user }] }),
-  });
+  const content = d.figure && String(d.figure).length < 400000
+    ? [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: String(d.figure) } }, { type: 'text', text: 'The figure above is part of the problem.\n\n' + user }] : user;
+  // no extended thinking (it would use up the reply's room), and room for a full answer
+  const ask = function (noThink) {
+    const body = { model: HELP_MODEL, max_tokens: 1200, system: HELP_RULES, messages: [{ role: 'user', content: content }] };
+    if (noThink) body.thinking = { type: 'disabled' };
+    return UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, payload: JSON.stringify(body) });
+  };
+  let res = ask(true);
+  if (res.getResponseCode() === 400 && /thinking/i.test(res.getContentText())) res = ask(false); // a model that doesn't take that setting
   if (res.getResponseCode() !== 200) return { ok: false, error: 'Mistake help isn’t available right now. Try a Hint or the Worked example.' };
   const j = JSON.parse(res.getContentText());
   try { aiSpend_(HELP_MODEL, j.usage); } catch (e) {}
-  const text = (j.content || []).map(function (c) { return c.text || ''; }).join('').trim();
-  return { ok: true, text: cut(text, 900), left: left };
+  let text = (j.content || []).filter(function (c) { return c.type === 'text'; }).map(function (c) { return c.text || ''; }).join('').trim();
+  if (j.stop_reason === 'max_tokens') { const k = Math.max(text.lastIndexOf('. '), text.lastIndexOf('? '), text.lastIndexOf('! ')); if (k > 40) text = text.slice(0, k + 1); } // never end mid-sentence
+  if (!text) return { ok: false, error: 'Mistake help didn’t have an answer this time. Try again, or use a Hint.' };
+  return { ok: true, text: cut(text, 1500), left: left };
 }
