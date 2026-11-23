@@ -36206,6 +36206,49 @@ function nsMode(r) {
 /* ---------- Parentheses slips: the student's answer is what the calculator gives when a pair of parentheses is left out ----------
    (−3)² typed as −3² (= −9), 12/(2·3) typed as 12/2·3 (= 18), (8 + 4)/2 typed as 8 + 4/2, √(9 + 16) typed as √9 + 16, 2^(3+1) typed as 2^3+1.
    The calculations come from the worked solution: each one that gives the answer is tried again with each pair of parentheses taken out. */
+/* ---------- AI mistake help (help letter a): after a wrong try, "🤖 Help me find my mistake" sends the problem, the student's answer,
+   and their Show-your-work lines to the teacher's Sheet, which asks a low-cost AI model to point to the first wrong step without giving the answer. */
+let AI_HELP_ON = null; // from the Sheet when an assignment starts (null: not asked yet)
+const AI_LAST = {}; // question number → the last wrong try: { q, a, work } (kept when a miss brings new numbers)
+function aiAnswerText(q, a) {
+  if (q.mode === 'fr' && q.fr) { const f = q.fr.fields || []; return (Array.isArray(a) ? a : [a]).map((v, k) => `${f[k] && f[k].label ? unM(f[k].label) + ' ' : ''}${v ?? ''}`).join(';  '); }
+  return Array.isArray(q.choices) && Number.isInteger(a) ? unM(q.choices[a]) : String(a ?? '');
+}
+function aiMask(q, t) { // never show a number from the answer that the question doesn't already have
+  const plain = (x) => unM(String(x || ''));
+  const given = new Set(plain(`${q.stem} ${q.frStem || ''}`).match(/\d+(?:\.\d+)?/g) || []);
+  const ans = [q.fr ? q.fr.display : '', Array.isArray(q.choices) ? q.choices[q.answer] : ''].filter((x) => typeof x === 'string');
+  let out = String(t);
+  for (const n of new Set(ans.flatMap((x) => plain(x).match(/\d+(?:\.\d+)?/g) || []))) if (!given.has(n) && n.replace('.', '').length >= 2) out = out.replace(new RegExp(`(?<![\\d.])${n.replace('.', '\\.')}(?![\\d])`, 'g'), '?');
+  return out;
+}
+async function aiHelpAsk(i) {
+  const L = AI_LAST[i]; if (!L) return; const q = L.q;
+  const H = (HELP[i] = HELP[i] || {}); H.ai = { busy: true }; rerenderAt(i);
+  const ps = state.rid ? signinPass() : null;
+  const body = { action: 'mistakeHelp', period: state.period, name: state.name, token: ps && ps.rid === state.rid ? ps.token : undefined, preview: !!state.teacher,
+    stem: unM(q.mode === 'fr' && q.frStem ? q.frStem : q.stem), choices: q.mode !== 'fr' && Array.isArray(q.choices) ? q.choices.map((c, k) => `${'ABCDE'[k]}) ${unM(c)}`).join('   ') : '',
+    right: unM(q.fr && q.mode === 'fr' ? q.fr.display : Array.isArray(q.choices) ? q.choices[q.answer] : ''), solution: unM(q.solution || ''), answer: aiAnswerText(q, L.a), work: L.work.map((l) => unM(String(l))) };
+  if (q.draw) { try { const sz = q.size || [360, 280], cv = makeCanvas(sz[0], sz[1]); q.draw(cv); const u = cv.toDataURL('image/png'); if (u.length < 400000) body.figure = u.split(',')[1]; } catch (e) {} } // the figure, so the AI sees the triangle or graph
+  let g;
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 30000);
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+    clearTimeout(t); g = await res.json();
+  } catch (e) { g = { ok: false, error: 'Mistake help didn’t answer. Check your connection and try again.' }; }
+  H.ai = g && g.ok ? { text: aiMask(q, g.text), left: g.left, ans: body.answer, old: q !== state.qs[i] } : { error: (g && g.error) || 'Mistake help isn’t available right now.' };
+  if (g && g.ok) { state.aiUsed = state.aiUsed || {}; state.aiUsed[i] = (state.aiUsed[i] || 0) + 1; }
+  rerenderAt(i);
+}
+function aiHelpBox(q, i) {
+  const A = (HELP[i] || {}).ai; if (!A) return '';
+  const box = el('div', { class: 'helpbox' }, el('div', { class: 'helphead' }, '🤖 Mistake help'));
+  if (A.busy) box.append(el('div', { class: 'small' }, 'Looking at your answer and your work…'));
+  else if (A.error) box.append(el('div', {}, A.error));
+  else box.append(el('div', { style: 'white-space:pre-wrap' }, A.text),
+    el('div', { class: 'small', style: 'margin-top:6px' }, `About your ${A.old ? 'last try (before the new numbers)' : 'answer'}: ${A.ans || '(blank)'}. This help is from AI and can be wrong; check it against your notes.${A.left != null ? ` Mistake helps left today: ${A.left}.` : ''}`));
+  return box;
+}
 function calcNorm(t) {
   return String(t).replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/[−–]/g, '-').replace(/[·×⋅]/g, '*').replace(/÷/g, '/').replace(/²/g, '^2').replace(/³/g, '^3')
     .replace(/(sin|cos|tan)⁻¹/g, 'a$1').replace(/√/g, 'sqrt ').replace(/π/g, ' pi ').replace(/\s+/g, ' ').trim();
@@ -36548,12 +36591,12 @@ function regenQuestion(seedStr, old, i, t) {
 // Links made before Video was its own choice showed the video with the Worked example, so they still do: a string with e,
 // no v, and no '-' is one of those. The builder marks newer links that have e without v with a '-'.
 function helpOf(v) {
-  if (v === true || v === '1') return 'henvc';
+  if (v === true || v === '1') return 'henvca';
   if (typeof v !== 'string') return '';
   const old = v.includes('e') && !v.includes('v') && !v.includes('-');
-  return [...'henvc'].filter((c) => v.includes(c) || (c === 'v' && old)).join('');
+  return [...'henvca'].filter((c) => v.includes(c) || (c === 'v' && old)).join('');
 }
-function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Worked example'], ['n', 'Notes'], ['v', 'Video'], ['c', 'TI-Nspire steps']].filter(([c]) => h.includes(c)).map(([, t]) => t).join(', ') : 'no'; }
+function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Worked example'], ['n', 'Notes'], ['v', 'Video'], ['c', 'TI-Nspire steps'], ['a', 'AI mistake help']].filter(([c]) => h.includes(c)).map(([, t]) => t).join(', ') : 'no'; }
 /* ---------- Accommodations (IEP / 504) ----------
    Set once for a student on Classes & roster; they apply to every assignment that student opens:
    retries / attempts: extra tries on each question / extra attempts at the whole assignment; three: 3 answer choices instead of 4;
@@ -36569,7 +36612,7 @@ async function accLoad(period, name, rid) {
     const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'myAcc', period, name, token: ps && ps.rid === rid ? ps.token : undefined }) });
     clearTimeout(t);
-    const g = await res.json(); if (g && g.ok) { store.set(ck, g.acc || {}); return g.acc || {}; }
+    const g = await res.json(); if (g && g.ok) { store.set(ck, g.acc || {}); if (g.ai !== undefined) AI_HELP_ON = !!g.ai; return g.acc || {}; }
   } catch (e) {}
   return store.get(ck) || {}; // offline or an older script: what this Chromebook got last time
 }
@@ -37732,6 +37775,9 @@ function hintBar(q, i) {
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); if (h.ex) { h.ex = 0; } else { h.ex = (h.n || 0) + 1; h.n = h.ex; h.step = 0; if (!state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } } rerenderAt(i); } }, H.ex ? '📘 Hide example' : '📘 Worked example'));
     if (on('v') && practiceVideos(q, () => rerenderAt(i)).length) row.append(el('button', { class: 'btn secondary' + (H.vid ? ' on' : ''), type: 'button', style: sm, title: 'Watch a narrated video of a problem like this one',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.vid = !h.vid; if (h.vid && !state.teacher) { state.exUsed = state.exUsed || {}; state.exUsed[i] = true; saveState(); } rerenderAt(i); } }, H.vid ? '🎬 Hide video' : '🎬 Video'));
+    if (on('a') && AI_HELP_ON !== false && CONFIG.SCRIPT_URL && AI_LAST[i] && state.status[i] !== 'correct')
+      row.append(el('button', { class: 'btn secondary' + ((HELP[i] || {}).ai ? ' on' : ''), type: 'button', style: sm, title: 'AI looks at your answer and your work and points to the step that went wrong (it won’t give the answer)',
+        onclick: () => { const h = (HELP[i] = HELP[i] || {}); if (h.ai && !h.ai.busy && !h.ai.error) { h.ai = null; rerenderAt(i); } else if (!(h.ai && h.ai.busy)) aiHelpAsk(i); } }, (HELP[i] || {}).ai && !(HELP[i] || {}).ai.error && !(HELP[i] || {}).ai.busy ? '🤖 Hide mistake help' : '🤖 Help me find my mistake'));
     if (on('c') && nspireSkills(q).length) row.append(el('button', { class: 'btn secondary' + (H.calc ? ' on' : ''), type: 'button', style: sm, title: 'The keystrokes for the calculator part of this problem',
       onclick: () => { const h = (HELP[i] = HELP[i] || {}); h.calc = !h.calc; rerenderAt(i); } }, H.calc ? '🧮 Hide TI-Nspire' : '🧮 TI-Nspire'));
     if (on('n') && lessonFor(q.tpl)) row.append(el('button', { class: 'btn secondary', type: 'button', style: sm, title: 'Review the notes and class examples for this section',
@@ -37850,6 +37896,7 @@ function helpPanel(q, i) {
       wrap.append(el('div', { class: 'helpbox' }, el('div', { class: 'helphead' }, `🎬 Video: ${v.title} (a problem like yours, different numbers)`), pick, P.wrap)); }
   }
   if (H.calc) wrap.append(nspireBox(q));
+  if (H.ai) wrap.append(aiHelpBox(q, i));
   if (H.notes) {
     const k = lessonFor(q.tpl), L = k && LESSONS[k], box = el('div', { class: 'helpbox notes' });
     if (L) {
@@ -37914,6 +37961,7 @@ async function checkQ(i) {
   const pts = scoreOf(q, a);
   state.flash[i] = '';
   const am = pts < 1 ? calcTip(q, a) : ''; // a calculator slip: wrong angle mode, the decimal of an exact answer, or rounding too early
+  if (pts < 1) { AI_LAST[i] = { q, a: Array.isArray(a) ? a.slice() : a, work: workLines(i).slice() }; if (HELP[i]) HELP[i].ai = null; } else delete AI_LAST[i]; // for 🤖 mistake help
   const k = perVersion(q), m = (state.misses[i] || 0) + 1, wrong = wrongSoFar(q, i) + 1, total = state.retries + 1;
   if (pts === 1) { state.status[i] = 'correct'; }
   else if (wrong >= total) { state.status[i] = 'locked'; state.misses[i] = m; if (am) state.flash[i] = am; }
@@ -38670,6 +38718,29 @@ async function setupPost(op, extra) {
   return res.json();
 }
 const PERIOD_CHOICES = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+// Settings: AI mistake help (on/off, helps per student per day, monthly budget) and what's been spent this month
+function aiHelpSettings(st, note) {
+  const out = el('div', {});
+  if (!st || !st.ok || !st.aiHelp) return el('div', { class: 'small', style: 'margin-top:14px' }, 'AI mistake help settings appear here once your Sheet’s script updates itself (within about 10 minutes).');
+  const c = st.aiHelp, b = st.budget || { spent: 0, limit: c.budget };
+  const on = el('input', { type: 'checkbox', style: 'width:18px;height:18px' }); on.checked = !!c.on;
+  const per = el('select', { style: 'width:auto' }, ...[1, 2, 3, 4, 5, 8, 10].map((n) => el('option', { value: String(n) }, String(n)))); per.value = String(c.perDay);
+  const bud = el('input', { type: 'number', min: '1', max: '100', step: '1', value: String(c.budget), style: 'width:80px' });
+  const spent = el('span', {}, `Spent this month: $${(+b.spent || 0).toFixed(2)} of $${(+b.limit || c.budget).toFixed(2)}.`);
+  const save = async () => {
+    let r; try { r = await setupPost('aiHelpSave', { on: on.checked, perDay: +per.value, budget: +bud.value }); } catch { r = { ok: false, error: 'Couldn’t reach your script.' }; }
+    if (!r.ok) return note(out, false, r.error || 'Something went wrong.');
+    spent.textContent = `Spent this month: $${(+r.budget.spent || 0).toFixed(2)} of $${(+r.budget.limit).toFixed(2)}.`; note(out, true, '✅ Saved.');
+  };
+  [on, per, bud].forEach((x) => x.addEventListener('change', save));
+  return el('div', { style: 'margin-top:18px' }, el('div', { style: 'font-weight:600' }, '🤖 AI mistake help'),
+    el('p', { class: 'small', style: 'margin:2px 0 8px' }, 'When AI mistake help is checked under Homework help in Build an assignment, a student who misses a question gets a “Help me find my mistake” button. AI looks at their answer and their work and points to the first step that went wrong, without giving the answer. It uses the low-cost model (well under a cent per help). When this month’s budget is used up, the button stops working until next month; nothing more is spent. ', st.aiKey ? '' : el('b', {}, 'It needs the AI key above.')),
+    el('label', { style: 'display:flex;gap:8px;align-items:center' }, on, 'Turn on mistake help'),
+    el('div', { style: 'display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:8px' },
+      el('label', { style: 'display:flex;gap:6px;align-items:center' }, 'Helps per student per day', per),
+      el('label', { style: 'display:flex;gap:6px;align-items:center' }, 'Monthly budget $', bud)),
+    el('p', { class: 'small', style: 'margin:6px 0 0' }, spent), out);
+}
 async function classesScreen() {
   teacherNav('classes');
   document.getElementById('title').textContent = 'Classes & roster';
@@ -38817,9 +38888,9 @@ async function classesScreen() {
       el('div', { style: 'font-weight:600;margin-top:4px' }, 'Dashboard password'),
       el('p', { class: 'small', style: 'margin:2px 0 6px' }, 'The password for the Results dashboard and this page.'),
       el('div', { style: 'display:grid;gap:8px;max-width:360px' }, p1, p2), pbtn, out,
-      el('div', { style: 'font-weight:600;margin-top:18px' }, 'AI grading key (for trig-identity proofs)'),
+      el('div', { style: 'font-weight:600;margin-top:18px' }, 'AI key (for 🤖 mistake help and trig-identity proofs)'),
       el('p', { class: 'small', style: 'margin:2px 0 6px' }, kstat, ' The key is saved in your Sheet’s script and never shown again.'),
-      k, el('div', { style: 'display:flex;gap:8px;margin-top:8px;flex-wrap:wrap' }, kbtn, st.aiKey ? krm : ''), out2)); }
+      k, el('div', { style: 'display:flex;gap:8px;margin-top:8px;flex-wrap:wrap' }, kbtn, st.aiKey ? krm : ''), out2, aiHelpSettings(st, note))); }
 
   // 6. end of the year
   app.append(dashYearCard());
@@ -43059,6 +43130,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: '🤖 AI mistake help: a new Homework help choice. After a student misses a question, “Help me find my mistake” has AI look at their answer and their Show-your-work lines and point to the first wrong step, without giving the answer. Turn it on and set the limits (helps per student per day, monthly budget, $5 to start) under Settings on Classes & roster. It needs an Anthropic API key there.' },
   { date: '2026-11-22', subjects: ['apcalc', 'algebra2'], text: 'Piecewise functions in questions now appear the usual way, with a brace and each piece on its own line, instead of written out on one line with semicolons.' },
   { date: '2026-11-22', text: 'Accommodations (IEP / 504): on Classes & roster, set a student’s accommodations once (extra tries, extra attempts, 3 answer choices instead of 4, a 🔊 Read aloud button, larger text, Homework help always on, Desmos always on, or breaks without locking) and they apply to every assignment that student opens. Your Sheet’s script updates itself to store them within about 10 minutes.' },
   { date: '2026-11-22', text: 'Parentheses check: when a student’s wrong answer is exactly what the calculator gives with a pair of parentheses left out (like −3² instead of (−3)², 21 + 16 ÷ 2 instead of (21 + 16) ÷ 2, or √9 + 16 instead of √(9 + 16)), the assignment tells them which parentheses they missed and how to type it on the TI-Nspire.' },
@@ -43141,7 +43213,7 @@ function helpScreen(open) {
       OL([B('Build an assignment'), ' tab. Type a title and pick the subject (that’s the gradebook tab the scores go to).'],
         ['Open a chapter, then a section, and type how many of each question type you want. ', B('Preview'), ' shows a sample. ', B('★ Bonus'), ' adds extra-credit questions at the end. Under each question type, ', B('📋 OAS'), ' shows its Oklahoma Academic Standards objective; click it (or point at it) to read the objective’s wording.'],
         [B('Find a topic: '), 'type it in the search box above the list of question types (for example, “vertical and horizontal lines” or “9.4”). Only the matching question types show; clear the box to see everything again.'],
-        ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints, worked examples, videos, TI-Nspire steps, and notes — pick any of them, and leave it off for tests), and the Desmos calculator.'],
+        ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints, worked examples, videos, TI-Nspire steps, AI mistake help, and notes — pick any of them, and leave it off for tests), and the Desmos calculator.'],
         ['Click ', B('Try it as a student'), ' to see exactly what students will get. Nothing you do there is graded.'],
         ['Click ', B('Copy link'), ' or ', B('📤 Assign in Google Classroom'), ' (next step).']),
       P('To change one later: ', B('Edit an assignment you already made'), ' at the top of the same tab.')]],
@@ -43955,10 +44027,10 @@ function builder() {
   const desmosIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   const moreIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
   moreIn.checked = !!saved.more;
-  const helpIns = { h: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), e: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), n: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), v: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), c: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }) };
-  const helpNow = () => [...'henvc'].filter((c) => helpIns[c].checked).join('');
-  const syncHelp = () => { const h = helpNow(); hintsIn.checked = !!h; hintsIn.indeterminate = !!h && h.length < 5; };
-  for (const c of 'henvc') helpIns[c].checked = helpOf(saved.hints).includes(c);
+  const helpIns = { h: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), e: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), n: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), v: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), c: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }), a: el('input', { type: 'checkbox', style: 'width:16px;height:16px' }) };
+  const helpNow = () => [...'henvca'].filter((c) => helpIns[c].checked).join('');
+  const syncHelp = () => { const h = helpNow(); hintsIn.checked = !!h; hintsIn.indeterminate = !!h && h.length < 6; };
+  for (const c of 'henvca') helpIns[c].checked = helpOf(saved.hints).includes(c);
   syncHelp();
   desmosIn.checked = !!saved.desmos;
   const shareIn = el('input', { type: 'checkbox', style: 'width:20px;height:20px' });
@@ -44108,8 +44180,8 @@ function builder() {
     el('label', {}, 'Same questions for everyone'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, sameIn,
       el('span', { class: 'small' }, 'Every student gets the identical questions, numbers, and answer choices (handy for going over it together). Then use Try it as a student to swap any question for a new version until it’s exactly what you want. Unchecked = a different version for each student.')),
     el('label', {}, 'Homework help'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, hintsIn,
-      el('span', { class: 'small' }, 'Adds homework help to every question: a Hint (the first step, with the answer hidden), a Worked example (a twin problem with different numbers, solved one step at a time), a Video (a narrated walkthrough of a problem like theirs), TI-Nspire steps (the keystrokes for the calculator part, when there is one), and Notes (the section’s lesson notes, class examples, and interactives, when there is a lesson plan). Help never changes the score; the gradebook marks each question where a hint, worked example, or video was used. Leave it off for quizzes and tests.')),
-    el('span'), el('div', { style: 'display:flex;gap:18px;flex-wrap:wrap;margin:-4px 0 4px 30px' }, ...[['h', 'Hint'], ['e', 'Worked example'], ['v', 'Video'], ['n', 'Notes'], ['c', 'TI-Nspire steps']].map(([c, t]) => el('label', { style: 'display:flex;gap:6px;align-items:center;font-weight:400;font-size:15px;margin:0' }, helpIns[c], t))),
+      el('span', { class: 'small' }, 'Adds homework help to every question: a Hint (the first step, with the answer hidden), a Worked example (a twin problem with different numbers, solved one step at a time), a Video (a narrated walkthrough of a problem like theirs), TI-Nspire steps (the keystrokes for the calculator part, when there is one), AI mistake help (after a miss, AI points to the step that went wrong; set it up under Settings on Classes & roster), and Notes (the section’s lesson notes, class examples, and interactives, when there is a lesson plan). Help never changes the score; the gradebook marks each question where a hint, worked example, or video was used. Leave it off for quizzes and tests.')),
+    el('span'), el('div', { style: 'display:flex;gap:18px;flex-wrap:wrap;margin:-4px 0 4px 30px' }, ...[['h', 'Hint'], ['e', 'Worked example'], ['v', 'Video'], ['n', 'Notes'], ['c', 'TI-Nspire steps'], ['a', 'AI mistake help']].map(([c, t]) => el('label', { style: 'display:flex;gap:6px;align-items:center;font-weight:400;font-size:15px;margin:0' }, helpIns[c], t))),
     el('label', {}, '“Try another” button'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, moreIn,
       el('span', { class: 'small' }, 'Adds a “Try another” button to every question. It gives the student a new question of the same kind, with new numbers, to practice on: they pick an answer, see if it’s right, and can see the solution. It is never graded and doesn’t change their score.')),
     el('label', {}, 'Desmos calculator'), el('label', { style: 'display:flex;gap:10px;align-items:center;font-weight:400;margin:0' }, desmosIn,
@@ -44289,8 +44361,8 @@ function builder() {
   [titleIn, subjSel, orderSel, retriesIn, checksIn, attemptsIn, leaveIn, bonusPctIn].forEach((x) => x.addEventListener('input', update));
   lockIn.addEventListener('change', update);
   sameIn.addEventListener('change', update);
-  hintsIn.addEventListener('change', () => { for (const c of 'henvc') helpIns[c].checked = hintsIn.checked; hintsIn.indeterminate = false; update(); }); // checking Homework help checks all of its parts
-  for (const c of 'henvc') helpIns[c].addEventListener('change', () => { syncHelp(); update(); });
+  hintsIn.addEventListener('change', () => { for (const c of 'henvca') helpIns[c].checked = hintsIn.checked; hintsIn.indeterminate = false; update(); }); // checking Homework help checks all of its parts
+  for (const c of 'henvca') helpIns[c].addEventListener('change', () => { syncHelp(); update(); });
   desmosIn.addEventListener('change', update);
   moreIn.addEventListener('change', update);
   shareIn.addEventListener('change', update);
@@ -44384,7 +44456,7 @@ function builder() {
     if (at > 1 && redoSel.value === 'missed') q.set('redo', 'missed');
     if (!lockIn.checked) q.set('lock', '0');
     if (sameIn.checked) q.set('same', '1');
-    { const h = helpNow(); if (h) q.set('hints', h === 'henvc' ? '1' : h.includes('e') && !h.includes('v') ? h + '-' : h); }
+    { const h = helpNow(); if (h) q.set('hints', h === 'henvca' ? '1' : h.includes('e') && !h.includes('v') ? h + '-' : h); }
     if (desmosIn.checked) q.set('desmos', '1');
     if (moreIn.checked) q.set('more', '1');
     if (shareIn.checked) q.set('sw', '1');
@@ -44400,7 +44472,7 @@ function builder() {
     linkIn.value = url; tryLink.href = url + '&preview=1'; keyLink.href = url + '&teacher=1'; shareA.value = shareLink(url, true); shareQ.value = shareLink(url, false);
     if (changedNow && editId) { clearTimeout(remTimer); remTimer = setTimeout(() => rememberAssignment(url, title, subjSel.value, editId), 2500); } // your list keeps the edited version
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'custom';
-    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${[...items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`), ...bItems.map(([id, n, f]) => `['${id}', ${n}, '${f}', 'b']`)].join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${nBonus && bp !== 5 ? `, bonusPct: ${bp}` : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${helpNow() ? (helpNow() === 'henvc' ? ', hints: true' : `, hints: '${helpNow()}${helpNow().includes('e') && !helpNow().includes('v') ? '-' : ''}'`) : ''}${desmosIn.checked ? ', desmos: true' : ''}${shareIn.checked ? ', shareWork: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
+    codeOut.textContent = `'${slug}': { subject: '${subjSel.value}', title: '${title.replace(/'/g, "\\'")}', items: [${[...items.map(([id, n, f]) => `['${id}', ${n}${f === 'fr' ? ", 'fr'" : ''}]`), ...bItems.map(([id, n, f]) => `['${id}', ${n}, '${f}', 'b']`)].join(', ')}]${orderSel.value === 'mixed' ? ', shuffle: true' : ''}${nBonus && bp !== 5 ? `, bonusPct: ${bp}` : ''}${rt ? `, retries: ${rt}` : ''}${rt && ck > 1 ? `, checks: ${ck}` : ''}${at > 1 ? `, attempts: ${at}` : ''}${lockIn.checked ? '' : ', lockdown: false'}${sameIn.checked ? ', same: true' : ''}${helpNow() ? (helpNow() === 'henvca' ? ', hints: true' : `, hints: '${helpNow()}${helpNow().includes('e') && !helpNow().includes('v') ? '-' : ''}'`) : ''}${desmosIn.checked ? ', desmos: true' : ''}${shareIn.checked ? ', shareWork: true' : ''}${at > 1 && redoSel.value === 'missed' ? ", redo: 'missed'" : ''} },`;
   }
   update(); opening = false;
 }

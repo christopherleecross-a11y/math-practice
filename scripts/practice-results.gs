@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-22.3'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-22.4'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -122,6 +122,10 @@ function doPost(e) {
   if (d.action === 'lessonPlans' || d.action === 'saveLesson' || d.action === 'resetLesson' || d.action === 'lessonHistory') { // your edits to the lesson plans
     let out;
     try { out = d.action === 'lessonPlans' ? lessonPlans_(d) : d.action === 'saveLesson' ? saveLesson_(d) : d.action === 'lessonHistory' ? lessonHistory_(d) : resetLesson_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'mistakeHelp') {
+    let out; try { out = mistakeHelp_(d); } catch (err) { out = { ok: false, error: 'Help isn’t available right now.' }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'myAcc') { // a student starting an assignment: their own accommodations (only theirs; with Google sign-in, only for that sign-in)
@@ -412,6 +416,7 @@ const PROOF_RULES = [
 function gradeProof_(d) {
   const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) return { error: 'no API key saved in the script' };
+  if (aiBudget_().left <= 0) return { error: 'this month’s AI budget is used up' };
   const lines = (d.lines || []).slice(0, 25).map(function (s) { return String(s).slice(0, 200); });
   if (!lines.length) return { score: 0, feedback: 'No proof was written.' };
   const cache = CacheService.getScriptCache();
@@ -437,6 +442,7 @@ function gradeProof_(d) {
     payload: JSON.stringify({ model: AI_MODEL, max_tokens: 500, system: PROOF_RULES, messages: [{ role: 'user', content: user }] }),
   });
   if (res.getResponseCode() !== 200) return { error: 'the AI service returned ' + res.getResponseCode() };
+  try { aiSpend_(AI_MODEL, JSON.parse(res.getContentText()).usage); } catch (e) {}
   let out;
   try {
     const text = JSON.parse(res.getContentText()).content.map(function (c) { return c.text || ''; }).join('');
@@ -935,7 +941,15 @@ function setupOp_(d) {
     });
     return { ok: true, unmatched: out, roster: rosterList() };
   }
-  if (op === 'settings') return { ok: true, aiKey: !!props.getProperty('ANTHROPIC_API_KEY'), build: SCRIPT_BUILD };
+  if (op === 'settings') return { ok: true, aiKey: !!props.getProperty('ANTHROPIC_API_KEY'), build: SCRIPT_BUILD, aiHelp: aiHelpCfg_(), budget: aiBudget_() };
+  if (op === 'aiHelpSave') {
+    const c = aiHelpCfg_();
+    if (d.on !== undefined) c.on = !!d.on;
+    if (d.perDay !== undefined) c.perDay = Math.max(1, Math.min(20, Math.floor(+d.perDay) || 3));
+    if (d.budget !== undefined) c.budget = Math.max(1, Math.min(100, Math.round(+d.budget * 100) / 100 || 5));
+    props.setProperty('AI_HELP_CFG', JSON.stringify(c));
+    return { ok: true, aiHelp: c, budget: aiBudget_() };
+  }
   if (op === 'password') {
     const np = String(d.newPassword || '');
     if (np.length < 6) return { ok: false, error: 'Use at least 6 characters.' };
@@ -1905,8 +1919,8 @@ function accSave_(d) {
 }
 function myAcc_(d) {
   const token = d.token; signinCheck_(d);
-  if (token && !d.rid) return { ok: true, acc: {} }; // a pass that didn't check out
-  const rows = accRows_(); if (!rows.length) return { ok: true, acc: {} };
+  if (token && !d.rid) return { ok: true, acc: {}, ai: aiHelpReady_() }; // a pass that didn't check out
+  const rows = accRows_(); if (!rows.length) return { ok: true, acc: {}, ai: aiHelpReady_() };
   let hit = null;
   if (d.rid) hit = rows.filter(function (r) { return r.id && r.id === String(d.rid); })[0];
   if (!hit && !token) { // signed in by picking or typing a name: the roster name (or a nickname) in that period
@@ -1915,5 +1929,77 @@ function myAcc_(d) {
     hit = rows.filter(function (r) { return (ro && r.id === ro.id) || (r.period === per && normName_(r.name) === t); })[0];
   }
   const a = hit ? accClean_(hit.acc) : {}; delete a.note; // the teacher's note stays private
-  return { ok: true, acc: a };
+  return { ok: true, acc: a, ai: aiHelpReady_() };
+}
+
+
+/* ---------- AI mistake help: "Help me find my mistake" on a question a student got wrong ----------
+   Uses the cheapest model. Limits: a monthly budget (default $5, counted from what each call actually used; proof grading counts too),
+   a number of helps per student per day, and a cap for the whole Sheet per day. */
+const HELP_MODEL = 'claude-haiku-5-5';
+const AI_PRICES = { 'claude-haiku-5-5': [0.10, 0.50], 'claude-sonnet-5-5': [2, 10], 'claude-opus-5-5': [4, 20] }; // dollars per million tokens: [input, output]
+const MAX_HELPS_PER_DAY = 400; // for the whole Sheet
+function aiHelpCfg_() {
+  let c = {}; try { c = JSON.parse(PropertiesService.getScriptProperties().getProperty('AI_HELP_CFG') || '{}') || {}; } catch (e) {}
+  return { on: c.on !== false, perDay: c.perDay || 3, budget: c.budget || 5 };
+}
+function aiBudget_() {
+  const props = PropertiesService.getScriptProperties(), month = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM');
+  const spent = props.getProperty('AI_MONTH') === month ? +props.getProperty('AI_SPENT') || 0 : 0, limit = aiHelpCfg_().budget;
+  return { month: month, spent: Math.round(spent * 10000) / 10000, limit: limit, left: limit - spent };
+}
+function aiSpend_(model, usage) {
+  if (!usage) return;
+  const pr = AI_PRICES[model] || AI_PRICES['claude-sonnet-5-5'];
+  const cost = ((+usage.input_tokens || 0) + (+usage.cache_creation_input_tokens || 0)) / 1e6 * pr[0] + (+usage.output_tokens || 0) / 1e6 * pr[1];
+  const props = PropertiesService.getScriptProperties(), b = aiBudget_(), lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try { props.setProperties({ AI_MONTH: b.month, AI_SPENT: String(b.spent + cost) }); } finally { lock.releaseLock(); }
+}
+function aiHelpReady_() {
+  const c = aiHelpCfg_();
+  return !!(c.on && PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY') && aiBudget_().left > 0);
+}
+const HELP_RULES = 'You are a patient, encouraging math tutor for high school students. A student got a problem wrong. You get the problem, ' +
+  'the correct answer and a worked solution (for your reference only), the student\'s answer, and the student\'s written work. ' +
+  'Find the FIRST place the student went wrong and explain it in 2 to 4 short sentences a teenager can follow. Rules: ' +
+  'Never state the correct final answer or any number that is part of it, and never give the whole solution. ' +
+  'When they showed work, point to the line: "In your line 2, ...". If they showed no work, name the most likely mistake from their answer and ask them to check that step. ' +
+  'If it looks like a calculator slip (degree/radian mode, missing parentheses, rounding too early), say so. ' +
+  'End with one short question or next step for them to try. Plain text only: no LaTeX, no markdown, no lists; write math like x² + 3x, √5, 3/4.';
+function mistakeHelp_(d) {
+  const props = PropertiesService.getScriptProperties(), key = props.getProperty('ANTHROPIC_API_KEY'), cfg = aiHelpCfg_();
+  if (!key || !cfg.on) return { ok: false, error: 'Your teacher hasn’t turned on mistake help.' };
+  if (aiBudget_().left <= 0) return { ok: false, error: 'Mistake help is used up for this month. Try a Hint or the Worked example.' };
+  const token = d.token; signinCheck_(d);
+  if (token && !d.rid) return { ok: false, error: 'Sign in again to use mistake help.' };
+  const who = d.rid ? 'r' + d.rid : 'n' + String(d.period || '') + '|' + normName_(d.name || '');
+  if (!d.preview && who.length < 3) return { ok: false, error: 'Sign in to use mistake help.' };
+  // per student per day, and for the whole Sheet
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'), lock = LockService.getScriptLock(); lock.waitLock(20000);
+  let left;
+  try {
+    let u = {}; try { u = JSON.parse(props.getProperty('AI_HELP_USE') || '{}') || {}; } catch (e) {}
+    if (u.day !== today) u = { day: today, total: 0, by: {} };
+    if (u.total >= MAX_HELPS_PER_DAY) return { ok: false, error: 'Mistake help is busy today. Try a Hint or the Worked example.' };
+    const mine = u.by[who] || 0;
+    if (mine >= cfg.perDay) return { ok: false, error: 'You’ve used all ' + cfg.perDay + ' of today’s mistake helps. Try a Hint or the Worked example.', left: 0 };
+    u.by[who] = mine + 1; u.total++; left = cfg.perDay - mine - 1;
+    props.setProperty('AI_HELP_USE', JSON.stringify(u));
+  } finally { lock.releaseLock(); }
+  const cut = function (t, n) { return String(t == null ? '' : t).slice(0, n); };
+  const work = (Array.isArray(d.work) ? d.work : []).slice(0, 20).map(function (l, k) { return 'Line ' + (k + 1) + ': ' + cut(l, 200); }).join('\n');
+  const user = 'Problem:\n' + cut(d.stem, 1500) + (d.choices ? '\nChoices: ' + cut(d.choices, 600) : '') +
+    '\n\nCorrect answer (do not reveal): ' + cut(d.right, 200) + '\nWorked solution (do not reveal):\n' + cut(d.solution, 1500) +
+    '\n\nStudent\'s answer: ' + cut(d.answer, 300) + '\n\nStudent\'s work:\n' + (work || '(no work shown)');
+  const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    payload: JSON.stringify({ model: HELP_MODEL, max_tokens: 300, system: HELP_RULES, messages: [{ role: 'user', content: d.figure && String(d.figure).length < 400000
+      ? [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: String(d.figure) } }, { type: 'text', text: 'The figure above is part of the problem.\n\n' + user }] : user }] }),
+  });
+  if (res.getResponseCode() !== 200) return { ok: false, error: 'Mistake help isn’t available right now. Try a Hint or the Worked example.' };
+  const j = JSON.parse(res.getContentText());
+  try { aiSpend_(HELP_MODEL, j.usage); } catch (e) {}
+  const text = (j.content || []).map(function (c) { return c.text || ''; }).join('').trim();
+  return { ok: true, text: cut(text, 900), left: left };
 }
