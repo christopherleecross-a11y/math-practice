@@ -43144,6 +43144,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'Help has a search box at the top: type a word (like Sylogist, accommodations, or password) to see only the topics that mention it, with the word highlighted.' },
   { date: '2026-11-22', text: 'Show your work has a new “⬆ Use last line as my answer” button: it copies the student’s last line of work into the answer box (just the part after “=” when the box already says “x =”).' },
   { date: '2026-11-22', text: '🤖 AI mistake help: a new Homework help choice. After a student misses a question, “Help me find my mistake” has AI look at their answer and their Show-your-work lines and point to the first wrong step, without giving the answer. Turn it on and set the limits (helps per student per day, monthly budget, $5 to start) under Settings on Classes & roster. It needs an Anthropic API key there.' },
   { date: '2026-11-22', subjects: ['apcalc', 'algebra2'], text: 'Piecewise functions in questions now appear the usual way, with a brace and each piece on its own line, instead of written out on one line with semicolons.' },
@@ -43264,6 +43265,7 @@ function helpScreen(open) {
         [B('Add a new student'), ': type their school email and pick the period. It can add them to the Classroom class too.'],
         [B('Move a student to another period'), ': pick the student and the new period. Their old scores stay with them.'],
         ['Nicknames: if a student types a different name than Classroom has (Mike for Michael), add it so their scores still match.'],
+        [B('Change your dashboard password'), ' in ', B('🔑 Settings'), ' at the bottom of this tab. Other computers will ask for the new one.'],
         [B('🤖 AI mistake help'), ': in ', B('🔑 Settings'), ' at the bottom, paste your Anthropic API key (from platform.claude.com, Get API key) under AI key, then check ', B('Turn on mistake help'), ', pick the helps per student per day, and set the monthly budget. It shows what’s been spent this month; when the budget is used up, the button stops until next month. Turn it on or off for each assignment with the AI mistake help box under Homework help.'],
         [B('Accommodations (IEP / 504)'), ': in the 🧩 Accommodations box, pick the period and check what each student gets: extra tries on each question, extra attempts, 3 answer choices instead of 4, a 🔊 Read aloud button, larger text, Homework help always on, the Desmos calculator always on, or breaks (leaving full screen never locks the assignment). It saves as you click and applies to every assignment that student opens, on any Chromebook. The note is only for you.'])]],
     ['crossword', `${hasLessons ? 11 : 10}. Vocabulary crossword`, [
@@ -43286,10 +43288,49 @@ function helpScreen(open) {
   app.append(el('div', { class: 'card' },
     el('p', { style: 'margin:0' }, `How to use this site${TEACHER_ID || CONFIG.TEACHER_NAME ? `, ${CONFIG.TEACHER_NAME}` : ''}. Click a topic to open it. `,
       el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); app.querySelectorAll('details').forEach((d) => (d.open = true)); } }, 'Open all'), ' · ',
-      el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); window.print(); } }, 'Print this page'))));
-  sections.forEach(([id, title, body]) => app.append(el('details', { class: 'card', id: 'help-' + id, ...(id === open ? { open: '' } : {}), style: 'padding:10px 14px' },
+      el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); window.print(); } }, 'Print this page')),
+    helpSearchBox()));
+  sections.forEach(([id, title, body]) => app.append(el('details', { class: 'card helpsec', id: 'help-' + id, ...(id === open ? { open: '' } : {}), style: 'padding:10px 14px' },
     el('summary', { style: 'cursor:pointer;font-weight:700;font-size:17px;color:var(--accent)' }, title), ...body)));
   if (open) setTimeout(() => { const d = document.getElementById('help-' + open); if (d) d.scrollIntoView({ block: 'start' }); }, 50);
+}
+
+// Help: search every topic (and What's new) for words; only the topics that have all of them show, opened, with the words marked
+function helpSearchBox() {
+  const inp = el('input', { type: 'search', placeholder: 'Search help (for example: Sylogist, accommodations, password, video)', 'aria-label': 'Search help',
+    style: 'width:100%;box-sizing:border-box;margin-top:10px;padding:10px 12px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
+  const note = el('div', { class: 'small', style: 'margin-top:6px;min-height:1em' });
+  const STOP = new Set(['a', 'an', 'and', 'the', 'of', 'to', 'in', 'on', 'for', 'with', 'how', 'do', 'i', 'my', 'is', 'it', 'what', 'can', 'where', 'does']);
+  const stem = (w) => w.replace(/(ies)$/, 'y').replace(/(ches|shes|xes|ses)$/, (m) => m.slice(0, -2)).replace(/([^s])s$/, '$1');
+  const unmark = (root) => { root.querySelectorAll('mark.hl').forEach((m) => m.replaceWith(document.createTextNode(m.textContent))); root.normalize(); };
+  const markIn = (root, words) => {
+    const re = new RegExp(`\\b(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})[a-z’']*`, 'gi');
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement.closest('select,option,input,textarea,script,style,button') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+    const nodes = []; while (walk.nextNode()) nodes.push(walk.currentNode);
+    nodes.forEach((n) => {
+      const t = n.nodeValue; re.lastIndex = 0; if (!re.test(t)) return; re.lastIndex = 0;
+      const frag = document.createDocumentFragment(); let last = 0, m;
+      while ((m = re.exec(t))) { frag.append(t.slice(last, m.index), el('mark', { class: 'hl', style: 'background:#ffe58a;padding:0 1px;border-radius:2px' }, m[0])); last = m.index + m[0].length; }
+      frag.append(t.slice(last)); n.replaceWith(frag);
+    });
+  };
+  let first = null, timer = null;
+  const run = () => {
+    const secs = [...document.querySelectorAll('details.helpsec')]; if (!first) first = secs.map((d) => d.open);
+    secs.forEach(unmark);
+    const raw = inp.value.trim(), words = (raw.toLowerCase().replace(/[’']/g, '').match(/[a-z0-9]+(?:\.[a-z0-9]+)*/g) || []).filter((w) => !STOP.has(w)).map(stem);
+    if (!words.length) { secs.forEach((d, k) => { d.style.display = ''; d.open = first[k]; }); note.textContent = raw ? 'Type a word to look for.' : ''; return; }
+    let n = 0;
+    secs.forEach((d) => {
+      const txt = ' ' + (d.textContent || '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9.]+/g, ' ') + ' ';
+      const ok = words.every((w) => txt.includes(' ' + w));
+      d.style.display = ok ? '' : 'none'; d.open = ok;
+      if (ok) { n++; markIn(d, words); }
+    });
+    note.textContent = n ? `${n} topic${n === 1 ? '' : 's'} mention “${raw}”. Clear the box to see every topic again.` : `Nothing in Help mentions “${raw}”. Try a shorter or different word.`;
+  };
+  inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 200); });
+  return el('div', {}, inp, note);
 }
 
 function teacherMenu() {
