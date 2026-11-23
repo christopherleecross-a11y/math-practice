@@ -285,6 +285,17 @@ body.tp-open{overflow:hidden}
   .clues li{padding:2px 0;border:0;background:none!important;color:#000!important;break-inside:avoid;font-size:10pt}
   .chip{background:none!important;color:#000!important;opacity:1!important;text-decoration:none!important;font-size:10pt}
 }
+
+/* reading options (the Aa button): the same choices as the practice pages */
+html.rd-font body, html.rd-font button, html.rd-font input, html.rd-font select, html.rd-font textarea { font-family: 'Lexend', system-ui, sans-serif !important; }
+html.rd-space body { line-height: 1.85; letter-spacing: .02em; word-spacing: .08em; }
+html.rd-dark { filter: invert(1) hue-rotate(180deg); background: #fff; } html.rd-dark img, html.rd-dark video, html.rd-dark iframe { filter: invert(1) hue-rotate(180deg); }
+html.rd-big body { font-size: 115%; }
+#readBtn{position:fixed;left:10px;bottom:14px;z-index:70;width:44px;height:44px;border-radius:22px;border:1px solid #ccc;background:#fff;color:#1d1d1b;font:700 17px system-ui;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer}
+#readPanel{position:fixed;left:10px;bottom:64px;z-index:70;background:#fff;color:#1d1d1b;border:1px solid #ccc;border-radius:12px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:300px;font-size:15px;line-height:1.4}
+#readPanel label{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+#readPanel small{color:#666}
+@media print { #readBtn, #readPanel { display:none !important } }
 </style>
 <script src="sylogist.js"></script>
 </head>
@@ -2260,6 +2271,7 @@ $('#nameStart').addEventListener('click', () => {
   // students ticked for a word bank on the Roster get one on shared links too
   const owner = P.assign && P.assign.sheet ? P.assign : null, mine = P;
   const passTok = owner ? (googlePass(TEACHERS.findIndex(t => t.sheet === owner.sheet)) || {}).token : ''; // lets the Sheet add a new student to its Roster
+  if (owner && window.readingFor) window.readingFor(owner.sheet, owner.period, student, passTok); // their reading options (Aa)
   if (owner) sheetGet(owner.sheet, Object.assign({ action: 'assignment', period: owner.period, name: student }, passTok ? { token: passTok } : {}))
     .then(r => { if (r && r.ok && r.wordBank && P === mine) { P.wordBank = true; save(); renderBank(true); } }).catch(() => {});
 });
@@ -3812,5 +3824,47 @@ window.addEventListener('hashchange', () => location.reload());
 })();
 </script>
 <script>if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {})); // works offline (sw.js)</script>
+<script>
+/* Reading options (Aa): easy-read font, more space, dark mode, bigger text. The same choices a student made on the practice pages
+   (saved with their name in the teacher's Sheet, and on this Chromebook), plus any the teacher turned on as accommodations. */
+(function () {
+  const OPTS = [['font', 'Easy-read font', 'Letters that are easier to tell apart (Lexend)'], ['spacing', 'More space', 'More room between lines and letters'], ['dark', 'Dark mode', 'Light text on a dark background'], ['big', 'Bigger text', 'Everything a little bigger']];
+  const get = (k) => { try { return JSON.parse(localStorage.getItem(k)) || null; } catch (e) { return null; } };
+  let mine = get('reading-options') || {}, acc = {}, who = null; // who: { sheet, period, name, token } once the student signs in
+  const now = () => { const o = {}; OPTS.forEach(([k]) => { o[k] = !!(mine[k] || acc[k]); }); return o; };
+  function apply() {
+    const o = now(), H = document.documentElement;
+    if (o.font && !document.getElementById('lexendFont')) { const l = document.createElement('link'); l.id = 'lexendFont'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap'; document.head.append(l); }
+    H.classList.toggle('rd-font', o.font); H.classList.toggle('rd-space', o.spacing); H.classList.toggle('rd-dark', o.dark); H.classList.toggle('rd-big', o.big);
+  }
+  function save() {
+    try { localStorage.setItem('reading-options', JSON.stringify(mine)); } catch (e) {}
+    apply();
+    if (who && who.sheet) fetch(who.sheet, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'readPrefs', period: who.period, name: who.name, token: who.token || undefined, prefs: mine }) }).catch(() => {});
+  }
+  const btn = document.createElement('button'), panel = document.createElement('div');
+  btn.id = 'readBtn'; btn.type = 'button'; btn.textContent = 'Aa'; btn.title = btn.ariaLabel = 'Reading options';
+  panel.id = 'readPanel'; panel.hidden = true;
+  function draw() {
+    const o = now(); panel.innerHTML = '<div style="font-weight:700;margin-bottom:6px">Reading options</div>';
+    OPTS.forEach(([k, t, d]) => {
+      const lab = document.createElement('label'), c = document.createElement('input'); c.type = 'checkbox'; c.checked = o[k]; c.disabled = !!acc[k]; c.style.cssText = 'width:18px;height:18px;margin-top:2px';
+      c.onchange = () => { mine = Object.assign({}, mine, { [k]: c.checked }); save(); };
+      const sp = document.createElement('span'); sp.innerHTML = '<b></b><br><small></small>'; sp.querySelector('b').textContent = t; sp.querySelector('small').textContent = acc[k] ? 'Turned on by your teacher' : d;
+      lab.append(c, sp); panel.append(lab);
+    });
+    const n = document.createElement('small'); n.textContent = 'Saved with your name, so it follows you to any Chromebook.'; panel.append(n);
+  }
+  btn.onclick = () => { if (panel.hidden) draw(); panel.hidden = !panel.hidden; };
+  document.addEventListener('click', (e) => { if (!panel.hidden && !panel.contains(e.target) && e.target !== btn) panel.hidden = true; });
+  document.body.append(btn, panel); apply();
+  // after a student signs in: their saved choices and accommodations from the teacher's Sheet
+  window.readingFor = function (sheet, period, name, token) {
+    if (!sheet || !name) return; who = { sheet, period, name, token };
+    fetch(sheet, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'myAcc', period, name, token: token || undefined }) })
+      .then((r) => r.json()).then((g) => { if (!g || !g.ok) return; acc = {}; ['font', 'spacing', 'dark', 'big'].forEach((k) => { if (g.acc && g.acc[k]) acc[k] = true; }); if (g.prefs) { mine = g.prefs; try { localStorage.setItem('reading-options', JSON.stringify(mine)); } catch (e) {} } apply(); if (!panel.hidden) draw(); }).catch(() => {});
+  };
+})();
+</script>
 </body>
 </html>

@@ -36612,7 +36612,7 @@ function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Wo
 const READ_OPTS = [['font', 'Easy-read font', 'Letters that are easier to tell apart (Lexend)'], ['spacing', 'More space', 'More room between lines and letters'],
   ['dark', 'Dark mode', 'Light text and drawings on a dark background'], ['big', 'Bigger text', 'Everything about 20% bigger']];
 let READ_ME = null; // this student's own choices (null: not loaded yet)
-function readNow() { const mine = READ_ME || store.get(TK('read')) || {}, A = ACC_ME || {}; const o = {}; READ_OPTS.forEach(([k]) => { o[k] = !!(mine[k] || A[k]); }); return o; }
+function readNow() { const mine = READ_ME || store.get(TK('read')) || store.get('reading-options') || {}, A = ACC_ME || {}; const o = {}; READ_OPTS.forEach(([k]) => { o[k] = !!(mine[k] || A[k]); }); return o; }
 function applyRead() {
   const o = readNow(), H = document.documentElement;
   if (o.font && !document.getElementById('lexendFont')) document.head.append(el('link', { id: 'lexendFont', rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap' }));
@@ -36626,7 +36626,7 @@ function applyRead() {
   }
 }
 async function readSave(o) {
-  READ_ME = o; store.set(TK('read'), o); applyRead();
+  READ_ME = o; store.set(TK('read'), o); store.set('reading-options', o); applyRead(); // reading-options: for the crossword page too
   if (!state || state.teacher || PREVIEW || !CONFIG.SCRIPT_URL || !state.name) return;
   const ps = state.rid ? signinPass() : null;
   try { await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'readPrefs', period: state.period, name: state.name, token: ps && ps.rid === state.rid ? ps.token : undefined, prefs: o }) }); } catch (e) {}
@@ -36662,7 +36662,7 @@ async function accLoad(period, name, rid) {
     const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'myAcc', period, name, token: ps && ps.rid === rid ? ps.token : undefined }) });
     clearTimeout(t);
-    const g = await res.json(); if (g && g.ok) { store.set(ck, g.acc || {}); if (g.ai !== undefined) AI_HELP_ON = !!g.ai; if (g.prefs) { READ_ME = g.prefs; store.set(TK('read'), g.prefs); } return g.acc || {}; }
+    const g = await res.json(); if (g && g.ok) { store.set(ck, g.acc || {}); if (g.ai !== undefined) AI_HELP_ON = !!g.ai; if (g.prefs) { READ_ME = g.prefs; store.set(TK('read'), g.prefs); store.set('reading-options', g.prefs); } return g.acc || {}; }
   } catch (e) {}
   return store.get(ck) || {}; // offline or an older script: what this Chromebook got last time
 }
@@ -42820,6 +42820,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-23', text: 'The Aa reading options (easy-read font, more space, dark mode, bigger text) are on the vocabulary crossword too, with the same saved choices and accommodations as the practice pages.' },
   { date: '2026-11-23', text: 'Reading options for students: an Aa button in the bottom-left corner of the student pages turns on an easy-read font, more space between lines, dark mode, or bigger text. Their choices are saved with their name, so they follow them to any Chromebook. You can also turn any of these on for a student in 🧩 Accommodations.' },
   { date: '2026-11-23', text: 'If the Wi-Fi drops during an assignment, students now see a red banner across the top: “No internet. Keep working, but don’t close this page or sign out until this message goes away.” It disappears once their work has saved, and the browser asks “Leave this page?” if they try to close it with work not yet saved.' },
   { date: '2026-11-23', text: '✏️ Write your own questions: in Build an assignment, click ✏️ Write a question. Multiple choice, a typed number, a typed expression (any equal form counts), or typed words, with an optional picture and solution. Give letters a range ({a}, {b}…) for new numbers for each student, and use {= …} for worked-out values. Put it in a book section or in its own ✏️ My questions group, then add it to assignments like any other question.' },
