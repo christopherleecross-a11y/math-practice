@@ -27,14 +27,14 @@ with sync_playwright() as p:
       const errs = [], tpls = [...new Set(vids.map((v) => v.tpl))];
       for (const v of vids) {
         let q; try { q = TEMPLATES[v.tpl](mulberry32(v.seed)); } catch (e) { errs.push(`${v.tpl} ${v.seed}: ${e.message}`); continue; }
-        v.stem = String(q.stem);
+        v.stem = String(q._stem0 || q.stem);
         let re; try { re = new RegExp(v.kind); } catch (e) { errs.push(`${v.tpl} ${v.seed}: bad kind ${v.kind}`); continue; }
-        if (!re.test(`${q.topic || ''} ## ${q.stem}`)) errs.push(`${v.tpl} ${v.seed}: its own problem doesn't match kind /${v.kind}/: ${q.stem.slice(0, 80)}`);
+        if (!re.test(`${q.topic || ''} ## ${q._stem0 || q.stem}`)) errs.push(`${v.tpl} ${v.seed}: its own problem doesn't match kind /${v.kind}/: ${q.stem.slice(0, 80)}`);
         if (!v.title) errs.push(`${v.tpl} ${v.seed}: no title`); if (v.steps.length < 2) errs.push(`${v.tpl} ${v.seed}: no steps`);
       }
       const miss = [];
       for (const t of tpls) { const mv = vids.filter((v) => v.tpl === t), mine = mv.map((v) => new RegExp(v.kind)); let bad = 0, ex = '', ov = 0, oex = '';
-        for (let k = 0; k < 400; k++) { let q; try { q = TEMPLATES[t](mulberry32(5000 + k)); } catch (e) { continue; } const key = `${q.topic || ''} ## ${q.stem}`;
+        for (let k = 0; k < 400; k++) { let q; try { q = TEMPLATES[t](mulberry32(5000 + k)); } catch (e) { continue; } const key = `${q.topic || ''} ## ${q._stem0 || q.stem}`;
           if (!mine.some((r) => r.test(key))) { bad++; ex = ex || key.slice(0, 110); }
           const hit = mv.filter((v, i) => mine[i].test(key)); if (hit.length > 1 && hit.some((v) => !v.pick)) { ov++; oex = oex || hit.map((v) => v.seed).join('+') + ' ' + key.slice(0, 90); } }
         if (ov) miss.push(`${t}: ${ov}/400 problems match several videos without picks, e.g. ${oex}`);
@@ -44,7 +44,7 @@ with sync_playwright() as p:
       for (const t of QUESTION_TYPES.filter((x) => /^cAP/.test(x.id) && secs0.includes(x.section) && !tpls.includes(x.id)).map((x) => x.id)) {
         let bad = 0, ex = '';
         for (let k = 0; k < 300; k++) { let q; try { q = TEMPLATES[t](mulberry32(7000 + k)); } catch (e) { continue; } if (!q.baseTpl) { bad++; ex = 'no baseTpl'; break; }
-          const key = `${q.baseTopic || ''} ## ${q.stem}`; if (!vids.concat(other).some((v) => v.tpl === q.baseTpl && new RegExp(v.kind || '').test(key))) { bad++; ex = ex || q.baseTpl + ': ' + key.slice(0, 90); } }
+          const key = `${q.baseTopic || ''} ## ${q._stem0 || q.stem}`; if (!vids.concat(other).some((v) => v.tpl === q.baseTpl && new RegExp(v.kind || '').test(key))) { bad++; ex = ex || q.baseTpl + ': ' + key.slice(0, 90); } }
         if (bad) miss.push(`${t} (AP, uses its base type's videos): ${bad}/300 problems have no video, e.g. ${ex}`);
       }
       const sections = [...new Set(tpls.map((t) => (QUESTION_TYPES.find((x) => x.id === t) || {}).section))];

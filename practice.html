@@ -42170,7 +42170,7 @@ function pvLoad(subj, then) {
     PV_WAIT[subj].forEach((f) => { try { f(); } catch {} }); PV_WAIT[subj] = [];
   });
 }
-const pvInst = (v) => { if (v.inst !== undefined) return v.inst; let t = null; try { t = TEMPLATES[v.tpl](mulberry32(v.seed)); if (!t || String(t.stem) !== v.stem) t = null; } catch { t = null; } v.inst = t; return t; };
+const pvInst = (v) => { if (v.inst !== undefined) return v.inst; let t = null; try { t = TEMPLATES[v.tpl](mulberry32(v.seed)); if (!t || String(t._stem0 || t.stem) !== v.stem) t = null; /* _stem0: the wording before a display change, like a piecewise brace */ } catch { t = null; } v.inst = t; return t; };
 const practiceVideos = (q, onLoad) => {
   if (!q || !q.tpl) return [];
   // AP Calculus borrows question types from other subjects as ap_<id>: same problems, so use that type's videos
@@ -42178,11 +42178,11 @@ const practiceVideos = (q, onLoad) => {
   const inline = PRACTICE_VIDS.filter((v) => v.tpl === tpl && (!v.when || v.when(q)));
   if (inline.length) return inline;
   const subj = pvSubject({ tpl }); if (!PV_FILES[subj]) { if (onLoad) pvLoad(subj, onLoad); return []; }
-  const key = `${q.topic || ''} ## ${q.stem || ''}`;
+  const key = `${q.topic || ''} ## ${q._stem0 || q.stem || ''}`;
   const own = PV_FILES[subj].filter((v) => v.tpl === tpl && v.re.test(key) && pvInst(v));
   if (own.length || !q.baseTpl) return own;
   // an AP® Practice question with no video of its own: use the videos of the type it was made from
-  const bkey = `${q.baseTopic || ''} ## ${q.stem || ''}`, bsubj = pvSubject({ tpl: q.baseTpl }) || subj; // the base type can belong to another subject
+  const bkey = `${q.baseTopic || ''} ## ${q._stem0 || q.stem || ''}`, bsubj = pvSubject({ tpl: q.baseTpl }) || subj; // the base type can belong to another subject
   if (!PV_FILES[bsubj]) { if (onLoad) pvLoad(bsubj, onLoad); return []; }
   return PV_FILES[bsubj].filter((v) => v.tpl === q.baseTpl && v.re.test(bkey) && pvInst(v));
 };
