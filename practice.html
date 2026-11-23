@@ -36825,7 +36825,23 @@ async function cloudFlush(leaving) {
     setCloudStatus(g && g.ok ? 'Progress saved online ✓' : 'Progress saved on this device (online save failed)');
   } catch (e) { setCloudStatus('Progress saved on this device (no internet right now)'); cloudTimer = setTimeout(() => cloudFlush(false), 20000); }
 }
-function setCloudStatus(t) { cloudStatus = t; const e = document.getElementById('cloudStatus'); if (e) e.textContent = t; }
+function setCloudStatus(t) { cloudStatus = t; const e = document.getElementById('cloudStatus'); if (e) e.textContent = t; offlineBanner(); }
+/* ---------- Wi-Fi down during an assignment: a banner that says not to close the page or sign out ----------
+   (work done offline is only on this Chromebook, and students rarely get the same one again) */
+const unsentWork = () => !!(state && !state.teacher && !PREVIEW && CONFIG.SCRIPT_URL && ((state.submitted && !state.submitted.confirmed && state.submitted.saveStatus !== 'preview' && state.submitted.saveStatus !== 'none') || /on this device/.test(cloudStatus || '')));
+function offlineBanner() {
+  const off = navigator.onLine === false && state && !state.teacher && !PREVIEW && document.getElementById('app') && state.qs;
+  const show = off || unsentWork();
+  let b = document.getElementById('offlineBanner');
+  if (!show) { if (b) b.remove(); return; }
+  if (!b) { b = el('div', { id: 'offlineBanner', role: 'alert', style: 'position:fixed;top:0;left:0;right:0;z-index:60;background:#b3261e;color:#fff;padding:10px 16px;font:600 16px system-ui;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3)' }); document.body.append(b); }
+  b.textContent = off ? '⚠️ No internet. Keep working, but don’t close this page or sign out until this message goes away. Your work will save by itself when the internet is back.'
+    : '⏳ Saving your work… Don’t close this page or sign out until this message goes away.';
+}
+setInterval(offlineBanner, 2000);
+addEventListener('offline', offlineBanner);
+addEventListener('online', () => { offlineBanner(); if (cloudTimer) cloudFlush(false); }); // back online: save right away instead of waiting
+addEventListener('beforeunload', (e) => { if (unsentWork()) { e.preventDefault(); e.returnValue = ''; } }); // the browser asks “Leave this page?”
 // before leaving the page, send anything not yet saved
 addEventListener('pagehide', () => { if (cloudTimer) cloudFlush(true); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudTimer) cloudFlush(true); });
@@ -38601,6 +38617,7 @@ function refreshStatus() {
   const s = document.getElementById('saveStatus'); if (!s) return;
   const st = state.submitted.saveStatus;
   s.className = 'status ' + (st === 'ok' ? 'ok' : st === 'fail' ? 'fail' : 'wait');
+  offlineBanner();
   if (st === 'fail') { s.replaceChildren(`${navigator.onLine === false ? 'No internet right now. Your score is saved on this Chromebook and will send by itself as soon as the connection is back; keep this page open. ' : ''}Your score hasn’t reached ${CONFIG.TEACHER_NAME} yet. Stay on this page and tap Try again, or show this screen to ${CONFIG.TEACHER_NAME}. `,
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:6px 0 0;padding:6px 14px', onclick: () => send(state.qs.map((q, i) => scoreOf(q, state.answers[i])), true) }, 'Try again')); return; }
   s.textContent = st === 'ok' ? `Saved — ${CONFIG.TEACHER_NAME} has your score.`
@@ -42758,6 +42775,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-23', text: 'If the Wi-Fi drops during an assignment, students now see a red banner across the top: “No internet. Keep working, but don’t close this page or sign out until this message goes away.” It disappears once their work has saved, and the browser asks “Leave this page?” if they try to close it with work not yet saved.' },
   { date: '2026-11-23', text: '✏️ Write your own questions: in Build an assignment, click ✏️ Write a question. Multiple choice, a typed number, a typed expression (any equal form counts), or typed words, with an optional picture and solution. Give letters a range ({a}, {b}…) for new numbers for each student, and use {= …} for worked-out values. Put it in a book section or in its own ✏️ My questions group, then add it to assignments like any other question.' },
   { date: '2026-11-23', text: 'Works without internet: once the site has been opened on a Chromebook, it opens again even when the Wi-Fi is down, and an assignment keeps working. A score turned in with no connection is kept on the Chromebook and sends by itself as soon as the connection is back. The site also opens faster.' },
   { date: '2026-11-23', subjects: ['act'], text: '🎯 ACT practice on their own: the front page of the student link now lets any student practice an ACT topic (10 questions, with help), take a timed quick quiz (15 questions, 17 minutes), or take a practice test (45 questions, 50 minutes, 4 choices, like the Enhanced ACT). New questions every time; never graded. They see a rough estimated ACT score and their weak topics. You see who’s practicing and their estimates on the Results dashboard under 🎯 ACT practice.' },
@@ -42904,7 +42922,7 @@ function helpScreen(open) {
         el('li', {}, B('A student’s score is missing'), ': make sure they used the link from your Classroom and turned it in. Check Classes & roster for a nickname mismatch.'),
         el('li', {}, B('Mistake help says it’s used up or not turned on'), ': check 🤖 AI mistake help in Settings on Classes & roster (the key, the on box, and this month’s budget). Each student also has a daily limit.'),
         el('li', {}, B('A help Video or the 🤖 button is missing'), ': it shows only when that kind of help is checked for the assignment (and mistake help only after a wrong try).'),
-        el('li', {}, B('The Wi-Fi went down'), ': a page that was already open keeps working, and a score turned in with no connection sends by itself when the connection is back (keep the page open). A Chromebook that has opened the site before can open it again offline; signing in with Google, videos, and Desmos need the internet.'),
+        el('li', {}, B('The Wi-Fi went down'), ': students see a red banner telling them not to close the page or sign out until it goes away (work done offline is only on that Chromebook). A page that was already open keeps working, and a score turned in with no connection sends by itself when the connection is back (keep the page open). A Chromebook that has opened the site before can open it again offline; signing in with Google, videos, and Desmos need the internet.'),
         el('li', {}, B('Still stuck?'), ' Ask Mr. Cross.'))]],
     ['new', 'What’s new', [wnList(wnMine())]],
   ];
