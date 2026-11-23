@@ -35985,7 +35985,8 @@ for (const id of Object.keys(TEMPLATES)) { const make = TEMPLATES[id]; TEMPLATES
   let at = -1; QUESTION_TYPES.forEach((t, i) => { if (t.subject === subject && t.section === section) at = i; });
   if (at >= 0) QUESTION_TYPES.splice(at + 1, 0, { id, subject, section, label, desc, nspire: true });
 });
-(function loadCustom() {
+const MYQ = {}, myqImgs = {}; let MYQ_LOADED = false, MYQ_P = null; // your own questions (✏️ Write a question): id → definition
+function loadCustom() {
   const mix = new URLSearchParams(location.search).get('mix');
   if (!mix) return;
   const items = mixItems(mix);
@@ -36003,7 +36004,11 @@ for (const id of Object.keys(TEMPLATES)) { const make = TEMPLATES[id]; TEMPLATES
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
   SETS[CUSTOM_KEY] = { ...(actKind ? { act: actKind } : {}), ...(timeLimit ? { time: timeLimit } : {}), subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, more, desmos, shareWork, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined, picks: same ? picksOf(q) : undefined };
-})();
+}
+loadCustom();
+// a link with your own questions (cq…): get them from your Sheet first, then make the assignment and open the page
+const MYQ_START = (() => { const ids = myqIdsIn(new URLSearchParams(location.search).get('mix')).filter((id) => !MYQ[id]); if (!ids.length || !CONFIG.SCRIPT_URL) return null;
+  return myqFetch(ids).then((qs) => { qs.forEach(myqRegister); loadCustom(); }); })();
 
 /* ---------- question generation ---------- */
 function applyMode(q, mode) {
@@ -37879,6 +37884,155 @@ function reportsCard() {
   }).catch(() => box.remove());
   return box;
 }
+/* ---------- Questions you write (Build an assignment › ✏️ Write a question) ----------
+   Saved in your Sheet ("My Questions" tab) and used in links as cq<id>. A question can have random numbers:
+   letters a–d each get a range, {a} puts a's value in the text, and {= a*b} puts in a calculated value (rounded like the answer). */
+function myqNum(v, dp) { // a value as text: whole numbers as is, others rounded (dp, or up to 4 places)
+  if (!isFinite(v)) return '?';
+  const r = dp === 'any' || dp == null ? +v.toFixed(4) : +v.toFixed(+dp);
+  return String(r).replace(/^-/, MINUS);
+}
+function myqVals(def, r) { const V = {}; Object.entries(def.vars || {}).forEach(([k, [a, b, st]]) => { a = +a; b = +b; st = +st || 1; const n = Math.max(0, Math.floor((b - a) / st + 1e-9)); V[k] = +(a + st * Math.floor(r() * (n + 1))).toFixed(6); }); return V; }
+function myqCalc(expr, V) { // a formula with letters a–d: the site's calculator, with each letter replaced by its value
+  let e = calcNorm(String(expr)).replace(/\b([a-d])\b/g, (m, k) => (V[k] !== undefined ? `(${V[k]})` : m)).replace(/\s+/g, '');
+  return calcEval(e);
+}
+function myqFill(text, def, V) {
+  return String(text || '').replace(/\{=\s*([^}]+)\}/g, (m, e) => myqNum(myqCalc(e, V), def.round)).replace(/\{([a-d])\}/g, (m, k) => (V[k] !== undefined ? myqNum(V[k]) : m));
+}
+function myqImage(def) {
+  if (!def.img) return null;
+  let im = myqImgs[def.id]; if (!im || im.src !== def.img) { im = myqImgs[def.id] = new Image(); im.src = def.img; }
+  const w = Math.min(560, def.imgW || 400), h = Math.round(w * ((def.imgH || 300) / (def.imgW || 400)));
+  return { size: [w, h], draw: (cv) => { const go = () => { const c = cv._ctx; c.clearRect(0, 0, cv._w, cv._h); c.drawImage(im, 0, 0, cv._w, cv._h); }; if (im.complete && im.naturalWidth) go(); else im.addEventListener('load', go, { once: true }); } };
+}
+function myqTemplate(def) {
+  return (r) => {
+    const V = myqVals(def, r), fill = (t) => myqFill(t, def, V), pic = myqImage(def);
+    const q = { topic: def.title || 'Your question', stem: fill(def.stem), ...(pic || {}) };
+    const right = def.kind === 'mc' ? fill((def.choices || [])[0]) : fill(def.answer);
+    q.solution = def.solution ? fill(def.solution) : `Answer: ${right}`;
+    if (def.kind === 'mc') { Object.assign(q, buildChoices(r, right, (def.choices || []).slice(1).map(fill).filter((c) => c && c !== right), () => null)); return q; }
+    if (def.kind === 'num') {
+      const v = /^\s*\{=/.test(def.answer || '') ? myqCalc(String(def.answer).replace(/^\s*\{=\s*|\}\s*$/g, ''), V) : pxConst(fill(def.answer).replace(MINUS, '-'));
+      const dp = def.round === 'any' || def.round == null ? null : +def.round, shown = myqNum(v, def.round);
+      const abs = def.tol ? Math.abs(+def.tol) : dp == null ? 1e-6 * Math.max(1, Math.abs(v)) : 0.5 * 10 ** -dp + 1e-9;
+      q.fr = frNums([{ label: def.label || 'Answer', val: v, tol: abs / Math.max(1, Math.abs(v)), key: shown.replace(MINUS, '-') }], shown);
+      const step = dp == null ? (Number.isInteger(v) ? 1 : 0.1) : 10 ** -dp;
+      Object.assign(q, buildChoices(r, shown, [v + step, v - step, v * 2, -v, v + 10 * step].map((x) => myqNum(x, def.round)).filter((c) => c !== shown), (i) => myqNum(v + (i + 2) * step, def.round)));
+      return q;
+    }
+    if (def.kind === 'expr') {
+      const ans = fill(def.answer), letter = (ans.replace(/sin|cos|tan|log|ln|sqrt|pi/g, '').match(/[a-z]/i) || ['x'])[0], f = pxParse(ans, [letter]);
+      q.fr = { fields: [{ kind: 'expr', keys: 'poly', label: def.label || 'Answer' }], key: [ans], display: ans, check: (v) => !!f && pxEquiv(v[0], (x) => f({ [letter]: x, x }), { v: letter }) };
+      return q;
+    }
+    const acc = String(def.answer || '').split(/\n|;/).map((x) => fill(x).trim()).filter(Boolean), nz = (x) => String(x || '').toLowerCase().replace(/\\text\{([^}]*)\}/g, '$1').replace(/[\s.]+/g, '').replace(/[−–]/g, '-');
+    q.fr = { fields: [{ kind: 'text', label: def.label || 'Answer' }], key: [acc[0] || ''], display: acc[0] || '', check: (v) => acc.some((a) => nz(a) === nz(v[0])) };
+    return q;
+  };
+}
+// put a question into the site: its template, and a row in Build an assignment (in the section it names, or under ✏️ My questions)
+function myqRegister(def) {
+  const id = 'cq' + def.id; MYQ[def.id] = def;
+  TEMPLATES[id] = myqTemplate(def);
+  const at0 = QUESTION_TYPES.findIndex((t) => t.id === id); if (at0 >= 0) QUESTION_TYPES.splice(at0, 1);
+  const row = { id, subject: def.subject, section: def.section || '✏️ My questions', label: def.title || 'Your question', desc: `Your question · ${{ mc: 'multiple choice', num: 'typed number', expr: 'typed expression', text: 'typed words' }[def.kind] || ''}${def.vars && Object.keys(def.vars).length ? ' · new numbers for each student' : ''}`, mine: true, ...(def.section ? {} : { ch: 'mine' }) };
+  let at = -1; QUESTION_TYPES.forEach((t, i) => { if (t.subject === def.subject && (def.section ? t.section === def.section : true)) at = i; });
+  if (at >= 0) QUESTION_TYPES.splice(at + 1, 0, row); else QUESTION_TYPES.push(row);
+}
+function myqUnregister(qid) { const id = 'cq' + qid; delete MYQ[qid]; delete TEMPLATES[id]; const k = QUESTION_TYPES.findIndex((t) => t.id === id); if (k >= 0) QUESTION_TYPES.splice(k, 1); }
+// teacher pages: load all of them once
+function myqLoad() {
+  if (MYQ_LOADED || !CONFIG.SCRIPT_URL || !dashPw.get()) return Promise.resolve();
+  if (!MYQ_P) MYQ_P = setupPost('myQList').then((g) => { if (g && g.ok) { (g.qs || []).forEach(myqRegister); MYQ_LOADED = true; store.set(TK('myq:cache'), g.qs || []); } }).catch(() => { (store.get(TK('myq:cache')) || []).forEach(myqRegister); }).finally(() => { MYQ_P = null; });
+  return MYQ_P;
+}
+// a student's page: the questions its link uses (cq… ids), before the assignment is made
+function myqIdsIn(mix) { return [...new Set(String(mix || '').split('_').map((p) => p.split('.')[0]).filter((x) => /^cq[a-z0-9]+$/i.test(x)).map((x) => x.slice(2)))]; }
+async function myqFetch(ids) {
+  const ck = TK('myq:for:' + ids.join(','));
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 8000);
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'myQs', ids }) });
+    clearTimeout(t); const g = await res.json();
+    if (g && g.ok) { store.set(ck, g.qs || []); return g.qs || []; }
+  } catch (e) {}
+  return store.get(ck) || []; // offline: what this Chromebook got last time
+}
+// the editor
+function myqEditor(def, done) {
+  def = JSON.parse(JSON.stringify(def || { kind: 'mc', subject: Object.keys(SUBJECTS)[0], choices: ['', '', '', ''], round: 'any', vars: {} }));
+  const box = el('div', { class: 'card', style: 'border:2px solid var(--accent)' });
+  const inp = (v, ph, w) => el('input', { type: 'text', value: v || '', placeholder: ph || '', style: `width:${w || '100%'};box-sizing:border-box` });
+  const ta = (v, ph, rows = 3) => el('textarea', { rows: String(rows), placeholder: ph || '', style: 'width:100%;box-sizing:border-box;font:inherit' }, v || '');
+  const title = inp(def.title, 'Short name, like “Ferris wheel height”');
+  const subj = el('select', { style: 'width:auto' }, ...Object.entries(SUBJECTS).map(([k, v]) => el('option', { value: k }, v))); subj.value = def.subject;
+  const sec = el('select', { style: 'width:auto;max-width:100%' });
+  const fillSecs = () => { const keep = def.section || ''; sec.innerHTML = ''; sec.append(el('option', { value: '' }, '✏️ My questions (their own group)'), ...[...new Set(QUESTION_TYPES.filter((t) => t.subject === subj.value && !t.mine).map((t) => t.section))].map((s) => el('option', { value: s }, s))); sec.value = keep; if (sec.value !== keep) sec.value = ''; };
+  subj.onchange = () => { def.section = ''; fillSecs(); }; fillSecs();
+  const stem = ta(def.stem, 'The question. For new numbers for each student, use {a}, {b}… (set their ranges below), and {= a*b} for a value worked out from them.', 4);
+  const kind = el('select', { style: 'width:auto' }, ...[['mc', 'Multiple choice'], ['num', 'Typed number'], ['expr', 'Typed expression (like 3x + 2)'], ['text', 'Typed words']].map(([v, t]) => el('option', { value: v }, t))); kind.value = def.kind;
+  const ch = [0, 1, 2, 3].map((k) => inp((def.choices || [])[k], k ? `Wrong answer ${k}` : 'Right answer'));
+  const ans = inp(def.answer, '');
+  const round = el('select', { style: 'width:auto' }, ...[['any', 'as typed'], ['0', 'whole number'], ['1', 'nearest tenth'], ['2', 'nearest hundredth'], ['3', 'nearest thousandth']].map(([v, t]) => el('option', { value: v }, t))); round.value = String(def.round ?? 'any');
+  const label = inp(def.label, 'Answer', '160px');
+  const vars = ['a', 'b', 'c', 'd'].map((k) => { const v = (def.vars || {})[k] || []; return { k, from: inp(v[0] ?? '', 'from', '70px'), to: inp(v[1] ?? '', 'to', '70px'), step: inp(v[2] ?? '', '1', '60px') }; });
+  const sol = ta(def.solution, 'How to work it out (optional). Students see it after they finish, and in worked examples. {a} and {= …} work here too.', 3);
+  let img = def.img || '', imgW = def.imgW, imgH = def.imgH;
+  const imgPrev = el('div', {}), file = el('input', { type: 'file', accept: 'image/*' });
+  const showImg = () => { imgPrev.innerHTML = ''; if (img) imgPrev.append(el('img', { src: img, style: 'max-width:260px;max-height:180px;border:1px solid var(--line);border-radius:6px;display:block;margin-top:6px' }), el('button', { class: 'btn secondary', type: 'button', style: 'margin:4px 0 0;padding:4px 10px', onclick: () => { img = ''; showImg(); } }, 'Remove picture')); };
+  file.onchange = () => { const f = file.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { const im = new Image(); im.onload = () => {
+    let w = Math.min(640, im.naturalWidth), out = ''; for (let k = 0; k < 6; k++) { const h = Math.round((w * im.naturalHeight) / im.naturalWidth), c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(im, 0, 0, w, h); out = c.toDataURL('image/jpeg', 0.72); imgW = w; imgH = h; if (out.length < 36000) break; w = Math.round(w * 0.8); }
+    img = out.length < 45000 ? out : ''; if (!img) alert('That picture is too big even after shrinking it. Try a smaller or simpler picture.'); showImg(); }; im.src = fr.result; }; fr.readAsDataURL(f); };
+  showImg();
+  const mcBox = el('div', {}, el('label', {}, 'Answer choices (the site shuffles them)'), ...ch.map((c) => el('div', { style: 'margin:3px 0' }, c)));
+  const ansBox = el('div', {}, el('label', {}, 'Right answer'), ans, el('div', { class: 'small', style: 'margin:4px 0' }), el('div', { style: 'display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px' }, el('span', {}, 'Round to', ' ', round), el('span', {}, 'Answer box label', ' ', label)));
+  const ansHelp = ansBox.children[2];
+  const syncKind = () => {
+    mcBox.style.display = kind.value === 'mc' ? '' : 'none'; ansBox.style.display = kind.value === 'mc' ? 'none' : '';
+    round.parentElement.style.display = kind.value === 'num' ? '' : 'none';
+    ans.placeholder = { num: 'Like 42, or {= a*b} when it uses random numbers', expr: 'Like 3x^2 - 2x + 1 (any equal form is accepted)', text: 'Like isosceles (more than one accepted answer: separate with ;)' }[kind.value] || '';
+    ansHelp.textContent = { num: 'Students type a number. With a rounding choice, answers rounded that way are accepted.', expr: 'Students type an expression; any equivalent form counts (3x + 2 or 2 + 3x).', text: 'Capital letters, spaces, and periods don’t matter.' }[kind.value] || '';
+  };
+  kind.onchange = syncKind; syncKind();
+  const prev = el('div', {}), msg = el('span', { class: 'small', style: 'margin-left:8px' });
+  const collect = () => {
+    const V = {}; vars.forEach((v) => { if (v.from.value.trim() !== '' && v.to.value.trim() !== '') V[v.k] = [+v.from.value, +v.to.value, +v.step.value || 1]; });
+    return { ...(def.id ? { id: def.id } : {}), title: title.value.trim(), subject: subj.value, section: sec.value, stem: stem.value.trim(), kind: kind.value, choices: ch.map((c) => c.value.trim()), answer: ans.value.trim(), round: round.value, label: label.value.trim(), vars: V, solution: sol.value.trim(), ...(img ? { img, imgW, imgH } : {}) };
+  };
+  const problems = (d) => { const p = []; if (!d.title) p.push('a short name'); if (!d.stem) p.push('the question');
+    if (d.kind === 'mc' && (!d.choices[0] || d.choices.slice(1).filter(Boolean).length < 1)) p.push('the right answer and at least one wrong answer'); if (d.kind !== 'mc' && !d.answer) p.push('the right answer'); return p; };
+  let ps = 1;
+  const preview = () => { const d = collect(); prev.innerHTML = ''; const p = problems(d); if (p.length) { msg.textContent = 'Still needed: ' + p.join(', ') + '.'; return; } msg.textContent = '';
+    try { const q = applyMode(myqTemplate({ ...d, id: d.id || 'preview' })(mulberry32(Date.now() % 99991 + ps++)), d.kind === 'mc' ? 'mc' : 'fr'); prev.append(previewQuestion(q)); } catch (e) { msg.textContent = 'Something in the question didn’t work: check the {…} parts.'; } };
+  const save = async () => {
+    const d = collect(), p = problems(d); if (p.length) { msg.textContent = 'Still needed: ' + p.join(', ') + '.'; return; }
+    try { myqTemplate({ ...d, id: 'x' })(mulberry32(1)); } catch (e) { msg.textContent = 'Something in the question didn’t work: check the {…} parts, then Preview.'; return; }
+    msg.textContent = 'Saving…';
+    let g; try { g = await setupPost('myQSave', { q: d }); } catch { g = { ok: false, error: 'Couldn’t reach your script.' }; }
+    if (!g || !g.ok) { msg.textContent = /unknown/i.test((g && g.error) || '') ? 'Your Sheet’s script hasn’t picked this up yet; it updates itself within about 10 minutes.' : (g && g.error) || 'It didn’t save.'; return; }
+    d.id = g.id; if (def.id) myqUnregister(def.id); myqRegister(d); store.set(TK('myq:cache'), Object.values(MYQ)); done(d);
+  };
+  const del = async () => { if (!def.id || !confirm('Delete this question? Assignments that use it will skip it.')) return; const g = await setupPost('myQDelete', { id: def.id }).catch(() => null); if (g && g.ok) { myqUnregister(def.id); store.set(TK('myq:cache'), Object.values(MYQ)); done(null); } else msg.textContent = 'It didn’t delete.'; };
+  box.append(el('h3', { style: 'margin:0 0 8px' }, def.id ? '✏️ Edit your question' : '✏️ Write a question'),
+    el('label', {}, 'Name (shows in the list here)'), title,
+    el('div', { style: 'display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;align-items:center' }, el('span', {}, 'Subject ', subj), el('span', {}, 'Put it in ', sec)),
+    el('label', { style: 'margin-top:8px;display:block' }, 'Question'), stem,
+    el('div', { style: 'margin:6px 0' }, el('span', { class: 'small' }, 'Picture (optional): '), file, imgPrev),
+    el('div', { style: 'margin:8px 0' }, el('span', {}, 'Answer type '), kind), mcBox, ansBox,
+    el('details', { style: 'margin-top:10px', ...(Object.keys(def.vars || {}).length ? { open: '' } : {}) }, el('summary', { style: 'cursor:pointer;font-weight:600' }, '🎲 New numbers for each student (optional)'),
+      el('p', { class: 'small', style: 'margin:6px 0' }, 'Give a letter a range, then write {a} in the question, answers, or solution. Use {= …} for a worked-out value, like {= a*b} or {= sqrt(a^2+b^2)}. Each student gets their own numbers.'),
+      ...vars.map((v) => el('div', { style: 'display:flex;gap:6px;align-items:center;margin:3px 0' }, el('b', { style: 'width:18px' }, v.k), v.from, el('span', {}, 'to'), v.to, el('span', { class: 'small' }, 'step'), v.step))),
+    el('label', { style: 'margin-top:10px;display:block' }, 'Solution (optional)'), sol,
+    el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center' },
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: preview }, 'Preview'),
+      el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: save }, 'Save'),
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => done(undefined) }, 'Cancel'),
+      def.id ? el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;color:#b3261e', onclick: del }, 'Delete') : '', msg), prev);
+  return box;
+}
+
 /* ---------- ACT practice on your own (students; not graded) ----------
    Three kinds, each a fresh set of questions every time: a topic (10 questions, with help), a quick quiz (15 mixed, 17 minutes),
    and a practice test (45 mixed, 50 minutes, like the Enhanced ACT: 45 questions, 50 minutes, 4 choices, calculator allowed).
@@ -38385,7 +38539,15 @@ async function sendNow(pts, resend) {
   }
   store.set(state.key, { ...(store.get(state.key) || {}), submitted: sub });
   refreshStatus();
+  if (sub.saveStatus === 'fail') sendLater(pts); // no connection: keep trying, and send the moment it's back
   if (payload.shareWork && sub.saveStatus === 'ok') { sub.workUrl = sub.workUrl || 'wait'; fetchWorkLink(payload, 10); refreshWorkLink(); }
+}
+// Offline when turning in: try again every minute, and right away when the connection comes back (the score is saved on this Chromebook meanwhile)
+let sendLaterT = null;
+function sendLater(pts) {
+  clearInterval(sendLaterT);
+  const sub = state && state.submitted, key = state && state.key, again = () => { if (!state || state.key !== key || state.submitted !== sub || sub.confirmed) { clearInterval(sendLaterT); removeEventListener('online', again); return; } if (navigator.onLine !== false) sendNow(pts, true); };
+  sendLaterT = setInterval(again, 60000); addEventListener('online', again, { once: true });
 }
 // A turned-in assignment opened again (on any Chromebook) whose score was never confirmed by the Sheet:
 // ask the Sheet whether the score is there, and send it if it isn't.
@@ -38439,7 +38601,7 @@ function refreshStatus() {
   const s = document.getElementById('saveStatus'); if (!s) return;
   const st = state.submitted.saveStatus;
   s.className = 'status ' + (st === 'ok' ? 'ok' : st === 'fail' ? 'fail' : 'wait');
-  if (st === 'fail') { s.replaceChildren(`Your score hasn’t reached ${CONFIG.TEACHER_NAME} yet. Stay on this page and tap Try again, or show this screen to ${CONFIG.TEACHER_NAME}. `,
+  if (st === 'fail') { s.replaceChildren(`${navigator.onLine === false ? 'No internet right now. Your score is saved on this Chromebook and will send by itself as soon as the connection is back; keep this page open. ' : ''}Your score hasn’t reached ${CONFIG.TEACHER_NAME} yet. Stay on this page and tap Try again, or show this screen to ${CONFIG.TEACHER_NAME}. `,
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:6px 0 0;padding:6px 14px', onclick: () => send(state.qs.map((q, i) => scoreOf(q, state.answers[i])), true) }, 'Try again')); return; }
   s.textContent = st === 'ok' ? `Saved — ${CONFIG.TEACHER_NAME} has your score.`
     : st === 'retry' ? 'Still sending your score… (the connection was slow; trying again)'
@@ -39651,6 +39813,10 @@ function lessonsReady() {
 }
 const lessonsLoaded = () => !!(LESSONS_P && LESSONS_P.ok);
 // these open pages that show a plan's content: each waits for lessons.js first (with a short “Loading…” note)
+['builder', 'dashboard', 'printScreen', 'startScreen'].forEach((name) => { // teacher pages that list or make questions: your own questions first
+  const f = window[name]; if (typeof f !== 'function') return;
+  window[name] = function (...args) { if (MYQ_LOADED || !dashPw.get() || !CONFIG.SCRIPT_URL) return f.apply(this, args); return myqLoad().then(() => f.apply(this, args), () => f.apply(this, args)); };
+});
 ['lessonScreen', 'lessonEdit', 'lessonBuild', 'bellReview', 'missedScreen', 'catchupScreen', 'vocabScreen', 'sheetFromPlan'].forEach((name) => {
   const f = window[name]; if (typeof f !== 'function') return;
   window[name] = function (...args) {
@@ -42592,6 +42758,8 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-23', text: '✏️ Write your own questions: in Build an assignment, click ✏️ Write a question. Multiple choice, a typed number, a typed expression (any equal form counts), or typed words, with an optional picture and solution. Give letters a range ({a}, {b}…) for new numbers for each student, and use {= …} for worked-out values. Put it in a book section or in its own ✏️ My questions group, then add it to assignments like any other question.' },
+  { date: '2026-11-23', text: 'Works without internet: once the site has been opened on a Chromebook, it opens again even when the Wi-Fi is down, and an assignment keeps working. A score turned in with no connection is kept on the Chromebook and sends by itself as soon as the connection is back. The site also opens faster.' },
   { date: '2026-11-23', subjects: ['act'], text: '🎯 ACT practice on their own: the front page of the student link now lets any student practice an ACT topic (10 questions, with help), take a timed quick quiz (15 questions, 17 minutes), or take a practice test (45 questions, 50 minutes, 4 choices, like the Enhanced ACT). New questions every time; never graded. They see a rough estimated ACT score and their weak topics. You see who’s practicing and their estimates on the Results dashboard under 🎯 ACT practice.' },
   { date: '2026-11-23', text: '⚑ Report a problem: every question now has a small “Report a problem with this question” link at the bottom. A student (or you, in Teacher preview) picks what’s wrong and sends it. Reports show on the Results dashboard under ⚑ Problem reports, with 📋 Copy for a fix (everything needed to make that exact question again, to paste to Claude) and ✓ Mark fixed.' },
   { date: '2026-11-23', text: 'Faster loading: the lesson plans are now a separate file that loads only when a lesson page, catch-up page, flashcards, or a student’s 📖 Notes needs it. Students doing an assignment download less than half as much as before.' },
@@ -42679,6 +42847,7 @@ function helpScreen(open) {
     ['build', '3. Build your own assignment (quizzes, reviews, tests)', [
       OL([B('Build an assignment'), ' tab. Type a title and pick the subject (that’s the gradebook tab the scores go to).'],
         ['Open a chapter, then a section, and type how many of each question type you want. ', B('Preview'), ' shows a sample. ', B('★ Bonus'), ' adds extra-credit questions at the end. Under each question type, ', B('📋 OAS'), ' shows its Oklahoma Academic Standards objective; click it (or point at it) to read the objective’s wording.'],
+        [B('✏️ Write a question'), ' (above the list): your own question, as multiple choice, a typed number, a typed expression (any equal form counts), or typed words, with an optional picture and solution. For new numbers for each student, give letters a range (a from 6 to 12) and write {a} in the question; {= a*b} or {= sqrt(a^2+b^2)} puts in a worked-out value. Preview it, Save it, and it shows in the section you picked (or under ✏️ My questions) with a ✏️ Edit button. Add it to assignments like any other question.'],
         [B('Find a topic: '), 'type it in the search box above the list of question types (for example, “vertical and horizontal lines” or “9.4”). Only the matching question types show; clear the box to see everything again.'],
         ['Choose the settings above the list: tries per question, attempts, ', B('Lockdown mode'), ' (for tests), ', B('Homework help'), ' (hints, worked examples, videos, TI-Nspire steps, AI mistake help, and notes — pick any of them, and leave it off for tests), and the Desmos calculator.'],
         ['Click ', B('Try it as a student'), ' to see exactly what students will get. Nothing you do there is graded.'],
@@ -42735,6 +42904,7 @@ function helpScreen(open) {
         el('li', {}, B('A student’s score is missing'), ': make sure they used the link from your Classroom and turned it in. Check Classes & roster for a nickname mismatch.'),
         el('li', {}, B('Mistake help says it’s used up or not turned on'), ': check 🤖 AI mistake help in Settings on Classes & roster (the key, the on box, and this month’s budget). Each student also has a daily limit.'),
         el('li', {}, B('A help Video or the 🤖 button is missing'), ': it shows only when that kind of help is checked for the assignment (and mistake help only after a wrong try).'),
+        el('li', {}, B('The Wi-Fi went down'), ': a page that was already open keeps working, and a score turned in with no connection sends by itself when the connection is back (keep the page open). A Chromebook that has opened the site before can open it again offline; signing in with Google, videos, and Desmos need the internet.'),
         el('li', {}, B('Still stuck?'), ' Ask Mr. Cross.'))]],
     ['new', 'What’s new', [wnList(wnMine())]],
   ];
@@ -43732,7 +43902,10 @@ function builder() {
   const findIn = el('input', { type: 'search', placeholder: 'Search for a topic (for example: vertical and horizontal lines, Law of Sines, 9.4, G.RT.1.2)', 'aria-label': 'Search question types',
     style: 'width:100%;box-sizing:border-box;padding:10px 12px;font-size:16px;border:1px solid var(--line);border-radius:8px' });
   const findNote = el('div', { class: 'small', style: 'margin:6px 2px 0;min-height:1em' });
-  list.prepend(el('div', { style: 'margin-bottom:10px' }, findIn, findNote));
+  const writeBtn = el('button', { class: 'btn secondary', type: 'button', style: 'margin:0 0 8px' }, '✏️ Write a question');
+  const openEditor = (def) => { const old = document.getElementById('myqEd'); if (old) old.remove(); const ed = myqEditor(def, (d) => { if (d === undefined) ed.remove(); else builder(); }); ed.id = 'myqEd'; list.prepend(ed); ed.scrollIntoView({ block: 'start' }); };
+  writeBtn.onclick = () => openEditor(null);
+  list.prepend(el('div', { style: 'margin-bottom:10px' }, el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, writeBtn, el('span', { class: 'small' }, 'Your own question: multiple choice or typed, with a picture and new numbers for each student if you like.')), findIn, findNote));
   const STOP = new Set(['a', 'an', 'and', 'the', 'of', 'to', 'in', 'on', 'for', 'with', 'by', 'or', 'from', 'find', 'using', 'use', 'how']);
   const stem1 = (w) => w.replace(/(ies)$/, 'y').replace(/(ches|shes|xes|ses)$/, (m) => m.slice(0, -2)).replace(/([^s])s$/, '$1'); // lines → line, parabolas → parabola, slopes → slope
   const words = (t) => String(t).toLowerCase().replace(/[’']/g, '').match(/[a-z0-9]+(?:\.[a-z0-9]+)*/g) || [];
@@ -43771,7 +43944,7 @@ function builder() {
     if (ch !== chapter) {
       chapter = ch; chKey = `chapter:${subject}:${ch}`;
       const name = (CH_TITLES[subject] || {})[ch];
-      const F = foldBox(chKey, `Chapter ${ch}${name ? `: ${name}` : ''}`, true);
+      const F = foldBox(chKey, ch === 'mine' ? '✏️ My questions' : `Chapter ${ch}${name ? `: ${name}` : ''}`, true);
       chBody = F.body; list.append(F.box);
     }
     if (t.section !== section) {
@@ -43827,6 +44000,7 @@ function builder() {
     const rowEl = el('div', { style: 'display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap' + (t.challenge ? ';background:#fffaf0;box-shadow:inset 3px 0 0 #c9a227;padding-left:8px' : ''), title: t.challenge ? 'A harder, multi-step question. Use ★ Bonus to add it as extra credit.' : '' },
       num, el('div', { style: 'flex:1;min-width:180px' }, el('div', { style: 'font-weight:600' }, t.label), el('div', { class: 'small' }, t.desc), oasBadge(t)),
       t.writtenOnly || t.sketch ? el('span', { class: 'small', style: 'padding:7px 8px' }, t.sketch ? 'Graph on a grid' : t.frq ? 'Free response, parts (a)–(d)' : 'Written proof') : fmtSel, prevBtn, hideBtn, bBtn, t.writtenOnly || t.sketch ? '' : split, bLine);
+    if (t.mine && MYQ[t.id.slice(2)]) rowEl.append(el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:7px 12px;font-size:14px', onclick: () => openEditor(MYQ[t.id.slice(2)]) }, '✏️ Edit'));
     secBody.append(rowEl, prevBox); rows.push({ el: rowEl, prev: prevBox, t, sec: section, ch: chKey, chName: (CH_TITLES[subject] || {})[ch] || '' });
     prevBtn._fmt = fmtSel;
   });
@@ -44088,7 +44262,7 @@ function copyIntoBuilder(link) {
 }
 
 /* ---------- entry ---------- */
-(function init() {
+function init() {
   lastW = app.clientWidth;
   document.title = CONFIG.TEACHER_NAME + ' — Practice';
   document.getElementById('subtitle').textContent = CONFIG.TEACHER_NAME;
@@ -44133,9 +44307,11 @@ function copyIntoBuilder(link) {
     return;
   }
   startScreen(false);
-})();
+}
+if (MYQ_START) { app.innerHTML = '<div class="card">Loading…</div>'; MYQ_START.finally(() => { app.innerHTML = ''; init(); }); } else init();
 
 window.__practice = { TEMPLATES, generate, SETS, mulberry32, cyrb53 }; // used for testing
 </script>
+<script>if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {})); // works offline (sw.js)</script>
 </body>
 </html>

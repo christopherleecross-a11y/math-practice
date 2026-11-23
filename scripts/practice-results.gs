@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-23.2'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-23.3'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -122,6 +122,10 @@ function doPost(e) {
   if (d.action === 'lessonPlans' || d.action === 'saveLesson' || d.action === 'resetLesson' || d.action === 'lessonHistory') { // your edits to the lesson plans
     let out;
     try { out = d.action === 'lessonPlans' ? lessonPlans_(d) : d.action === 'saveLesson' ? saveLesson_(d) : d.action === 'lessonHistory' ? lessonHistory_(d) : resetLesson_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'myQs') { // the teacher-written questions an assignment link uses (public: a student's page needs them to make the questions)
+    let out; try { out = { ok: true, qs: myQRows_().filter(function (q) { return (d.ids || []).indexOf(q.id) >= 0; }) }; } catch (err) { out = { ok: false }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'myAct') { // a student's own ACT practice history
@@ -920,6 +924,9 @@ function setupOp_(d) {
   }
   if (op === 'roster') return { ok: true, roster: rosterList() };
   if (op === 'reports') return { ok: true, reports: reportRows_() };
+  if (op === 'myQList') return { ok: true, qs: myQRows_() };
+  if (op === 'myQSave') return myQSave_(d);
+  if (op === 'myQDelete') return myQDelete_(d);
   if (op === 'reportDone') return reportDone_(d);
   if (op === 'accList') return { ok: true, acc: accRows_().map(function (r) { return { id: r.id, period: r.period, name: r.name, acc: r.acc }; }) };
   if (op === 'accSave') return accSave_(d);
@@ -2076,4 +2083,46 @@ function myAct_(d) {
     return { t: r[0] instanceof Date ? r[0].getTime() : new Date(r[0]).getTime(), title: String(r[3]), score: +r[4] || 0, total: +r[5] || 0, pct: +r[6] || 0, detail: String(r[7] || '').slice(0, 4000), minutes: +r[8] || 0 };
   }).sort(function (a, b) { return b.t - a.t; }).slice(0, 40);
   return { ok: true, rows: out };
+}
+
+
+/* ---------- Questions the teacher writes ("✏️ Write a question" in Build an assignment) ----------
+   Hidden "My Questions" tab: ID | Subject | Title | Question (JSON) | Updated. An assignment link names them as cq<ID>. */
+const MYQ_TAB = 'My Questions';
+function myQSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(MYQ_TAB);
+  if (!sh) { sh = ss.insertSheet(MYQ_TAB); sh.appendRow(['ID', 'Subject', 'Title', 'Question', 'Updated']); sh.getRange(1, 1, 1, 5).setFontWeight('bold'); sh.setFrozenRows(1); sh.hideSheet(); }
+  return sh;
+}
+function myQRows_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MYQ_TAB);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const cache = CacheService.getScriptCache(), hit = cache.get('myq');
+  if (hit) try { return JSON.parse(hit); } catch (e) {}
+  const out = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues().map(function (r) { let q = null; try { q = JSON.parse(String(r[3] || '')); } catch (e) {} return q && r[0] ? Object.assign(q, { id: String(r[0]), subject: String(r[1]) }) : null; }).filter(Boolean);
+  const js = JSON.stringify(out); if (js.length < 90000) try { cache.put('myq', js, 600); } catch (e) {}
+  return out;
+}
+function myQSave_(d) {
+  const q = d.q || {}; let js = JSON.stringify(q);
+  if (js.length > 49000) return { ok: false, error: 'This question is too big to save (usually the picture). Use a smaller picture.' };
+  const sh = myQSheet_(), lock = LockService.getScriptLock(); lock.waitLock(20000);
+  let id = String(q.id || '').replace(/[^a-z0-9]/gi, '');
+  try {
+    const ids = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().map(function (r) { return String(r[0]); }) : [];
+    if (!id) { do { id = Utilities.getUuid().replace(/-/g, '').slice(0, 8); } while (ids.indexOf(id) >= 0); }
+    const k = ids.indexOf(id), row = [id, String(q.subject || ''), String(q.title || '').slice(0, 120), js, new Date()];
+    if (k >= 0) sh.getRange(k + 2, 1, 1, 5).setValues([row]); else sh.appendRow(row);
+    CacheService.getScriptCache().remove('myq');
+  } finally { lock.releaseLock(); }
+  return { ok: true, id: id };
+}
+function myQDelete_(d) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MYQ_TAB), id = String(d.id || '');
+  if (!sh || sh.getLastRow() < 2) return { ok: true };
+  const ids = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().map(function (r) { return String(r[0]); }), k = ids.indexOf(id);
+  if (k >= 0) sh.deleteRow(k + 2);
+  CacheService.getScriptCache().remove('myq');
+  return { ok: true };
 }
