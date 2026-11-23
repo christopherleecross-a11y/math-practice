@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-23.3'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-23.4'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -122,6 +122,10 @@ function doPost(e) {
   if (d.action === 'lessonPlans' || d.action === 'saveLesson' || d.action === 'resetLesson' || d.action === 'lessonHistory') { // your edits to the lesson plans
     let out;
     try { out = d.action === 'lessonPlans' ? lessonPlans_(d) : d.action === 'saveLesson' ? saveLesson_(d) : d.action === 'lessonHistory' ? lessonHistory_(d) : resetLesson_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'readPrefs') { // a student's own reading options (easy-read font, spacing, dark mode, bigger text)
+    let out; try { out = readPrefsSave_(d); } catch (err) { out = { ok: false }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'myQs') { // the teacher-written questions an assignment link uses (public: a student's page needs them to make the questions)
@@ -1917,7 +1921,7 @@ function accClean_(a) {
   const n = function (v, hi) { v = Math.floor(Number(v) || 0); return Math.max(0, Math.min(hi, v)); }, out = {};
   if (n(a.retries, 5)) out.retries = n(a.retries, 5);
   if (n(a.attempts, 5)) out.attempts = n(a.attempts, 5);
-  ['three', 'read', 'big', 'help', 'desmos', 'breaks'].forEach(function (k) { if (a[k]) out[k] = true; });
+  ['three', 'read', 'big', 'font', 'spacing', 'dark', 'help', 'desmos', 'breaks'].forEach(function (k) { if (a[k]) out[k] = true; });
   if (a.note) out.note = String(a.note).slice(0, 200);
   return out;
 }
@@ -1946,7 +1950,7 @@ function myAcc_(d) {
     hit = rows.filter(function (r) { return (ro && r.id === ro.id) || (r.period === per && normName_(r.name) === t); })[0];
   }
   const a = hit ? accClean_(hit.acc) : {}; delete a.note; // the teacher's note stays private
-  return { ok: true, acc: a, ai: aiHelpReady_() };
+  return { ok: true, acc: a, ai: aiHelpReady_(), prefs: readPrefsGet_(d) };
 }
 
 
@@ -2125,4 +2129,18 @@ function myQDelete_(d) {
   if (k >= 0) sh.deleteRow(k + 2);
   CacheService.getScriptCache().remove('myq');
   return { ok: true };
+}
+
+
+/* ---------- Reading options a student picks for themselves (the Aa button), kept by name so they follow them to any Chromebook ---------- */
+function readWho_(d) { const token = d.token; signinCheck_(d); if (token && !d.rid) return ''; return d.rid ? 'rp:r' + d.rid : (d.name ? 'rp:n' + String(d.period || '') + '|' + normName_(d.name) : ''); }
+function readPrefsSave_(d) {
+  const who = readWho_(d); if (!who) return { ok: false };
+  const p = {}; ['font', 'spacing', 'dark', 'big'].forEach(function (k) { if (d.prefs && d.prefs[k]) p[k] = true; });
+  const props = PropertiesService.getScriptProperties();
+  if (Object.keys(p).length) props.setProperty(who, JSON.stringify(p)); else props.deleteProperty(who);
+  return { ok: true };
+}
+function readPrefsGet_(d) {
+  try { const who = readWho_({ period: d.period, name: d.name, rid: d.rid }); if (!who) return null; const v = PropertiesService.getScriptProperties().getProperty(who); return v ? JSON.parse(v) : {}; } catch (e) { return null; }
 }

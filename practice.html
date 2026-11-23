@@ -319,6 +319,9 @@ tr.dash-late td strong { color: #b42318; }
   table.dash-std th, table.dash-std td { padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
   table.dash-std th { font-size:13px; color:#666; }
   body.acc-big #app { font-size: 120%; } body.acc-big #app input, body.acc-big #app .mq-editable-field { font-size: 1.15em; }
+  html.rd-font #app, html.rd-font #app *:not(math-field), html.rd-font #readPanel { font-family: 'Lexend', system-ui, sans-serif !important; }
+  html.rd-space #app { line-height: 1.85; letter-spacing: .02em; word-spacing: .08em; } html.rd-space #app p, html.rd-space #app .stem { margin-bottom: .9em; }
+  html.rd-dark { filter: invert(1) hue-rotate(180deg); background: #fff; } html.rd-dark img, html.rd-dark video, html.rd-dark iframe { filter: invert(1) hue-rotate(180deg); } /* photos and videos look normal; drawn figures turn light-on-dark with the page */
 </style>
 <script src="sylogist.js"></script>
 </head>
@@ -9552,7 +9555,7 @@ function makeCanvas(w, h) {
   return cv;
 }
 
-const TEXT_FONT = '17px "Times New Roman", Times, serif';
+let TEXT_FONT = '17px "Times New Roman", Times, serif', TEXT_LH = 26; // the reading options (Aa) can change these
 const NOWRAP = '\u2063'; // a line that starts with this stays on one line (shrunk to fit if needed)
 // keep each equation on one line: a run of math words (no ordinary English words) that contains "=" is glued with
 // no-break spaces when it fits, so the line breaks between equations or before one, never in the middle of one
@@ -9881,7 +9884,7 @@ function matrixCanvas(text, font, lh) {
   rows.forEach((row, i) => row.forEach((x, j) => c.fillText(x, 8 + cw * j + cw / 2, top + rh * i + rh / 2 + 1)));
   return cv;
 }
-function textCanvas(text, width, font = TEXT_FONT, lh = 26) {
+function textCanvas(text, width, font = TEXT_FONT, lh = TEXT_LH) {
   if (MATRIX_TEXT.test(String(text).trim())) return matrixCanvas(String(text), font, lh);
   text = autoMath(text);
   if (hasM(text)) return mathTextCanvas(text, width, font, lh);
@@ -36603,6 +36606,47 @@ function helpOf(v) {
   return [...'henvca'].filter((c) => v.includes(c) || (c === 'v' && old)).join('');
 }
 function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Worked example'], ['n', 'Notes'], ['v', 'Video'], ['c', 'TI-Nspire steps'], ['a', 'AI mistake help']].filter(([c]) => h.includes(c)).map(([, t]) => t).join(', ') : 'no'; }
+/* ---------- Reading options (the Aa button): easy-read font, more space between lines, dark mode, bigger text ----------
+   A student's choices are saved with their name in the Sheet, so they follow them to any Chromebook. The teacher can also
+   turn any of them on for a student as an accommodation (Classes & roster). */
+const READ_OPTS = [['font', 'Easy-read font', 'Letters that are easier to tell apart (Lexend)'], ['spacing', 'More space', 'More room between lines and letters'],
+  ['dark', 'Dark mode', 'Light text and drawings on a dark background'], ['big', 'Bigger text', 'Everything about 20% bigger']];
+let READ_ME = null; // this student's own choices (null: not loaded yet)
+function readNow() { const mine = READ_ME || store.get(TK('read')) || {}, A = ACC_ME || {}; const o = {}; READ_OPTS.forEach(([k]) => { o[k] = !!(mine[k] || A[k]); }); return o; }
+function applyRead() {
+  const o = readNow(), H = document.documentElement;
+  if (o.font && !document.getElementById('lexendFont')) document.head.append(el('link', { id: 'lexendFont', rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap' }));
+  H.classList.toggle('rd-font', o.font); H.classList.toggle('rd-space', o.spacing); H.classList.toggle('rd-dark', o.dark); document.body.classList.toggle('acc-big', o.big);
+  // the question text is drawn as a picture: draw it again in the chosen font and spacing
+  const f = o.font ? '17px Lexend, system-ui, sans-serif' : '17px "Times New Roman", Times, serif', lh = o.spacing ? 32 : 26;
+  if (f !== TEXT_FONT || lh !== TEXT_LH) {
+    TEXT_FONT = f; TEXT_LH = lh;
+    const redraw = () => { if (state && state.qs && document.querySelector('.q')) { const y = scrollY; render(); scrollTo(0, y); } };
+    if (o.font && document.fonts && document.fonts.load) document.fonts.load('17px Lexend').then(redraw, redraw); else redraw();
+  }
+}
+async function readSave(o) {
+  READ_ME = o; store.set(TK('read'), o); applyRead();
+  if (!state || state.teacher || PREVIEW || !CONFIG.SCRIPT_URL || !state.name) return;
+  const ps = state.rid ? signinPass() : null;
+  try { await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'readPrefs', period: state.period, name: state.name, token: ps && ps.rid === state.rid ? ps.token : undefined, prefs: o }) }); } catch (e) {}
+}
+function readButton() {
+  if (document.getElementById('readBtn')) return;
+  const panel = el('div', { id: 'readPanel', style: 'display:none;position:fixed;left:10px;bottom:64px;z-index:70;background:#fff;color:#1d1d1b;border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:300px' });
+  const draw = () => {
+    const o = readNow(), A = ACC_ME || {}; panel.innerHTML = '';
+    panel.append(el('div', { style: 'font-weight:700;margin-bottom:6px' }, 'Reading options'),
+      ...READ_OPTS.map(([k, t, d]) => { const c = el('input', { type: 'checkbox', style: 'width:18px;height:18px;margin-top:2px' }); c.checked = o[k]; c.disabled = !!A[k];
+        c.onchange = () => { const mine = { ...(READ_ME || store.get(TK('read')) || {}) }; mine[k] = c.checked; readSave(mine); };
+        return el('label', { style: 'display:flex;gap:8px;align-items:flex-start;margin:6px 0;font-weight:400' }, c, el('span', {}, el('b', {}, t), el('br'), el('span', { class: 'small' }, A[k] ? 'Turned on by your teacher' : d))); }),
+      el('div', { class: 'small', style: 'margin-top:4px' }, 'Saved with your name, so it follows you to any Chromebook.'));
+  };
+  const btn = el('button', { id: 'readBtn', type: 'button', title: 'Reading options', 'aria-label': 'Reading options', style: 'position:fixed;left:10px;bottom:14px;z-index:70;width:44px;height:44px;border-radius:22px;border:1px solid var(--line);background:#fff;color:#1d1d1b;font:700 17px system-ui;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer' }, 'Aa');
+  btn.onclick = () => { const open = panel.style.display === 'none'; if (open) draw(); panel.style.display = open ? '' : 'none'; };
+  document.addEventListener('click', (e) => { if (panel.style.display !== 'none' && !panel.contains(e.target) && e.target !== btn) panel.style.display = 'none'; });
+  document.body.append(btn, panel);
+}
 /* ---------- Accommodations (IEP / 504) ----------
    Set once for a student on Classes & roster; they apply to every assignment that student opens:
    retries / attempts: extra tries on each question / extra attempts at the whole assignment; three: 3 answer choices instead of 4;
@@ -36610,7 +36654,7 @@ function helpText(v) { const h = helpOf(v); return h ? [['h', 'Hint'], ['e', 'Wo
    breaks: leaving full screen never locks the assignment. */
 let ACC_ME = {};
 const ACC_PARTS = [['retries', 'Extra tries on each question', 'num'], ['attempts', 'Extra attempts at the assignment', 'num'], ['three', '3 answer choices instead of 4'], ['read', 'Read aloud (🔊 button)'],
-  ['big', 'Larger text'], ['help', 'Homework help always on'], ['desmos', 'Desmos calculator always on'], ['breaks', 'Breaks: leaving full screen never locks it']];
+  ['big', 'Larger text'], ['font', 'Easy-read font'], ['spacing', 'More space between lines'], ['dark', 'Dark mode'], ['help', 'Homework help always on'], ['desmos', 'Desmos calculator always on'], ['breaks', 'Breaks: leaving full screen never locks it']];
 async function accLoad(period, name, rid) {
   const ck = TK(`acc:${period}:${norm(name)}`), ps = rid ? signinPass() : null;
   try {
@@ -36618,7 +36662,7 @@ async function accLoad(period, name, rid) {
     const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'myAcc', period, name, token: ps && ps.rid === rid ? ps.token : undefined }) });
     clearTimeout(t);
-    const g = await res.json(); if (g && g.ok) { store.set(ck, g.acc || {}); if (g.ai !== undefined) AI_HELP_ON = !!g.ai; return g.acc || {}; }
+    const g = await res.json(); if (g && g.ok) { store.set(ck, g.acc || {}); if (g.ai !== undefined) AI_HELP_ON = !!g.ai; if (g.prefs) { READ_ME = g.prefs; store.set(TK('read'), g.prefs); } return g.acc || {}; }
   } catch (e) {}
   return store.get(ck) || {}; // offline or an older script: what this Chromebook got last time
 }
@@ -36700,7 +36744,7 @@ function accCard(roster, card, th, td, note) {
     if (!roster.length) { list.append(el('p', { class: 'small' }, 'No roster yet. Refresh the roster from Classroom above first.')); return; }
     const rows = roster.filter((r) => r.period === perSel.value).sort((a, b) => lastFirst(a.full).localeCompare(lastFirst(b.full)));
     const tb = el('table', { style: 'width:100%;border-collapse:collapse;margin-top:8px;font-size:14px' },
-      th('Student', 'Extra tries', 'Extra attempts', '3 choices', 'Read aloud', 'Larger text', 'Help always on', 'Desmos', 'Breaks', 'Note (only you see it)', ''));
+      th('Student', 'Extra tries', 'Extra attempts', '3 choices', 'Read aloud', 'Larger text', 'Easy-read font', 'More space', 'Dark mode', 'Help always on', 'Desmos', 'Breaks', 'Note (only you see it)', ''));
     rows.forEach((r) => {
       const a = { ...accOf(r) }, mark = el('span', { class: 'small', style: 'min-width:1.2em;display:inline-block' });
       let t = null;
@@ -37018,6 +37062,7 @@ async function startScreen(teacher = false) {
   return startScreen0(teacher);
 }
 function startScreen0(teacher = false) {
+  if (!teacher) setTimeout(() => { applyRead(); readButton(); }, 0); // the Aa reading options
   if (teacher) teacherNav('key');
   const setKey = CUSTOM_KEY || params.get('set');
   app.innerHTML = '';
@@ -37154,7 +37199,7 @@ async function begin(setKey, period, name, teacher, teacherAttempt = 1, rid = nu
   const sid = sidOf(name, rid);
   const base = `practice:${CONFIG.SALT}:${setKey}:${period}:${sid}`;
   ACC_ME = !teacher && !PREVIEW && CONFIG.SCRIPT_URL && !noCloud ? await accLoad(period, name, rid) : {}; // this student's accommodations
-  document.body.classList.toggle('acc-big', !!ACC_ME.big);
+  if (!teacher) { applyRead(); readButton(); } else document.body.classList.remove('acc-big');
   if (!teacher && CONFIG.SCRIPT_URL && !noCloud) { app.innerHTML = '<div class="card">Loading your saved work…</div>'; await cloudRestore(base); }
   // nothing saved under this sign-in yet: pick up work saved earlier under the student's typed name
   // (before the class list or Google sign-in was working), on this Chromebook or online
@@ -42775,6 +42820,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-23', text: 'Reading options for students: an Aa button in the bottom-left corner of the student pages turns on an easy-read font, more space between lines, dark mode, or bigger text. Their choices are saved with their name, so they follow them to any Chromebook. You can also turn any of these on for a student in 🧩 Accommodations.' },
   { date: '2026-11-23', text: 'If the Wi-Fi drops during an assignment, students now see a red banner across the top: “No internet. Keep working, but don’t close this page or sign out until this message goes away.” It disappears once their work has saved, and the browser asks “Leave this page?” if they try to close it with work not yet saved.' },
   { date: '2026-11-23', text: '✏️ Write your own questions: in Build an assignment, click ✏️ Write a question. Multiple choice, a typed number, a typed expression (any equal form counts), or typed words, with an optional picture and solution. Give letters a range ({a}, {b}…) for new numbers for each student, and use {= …} for worked-out values. Put it in a book section or in its own ✏️ My questions group, then add it to assignments like any other question.' },
   { date: '2026-11-23', text: 'Works without internet: once the site has been opened on a Chromebook, it opens again even when the Wi-Fi is down, and an assignment keeps working. A score turned in with no connection is kept on the Chromebook and sends by itself as soon as the connection is back. The site also opens faster.' },
@@ -42907,7 +42953,7 @@ function helpScreen(open) {
         ['Nicknames: if a student types a different name than Classroom has (Mike for Michael), add it so their scores still match.'],
         [B('Change your dashboard password'), ' in ', B('🔑 Settings'), ' at the bottom of this tab. Other computers will ask for the new one.'],
         [B('🤖 AI mistake help'), ': in ', B('🔑 Settings'), ' at the bottom, paste your Anthropic API key (from platform.claude.com, Get API key) under AI key, then check ', B('Turn on mistake help'), ', pick the helps per student per day, and set the monthly budget. It shows what’s been spent this month; when the budget is used up, the button stops until next month. Turn it on or off for each assignment with the AI mistake help box under Homework help.'],
-        [B('Accommodations (IEP / 504)'), ': in the 🧩 Accommodations box, pick the period and check what each student gets: extra tries on each question, extra attempts, 3 answer choices instead of 4, a 🔊 Read aloud button, larger text, Homework help always on, the Desmos calculator always on, or breaks (leaving full screen never locks the assignment). It saves as you click and applies to every assignment that student opens, on any Chromebook. The note is only for you.'])]],
+        [B('Accommodations (IEP / 504)'), ': in the 🧩 Accommodations box, pick the period and check what each student gets: extra tries on each question, extra attempts, 3 answer choices instead of 4, a 🔊 Read aloud button, larger text, an easy-read font, more space between lines, dark mode, Homework help always on, the Desmos calculator always on, or breaks (leaving full screen never locks the assignment). It saves as you click and applies to every assignment that student opens, on any Chromebook. The note is only for you.'])]],
     ['crossword', `${hasLessons ? 11 : 10}. Vocabulary crossword`, [
       P('Open it with the ', B('Crossword'), ' tab. Its own tabs:'),
       OL([B('Make a puzzle'), ': pick a word list and difficulty, then ', B('Build puzzle'), '. Under More options you can give everyone a word bank or set a time limit.'],
