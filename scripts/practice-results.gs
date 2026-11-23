@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-22.5'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-23.1'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -122,6 +122,10 @@ function doPost(e) {
   if (d.action === 'lessonPlans' || d.action === 'saveLesson' || d.action === 'resetLesson' || d.action === 'lessonHistory') { // your edits to the lesson plans
     let out;
     try { out = d.action === 'lessonPlans' ? lessonPlans_(d) : d.action === 'saveLesson' ? saveLesson_(d) : d.action === 'lessonHistory' ? lessonHistory_(d) : resetLesson_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'reportProblem') {
+    let out; try { out = reportProblem_(d); } catch (err) { out = { ok: false, error: 'The report didn’t save. Try again in a minute.' }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'mistakeHelp') {
@@ -911,6 +915,8 @@ function setupOp_(d) {
     return { ok: true, roster: rosterList() };
   }
   if (op === 'roster') return { ok: true, roster: rosterList() };
+  if (op === 'reports') return { ok: true, reports: reportRows_() };
+  if (op === 'reportDone') return reportDone_(d);
   if (op === 'accList') return { ok: true, acc: accRows_().map(function (r) { return { id: r.id, period: r.period, name: r.name, acc: r.acc }; }) };
   if (op === 'accSave') return accSave_(d);
   if (op === 'rosterEdit') {
@@ -2009,4 +2015,45 @@ function mistakeHelp_(d) {
   if (j.stop_reason === 'max_tokens') { const k = Math.max(text.lastIndexOf('. '), text.lastIndexOf('? '), text.lastIndexOf('! ')); if (k > 40) text = text.slice(0, k + 1); } // never end mid-sentence
   if (!text) return { ok: false, error: 'Mistake help didn’t have an answer this time. Try again, or use a Hint.' };
   return { ok: true, text: cut(text, 1500), left: left };
+}
+
+
+/* ---------- Problem reports: "⚑ Report a problem" on a question ----------
+   Saved on a hidden "Problem reports" tab with everything needed to make that exact question again:
+   When | Who | Period | Assignment | Question type | Kind | Note | Question | Answer key | Their answer | Details (JSON) | Status */
+const REPORT_TAB = 'Problem reports';
+function reportSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(REPORT_TAB);
+  if (!sh) { sh = ss.insertSheet(REPORT_TAB); sh.appendRow(['When', 'Who', 'Period', 'Assignment', 'Question type', 'Kind', 'Note', 'Question', 'Answer key', 'Their answer', 'Details', 'Status']); sh.getRange(1, 1, 1, 12).setFontWeight('bold'); sh.setFrozenRows(1); sh.hideSheet(); }
+  return sh;
+}
+function reportProblem_(d) {
+  const cut = function (t, n) { return String(t == null ? '' : t).slice(0, n); };
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'), props = PropertiesService.getScriptProperties(), lock = LockService.getScriptLock();
+  const who = cut(d.name, 80) || 'someone', key = 'n' + cut(d.period, 10) + '|' + normName_(who);
+  lock.waitLock(20000);
+  try {
+    let u = {}; try { u = JSON.parse(props.getProperty('REPORT_USE') || '{}') || {}; } catch (e) {}
+    if (u.day !== today) u = { day: today, total: 0, by: {} };
+    if (u.total >= 200 || (u.by[key] || 0) >= 10) return { ok: false, error: 'Thanks! You’ve sent a lot of reports today; your teacher will look at them.' };
+    u.by[key] = (u.by[key] || 0) + 1; u.total++; props.setProperty('REPORT_USE', JSON.stringify(u));
+    reportSheet_().appendRow([new Date(), (d.teacher ? '(teacher) ' : '') + who, cut(d.period, 20), cut(d.title, 120), cut(d.tpl, 60), cut(d.kind, 60), cut(d.note, 600),
+      cut(d.stem, 2000), cut(d.key, 400), cut(d.answer, 400), cut(JSON.stringify(d.details || {}), 20000), 'new']);
+  } finally { lock.releaseLock(); }
+  return { ok: true };
+}
+function reportRows_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REPORT_TAB);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const n = sh.getLastRow() - 1, start = Math.max(2, sh.getLastRow() - 199);
+  return sh.getRange(start, 1, sh.getLastRow() - start + 1, 12).getValues().map(function (r, i) {
+    return { row: start + i, t: r[0] instanceof Date ? r[0].getTime() : String(r[0]), who: r[1], period: r[2], title: r[3], tpl: r[4], kind: r[5], note: r[6], stem: r[7], key: r[8], answer: r[9], details: r[10], status: r[11] };
+  }).reverse();
+}
+function reportDone_(d) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REPORT_TAB), row = Math.floor(+d.row);
+  if (!sh || row < 2 || row > sh.getLastRow()) return { ok: false, error: 'That report wasn’t found.' };
+  sh.getRange(row, 12).setValue(d.status === 'new' ? 'new' : 'done');
+  return { ok: true };
 }
