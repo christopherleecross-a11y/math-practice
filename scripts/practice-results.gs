@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-23.1'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-23.2'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -122,6 +122,10 @@ function doPost(e) {
   if (d.action === 'lessonPlans' || d.action === 'saveLesson' || d.action === 'resetLesson' || d.action === 'lessonHistory') { // your edits to the lesson plans
     let out;
     try { out = d.action === 'lessonPlans' ? lessonPlans_(d) : d.action === 'saveLesson' ? saveLesson_(d) : d.action === 'lessonHistory' ? lessonHistory_(d) : resetLesson_(d); } catch (err) { out = { ok: false, error: String(err) }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (d.action === 'myAct') { // a student's own ACT practice history
+    let out; try { out = myAct_(d); } catch (err) { out = { ok: true, rows: [] }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
   if (d.action === 'reportProblem') {
@@ -2056,4 +2060,20 @@ function reportDone_(d) {
   if (!sh || row < 2 || row > sh.getLastRow()) return { ok: false, error: 'That report wasn’t found.' };
   sh.getRange(row, 12).setValue(d.status === 'new' ? 'new' : 'done');
   return { ok: true };
+}
+
+
+/* ---------- ACT practice (students on their own; not graded): rows land on the "ACT Practice" tab ----------
+   myAct: one student's own sessions, newest first (with Google sign-in, only for that sign-in). */
+function myAct_(d) {
+  const token = d.token; signinCheck_(d);
+  if (token && !d.rid) return { ok: true, rows: [] };
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ACT Practice');
+  if (!sh || sh.getLastRow() < 2) return { ok: true, rows: [] };
+  const per = String(d.period || ''), t = normName_(d.name || ''); if (!t) return { ok: true, rows: [] };
+  const vals = sh.getRange(2, 1, sh.getLastRow() - 1, 11).getValues();
+  const out = vals.filter(function (r) { return String(r[1]) === per && normName_(r[2]) === t; }).map(function (r) {
+    return { t: r[0] instanceof Date ? r[0].getTime() : new Date(r[0]).getTime(), title: String(r[3]), score: +r[4] || 0, total: +r[5] || 0, pct: +r[6] || 0, detail: String(r[7] || '').slice(0, 4000), minutes: +r[8] || 0 };
+  }).sort(function (a, b) { return b.t - a.t; }).slice(0, 40);
+  return { ok: true, rows: out };
 }

@@ -35998,10 +35998,11 @@ for (const id of Object.keys(TEMPLATES)) { const make = TEMPLATES[id]; TEMPLATES
   const attempts = Math.max(1, Math.min(10, Math.floor(+q.get('attempts') || 1)));
   const checks = Math.max(1, Math.min(5, Math.floor(+q.get('checks') || 1)));
   const same = q.get('same') === '1', hints = helpOf(q.get('hints') || ''), more = q.get('more') === '1', desmos = q.get('desmos') === '1', shareWork = q.get('sw') === '1', redo = q.get('redo') === 'missed' ? 'missed' : 'all';
+  const actKind = ['topic', 'quiz', 'test'].includes(q.get('act')) && SUBJECTS.act ? q.get('act') : null, timeLimit = Math.max(0, Math.min(180, Math.floor(+q.get('time') || 0))) || undefined;
   const leaveLimit = q.has('leave') ? Math.max(0, Math.min(20, Math.floor(+q.get('leave') || 0))) : undefined;
   CUSTOM_KEY = customKeyFor(q);
   const lockdown = q.get('lock') !== '0';
-  SETS[CUSTOM_KEY] = { subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, more, desmos, shareWork, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined, picks: same ? picksOf(q) : undefined };
+  SETS[CUSTOM_KEY] = { ...(actKind ? { act: actKind } : {}), ...(timeLimit ? { time: timeLimit } : {}), subject, title, items, shuffle: shuffleQs, mix, custom: true, retries, checks, bonusPct: bonusPctOf(q), attempts, lockdown, same, hints, more, desmos, shareWork, leaveLimit, redo, gen: q.get('g') === '2' ? 2 : undefined, picks: same ? picksOf(q) : undefined };
 })();
 
 /* ---------- question generation ---------- */
@@ -37012,6 +37013,7 @@ function startScreen0(teacher = false) {
         return g;
       }).filter((g) => g.children.length));
     card.append(el('label', { for: 'set' }, 'Assignment'), setSel);
+    if (!teacher && SUBJECTS.act && actTypes().length) setTimeout(() => { if (!document.getElementById('actEntry') && document.getElementById('set')) { const c = actEntryCard(); c.id = 'actEntry'; app.append(c); } }, 0);
     if (!teacher) card.append(el('p', { class: 'small', style: 'margin:6px 0 0' }, 'Looking for the vocabulary crossword? ', el('a', { href: 'crossword.html?t=' + TEACHER_ID, style: 'color:var(--accent);font-weight:600' }, 'Open it here')));
     const none = el('p', { class: 'small' }, teacher ? 'Loading the assignments you built…' : 'No assignments here yet.');
     if (!setSel.querySelector('option[value]:not([value=""])')) card.append(none);
@@ -37219,7 +37221,7 @@ function render() {
   const wm = !teacher && CONFIG.WATERMARK !== false;
   if (wm) app.style.setProperty('--wm', watermarkCss()); else app.style.removeProperty('--wm');
   const W = contentWidth();
-  if (submitted) app.append(resultsCard());
+  if (submitted) { app.append(resultsCard()); if (SETS[state.setKey] && SETS[state.setKey].act) app.append(actResults()); }
   if (teacher) app.append(el('div', { class: 'card' }, el('strong', {}, 'Answer key'), el('p', { class: 'small' }, `Version ${state.version}. This is exactly what this student sees.`)));
   qs.forEach((q, i) => {
     const locked = !!state.status[i];
@@ -37877,6 +37879,108 @@ function reportsCard() {
   }).catch(() => box.remove());
   return box;
 }
+/* ---------- ACT practice on your own (students; not graded) ----------
+   Three kinds, each a fresh set of questions every time: a topic (10 questions, with help), a quick quiz (15 mixed, 17 minutes),
+   and a practice test (45 mixed, 50 minutes, like the Enhanced ACT: 45 questions, 50 minutes, 4 choices, calculator allowed).
+   Scores go to the "ACT Practice" tab, never to the gradebook or Classroom. */
+const ACT_CATS = [['3', 'Number and quantity'], ['4', 'Algebra'], ['5', 'Functions'], ['6', 'Geometry'], ['7', 'Statistics and probability']];
+const ACT_PLAN = { test: { n: [6, 11, 10, 11, 7], min: 50, title: 'ACT practice test' }, quiz: { n: [2, 4, 3, 4, 2], min: 17, title: 'ACT quick quiz' } };
+const actTypes = (sec) => QUESTION_TYPES.filter((t) => t.subject === 'act' && TEMPLATES[t.id] && !/^Practice Test/.test(t.section) && (sec ? t.section === sec : true));
+const actSections = () => [...new Set(actTypes().map((t) => t.section))].sort((a, b) => parseFloat(a) - parseFloat(b) || a.localeCompare(b));
+const actCat = (tpl) => { const t = QUESTION_TYPES.find((x) => x.id === tpl); return t ? (ACT_CATS.find(([p]) => t.section.startsWith(p + '.')) || [null, 'Other'])[1] : 'Other'; };
+function actLink(kind, sec) {
+  const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const counts = {};
+  if (kind === 'topic') { const ts = shuffle(actTypes(sec)); for (let k = 0; k < 10; k++) { const id = ts[k % ts.length].id; counts[id] = (counts[id] || 0) + 1; } }
+  else ACT_CATS.forEach(([p], ci) => { const ts = shuffle(actTypes().filter((t) => t.section.startsWith(p + '.'))); for (let k = 0; k < ACT_PLAN[kind].n[ci] && ts.length; k++) { const id = ts[k % ts.length].id; counts[id] = (counts[id] || 0) + 1; } });
+  const mix = shuffle(Object.entries(counts)).map(([id, n]) => `${id}.${n}.mc`).join('_');
+  const q = new URLSearchParams();
+  if (TEACHER_ID) q.set('t', TEACHER_ID);
+  q.set('mix', mix); q.set('subject', 'act'); q.set('act', kind); q.set('lock', '0'); q.set('order', 'mixed'); q.set('r', Math.random().toString(36).slice(2, 8)); // r: a new set of numbers each time
+  if (kind === 'topic') { q.set('title', `ACT practice: ${sec}`); q.set('retries', '2'); q.set('checks', '2'); q.set('hints', '1'); q.set('more', '1'); }
+  else { q.set('title', ACT_PLAN[kind].title); q.set('time', String(ACT_PLAN[kind].min)); }
+  if (PREVIEW) q.set('preview', '1');
+  return 'practice.html?' + q.toString();
+}
+// the student link's front page: a card to start ACT practice
+function actEntryCard() {
+  const secSel = el('select', { style: 'width:auto;max-width:100%' }, ...actSections().map((s) => el('option', { value: s }, s)));
+  const go = (kind, sec) => { location.href = actLink(kind, sec); };
+  const card = el('div', { class: 'card' },
+    el('h3', { style: 'margin:0 0 4px' }, '🎯 ACT practice on your own'),
+    el('p', { class: 'small', style: 'margin:0 0 10px' }, 'Not graded. New questions every time. Use your TI-Nspire like on the real ACT (45 questions, 50 minutes, 4 answer choices).'),
+    el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, el('strong', {}, 'Practice a topic:'), secSel, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => go('topic', secSel.value) }, 'Start (10 questions, with help)')),
+    el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' },
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => go('quiz') }, '⏱ Quick quiz: 15 questions, 17 minutes'),
+      el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: () => go('test') }, '📝 Practice test: 45 questions, 50 minutes')));
+  return card;
+}
+// a rough ACT math score (1–36) from the percent right on a full mixed test (a quick quiz is rougher still)
+function actEstimate(pct) {
+  const P = [[0, 1], [10, 10], [20, 13], [33, 16], [50, 20], [60, 23], [67, 25], [75, 27], [83, 30], [90, 32], [95, 34], [100, 36]];
+  const x = Math.max(0, Math.min(100, pct));
+  for (let k = 1; k < P.length; k++) if (x <= P[k][0]) { const [a, sa] = P[k - 1], [b, sb] = P[k]; return Math.round(sa + ((x - a) / (b - a)) * (sb - sa)); }
+  return 36;
+}
+// after turning in: the estimate, right/wrong by ACT category, and the student's recent ACT practice
+function actResults() {
+  const S = SETS[state.setKey]; if (!S || !S.act || !state.submitted) return '';
+  const { score, total } = state.submitted, pct = (100 * score) / (total || 1), card = el('div', { class: 'card' });
+  if (S.act !== 'topic') card.append(el('div', { class: 'small' }, 'Estimated ACT math score'), el('div', { class: 'score' }, `about ${actEstimate(pct)}`),
+    el('p', { class: 'small', style: 'margin:2px 0 10px' }, `A rough estimate from ${Math.round(pct)}% right${S.act === 'quiz' ? ' on a short quiz (a full practice test gives a better estimate)' : ''}. The real ACT is scaled differently on each test date.`));
+  const by = {}; state.qs.forEach((q, i) => { const c = actCat(q.tpl), b = (by[c] = by[c] || [0, 0]); b[1]++; if (scoreOf(q, state.answers[i]) === 1) b[0]++; });
+  card.append(el('strong', {}, 'By topic'), el('table', { style: 'width:100%;border-collapse:collapse;margin:6px 0 8px' }, ...ACT_CATS.map(([, c]) => c).filter((c) => by[c]).map((c) => el('tr', {},
+    el('td', { style: 'padding:4px 0' }, c), el('td', { style: 'text-align:right;padding:4px 0' }, `${by[c][0]} of ${by[c][1]}`),
+    el('td', { style: 'width:45%;padding:4px 8px' }, el('div', { style: `height:10px;border-radius:5px;background:linear-gradient(90deg,${by[c][0] / by[c][1] >= 0.7 ? '#2e7d32' : by[c][0] / by[c][1] >= 0.5 ? '#c99a06' : '#c0392b'} ${(100 * by[c][0]) / by[c][1]}%,#eee 0)` }))))));
+  const weak = ACT_CATS.map(([, c]) => c).filter((c) => by[c] && by[c][0] / by[c][1] < 0.6);
+  if (weak.length) card.append(el('p', { class: 'small', style: 'margin:0 0 8px' }, `Practice next: ${weak.join(', ')}. Pick a topic from that list on the front page.`));
+  const again = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+    el('a', { class: 'btn secondary', style: 'margin:0', href: actLink(S.act === 'topic' ? 'topic' : S.act, S.act === 'topic' ? (QUESTION_TYPES.find((t) => t.id === state.qs[0].tpl) || {}).section : undefined) }, S.act === 'topic' ? '🔁 Another 10 on this topic' : `🔁 Another ${S.act === 'test' ? 'practice test' : 'quick quiz'}`),
+    el('a', { class: 'btn secondary', style: 'margin:0', href: 'practice.html' + (TEACHER_ID ? `?t=${TEACHER_ID}` : '') }, 'Back to the front page'));
+  card.append(again);
+  const hist = el('div', { style: 'margin-top:12px' }); card.append(hist);
+  if (CONFIG.SCRIPT_URL && !PREVIEW) actHistory(state.period, state.name, state.rid).then((rows) => {
+    if (!rows.length) return;
+    hist.append(el('strong', {}, 'Your recent ACT practice'), el('table', { style: 'width:100%;border-collapse:collapse;margin-top:6px;font-size:14px' },
+      ...rows.slice(0, 12).map((r) => el('tr', { style: 'border-top:1px solid var(--line)' }, el('td', { style: 'padding:4px 0' }, new Date(r.t).toLocaleDateString()), el('td', {}, r.title),
+        el('td', { style: 'text-align:right' }, `${Math.round(100 * r.pct)}%`), el('td', { style: 'text-align:right' }, /^ACT practice test|^ACT quick quiz/.test(r.title) ? `≈ ${actEstimate(100 * r.pct)}` : '')))));
+  });
+  return card;
+}
+async function actHistory(period, name, rid) {
+  const ps = rid ? signinPass() : null;
+  try {
+    const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'myAct', period, name, token: ps && ps.rid === rid ? ps.token : undefined }) });
+    const g = await res.json(); return (g && g.rows) || [];
+  } catch (e) { return []; }
+}
+// the countdown on a timed quiz or test; at 0 it turns the work in
+setInterval(() => {
+  const S = state && SETS[state.setKey], box = document.getElementById('actTimer');
+  if (!S || !S.time || state.submitted || state.teacher) { if (box) box.remove(); return; }
+  const left = Math.max(0, Math.round((state.started + S.time * 60000 - Date.now()) / 1000));
+  let b = box; if (!b) { b = el('div', { id: 'actTimer', style: 'position:fixed;top:10px;right:10px;z-index:50;background:#1d1d1b;color:#fff;border-radius:10px;padding:8px 14px;font:700 18px system-ui;box-shadow:0 2px 8px rgba(0,0,0,.25)' }); document.body.append(b); }
+  b.textContent = `⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`; b.style.background = left <= 300 ? '#b3261e' : '#1d1d1b';
+  if (!left && !state._timeUp) { state._timeUp = true; confirmArmed = true; submit(); }
+}, 1000);
+// Results dashboard: who's practicing ACT on their own (not graded), estimates over time, and the class's weakest ACT topics
+function actPracticeCard(rows) {
+  if (!rows.length) return '';
+  const byStu = {}; rows.forEach((r) => { const k = `${r.period}|${r.name}`; (byStu[k] = byStu[k] || { period: r.period, name: r.name, rows: [] }).rows.push(r); });
+  const stus = Object.values(byStu).map((s) => { s.rows.sort((a, b) => a.t - b.t); const tests = s.rows.filter((r) => /^ACT (practice test|quick quiz)/.test(r.title));
+    return { ...s, n: s.rows.length, last: s.rows[s.rows.length - 1].t, first: tests.length ? actEstimate(100 * tests[0].pct) : null, latest: tests.length ? actEstimate(100 * tests[tests.length - 1].pct) : null, best: tests.length ? Math.max(...tests.map((r) => actEstimate(100 * r.pct))) : null }; })
+    .sort((a, b) => b.last - a.last);
+  const cat = {}; rows.forEach((r) => { const ids = dashTplIds(r.set, r.detail), d = parseDetail(r.detail); d.forEach((x) => { const c = actCat(ids && ids[x.n - 1]); const b = (cat[c] = cat[c] || [0, 0]); b[1]++; if (x.pts === 1) b[0]++; }); });
+  const box = el('details', { class: 'card', style: 'padding:10px 14px' }, el('summary', { style: 'cursor:pointer;font-weight:700' }, `🎯 ACT practice on their own (${stus.length} student${stus.length === 1 ? '' : 's'}, ${rows.length} session${rows.length === 1 ? '' : 's'})`),
+    el('p', { class: 'small', style: 'margin:6px 0' }, 'Students start these from the front page of the student link. They aren’t graded and never go to Classroom. Estimated scores (≈) are rough, from the percent right on quick quizzes and practice tests.'),
+    el('div', { class: 'small', style: 'margin:4px 0 8px' }, 'Class by ACT topic: ', ...ACT_CATS.map(([, c]) => c).filter((c) => cat[c]).flatMap((c, k) => [k ? ' · ' : '', el('b', {}, c), ` ${Math.round((100 * cat[c][0]) / cat[c][1])}%`])),
+    dashTable([
+      { k: 'name', t: 'Student' }, { k: 'period', t: 'Period' }, { k: 'n', t: 'Sessions', desc: true },
+      { k: 'first', t: 'First ≈', desc: true, show: (s) => (s.first == null ? '—' : String(s.first)) }, { k: 'latest', t: 'Latest ≈', desc: true, show: (s) => (s.latest == null ? '—' : String(s.latest)) },
+      { k: 'best', t: 'Best ≈', desc: true, show: (s) => (s.best == null ? '—' : String(s.best)) }, { k: 'last', t: 'Last practiced', desc: true, show: (s) => dashDate(s.last) },
+    ], stus));
+  return box;
+}
 function moreBox(q, i) {
   if (state.teacher || !setting(state.setKey, 'more') || !twinable(q)) return el('span');
   const M = MORE[i], W = contentWidth();
@@ -38252,7 +38356,7 @@ async function sendNow(pts, resend) {
   const payload = {
     rid: state.rid || undefined, token: state.token || undefined, sid: sub.sid,
     akey: SETS[state.setKey].custom ? state.setKey : undefined, link: SETS[state.setKey].custom ? (location.origin + location.pathname + location.search).replace(/[?&]preview=1\b/, '') : undefined,
-    set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, subject: SUBJECTS[SETS[state.setKey].subject] || '', setTitle: SETS[state.setKey].title, period: state.period, name: state.name,
+    set: SETS[state.setKey].custom ? 'custom:' + SETS[state.setKey].mix : state.setKey, subject: SETS[state.setKey].act ? 'ACT Practice' : SUBJECTS[SETS[state.setKey].subject] || '', setTitle: SETS[state.setKey].title, period: state.period, name: state.name,
     score: sub.score, total: sub.total, percent: Math.round((100 * sub.score) / sub.total),
     detail: state.qs.map((q, i) => { const a = state.answers[i];
       const nTry = state.retries ? wrongSoFar(q, i) + (pts[i] === 1 ? 1 : 0) : 0, tr = (nTry > 1 ? (pts[i] === 1 ? `(try ${nTry})` : `(${nTry} tries)`) : '') + (state.hintUsed && state.hintUsed[i] ? '(hint)' : '') + (state.exUsed && state.exUsed[i] ? '(example)' : '') + (q.bonus ? '(bonus)' : '');
@@ -38660,11 +38764,12 @@ function dashLogin(msg, next) {
 function dashRender() {
   const D = DASH.data; app.innerHTML = '';
   const all = D.results;
-  const tabs = [...new Set(all.map((r) => r.tab))].sort();
+  const tabs = [...new Set(all.map((r) => r.tab))].filter((t) => t !== 'ACT Practice').sort();
   const periods = [...new Set([...all.map((r) => r.period), ...D.progress.map((p) => p.period), ...D.roster.map((r) => r.period)])].filter(Boolean).sort((a, b) => perOrder(a) - perOrder(b));
   const inSubj = (r) => !DASH.subject || r.tab === DASH.subject;
   const inPer = (r) => !DASH.period || r.period === DASH.period;
-  const rows = all.filter((r) => inSubj(r) && inPer(r));
+  const actRows = all.filter((r) => r.tab === 'ACT Practice' && inPer(r)); // students' own ACT practice: its own card, not an assignment
+  const rows = all.filter((r) => r.tab !== 'ACT Practice' && inSubj(r) && inPer(r));
   // assignments, most recent first
   const byTitle = {};
   rows.forEach((r) => { const a = (byTitle[r.title] = byTitle[r.title] || { title: r.title, tab: r.tab, set: r.set, last: 0, rows: [] }); a.rows.push(r); if (r.t > a.last) { a.last = r.t; a.set = r.set; } });
@@ -38681,10 +38786,11 @@ function dashRender() {
     if (period) a.periods.add(period);
     if (!a.rows.length && t > a.last) a.last = t;
   };
-  D.progress.forEach((p) => addEmpty(p.title, p.set, p.t, p.period));
+  D.progress.filter((p) => !/^ACT (practice|quick quiz)/.test(p.title || '')).forEach((p) => addEmpty(p.title, p.set, p.t, p.period));
   (D.posted || []).forEach((p) => { const k = String(p.key || ''), i = k.indexOf('|');
     addEmpty(k.startsWith('custom:') && i > 0 ? k.slice(i + 1) : SETS[k] ? SETS[k].title : p.title, k.startsWith('custom:') && i > 0 ? k.slice(0, i) : k, p.t, p.period); });
   const titles = Object.values(byTitle).sort((a, b) => b.last - a.last);
+  DASH.actRows = actRows;
   if (DASH.title && !byTitle[DASH.title] && !D.progress.some((p) => p.title === DASH.title)) DASH.title = '';
 
   const sel = (opts, val, on) => { const s = el('select', {}, ...opts.map(([v, t]) => el('option', { value: v }, t))); s.value = val; s.addEventListener('change', () => on(s.value)); return s; };
@@ -38784,6 +38890,7 @@ function dashOverview(titles) {
   if (allRows.length) app.append(dashReteach(allRows, DASH.period ? `${DASH.period} period` : 'your students'));
   if (allRows.length) app.append(dashStandards(allRows, DASH.period ? `${DASH.period} period` : 'your classes'));
   app.append(reportsCard());
+  if (DASH.actRows && DASH.actRows.length) app.append(actPracticeCard(DASH.actRows));
   if (DASH.period) {
     const names = {}; allRows.filter((r) => r.period === DASH.period).forEach((r) => (names[who(r.period, r.name)] = { period: r.period, name: r.name }));
     D.roster.filter((r) => r.period === DASH.period).forEach((r) => { const kk = who(r.period, r.full); if (!names[kk] && ![r.full, ...String(r.aliases || '').split(',')].some((n) => n.trim() && names[who(r.period, n)])) names[kk] = { period: r.period, name: r.full }; });
@@ -42485,6 +42592,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-23', subjects: ['act'], text: '🎯 ACT practice on their own: the front page of the student link now lets any student practice an ACT topic (10 questions, with help), take a timed quick quiz (15 questions, 17 minutes), or take a practice test (45 questions, 50 minutes, 4 choices, like the Enhanced ACT). New questions every time; never graded. They see a rough estimated ACT score and their weak topics. You see who’s practicing and their estimates on the Results dashboard under 🎯 ACT practice.' },
   { date: '2026-11-23', text: '⚑ Report a problem: every question now has a small “Report a problem with this question” link at the bottom. A student (or you, in Teacher preview) picks what’s wrong and sends it. Reports show on the Results dashboard under ⚑ Problem reports, with 📋 Copy for a fix (everything needed to make that exact question again, to paste to Claude) and ✓ Mark fixed.' },
   { date: '2026-11-23', text: 'Faster loading: the lesson plans are now a separate file that loads only when a lesson page, catch-up page, flashcards, or a student’s 📖 Notes needs it. Students doing an assignment download less than half as much as before.' },
   { date: '2026-11-22', text: 'Help has a search box at the top: type a word (like Sylogist, accommodations, or password) to see only the topics that mention it, with the word highlighted.' },
@@ -42587,6 +42695,7 @@ function helpScreen(open) {
         ['Click a student for their history and a printable progress report. Pick a period to print reports for the whole class.'],
         [B('📋 Scores by standard'), ' (below the assignment list) shows each Oklahoma standard with the percent right, for every period side by side, priority standards (★) first. Click a standard to read it and see the students below 70% on it. Pick a student to see their own standards.'],
         [B('📋 Copy for Sylogist'), ' (on an assignment, above the student list) copies the scores; then open that assignment’s column in Sylogist and click your ', B('Fill Sylogist'), ' bookmark. It fills in the students it finds on that page and lists any it couldn’t match. You can copy all periods at once and fill each class’s page in turn, or pick a period first for a shorter list. It never saves; look it over and save in Sylogist. (To get the bookmark, see the box below the student list.)'],
+        [B('🎯 ACT practice on their own'), ' (below Problem reports): students can start ACT practice themselves from the front page of the student link: a topic (10 questions, with help), a quick quiz (15 questions, 17 minutes), or a practice test (45 questions, 50 minutes, like the Enhanced ACT). It’s never graded or sent to Classroom; scores go to an ACT Practice tab in your Sheet. This list shows each student’s sessions and rough estimated ACT scores (first, latest, best), and the class’s percent right in each ACT topic.'],
         [B('⚑ Problem reports'), ' (below Scores by standard): questions students flagged with ⚑ Report a problem at the bottom of a question. Each shows the question, the key, their answer, and their note. ', B('📋 Copy for a fix'), ' copies everything needed to make that exact question again; paste it to Claude to get it fixed, then click ', B('✓ Mark fixed'), '.'],
         ['A student locked out of a test (they left the page too many times) is unlocked from here; it takes effect on their screen within about 10 seconds.'])]],
     ['keys', '6. Answer keys and printing', [
