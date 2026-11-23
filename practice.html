@@ -37476,7 +37476,21 @@ function mathWork(i, done) {
   keys.prepend(textBtn);
   const add = el('button', { type: 'button', class: 'madd' }, '+ New line');
   add.addEventListener('click', () => { addLine('', null, true); save(); });
-  box.append(el('div', { class: 'small', style: 'margin:8px 0 4px' }, 'Type your work: ^ for exponents, _ for subscripts, / for fractions. Press Enter for a new line.'), keys, list, add);
+  // copy the last line of work into the answer box (what comes after "=" when the answer box already has its "x =")
+  const use = el('button', { type: 'button', class: 'madd', style: 'margin-left:8px', title: 'Put your last line of work in the answer box' }, '⬆ Use last line as my answer');
+  use.addEventListener('click', () => {
+    const vals = [...list.querySelectorAll('math-field')].map((m) => m.value).filter((v) => v && v.replace(/\\[:,; ]|\s/g, ''));
+    let qb = box; while (qb && !qb.querySelector(':scope > .qhead')) qb = qb.parentElement;
+    const fields = qb ? [...qb.querySelectorAll('math-field.mans')].filter((m) => !m.readOnly) : [];
+    if (!vals.length || !fields.length) { use.textContent = !vals.length ? 'Type a line of work first' : 'This answer can’t be filled from your work'; setTimeout(() => { use.textContent = '⬆ Use last line as my answer'; }, 2500); return; }
+    const mf = fields.includes(document.querySelector('math-field.mans:focus')) ? document.querySelector('math-field.mans:focus') : fields.find((m) => !m.value) || fields[0];
+    let v = cleanPasteMath(vals[vals.length - 1]).trim();
+    const lab = mf.closest('label'), hasEq = lab && /[=≈]\s*$/.test(lab.textContent.replace(/\s+$/, ''));
+    if (hasEq || fields.length > 1) { const parts = v.split(/=|\\approx/); v = parts[parts.length - 1].trim(); } // "x = 5" → 5 when the box already says "x ="
+    mf.value = v; mf.dispatchEvent(new Event('input', { bubbles: true })); mf.focus();
+    use.textContent = '✓ Copied to your answer'; setTimeout(() => { use.textContent = '⬆ Use last line as my answer'; }, 2000);
+  });
+  box.append(el('div', { class: 'small', style: 'margin:8px 0 4px' }, 'Type your work: ^ for exponents, _ for subscripts, / for fractions. Press Enter for a new line.'), keys, list, el('div', {}, add, use));
   return box;
 }
 
@@ -43130,6 +43144,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-22', text: 'Show your work has a new “⬆ Use last line as my answer” button: it copies the student’s last line of work into the answer box (just the part after “=” when the box already says “x =”).' },
   { date: '2026-11-22', text: '🤖 AI mistake help: a new Homework help choice. After a student misses a question, “Help me find my mistake” has AI look at their answer and their Show-your-work lines and point to the first wrong step, without giving the answer. Turn it on and set the limits (helps per student per day, monthly budget, $5 to start) under Settings on Classes & roster. It needs an Anthropic API key there.' },
   { date: '2026-11-22', subjects: ['apcalc', 'algebra2'], text: 'Piecewise functions in questions now appear the usual way, with a brace and each piece on its own line, instead of written out on one line with semicolons.' },
   { date: '2026-11-22', text: 'Accommodations (IEP / 504): on Classes & roster, set a student’s accommodations once (extra tries, extra attempts, 3 answer choices instead of 4, a 🔊 Read aloud button, larger text, Homework help always on, Desmos always on, or breaks without locking) and they apply to every assignment that student opens. Your Sheet’s script updates itself to store them within about 10 minutes.' },
