@@ -39978,6 +39978,8 @@ function advParseList(rows) {
   ADV_EMAIL.lastIndex = 0;
   const out = new Map(), add = (name, grade, gs) => {
     name = String(name || '').replace(/\s+/g, ' ').trim(); if (!name || !/[a-z]/i.test(name)) return;
+    const tc = (t) => (/[a-z]/.test(t) ? t : t.toLowerCase().replace(/(^|[\s,'’\-]|\bmc)([a-z])/g, (m, a, b) => a + b.toUpperCase())); // SMITH, AVA → Smith, Ava
+    name = tc(name); gs.forEach((g) => { if (g.name) g.name = tc(g.name); });
     const k = lastFirst(name), s = out.get(k) || { name, grade: '', guardians: [] }; if (grade && !s.grade) s.grade = grade;
     gs.forEach((g) => { g.name = (g.name || '').trim(); if (!g.name && !g.phone && !g.email) return;
       const same = s.guardians.find((x) => (g.name && x.name && lastFirst(x.name) === lastFirst(g.name)) || (g.email && x.email === g.email) || (g.phone && x.phone === g.phone));
@@ -39993,11 +39995,12 @@ function advParseList(rows) {
     if (ADV_REL.test(t)) { g.rel = g.rel || t; t = ''; }
     return t;
   };
+  const hi = rows.findIndex((r) => isHead(r) && r.length >= 3); if (hi > 0) rows = rows.slice(hi);
   if (rows.length && isHead(rows[0])) {
     const H = rows[0].map((h) => h.toLowerCase()), seen = {};
     const roles = H.map((h) => {
       const guard = /parent|guardian|contact|mother|father|mom|dad|emergency/.test(h), n = (h.match(/\b([1-4])\b|#\s*([1-4])/) || [])[1] || (h.match(/#\s*([1-4])/) || [])[1];
-      let f = /e-?mail/.test(h) ? 'email' : /phone|cell|mobile|home|work|number/.test(h) ? 'phone' : /relation/.test(h) ? 'rel' : /grade|^gr\.?$|grd/.test(h) && !guard ? 'grade'
+      let f = /e-?mail/.test(h) ? 'email' : /phone|cell|mobile|number/.test(h) || (/\b(home|work)\b/.test(h) && !/room/.test(h)) ? 'phone' : /relation/.test(h) ? 'rel' : /grade|^gr\.?$|grd/.test(h) && !guard ? 'grade'
         : guard && /first/.test(h) ? 'gfirst' : guard && /last/.test(h) ? 'glast' : guard ? 'gname' : /first/.test(h) ? 'sfirst' : /last/.test(h) ? 'slast' : /student|^name$|full name/.test(h) ? 'sname' : '';
       if (!f) return null; if (['sname', 'sfirst', 'slast', 'grade'].includes(f)) return { f };
       // which parent: a number in the header, or the next parent for this kind of column
@@ -40016,11 +40019,16 @@ function advParseList(rows) {
   } else {
     rows.forEach((r) => {
       let name = '', grade = ''; const gs = []; let g = null;
+      const reach = r.some((c) => { ADV_EMAIL.lastIndex = 0; ADV_PHONE.lastIndex = 0; return ADV_EMAIL.test(c) || ADV_PHONE.test(c); }); ADV_EMAIL.lastIndex = 0; ADV_PHONE.lastIndex = 0;
       r.forEach((c) => { if (!c) return;
+        if (!grade && advGrade(c)) { grade = advGrade(c); return; }
+        if (/^[\d\/.:\- ]+$/.test(c) && !ADV_PHONE.test(c)) { ADV_PHONE.lastIndex = 0; return; } ADV_PHONE.lastIndex = 0; // IDs, dates, lockers, site numbers
+        if (/^[a-z]$/i.test(c) || /^(on roll|active|inactive|withdrawn|no image available)$/i.test(c)) return;
         if (!grade && advGrade(c)) { grade = advGrade(c); return; }
         if (/^\d{4,9}$/.test(c)) return; // a student ID number
         const tmp = {}, left = pull(c, tmp);
         if (left && !name && !tmp.phone && !tmp.email) { name = left; return; }
+        if (left && !reach) return; // no phone or email in this row: other names on it (like a home room teacher) aren't parents
         if (left) { if (g && !g.name && !g.phone && !g.email) Object.assign(g, tmp, { name: left, rel: g.rel || tmp.rel }); else { g = { ...tmp, name: left }; gs.push(g); } return; }
         if (!g || (tmp.rel && (g.rel || g.name))) { g = {}; gs.push(g); } // a relationship word on its own starts the next parent
         ['rel', 'email'].forEach((f) => { if (tmp[f] && !g[f]) g[f] = tmp[f]; }); if (tmp.phone) g.phone = g.phone ? g.phone + ', ' + tmp.phone : tmp.phone; });
