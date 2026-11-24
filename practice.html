@@ -39976,7 +39976,7 @@ function advContactForm(s, pre, done) {
 // ---- reading an advisory list copied (or exported) from Sylogist or any spreadsheet: any column order, with or without a header row,
 // one row per student or one row per parent
 const ADV_REL = /^(mother|father|mom|dad|step-?mother|step-?father|step-?mom|step-?dad|guardian|legal guardian|grandmother|grandfather|grandma|grandpa|grandparent|aunt|uncle|sister|brother|parent|foster parent|other)$/i;
-const ADV_PHONE = /(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?:\s*(?:x|ext\.?)\s*\d+)?/g, ADV_EMAIL = /[^\s,;<>()"]+@[^\s,;<>()"]+\.[a-z]{2,}/gi;
+const ADV_PHONE = /(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?:\s*(?:x|ext\.?)\s*\d+)?/g, ADV_EMAIL = /[^\s,;<>()"\[\]]+@[^\s,;<>()"\[\]]+\.[a-z]{2,}/gi;
 function advCells(text) {
   const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n').filter((l) => l.trim());
   const tab = lines.some((l) => l.includes('\t'));
@@ -40052,15 +40052,18 @@ function advParseList(rows) {
 // Sylogist's page for one student (Student Information → a student's name): Name, Grade, then Contacts, each "NAME (Relationship)"
 // with Default Phone / Other Phones / Default Email when that contact is opened. Several students' pages can be pasted one after another.
 function advParseSylogist(text) {
+  // Sylogist's page copies with each label run into its value ("Grade09Site705", "74525Default Phone(580)665-8363"): put each label on its own line
+  text = String(text || '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(Default Phone|Other Phones|Default Email|Contact Information|Relationship Indicators|Address|Gender|Birth Date|Grade|Site|Enrollment Status|Home Room|Locker|Parking Space|State ID)/g, '\n$1');
   const T = String(text || '').replace(/\r\n?/g, '\n').split(/[\n\t]/).map((x) => x.trim()).filter(Boolean);
-  const LABEL = /^(name|id|state id|grade|gender|birth date|site|enrollment status|home room|locker|parking space|address|default phone|other phones|default email|contact information|relationship indicators|contacts)\b/i;
+  const LABEL = /^(name|id|state id|grade|gender|birth date|site|enrollment status|home room|locker|parking space|address|default phone|other phones|default email|contact information|relationship indicators|contacts)(?![a-z])/i;
   const val = (i, lab) => { const rest = T[i].slice(lab.length).replace(/^\s*:?\s*/, ''); return rest || (T[i + 1] && !LABEL.test(T[i + 1]) ? T[i + 1] : ''); };
   const studs = []; let s = null, c = null, inContacts = false;
   for (let i = 0; i < T.length; i++) {
     const t = T[i];
     if (/^name$/i.test(t) && /^[^,\d]+,\s*[^,\d]+$/.test(T[i + 1] || '')) { s = { name: T[i + 1], grade: '', contacts: [] }; studs.push(s); c = null; inContacts = false; i++; continue; }
     if (!s) continue;
-    if (/^grade\b/i.test(t)) { const g = advGrade(val(i, 'grade')); if (g) s.grade = g; continue; }
+    if (/^grade(?![a-z])/i.test(t)) { const g = advGrade(val(i, 'grade')); if (g) s.grade = g; continue; }
     if (/^contacts$/i.test(t)) { inContacts = true; continue; }
     if (!inContacts) continue;
     const head = t.match(/^([A-Za-z'’.\- ]+?)\s*\(([^()]*)\)$/);
