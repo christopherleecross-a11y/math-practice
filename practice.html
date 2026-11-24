@@ -40220,7 +40220,7 @@ function advScheduleCard() {
     unsched.length ? el('p', { class: 'small', style: 'margin:8px 0 0' }, el('b', {}, `Not scheduled yet (${unsched.length}): `), unsched.map((s) => s.name).join('; ')) : el('p', { class: 'small', style: 'margin:8px 0 0' }, '✓ Every advisee has a time.'));
 }
 function advTextCard() {
-  const D = advDay(), studs = advStudents(), phone = /Android|iPhone|iPad/i.test(navigator.userAgent), box = el('div', {});
+  const D = advDay(), studs = advStudents(), phone = /Android|iPhone|iPad/i.test(navigator.userAgent), ios = /iPhone|iPad/i.test(navigator.userAgent), mac = !phone && /Macintosh/i.test(navigator.userAgent), box = el('div', {});
   let kind = 'invite';
   const days = D.date ? Math.round((new Date(D.date + 'T12:00') - new Date(advToday() + 'T12:00')) / 864e5) : null; if (days !== null && days <= 8 && days >= 0) kind = 'remind';
   const draw = () => {
@@ -40233,10 +40233,11 @@ function advTextCard() {
         gs.length ? el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:4px' }, ...gs.map((g) => {
           const body = advText(kind, s, g, D), num = String(g.phone).split(',')[0].replace(/[^\d+]/g, '');
           const done = async () => { try { await advConfSet(s.id, { texted: { ...(advConf(s.id).texted || {}), [kind]: advToday() } }); await advSave('contact', '', { sid: s.id, date: advToday(), method: 'Text', who: g.name, reason: kind === 'remind' ? 'Conference reminder' : 'Conference scheduling', notes: '' }); } catch (e) {} };
-          if (phone) return el('a', { class: 'btn secondary', style: 'margin:0;padding:6px 12px', href: `sms:${num}?body=${encodeURIComponent(body)}`, onclick: () => { setTimeout(() => { done().then(draw); }, 300); } }, `📱 Text ${g.name || 'parent'}`);
+          if (phone) return el('a', { class: 'btn secondary', style: 'margin:0;padding:6px 12px', href: `sms:${num}${ios ? '&' : '?'}body=${encodeURIComponent(body)}`, onclick: () => { setTimeout(() => { done().then(draw); }, 300); } }, `📱 Text ${g.name || 'parent'}`);
           const b = el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px' }, `📋 Copy text for ${g.name || 'parent'} · ${g.phone.split(',')[0]}`);
           b.onclick = async () => { try { await navigator.clipboard.writeText(body); b.textContent = '✓ Copied: paste it in Google Messages'; } catch { prompt('Copy this:', body); } done(); };
-          return b;
+          // a Mac paired with an iPhone sends texts from Messages on the Mac
+          return mac ? el('span', { style: 'display:inline-flex;gap:4px;align-items:center' }, b, el('a', { class: 'small', href: `sms:${num}&body=${encodeURIComponent(body)}`, title: 'If your Mac sends texts through your iPhone', onclick: () => { setTimeout(() => { done().then(draw); }, 300); } }, 'or open in Messages (iPhone)')) : b;
         })) : el('div', { class: 'small', style: 'color:#b3261e' }, 'No phone number on file. Add one on 👥 Advisees & parents.'),
         el('details', { class: 'small', style: 'margin-top:4px' }, el('summary', { style: 'cursor:pointer' }, 'See the text'), el('div', { style: 'white-space:pre-wrap;background:#fafaf7;border:1px solid var(--line);border-radius:8px;padding:6px;margin-top:4px' }, advText(kind, s, gs[0] || (s.guardians || [])[0], D)))));
     });
@@ -40246,7 +40247,7 @@ function advTextCard() {
   draw();
   return el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 4px' }, '📱 Text parents'),
     el('p', { class: 'small', style: 'margin:0' }, phone ? 'Tap a parent: Messages opens with the text filled in, from your own number. Press send, come back, and tap the next one. Each one is logged in 📞 Parent contacts.'
-      : 'Easiest on your phone: open this page on your Android and each button opens Messages with the text filled in. On this computer, each button copies the text to paste into Google Messages for web.'),
+      : 'Easiest on your phone: open this page on your Android or iPhone and each button opens Messages with the text filled in. On this computer, each button copies the text to paste into Google Messages for web; with an iPhone, “open in Messages” sends it from the Messages app on your Mac.'),
     tabs, box);
 }
 function advPrintSchedule() {
@@ -43457,7 +43458,7 @@ function helpScreen(open) {
         [B('📋 Ineligible list'), ': save the week’s PDF from the email, set the week, and choose the PDF. In a few seconds it shows which of your advisees are on it, with their lines from the list, and marks who’s ', B('NEW this week'), '. Click ', B('Save this week'), '; only your advisees’ lines are kept. ', B('Past weeks'), ' shows each advisee’s weeks and how many weeks in a row.'],
         ['Next to each advisee on the list: ', B('✉️ Draft email'), ' opens a message to the parents in your mail app (read it over and change anything before sending), ', B('📞 Call script'), ' shows their numbers and what to say, and ', B('📝 Log a contact'), ' records the call or email.'],
         [B('📞 Parent contacts'), ': every contact you logged, newest first. Pick an advisee to log any other contact.'],
-        [B('🗂 Conferences'), ' (ICAP conferences): under ', B('📅 Conference day'), ' set the date, place, and times (4:00 to 8:00 in 15-minute slots to start). On the ', B('🕓 Schedule'), ', pick an advisee for each time; ', B('🖨 Print schedule'), ' prints it like the school’s scheduling sheet, with the parents you were unable to meet. ', B('📱 Text parents'), ': the scheduling text asks for their preferred time (change the wording under Wording of the texts); the reminder text is for the week before (a yellow banner shows up then). On your Android phone, open this page and tap a parent: Messages opens with the text filled in, sent from your own number. On a computer, the button copies the text instead. Each text is logged in 📞 Parent contacts. After the conference, mark each advisee Met or Unable to meet (with the reason) under ', B('Notes & grades'), '.'],
+        [B('🗂 Conferences'), ' (ICAP conferences): under ', B('📅 Conference day'), ' set the date, place, and times (4:00 to 8:00 in 15-minute slots to start). On the ', B('🕓 Schedule'), ', pick an advisee for each time; ', B('🖨 Print schedule'), ' prints it like the school’s scheduling sheet, with the parents you were unable to meet. ', B('📱 Text parents'), ': the scheduling text asks for their preferred time (change the wording under Wording of the texts); the reminder text is for the week before (a yellow banner shows up then). On your phone (Android or iPhone), open this page and tap a parent: Messages opens with the text filled in, sent from your own number. On a computer, the button copies the text instead; a Mac that’s paired with an iPhone can also open it in Messages. Each text is logged in 📞 Parent contacts. After the conference, mark each advisee Met or Unable to meet (with the reason) under ', B('Notes & grades'), '.'],
         [B('Conference checklist and sheets'), ': type the items in the school’s conference packet once (put grades like 9 or 11,12 next to items only some grades get). ', B('Notes & grades'), ' on an advisee: paste the grades and absences from their progress report, check off items, and add notes. ', B('🖨 Print conference sheets'), ' makes one page per advisee with parents, the checklist for their grade, the grades and absences, this semester’s eligibility weeks and parent contacts, and lines for notes.']),
       P(B('If a name is missed: '), 'the list is matched by last name plus first name or nickname. Add the name the list uses as the advisee’s nickname. A PDF that’s a scanned picture can’t be read; ask for a regular PDF.')]],
     ['year', `${hasLessons ? 13 : 12}. End of the school year`, [
