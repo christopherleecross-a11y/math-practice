@@ -2,7 +2,7 @@
    Pages (practice.html, crossword.html): the network first, so teachers and students always get the newest version;
    the saved copy only when there's no connection. Other files (lesson plans, videos' data, the math keyboard): the saved copy
    right away, refreshed in the background. Scores and other requests to the Google Sheet are never touched here. */
-const CACHE = 'practice-v1';
+const CACHE = 'practice-v2';
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['practice.html', 'sylogist.js'])).catch(() => {})); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {
@@ -13,7 +13,8 @@ self.addEventListener('fetch', (e) => {
     e.respondWith((async () => {
       const c = await caches.open(CACHE);
       try {
-        const res = await Promise.race([fetch(req), new Promise((_, no) => setTimeout(() => no(new Error('slow')), 8000))]);
+        const res = await Promise.race([fetch(url.href, { cache: 'no-cache', credentials: 'same-origin' }), // no-cache: ask GitHub whether there's a newer version instead of using the browser's 10-minute copy
+          new Promise((_, no) => setTimeout(() => no(new Error('slow')), 8000))]);
         if (res && res.ok) c.put(url.origin + url.pathname, res.clone());
         return res;
       } catch (err) { return (await c.match(url.origin + url.pathname)) || Response.error(); }
