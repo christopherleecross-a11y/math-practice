@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-23.4'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-24.1'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -929,6 +929,9 @@ function setupOp_(d) {
   if (op === 'roster') return { ok: true, roster: rosterList() };
   if (op === 'reports') return { ok: true, reports: reportRows_() };
   if (op === 'myQList') return { ok: true, qs: myQRows_() };
+  if (op === 'advList') return { ok: true, rows: advRows_() };
+  if (op === 'advSave') return advSave_(d);
+  if (op === 'advDelete') return advDelete_(d);
   if (op === 'myQSave') return myQSave_(d);
   if (op === 'myQDelete') return myQDelete_(d);
   if (op === 'reportDone') return reportDone_(d);
@@ -2143,4 +2146,42 @@ function readPrefsSave_(d) {
 }
 function readPrefsGet_(d) {
   try { const who = readWho_({ period: d.period, name: d.name, rid: d.rid }); if (!who) return null; const v = PropertiesService.getScriptProperties().getProperty(who); return v ? JSON.parse(v) : {}; } catch (e) { return null; }
+}
+
+
+/* ---------- Advisory (teacher only, behind the dashboard password) ----------
+   Hidden "Advisory" tab: Kind | ID | Data (JSON) | Updated.
+   Kinds: student (an advisee and their parents), week (which advisees were on that week's ineligible list), contact (a parent contact),
+   conf (conference notes), set (settings like the conference checklist). Only advisees' rows are kept, never the school's whole list. */
+const ADV_TAB = 'Advisory';
+function advSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(ADV_TAB);
+  if (!sh) { sh = ss.insertSheet(ADV_TAB); sh.appendRow(['Kind', 'ID', 'Data', 'Updated']); sh.getRange(1, 1, 1, 4).setFontWeight('bold'); sh.setFrozenRows(1); sh.hideSheet(); }
+  return sh;
+}
+function advRows_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ADV_TAB);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues().map(function (r) { let data = null; try { data = JSON.parse(String(r[2] || '')); } catch (e) {} return data ? { kind: String(r[0]), id: String(r[1]), data: data, t: r[3] instanceof Date ? r[3].getTime() : 0 } : null; }).filter(Boolean);
+}
+function advSave_(d) {
+  const kind = String(d.kind || ''), data = d.data;
+  if (!/^(student|week|contact|conf|set)$/.test(kind) || !data) return { ok: false, error: 'Nothing to save.' };
+  const js = JSON.stringify(data); if (js.length > 45000) return { ok: false, error: 'That’s too much to save at once.' };
+  const sh = advSheet_(), lock = LockService.getScriptLock(); lock.waitLock(20000);
+  let id = String(d.id || '').replace(/[^\w.-]/g, '');
+  try {
+    const keys = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().map(function (r) { return r[0] + '|' + r[1]; }) : [];
+    if (!id) id = Utilities.getUuid().replace(/-/g, '').slice(0, 10);
+    const k = keys.indexOf(kind + '|' + id), row = [kind, id, js, new Date()];
+    if (k >= 0) sh.getRange(k + 2, 1, 1, 4).setValues([row]); else sh.appendRow(row);
+  } finally { lock.releaseLock(); }
+  return { ok: true, id: id };
+}
+function advDelete_(d) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ADV_TAB); if (!sh || sh.getLastRow() < 2) return { ok: true };
+  const keys = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().map(function (r) { return r[0] + '|' + r[1]; }), k = keys.indexOf(String(d.kind) + '|' + String(d.id));
+  if (k >= 0) sh.deleteRow(k + 2);
+  return { ok: true };
 }
