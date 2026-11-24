@@ -39907,6 +39907,9 @@ async function advisoryScreen() {
     await advCleanup();
   }
   app.append(advNav(ADV.tab));
+  { const D = advDay(), days = D.date ? Math.round((new Date(D.date + 'T12:00') - new Date(advToday() + 'T12:00')) / 864e5) : null;
+    const left = advStudents().filter((s) => { const c = advConf(s.id); return c.time !== undefined && c.time !== '' && !(c.texted || {}).remind; }).length;
+    if (days !== null && days >= 0 && days <= 7 && left) app.append(el('div', { class: 'card', style: 'border:2px solid #c9a227;background:#fff8e1' }, el('b', {}, `📅 Conferences are ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : 'in ' + days + ' days'} (${advLongDate(D.date)}). `), `${left} parent${left === 1 ? '' : 's'} haven’t had a reminder text yet. `, linkBtn('Send reminders', () => { ADV.tab = 'conf'; advisoryScreen(); }))); }
   if (!advStudents().length && ADV.tab !== 'students') app.append(el('div', { class: 'card' }, el('b', {}, 'Start here: '), 'add your advisees and their parents’ contact information on ', linkBtn('👥 Advisees & parents', () => { ADV.tab = 'students'; advisoryScreen(); }), '.'));
   ({ week: advWeekTab, students: advStudentsTab, contacts: advContactsTab, conf: advConfTab }[ADV.tab] || advWeekTab)();
 }
@@ -40161,8 +40164,104 @@ function advContactsTab() {
   draw();
 }
 // ---- conferences: a sheet for each advisee, to print or to have open
+// ---- conference day: the time slots (like the school's ICAP scheduling sheet), texts to parents from the teacher's own phone, and who couldn't be met
+const ADV_DAY_DEFAULT = { date: '', place: 'the Atoka Public School cafeteria', start: '16:00', end: '20:00', len: 15,
+  invite: 'Hi{parent}, this is {teacher}, {student}’s advisor at Atoka High School. I’m reaching out to schedule a time when you, {student}, and I can meet to discuss {student}’s high school classes for next school year. It’s an important meeting: we’ll plan {student}’s high school program of study and go over information about education and training after high school. {appointment} Thank you!',
+  remind: 'Hi{parent}, this is {teacher}, {student}’s advisor at Atoka High School. Just a reminder that your 15-minute conference to plan {student}’s classes for next year is {date} at {time} in {place}. If that time no longer works, please text me back. Thank you!' };
+const advDay = () => { const r = advOf('set').find((x) => x.id === 'confday'); return { ...ADV_DAY_DEFAULT, ...((r && r.data) || {}) }; };
+const advMin = (t) => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
+const advClock = (min, ampm) => { const h = Math.floor(min / 60), m = min % 60; return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}${ampm ? (h < 12 ? ' a.m.' : ' p.m.') : ''}`; };
+const advSlots = (D = advDay()) => { const out = [], len = Math.max(5, +D.len || 15); for (let t = advMin(D.start); t + len <= advMin(D.end); t += len) out.push(t); return out; };
+const advLongDate = (s) => { if (!s) return '(date)'; const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }); };
+async function advConfSet(sid, patch) { return advSave('conf', sid, { ...advConf(sid), ...patch }); }
+function advText(kind, s, g, D = advDay()) {
+  const c = advConf(s.id), first = advFirst(s.name), time = c.time != null && c.time !== '' ? advClock(+c.time, true) : '';
+  const slots = advSlots(D), fill = (t) => t.replace(/\{parent\}/g, g && g.name ? ' ' + g.name.split(/\s+/)[0] : '').replace(/\{teacher\}/g, CONFIG.TEACHER_NAME).replace(/\{student\}/g, first)
+    .replace(/\{date\}/g, advLongDate(D.date)).replace(/\{time\}/g, time || '(time)').replace(/\{place\}/g, D.place || '');
+  const appt = time ? `I have a 15-minute appointment set aside for you, {student}, and me on {date} at {time} in {place}. If that time doesn’t work, just text me back and we’ll find another.`
+    : `Conferences are {date} from ${slots.length ? advClock(slots[0], true) : ''} to ${slots.length ? advClock(slots[slots.length - 1] + (+D.len || 15), true) : ''} in {place}. What time works best for you?`;
+  return fill(fill(kind === 'remind' ? D.remind : D.invite).replace(/\{appointment\}/g, appt));
+}
+function advDayCard() {
+  const D = advDay(), msg = el('span', { class: 'small', style: 'margin-left:8px' });
+  const f = { date: el('input', { type: 'date', value: D.date, style: 'width:auto' }), place: el('input', { type: 'text', value: D.place, style: 'width:260px' }),
+    start: el('input', { type: 'time', value: D.start, style: 'width:auto' }), end: el('input', { type: 'time', value: D.end, style: 'width:auto' }),
+    len: el('input', { type: 'number', value: D.len, min: '5', max: '60', step: '5', style: 'width:70px' }),
+    invite: el('textarea', { rows: '4', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.invite), remind: el('textarea', { rows: '3', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.remind) };
+  const save = async () => { try { await advSave('set', 'confday', Object.fromEntries(Object.entries(f).map(([k, x]) => [k, k === 'len' ? +x.value || 15 : x.value.trim()]))); msg.textContent = '✓ Saved'; advisoryScreen(); } catch (e) { msg.textContent = e.message; } };
+  return el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, '📅 Conference day'),
+    el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, el('span', {}, 'Date ', f.date), el('span', {}, 'Where ', f.place), el('span', {}, 'From ', f.start, ' to ', f.end), el('span', {}, f.len, ' minutes each')),
+    el('details', { style: 'margin-top:8px' }, el('summary', { style: 'cursor:pointer' }, 'Wording of the texts'),
+      el('p', { class: 'small', style: 'margin:4px 0' }, 'These fill themselves in: {parent} {student} {teacher} {date} {time} {place}. {appointment} becomes “I have a 15-minute appointment set aside for you… at (time)” once you’ve given them a time, or asks what time works if you haven’t.'),
+      el('label', {}, 'Scheduling text'), f.invite, el('label', { style: 'display:block;margin-top:6px' }, 'Reminder text (a week before)'), f.remind,
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin:6px 0 0', onclick: () => { f.invite.value = ADV_DAY_DEFAULT.invite; f.remind.value = ADV_DAY_DEFAULT.remind; } }, 'Go back to the original wording')),
+    el('div', {}, el('button', { class: 'btn', type: 'button', style: 'margin:8px 0 0', onclick: save }, 'Save'), msg));
+}
+function advScheduleCard() {
+  const D = advDay(), studs = advStudents(), slots = advSlots(D), at = {}; studs.forEach((s) => { const t = advConf(s.id).time; if (t !== undefined && t !== '') at[+t] = s; });
+  const half = Math.ceil(slots.length / 2), msg = el('span', { class: 'small', style: 'margin-left:8px' });
+  const cell = (t) => {
+    const sel = el('select', { style: 'width:100%' }, el('option', { value: '' }, '—'), ...studs.map((s) => el('option', { value: s.id }, s.name))); sel.value = at[t] ? at[t].id : '';
+    sel.onchange = async () => { msg.textContent = 'Saving…'; try { if (at[t]) await advConfSet(at[t].id, { time: '' }); if (sel.value) { const old = advConf(sel.value).time; await advConfSet(sel.value, { time: t, date: D.date || advConf(sel.value).date || '' }); if (old !== '' && old !== undefined && +old !== t) delete at[+old]; } advisoryScreen(); } catch (e) { msg.textContent = e.message; } };
+    const s = at[t]; return [el('td', { style: 'padding:3px 6px;font-weight:600;white-space:nowrap' }, advClock(t)), el('td', { style: 'padding:3px' }, sel), el('td', { class: 'small', style: 'padding:3px 6px' }, s ? (s.guardians || []).map((g) => g.name).filter(Boolean).join(', ') : '')];
+  };
+  const unsched = studs.filter((s) => !Object.values(at).includes(s));
+  return el('div', { class: 'card' }, el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, el('h3', { style: 'margin:0' }, `🕓 Schedule${D.date ? ' · ' + advLongDate(D.date) : ''}`),
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => advPrintSchedule() }, '🖨 Print schedule'), msg),
+    el('p', { class: 'small', style: 'margin:4px 0 6px' }, 'Pick the advisee for each time once their parent says it works (or pick a time first and text it to them).'),
+    slots.length ? el('div', { style: 'overflow-x:auto' }, el('table', { style: 'border-collapse:collapse;font-size:14px;width:100%' },
+      el('tr', {}, ...['Time', 'Student', 'Parent', 'Time', 'Student', 'Parent'].map((t) => el('th', { style: 'text-align:left;padding:3px 6px' }, t))),
+      ...slots.slice(0, half).map((t, k) => el('tr', { style: 'border-top:1px solid var(--line)' }, ...cell(t), ...(slots[half + k] !== undefined ? cell(slots[half + k]) : [el('td'), el('td'), el('td')])))))
+      : el('p', { class: 'small' }, 'Set the times above.'),
+    unsched.length ? el('p', { class: 'small', style: 'margin:8px 0 0' }, el('b', {}, `Not scheduled yet (${unsched.length}): `), unsched.map((s) => s.name).join('; ')) : el('p', { class: 'small', style: 'margin:8px 0 0' }, '✓ Every advisee has a time.'));
+}
+function advTextCard() {
+  const D = advDay(), studs = advStudents(), phone = /Android|iPhone|iPad/i.test(navigator.userAgent), box = el('div', {});
+  let kind = 'invite';
+  const days = D.date ? Math.round((new Date(D.date + 'T12:00') - new Date(advToday() + 'T12:00')) / 864e5) : null; if (days !== null && days <= 8 && days >= 0) kind = 'remind';
+  const draw = () => {
+    box.innerHTML = '';
+    studs.forEach((s) => {
+      const c = advConf(s.id), sent = (c.texted || {})[kind], gs = (s.guardians || []).filter((g) => g.phone);
+      if (kind === 'remind' && (c.time === undefined || c.time === '')) return;
+      box.append(el('div', { style: 'border-top:1px solid var(--line);padding:8px 0' },
+        el('div', {}, el('b', {}, s.name), c.time !== undefined && c.time !== '' ? el('span', { class: 'small' }, ` · ${advClock(+c.time, true)}`) : '', sent ? el('span', { style: 'margin-left:8px;color:#1b7a3d;font-weight:700;font-size:13px' }, `✓ texted ${advDate(sent)}`) : ''),
+        gs.length ? el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:4px' }, ...gs.map((g) => {
+          const body = advText(kind, s, g, D), num = String(g.phone).split(',')[0].replace(/[^\d+]/g, '');
+          const done = async () => { try { await advConfSet(s.id, { texted: { ...(advConf(s.id).texted || {}), [kind]: advToday() } }); await advSave('contact', '', { sid: s.id, date: advToday(), method: 'Text', who: g.name, reason: kind === 'remind' ? 'Conference reminder' : 'Conference scheduling', notes: '' }); } catch (e) {} };
+          if (phone) return el('a', { class: 'btn secondary', style: 'margin:0;padding:6px 12px', href: `sms:${num}?body=${encodeURIComponent(body)}`, onclick: () => { setTimeout(() => { done().then(draw); }, 300); } }, `📱 Text ${g.name || 'parent'}`);
+          const b = el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:6px 12px' }, `📋 Copy text for ${g.name || 'parent'} · ${g.phone.split(',')[0]}`);
+          b.onclick = async () => { try { await navigator.clipboard.writeText(body); b.textContent = '✓ Copied: paste it in Google Messages'; } catch { prompt('Copy this:', body); } done(); };
+          return b;
+        })) : el('div', { class: 'small', style: 'color:#b3261e' }, 'No phone number on file. Add one on 👥 Advisees & parents.'),
+        el('details', { class: 'small', style: 'margin-top:4px' }, el('summary', { style: 'cursor:pointer' }, 'See the text'), el('div', { style: 'white-space:pre-wrap;background:#fafaf7;border:1px solid var(--line);border-radius:8px;padding:6px;margin-top:4px' }, advText(kind, s, gs[0] || (s.guardians || [])[0], D)))));
+    });
+    if (!box.children.length) box.append(el('p', { class: 'small' }, kind === 'remind' ? 'Give advisees times on the schedule first.' : 'Add advisees first.'));
+  };
+  const tabs = el('div', { style: 'display:flex;gap:6px;margin:6px 0' }, ...[['invite', 'Scheduling text'], ['remind', 'Reminder text']].map(([k, t]) => el('button', { type: 'button', class: 'btn' + (k === kind ? '' : ' secondary'), style: 'margin:0;padding:5px 12px', onclick: (e) => { kind = k; [...tabs.children].forEach((b) => (b.className = 'btn secondary')); e.target.className = 'btn'; draw(); } }, t)));
+  draw();
+  return el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 4px' }, '📱 Text parents'),
+    el('p', { class: 'small', style: 'margin:0' }, phone ? 'Tap a parent: Messages opens with the text filled in, from your own number. Press send, come back, and tap the next one. Each one is logged in 📞 Parent contacts.'
+      : 'Easiest on your phone: open this page on your Android and each button opens Messages with the text filled in. On this computer, each button copies the text to paste into Google Messages for web.'),
+    tabs, box);
+}
+function advPrintSchedule() {
+  const D = advDay(), esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])), slots = advSlots(D), studs = advStudents(), at = {};
+  studs.forEach((s) => { const t = advConf(s.id).time; if (t !== undefined && t !== '') at[+t] = s; });
+  const par = (s) => (s ? esc((s.guardians || []).map((g) => g.name).filter(Boolean).join(', ')) : ''), half = Math.ceil(slots.length / 2);
+  const rows = slots.slice(0, half).map((t, k) => { const u = slots[half + k]; return `<tr><td class="t">${advClock(t)}</td><td>${at[t] ? esc(at[t].name) : ''}</td><td>${par(at[t])}</td><td class="t">${u !== undefined ? advClock(u) : ''}</td><td>${u !== undefined && at[u] ? esc(at[u].name) : ''}</td><td>${u !== undefined ? par(at[u]) : ''}</td></tr>`; }).join('');
+  const missed = studs.filter((s) => advConf(s.id).outcome === 'missed' || (!Object.values(at).includes(s) && advConf(s.id).outcome !== 'met'));
+  const w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups for this site to print.'); return; }
+  w.document.write(`<!doctype html><title>Conference schedule</title><style>body{font:14px system-ui,sans-serif;margin:30px 36px;color:#111}h1{font-size:20px;text-align:center;margin:0}p{text-align:center;margin:4px 0 14px}table{border-collapse:collapse;width:100%;margin-bottom:18px;table-layout:fixed}th,td{border:1px solid #999;padding:6px;text-align:left;vertical-align:top;overflow-wrap:anywhere}td.t,th.t{font-weight:700;width:52px}h2{font-size:15px;text-align:center}</style>
+    <h1>Atoka High School ICAP Conference Schedule</h1><p>Advisor: ${esc(CONFIG.TEACHER_NAME)} · ${esc(advLongDate(D.date))} · ${esc(D.place)}</p>
+    <table><tr><th class="t">Time</th><th>Student</th><th>Parent</th><th class="t">Time</th><th>Student</th><th>Parent</th></tr>${rows}</table>
+    <h2>PARENTS YOU WERE UNABLE TO MEET AT THE CONFERENCE</h2><table><tr><th>Student</th><th>Parent</th><th>Reason unable to make contact</th></tr>${missed.map((s) => `<tr><td>${esc(s.name)}</td><td>${par(s)}</td><td>${esc(advConf(s.id).reason || '')}</td></tr>`).join('') || '<tr><td>&nbsp;</td><td></td><td></td></tr>'}</table>
+    <script>onload=()=>print()<\/script>`);
+  w.document.close();
+}
 function advConfTab() {
   const studs = advStudents(), items = advItems();
+  app.append(advDayCard(), advScheduleCard(), advTextCard());
   const itemsBox = el('div', {}), msg = el('span', { class: 'small', style: 'margin-left:8px' });
   const drawItems = (list) => { itemsBox.innerHTML = ''; list.forEach((it, k) => { const t = el('input', { type: 'text', value: it.t, style: 'width:340px;max-width:100%' }), gr = el('input', { type: 'text', value: it.grades || '', placeholder: 'all grades', style: 'width:110px', title: 'Only for these grades, like 9 or 11,12' });
     itemsBox.append(el('div', { style: 'display:flex;gap:6px;margin:3px 0;flex-wrap:wrap' }, t, gr, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:2px 8px', onclick: () => { list.splice(k, 1); drawItems(list); } }, '✕'))); it._t = t; it._g = gr; }); };
@@ -40172,7 +40271,7 @@ function advConfTab() {
     el('p', { class: 'small', style: 'margin:0 0 6px' }, 'The things in the school’s conference packet. Items for only some grades: put the grades in the second box (like 9, or 11,12). Each advisee’s sheet lists the items for their grade with a box to check.'),
     itemsBox, el('div', { style: 'display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center' }, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => { work.push({ t: '' }); drawItems(work); } }, '+ Add an item'), el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: saveItems }, 'Save the checklist'), msg)));
   const rows = studs.map((s) => { const c = advConf(s.id); return el('tr', { style: 'border-top:1px solid var(--line)' }, el('td', { style: 'padding:6px 4px' }, el('label', {}, el('input', { type: 'checkbox', class: 'advPick', value: s.id, checked: '' }), ' ', s.name)),
-    el('td', { class: 'small' }, c.date ? `Met ${advDate(c.date)}` : '—'), el('td', {}, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:4px 10px', onclick: () => advConfEdit(s) }, 'Notes & grades'))); });
+    el('td', { class: 'small' }, c.outcome === 'met' ? `✓ Met${c.date ? ' ' + advDate(c.date) : ''}` : c.outcome === 'missed' ? `Unable to meet${c.reason ? ': ' + c.reason : ''}` : c.time !== undefined && c.time !== '' ? `Scheduled ${advClock(+c.time, true)}` : '—'), el('td', {}, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:4px 10px', onclick: () => advConfEdit(s) }, 'Notes & grades'))); });
   app.append(el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, 'Conference sheets'),
     el('p', { class: 'small', style: 'margin:0 0 6px' }, 'One page per advisee: parents’ contact information, the checklist for their grade, this semester’s eligibility weeks, your parent-contact log, the grades and absences you paste in from their progress report, and room for notes. Print the checked ones, or open one on a laptop during the conference.'),
     studs.length ? el('table', { style: 'width:100%;border-collapse:collapse;font-size:14px' }, ...rows) : el('p', { class: 'small' }, 'Add advisees first.'),
@@ -40182,12 +40281,14 @@ function advConfEdit(s) {
   const c = { ...advConf(s.id) }, box = el('div', { class: 'card', style: 'border:2px solid var(--accent)' });
   const date = el('input', { type: 'date', value: c.date || '', style: 'width:auto' }), grades = el('textarea', { rows: '5', placeholder: 'Paste from the progress report: each class, its grade, and absences (one class per line)', style: 'width:100%;box-sizing:border-box;font:inherit' }, c.grades || '');
   const notes = el('textarea', { rows: '4', placeholder: 'Conference notes', style: 'width:100%;box-sizing:border-box;font:inherit' }, c.notes || ''), msg = el('span', { class: 'small', style: 'margin-left:8px' });
+  const outcome = el('select', { style: 'width:auto' }, el('option', { value: '' }, 'Not yet'), el('option', { value: 'met' }, 'Met with them'), el('option', { value: 'missed' }, 'Unable to meet')); outcome.value = c.outcome || '';
+  const reason = el('input', { type: 'text', value: c.reason || '', placeholder: 'Reason unable to meet or make contact', style: 'width:320px;max-width:100%' });
   const checks = advItemsFor(s).map((it) => { const k = el('input', { type: 'checkbox' }); k.checked = !!(c.done || {})[it.t]; k.dataset.t = it.t; return el('label', { style: 'display:block;margin:2px 0' }, k, ' ', it.t); });
-  box.append(el('h3', { style: 'margin:0 0 6px' }, `${s.name}: conference`), el('div', {}, 'Conference date ', date), el('div', { style: 'margin:8px 0' }, ...checks),
+  box.append(el('h3', { style: 'margin:0 0 6px' }, `${s.name}: conference`), el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, el('span', {}, 'Conference date ', date), outcome, reason), el('div', { style: 'margin:8px 0' }, ...checks),
     el('label', {}, 'Grades and absences'), grades, el('label', { style: 'display:block;margin-top:6px' }, 'Notes'), notes,
     el('div', { style: 'display:flex;gap:8px;margin-top:8px' }, el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: async () => {
       const done = {}; box.querySelectorAll('input[type=checkbox]').forEach((k) => { if (k.checked) done[k.dataset.t] = true; });
-      try { await advSave('conf', s.id, { date: date.value, grades: grades.value, notes: notes.value, done }); advisoryScreen(); } catch (e) { msg.textContent = e.message; } } }, 'Save'),
+      try { await advConfSet(s.id, { date: date.value, grades: grades.value, notes: notes.value, done, outcome: outcome.value, reason: reason.value.trim() }); advisoryScreen(); } catch (e) { msg.textContent = e.message; } } }, 'Save'),
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => box.remove() }, 'Cancel'), msg));
   app.append(box); box.scrollIntoView({ block: 'start' });
 }
@@ -40198,7 +40299,7 @@ function advPrint(ids) {
   const pages = ids.map(advStu).filter(Boolean).map((s) => {
     const c = advConf(s.id), weeks = advWeeks().filter((w) => w.date >= semStart), on = weeks.filter((w) => w.hits.some((h) => h.sid === s.id)), cs = advContacts(s.id).filter((x) => x.date >= semStart);
     return `<section class="pg"><h1>${esc(s.name)} <small>Grade ${esc(s.grade || '')} · Advisor: ${esc(CONFIG.TEACHER_NAME)}</small></h1>
-      <p class="sub">Parent–teacher conference${c.date ? ' · ' + esc(advDate(c.date)) : ' · date: ____________'}</p>
+      <p class="sub">Parent–teacher conference${c.date ? ' · ' + esc(advDate(c.date)) : ' · date: ____________'}${c.time !== undefined && c.time !== '' ? ' · ' + advClock(+c.time, true) : ''}</p>
       <h2>Parents / guardians</h2>${(s.guardians || []).length ? `<table>${s.guardians.map((g) => `<tr><td>${esc(g.name)}${g.rel ? ' (' + esc(g.rel) + ')' : ''}</td><td>${esc(g.phone)}</td><td>${esc(g.email)}</td></tr>`).join('')}</table>` : '<p class="blank">______________________________________________</p>'}
       <h2>Checklist</h2>${advItemsFor(s).map((it) => `<div class="ck">${(c.done || {})[it.t] ? '☑' : '☐'} ${esc(it.t)}</div>`).join('')}
       <h2>Grades and absences</h2>${c.grades ? `<pre>${esc(c.grades)}</pre>` : '<p class="blank">(from the progress report)<br><br><br><br></p>'}
@@ -43204,6 +43305,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-24', text: 'Advisory → Conferences now does ICAP conference scheduling: set the day and 15-minute times, put each advisee in a time slot, print the schedule (with the parents you were unable to meet), and text each parent from your own phone with the scheduling text or a reminder the week before. Open the page on your phone and each tap opens Messages with the text already written.' },
   { date: '2026-11-24', text: 'New Advisory tab for your advisory group: bring in your advisees and their parents’ contact information by copying your advisory list from Sylogist, choose the weekly ineligible-list PDF to see which advisees are on it (and who’s new this week), draft the parent email or call, log contacts, and print a conference sheet for each advisee with a checklist for their grade, their grades and absences, eligibility weeks, and contacts. See Help, section on Advisory.' },
   { date: '2026-11-23', text: 'The Aa reading options (easy-read font, more space, dark mode, bigger text) are on the vocabulary crossword too, with the same saved choices and accommodations as the practice pages.' },
   { date: '2026-11-23', text: 'Reading options for students: an Aa button in the bottom-left corner of the student pages turns on an easy-read font, more space between lines, dark mode, or bigger text. Their choices are saved with their name, so they follow them to any Chromebook. You can also turn any of these on for a student in 🧩 Accommodations.' },
@@ -43351,7 +43453,8 @@ function helpScreen(open) {
         [B('📋 Ineligible list'), ': save the week’s PDF from the email, set the week, and choose the PDF. In a few seconds it shows which of your advisees are on it, with their lines from the list, and marks who’s ', B('NEW this week'), '. Click ', B('Save this week'), '; only your advisees’ lines are kept. ', B('Past weeks'), ' shows each advisee’s weeks and how many weeks in a row.'],
         ['Next to each advisee on the list: ', B('✉️ Draft email'), ' opens a message to the parents in your mail app (read it over and change anything before sending), ', B('📞 Call script'), ' shows their numbers and what to say, and ', B('📝 Log a contact'), ' records the call or email.'],
         [B('📞 Parent contacts'), ': every contact you logged, newest first. Pick an advisee to log any other contact.'],
-        [B('🗂 Conferences'), ': type the items in the school’s conference packet once (put grades like 9 or 11,12 next to items only some grades get). ', B('Notes & grades'), ' on an advisee: paste the grades and absences from their progress report, check off items, and add notes. ', B('🖨 Print conference sheets'), ' makes one page per advisee with parents, the checklist for their grade, the grades and absences, this semester’s eligibility weeks and parent contacts, and lines for notes.']),
+        [B('🗂 Conferences'), ' (ICAP conferences): under ', B('📅 Conference day'), ' set the date, place, and times (4:00 to 8:00 in 15-minute slots to start). On the ', B('🕓 Schedule'), ', pick an advisee for each time; ', B('🖨 Print schedule'), ' prints it like the school’s scheduling sheet, with the parents you were unable to meet. ', B('📱 Text parents'), ': the scheduling text follows the school’s phone/text script and includes their time once they have one; the reminder text is for the week before (a yellow banner shows up then). On your Android phone, open this page and tap a parent: Messages opens with the text filled in, sent from your own number. On a computer, the button copies the text instead. Each text is logged in 📞 Parent contacts. After the conference, mark each advisee Met or Unable to meet (with the reason) under ', B('Notes & grades'), '.'],
+        [B('Conference checklist and sheets'), ': type the items in the school’s conference packet once (put grades like 9 or 11,12 next to items only some grades get). ', B('Notes & grades'), ' on an advisee: paste the grades and absences from their progress report, check off items, and add notes. ', B('🖨 Print conference sheets'), ' makes one page per advisee with parents, the checklist for their grade, the grades and absences, this semester’s eligibility weeks and parent contacts, and lines for notes.']),
       P(B('If a name is missed: '), 'the list is matched by last name plus first name or nickname. Add the name the list uses as the advisee’s nickname. A PDF that’s a scanned picture can’t be read; ask for a regular PDF.')]],
     ['year', `${hasLessons ? 13 : 12}. End of the school year`, [
       P('On the ', B('Classes & roster'), ' tab, use ', B('Archive and start a new year'), ' and type ', B('NEW YEAR'), ' to confirm. It saves a copy of your whole Sheet in your Google Drive (named for the school year), then empties it for the new year. The crossword page has the same box for its Sheet. Do both after final grades are in.')]],
