@@ -39882,6 +39882,17 @@ function advNav(active) {
   const tabs = [['week', '📋 Ineligible list'], ['students', '👥 Advisees & parents'], ['contacts', '📞 Parent contacts'], ['conf', '🗂 Conferences']];
   return el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px' }, ...tabs.map(([k, t]) => el('button', { type: 'button', class: 'btn' + (k === active ? '' : ' secondary'), style: 'margin:0', onclick: () => { ADV.tab = k; advisoryScreen(); } }, t)));
 }
+// the first version of the Sylogist import read other columns (site, status, gender, home room) as parents: take those out, and SMITH, AVA → Smith, Ava
+async function advCleanup() {
+  const junk = (g) => !g.phone && !g.email && !g.rel && (/^[\d\/.:\- ]*$/.test(g.name || '') || /^[a-z]$/i.test(g.name) || /^(on roll|active|inactive|withdrawn)$/i.test(g.name) || /^[A-Z'\-]+$/.test(g.name));
+  const tc = (t) => (/[a-z]/.test(t) ? t : t.toLowerCase().replace(/(^|[\s,'’\-]|\bmc)([a-z])/g, (m, a, b) => a + b.toUpperCase()));
+  for (const s of advStudents()) {
+    const gs = (s.guardians || []).filter((g) => !junk(g)), name = tc(s.name || '');
+    if (gs.length === (s.guardians || []).length && name === s.name) continue;
+    const d = { ...s, name, guardians: gs }; delete d.id;
+    try { await advSave('student', s.id, d); } catch (e) { return; }
+  }
+}
 async function advisoryScreen() {
   document.getElementById('title').textContent = 'Advisory';
   teacherNav('advisory');
@@ -39893,6 +39904,7 @@ async function advisoryScreen() {
     const g = await setupPost('advList').catch(() => null);
     if (!g || !g.ok) { app.innerHTML = ''; app.append(el('div', { class: 'card' }, /unknown/i.test((g && g.error) || '') ? 'Your Sheet’s script hasn’t picked up Advisory yet. It updates itself within about 10 minutes; try again then.' : 'Couldn’t reach your Sheet. Check the internet and try again.', ' ', linkBtn('Try again', () => advisoryScreen()))); return; }
     ADV.rows = g.rows || []; app.innerHTML = '';
+    await advCleanup();
   }
   app.append(advNav(ADV.tab));
   if (!advStudents().length && ADV.tab !== 'students') app.append(el('div', { class: 'card' }, el('b', {}, 'Start here: '), 'add your advisees and their parents’ contact information on ', linkBtn('👥 Advisees & parents', () => { ADV.tab = 'students'; advisoryScreen(); }), '.'));
