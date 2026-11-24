@@ -40037,6 +40037,33 @@ function advParseList(rows) {
   }
   return [...out.values()].map((s) => ({ ...s, guardians: s.guardians.map((g) => ({ name: g.name || '', rel: g.rel || '', phone: g.phone || '', email: [g.email, g.email2].filter(Boolean).join(', ') })) }));
 }
+// Sylogist's page for one student (Student Information → a student's name): Name, Grade, then Contacts, each "NAME (Relationship)"
+// with Default Phone / Other Phones / Default Email when that contact is opened. Several students' pages can be pasted one after another.
+function advParseSylogist(text) {
+  const T = String(text || '').replace(/\r\n?/g, '\n').split(/[\n\t]/).map((x) => x.trim()).filter(Boolean);
+  const LABEL = /^(name|id|state id|grade|gender|birth date|site|enrollment status|home room|locker|parking space|address|default phone|other phones|default email|contact information|relationship indicators|contacts)\b/i;
+  const val = (i, lab) => { const rest = T[i].slice(lab.length).replace(/^\s*:?\s*/, ''); return rest || (T[i + 1] && !LABEL.test(T[i + 1]) ? T[i + 1] : ''); };
+  const studs = []; let s = null, c = null, inContacts = false;
+  for (let i = 0; i < T.length; i++) {
+    const t = T[i];
+    if (/^name$/i.test(t) && /^[^,\d]+,\s*[^,\d]+$/.test(T[i + 1] || '')) { s = { name: T[i + 1], grade: '', contacts: [] }; studs.push(s); c = null; inContacts = false; i++; continue; }
+    if (!s) continue;
+    if (/^grade\b/i.test(t)) { const g = advGrade(val(i, 'grade')); if (g) s.grade = g; continue; }
+    if (/^contacts$/i.test(t)) { inContacts = true; continue; }
+    if (!inContacts) continue;
+    const head = t.match(/^([A-Za-z'’.\- ]+?)\s*\(([^()]*)\)$/);
+    if (head && !LABEL.test(t)) { c = { name: head[1].trim(), rel: head[2].split(',')[0].trim(), phone: '', email: '' }; if (/^other$/i.test(c.rel)) c.rel = ''; s.contacts.push(c); continue; }
+    if (!c) continue;
+    const m = t.match(/^(default phone|other phones|default email)/i); if (!m) continue;
+    const v = val(i, m[1]);
+    if (/email/i.test(m[1])) { const e = v.match(ADV_EMAIL); ADV_EMAIL.lastIndex = 0; if (e) c.email = e[0].toLowerCase(); }
+    else { const ps = v.match(ADV_PHONE) || []; ADV_PHONE.lastIndex = 0; ps.forEach((p) => { p = p.trim(); if (!c.phone.includes(p)) c.phone = c.phone ? `${c.phone}, ${p}` : p; }); }
+  }
+  // keep the contacts that were opened on the page (they show a phone or email); the rest were left closed
+  return advParseList([['Student', 'Grade', 'Contact name', 'Relationship', 'Phone', 'Email'],
+    ...studs.flatMap((x) => { const keep = x.contacts.filter((k) => k.phone || k.email); return keep.length ? keep.map((k) => [x.name, x.grade, k.name, k.rel, k.phone, k.email]) : [[x.name, x.grade, '', '', '', '']]; })]);
+}
+const advParseText = (text) => (/default phone|contact information/i.test(text) && /\bname\b/i.test(text) ? advParseSylogist(text) : advParseList(advCells(text)));
 async function advReadFile(f) {
   if (/\.xlsx?$/i.test(f.name)) {
     if (!window.XLSX) await new Promise((ok, no) => document.head.append(el('script', { src: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', onload: ok, onerror: no })));
@@ -40069,7 +40096,7 @@ function advStudentsTab() {
     list.prepend(box); box.scrollIntoView({ block: 'start' });
   };
   // bring the list in from Sylogist (copy the table, or its exported file) or any spreadsheet
-  const paste = el('textarea', { rows: '5', placeholder: 'Paste here: in Sylogist, select your advisory list with the mouse (or press Ctrl+A on that page), press Ctrl+C, then click here and press Ctrl+V. Any columns are fine.', style: 'width:100%;box-sizing:border-box;font:inherit' });
+  const paste = el('textarea', { rows: '5', placeholder: 'Paste here. Your advisees: on Sylogist’s Student Information page, press Ctrl+A, then Ctrl+C, then click here and press Ctrl+V. Their parents: click an advisee’s name in Sylogist, open the contacts you’d call (the ▸ arrows), press Ctrl+A and Ctrl+C, and paste here; paste the next advisee’s page right after it.', style: 'width:100%;box-sizing:border-box;font:inherit' });
   const pfile = el('input', { type: 'file', accept: '.csv,.tsv,.txt,.xlsx,.xls' }), pmsg = el('span', { class: 'small', style: 'margin-left:8px' }), prev = el('div', {});
   const preview = (list) => {
     prev.innerHTML = '';
@@ -40083,16 +40110,16 @@ function advStudentsTab() {
         try { await advSave('student', ex ? ex.id : '', d); n++; pmsg.textContent = `Saving ${n} of ${chosen.length}…`; } catch (e) { pmsg.textContent = e.message; return; } }
       advisoryScreen();
     };
-    prev.append(el('p', { class: 'small', style: 'margin:8px 0 4px' }, 'Here’s what was read. Uncheck anyone who isn’t your advisee (like a heading row). Advisees you already have are updated.'),
+    prev.append(el('p', { class: 'small', style: 'margin:8px 0 4px' }, 'Here’s what was read (', String(list.length), list.length === 1 ? ' student' : ' students', '). To add more parents, paste the next advisee’s page below what’s already in the box. Uncheck anyone who isn’t your advisee (like a heading row). Advisees you already have are updated.'),
       el('div', { style: 'max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px' }, el('table', { style: 'width:100%;border-collapse:collapse;font-size:14px' },
         el('tr', {}, ...['', 'Advisee', 'Grade', 'Parents / guardians'].map((t) => el('th', { style: 'text-align:left;padding:4px;position:sticky;top:0;background:#fff' }, t))),
         ...list.map((r, k) => el('tr', { style: 'border-top:1px solid var(--line)' }, el('td', { style: 'padding:4px' }, pick[k]), el('td', {}, r.name, studs.some((s) => lastFirst(s.name) === lastFirst(r.name)) ? el('span', { class: 'small' }, ' (update)') : ''), el('td', {}, r.grade || '?'),
           el('td', { class: 'small' }, ...(r.guardians.length ? r.guardians.flatMap((g, i) => [i ? el('br') : '', [g.name, g.rel && `(${g.rel})`, g.phone, g.email].filter(Boolean).join(' ')]) : ['—'])))))), go);
   };
-  paste.addEventListener('paste', () => setTimeout(() => preview(advParseList(advCells(paste.value))), 0));
+  paste.addEventListener('paste', () => setTimeout(() => preview(advParseText(paste.value)), 0));
   pfile.onchange = async () => { const f = pfile.files[0]; if (!f) return; try { preview(advParseList(await advReadFile(f))); } catch (e) { console.warn(e); prev.innerHTML = ''; prev.append(el('p', { class: 'small', style: 'color:#b3261e' }, 'That file couldn’t be read. Try saving it as CSV, or copy and paste the table instead.')); } };
   app.append(el('div', { class: 'card' }, el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, el('h3', { style: 'margin:0' }, `👥 Your advisees (${studs.length})`), el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: () => edit(null) }, '+ Add an advisee')),
-    el('details', { style: 'margin-top:8px', ...(studs.length ? {} : { open: '' }) }, el('summary', { style: 'cursor:pointer;font-weight:600' }, 'Bring in your advisory list from Sylogist'), paste, el('div', { style: 'margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, el('span', { class: 'small' }, 'Or choose a file Sylogist exported (Excel or CSV):'), pfile, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => preview(advParseList(advCells(paste.value))) }, 'Read what I pasted'), pmsg), prev),
+    el('details', { style: 'margin-top:8px', ...(studs.length ? {} : { open: '' }) }, el('summary', { style: 'cursor:pointer;font-weight:600' }, 'Bring in your advisory list from Sylogist'), paste, el('div', { style: 'margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, el('span', { class: 'small' }, 'Or choose a file Sylogist exported (Excel or CSV):'), pfile, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => preview(advParseText(paste.value)) }, 'Read what I pasted'), pmsg), prev),
     list,
     studs.length ? el('table', { style: 'width:100%;border-collapse:collapse;margin-top:10px;font-size:14px' },
       el('tr', {}, ...['Advisee', 'Grade', 'Parents / guardians', ''].map((t) => el('th', { style: 'text-align:left;padding:4px' }, t))),
@@ -43305,7 +43332,7 @@ function helpScreen(open) {
         [B('Results'), ' shows scores and the most-missed words. ', B('Roster'), ' adds students and gives any student a word bank on every puzzle.'])]],
     ['advisory', `${hasLessons ? 12 : 11}. Advisory (ineligible list and parent conferences)`, [
       P('Open the ', B('Advisory'), ' tab. Only you see your advisees: they’re kept on a hidden Advisory tab in your own Sheet, behind your dashboard password. Use the Sheet in your school Google account, and check with the principal if you’re unsure about keeping parent contact information there.'),
-      OL([B('👥 Advisees & parents'), ': add each advisee with their grade, a nickname if they go by one, and up to two parents or guardians (phone and email). To bring them all in from Sylogist, open your advisory list there, select it (or press Ctrl+A), copy it, and paste it under ', B('Bring in your advisory list from Sylogist'), ', or choose a file Sylogist exported (Excel or CSV). Any column order works. Look over what was read, uncheck anything that isn’t an advisee, and click ', B('Add these advisees'), '. Doing it again later updates their contact information.'],
+      OL([B('👥 Advisees & parents'), ': add each advisee with their grade, a nickname if they go by one, and up to two parents or guardians (phone and email). To bring them in from Sylogist: on its Student Information page (your advisees), press Ctrl+A, then Ctrl+C, and paste under ', B('Bring in your advisory list from Sylogist'), '. For parents, click an advisee’s name in Sylogist, open the contacts you’d call (the ▸ arrows; the closed ones are skipped), press Ctrl+A and Ctrl+C, and paste; paste each advisee’s page right after the last one, then add them all at once. A spreadsheet or exported file (Excel or CSV) works too, in any column order. Look over what was read, uncheck anything that isn’t an advisee, and click ', B('Add these advisees'), '. Doing it again later updates their contact information.'],
         [B('📋 Ineligible list'), ': save the week’s PDF from the email, set the week, and choose the PDF. In a few seconds it shows which of your advisees are on it, with their lines from the list, and marks who’s ', B('NEW this week'), '. Click ', B('Save this week'), '; only your advisees’ lines are kept. ', B('Past weeks'), ' shows each advisee’s weeks and how many weeks in a row.'],
         ['Next to each advisee on the list: ', B('✉️ Draft email'), ' opens a message to the parents in your mail app (read it over and change anything before sending), ', B('📞 Call script'), ' shows their numbers and what to say, and ', B('📝 Log a contact'), ' records the call or email.'],
         [B('📞 Parent contacts'), ': every contact you logged, newest first. Pick an advisee to log any other contact.'],
