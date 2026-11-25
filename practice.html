@@ -43391,6 +43391,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-25', text: 'Help: “Print this page” works now. It prints every topic, opened up (or just the topics that match your search).' },
   { date: '2026-11-24', text: 'Advisory → Conferences: a Semester picker at the top lets you mark who you met at this fall’s conference (Met / Unable to meet, right in the list) or switch to Spring 2027 to set the date and times and start texting parents.' },
   { date: '2026-11-24', text: 'Advisory: your advisees now stay with you until they graduate. Grades go up by themselves every July, seniors move to Graduated, and conferences are kept by semester, so each fall and spring starts fresh and the printed sheet shows earlier conferences.' },
   { date: '2026-11-24', text: 'Advisory → Conferences: move checklist items up or down with ▲ ▼ to put them in the order you go over them. Grades and absences are now two separate items, with separate boxes under Notes & grades and separate sections on the printed sheet.' },
@@ -43568,13 +43569,20 @@ function helpScreen(open) {
   app.append(el('div', { class: 'card' },
     el('p', { style: 'margin:0' }, `How to use this site${TEACHER_ID || CONFIG.TEACHER_NAME ? `, ${CONFIG.TEACHER_NAME}` : ''}. Click a topic to open it. `,
       el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); app.querySelectorAll('details').forEach((d) => (d.open = true)); } }, 'Open all'), ' · ',
-      el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); window.print(); } }, 'Print this page')),
-    helpSearchBox()));
+      el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); helpPrint(); } }, 'Print this page')),
+    el('div', { class: 'noprint' }, helpSearchBox())));
   sections.forEach(([id, title, body]) => app.append(el('details', { class: 'card helpsec', id: 'help-' + id, ...(id === open ? { open: '' } : {}), style: 'padding:10px 14px' },
     el('summary', { style: 'cursor:pointer;font-weight:700;font-size:17px;color:var(--accent)' }, title), ...body)));
   if (open) setTimeout(() => { const d = document.getElementById('help-' + open); if (d) d.scrollIntoView({ block: 'start' }); }, 50);
 }
 
+// Help: print every topic that's showing, opened (pages only print with body.printing, which keeps students from printing quizzes)
+function helpPrint() {
+  const ds = [...app.querySelectorAll('details')], was = ds.map((d) => d.open);
+  ds.forEach((d) => (d.open = true)); document.body.classList.add('printing');
+  const done = () => { document.body.classList.remove('printing'); ds.forEach((d, k) => (d.open = was[k])); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done); window.print(); setTimeout(() => { if (!matchMedia('print').matches) done(); }, 1000);
+}
 // Help: search every topic (and What's new) for words; only the topics that have all of them show, opened, with the words marked
 function helpSearchBox() {
   const inp = el('input', { type: 'search', placeholder: 'Search help (for example: Sylogist, accommodations, password, video)', 'aria-label': 'Search help',
