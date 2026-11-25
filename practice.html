@@ -39834,17 +39834,29 @@ function teacherSession(set) {
    The ineligible list PDF is read in the browser; only the lines about the teacher's advisees are kept. */
 const ADV = { rows: null, tab: 'week', scan: null };
 const advOf = (kind) => (ADV.rows || []).filter((r) => r.kind === kind);
-const advStudents = () => advOf('student').map((r) => ({ id: r.id, ...r.data })).sort((a, b) => lastFirst(a.name).localeCompare(lastFirst(b.name)));
+// advisees stay with their advisor from 9th grade to graduation: each is kept by graduation year, so the grade goes up by itself every July
+const advSyEnd = (d = new Date()) => d.getFullYear() + (d.getMonth() >= 6 ? 1 : 0); // the spring the school year ends
+const advTerm = (d = new Date()) => (d.getMonth() >= 6 ? 'FA' : 'SP') + String(d.getFullYear()).slice(2); // like the school's PTC-FA26 / PTC-SP27
+const advTermName = (t) => (t.startsWith('FA') ? 'Fall 20' : 'Spring 20') + t.slice(2);
+const advGradYear = (d, t) => d.gradYear || advSyEnd(t ? new Date(t) : new Date()) + (12 - (+d.grade || 9)); // older records: the grade they had when last saved
+const advGradeOf = (d, t) => String(12 - (advGradYear(d, t) - advSyEnd()));
+const advAll = () => advOf('student').map((r) => ({ id: r.id, ...r.data, gradYear: advGradYear(r.data, r.t), grade: advGradeOf(r.data, r.t) })).sort((a, b) => lastFirst(a.name).localeCompare(lastFirst(b.name)));
+const advStudents = () => advAll().filter((s) => +s.grade <= 12);
+const advGraduates = () => advAll().filter((s) => +s.grade > 12);
 const advStu = (id) => advStudents().find((s) => s.id === id);
 const advWeeks = () => advOf('week').map((r) => ({ id: r.id, ...r.data })).sort((a, b) => (a.date < b.date ? 1 : -1));
 const advContacts = (sid) => advOf('contact').map((r) => ({ id: r.id, ...r.data })).filter((c) => !sid || c.sid === sid).sort((a, b) => (a.date < b.date ? 1 : -1));
-const advConf = (sid) => { const r = advOf('conf').find((x) => x.id === sid); return r ? r.data : {}; };
+const ADV_KEEP = ['okp']; // the same every semester
+const advConfRaw = (sid) => { const r = advOf('conf').find((x) => x.id === sid); const d = (r && r.data) || {};
+  if (d.terms) return d; const { okp, ...rest } = d; return { okp, terms: Object.keys(rest).length ? { [d.term || 'FA26']: rest } : {} }; }; // older records were all this fall
+const advConf = (sid, term = advTerm()) => { const d = advConfRaw(sid); return { ...((d.terms || {})[term] || {}), okp: d.okp }; };
 const ADV_ITEMS_DEFAULT = [{ t: 'Grades (progress report)' }, { t: 'Absences' }, { t: 'MAP testing results' }, { t: 'School calendar' }, { t: 'Atoka Public Schools attendance policy' }, { t: 'Eligibility this semester' }, { t: 'Parent contact information is up to date' }];
 const advSplitGA = (it) => it.flatMap((x) => (/^progress report \(grades and absences\)$/i.test(x.t) ? [{ ...x, t: 'Grades (progress report)' }, { ...x, t: 'Absences', link: '' }] : [x]));
 // a checklist saved before MAP / calendar / attendance policy were added gets them added once
 const advItems = () => { const r = advOf('set').find((x) => x.id === 'conf'); if (!r) return ADV_ITEMS_DEFAULT; const it = r.data.items || [];
   return advSplitGA((r.data.v || 1) >= 2 ? it : [...it, ...ADV_ITEMS_DEFAULT.slice(2, 5).filter((d) => !it.some((x) => x.t.toLowerCase() === d.t.toLowerCase()))]); };
 async function advSave(kind, id, data) {
+  if (kind === 'student' && data.grade) data = { ...data, gradYear: advSyEnd() + (12 - (+data.grade || 9)) };
   const g = await setupPost('advSave', { kind, id, data }).catch(() => null);
   if (!g || !g.ok) throw new Error((g && g.error) || 'It didn’t save. Check the internet and try again.');
   const row = { kind, id: g.id, data, t: Date.now() }; ADV.rows = (ADV.rows || []).filter((r) => !(r.kind === kind && r.id === g.id)); ADV.rows.push(row);
@@ -39889,9 +39901,9 @@ function advNav(active) {
 async function advCleanup() {
   const junk = (g) => !g.phone && !g.email && !g.rel && (/^[\d\/.:\- ]*$/.test(g.name || '') || /^[a-z]$/i.test(g.name) || /^(on roll|active|inactive|withdrawn)$/i.test(g.name) || /^[A-Z'\-]+$/.test(g.name));
   const tc = (t) => (/[a-z]/.test(t) ? t : t.toLowerCase().replace(/(^|[\s,'’\-]|\bmc)([a-z])/g, (m, a, b) => a + b.toUpperCase()));
-  for (const s of advStudents()) {
+  for (const s of advAll()) {
     const gs = (s.guardians || []).filter((g) => !junk(g)), name = tc(s.name || '');
-    if (gs.length === (s.guardians || []).length && name === s.name) continue;
+    if (gs.length === (s.guardians || []).length && name === s.name && (advOf('student').find((r) => r.id === s.id) || { data: {} }).data.gradYear) continue;
     const d = { ...s, name, guardians: gs }; delete d.id;
     try { await advSave('student', s.id, d); } catch (e) { return; }
   }
@@ -40147,11 +40159,14 @@ function advStudentsTab() {
     list,
     studs.length ? el('table', { style: 'width:100%;border-collapse:collapse;margin-top:10px;font-size:14px' },
       el('tr', {}, ...['Advisee', 'Grade', 'Parents / guardians', ''].map((t) => el('th', { style: 'text-align:left;padding:4px' }, t))),
-      ...studs.map((s) => el('tr', { style: 'border-top:1px solid var(--line)' }, el('td', { style: 'padding:6px 4px' }, el('b', {}, s.name), s.aliases ? el('span', { class: 'small' }, ` (${s.aliases})`) : ''), el('td', {}, s.grade || ''),
+      ...studs.map((s) => el('tr', { style: 'border-top:1px solid var(--line)' }, el('td', { style: 'padding:6px 4px' }, el('b', {}, s.name), s.aliases ? el('span', { class: 'small' }, ` (${s.aliases})`) : ''), el('td', {}, s.grade || '', s.gradYear ? el('div', { class: 'small' }, `Class of ${s.gradYear}`) : ''),
         el('td', { class: 'small' }, ...(s.guardians || []).flatMap((g, k) => [k ? el('br') : '', `${g.name || ''}${g.rel ? ` (${g.rel})` : ''} ${g.phone || ''} ${g.email || ''}`])),
         el('td', {}, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:4px 10px', onclick: () => edit(s) }, 'Edit')))))
       : el('p', { class: 'small' }, 'No advisees yet.'),
-    el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Kept on a hidden Advisory tab in your Sheet, behind your dashboard password. Use the Sheet in your school Google account.')));
+    advGraduates().length ? el('details', { style: 'margin-top:10px' }, el('summary', { style: 'cursor:pointer' }, `🎓 Graduated (${advGraduates().length})`),
+      el('p', { class: 'small', style: 'margin:4px 0' }, 'They’re no longer on your lists. Their contacts and conference notes stay here until you remove them.'),
+      ...advGraduates().map((g) => el('div', { style: 'display:flex;gap:8px;align-items:center;margin:3px 0' }, el('span', {}, `${g.name} (Class of ${g.gradYear})`), el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:2px 8px', onclick: async () => { if (confirm(`Remove ${g.name}?`) && (await advDel('student', g.id))) advisoryScreen(); } }, 'Remove')))) : '',
+    el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Your advisees stay with you until they graduate: each one’s grade goes up by itself every July, and their parents, contacts, Oklahoma’s Promise status, and past conferences carry over. Kept on a hidden Advisory tab in your Sheet, behind your dashboard password. Use the Sheet in your school Google account.')));
 }
 // ---- the contact log
 function advContactsTab() {
@@ -40181,7 +40196,11 @@ const advMin = (t) => { const [h, m] = String(t || '0:0').split(':').map(Number)
 const advClock = (min, ampm) => { const h = Math.floor(min / 60), m = min % 60; return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}${ampm ? (h < 12 ? ' a.m.' : ' p.m.') : ''}`; };
 const advSlots = (D = advDay()) => { const out = [], len = Math.max(5, +D.len || 15); for (let t = advMin(D.start); t + len <= advMin(D.end); t += len) out.push(t); return out; };
 const advLongDate = (s) => { if (!s) return '(date)'; const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }); };
-async function advConfSet(sid, patch) { return advSave('conf', sid, { ...advConf(sid), ...patch }); }
+async function advConfSet(sid, patch) {
+  const d = advConfRaw(sid), t = advTerm(), keep = {}, term = { ...((d.terms || {})[t] || {}) };
+  Object.entries(patch).forEach(([k, v]) => { if (ADV_KEEP.includes(k)) keep[k] = v; else term[k] = v; });
+  return advSave('conf', sid, { okp: d.okp, ...keep, terms: { ...(d.terms || {}), [t]: term } });
+}
 const advTextClock = (min) => { const h = Math.floor(min / 60), m = min % 60; return `${((h + 11) % 12) + 1}${m ? ':' + String(m).padStart(2, '0') : ''} ${h < 12 ? 'AM' : 'PM'}`; };
 const advTextDate = (s) => { if (!s) return '(date)'; const [y, m, d] = s.split('-').map(Number), x = new Date(y, m - 1, d), th = d % 10 === 1 && d !== 11 ? 'st' : d % 10 === 2 && d !== 12 ? 'nd' : d % 10 === 3 && d !== 13 ? 'rd' : 'th';
   return `${x.toLocaleDateString('en-US', { weekday: 'long' })}, ${x.toLocaleDateString('en-US', { month: 'long' })} ${d}${th}`; };
@@ -40202,7 +40221,7 @@ function advDayCard() {
     invite: el('textarea', { rows: '4', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.invite),
     emailSubject: el('input', { type: 'text', value: D.emailSubject, style: 'width:100%;box-sizing:border-box' }), email: el('textarea', { rows: '8', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.email), remind: el('textarea', { rows: '3', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.remind) };
   const save = async () => { try { await advSave('set', 'confday', Object.fromEntries(Object.entries(f).map(([k, x]) => [k, k === 'len' ? +x.value || 15 : x.value.trim()]))); msg.textContent = '✓ Saved'; advisoryScreen(); } catch (e) { msg.textContent = e.message; } };
-  return el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, '📅 Conference day'),
+  return el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, `📅 Conference day · ${advTermName(advTerm())}`),
     el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, el('span', {}, 'Date ', f.date), el('span', {}, 'Where ', f.place), el('span', {}, 'From ', f.start, ' to ', f.end), el('span', {}, f.len, ' minutes each'), el('span', {}, 'Your name in texts ', f.name)),
     el('details', { style: 'margin-top:8px' }, el('summary', { style: 'cursor:pointer' }, 'Wording of the texts'),
       el('p', { class: 'small', style: 'margin:4px 0' }, 'These fill themselves in: {student} (first name), {parent} (a space and the parent’s first name), {teacher}, {date}, {from} and {to} (the first and last times), {len}, {time} (their time), {place}. {appointment} becomes “I have a 15-minute appointment set aside for you… at (time)” once you’ve given them a time, or asks what time works if you haven’t.'),
@@ -40313,7 +40332,7 @@ function advConfTab() {
       el('a', { href: 'https://okpromise.org', target: '_blank', rel: 'noopener' }, 'okpromise.org'), ' (apply online at OKcollegestart.org; 8th–11th graders are encouraged to apply by June 30, and seniors must apply by December 31 of senior year).',
       el('br'), el('b', {}, 'Grades on Sylogist: '), `${studs.filter((s) => advConf(s.id).portal === 'yes').length} can see them · ${studs.filter((s) => advConf(s.id).portal === 'no').length} need help · ${studs.filter((s) => !advConf(s.id).portal).length} not asked yet.`); };
   okpCount();
-  app.append(el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, 'Conference sheets'),
+  app.append(el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, `Conference sheets · ${advTermName(advTerm())}`),
     el('p', { class: 'small', style: 'margin:0 0 6px' }, 'One page per advisee: parents’ contact information, the checklist for their grade, this semester’s eligibility weeks, your parent-contact log, the grades and absences you paste in from their progress report, and room for notes. Print the checked ones, or open one on a laptop during the conference.'),
     studs.length ? el('table', { style: 'width:100%;border-collapse:collapse;font-size:14px' }, el('tr', {}, ...['Advisee', 'Conference', 'Oklahoma’s Promise', 'Parents see grades on Sylogist?', ''].map((t) => el('th', { style: 'text-align:left;padding:4px' }, t))), ...rows) : el('p', { class: 'small' }, 'Add advisees first.'),
     studs.length ? okpLine : '',
@@ -40358,6 +40377,7 @@ function advPrint(ids) {
       <h2>Grades</h2>${c.grades ? `<pre>${esc(c.grades)}</pre>` : '<p class="blank">(from the progress report)<br><br><br><br></p>'}
       <h2>Absences</h2>${c.absences ? `<pre>${esc(c.absences)}</pre>` : '<p class="blank">______________</p>'}
       <h2>MAP testing results</h2>${c.map ? `<pre>${esc(c.map)}</pre>` : '<p class="blank">Math: ____________ &nbsp; Reading: ____________</p>'}
+      ${(() => { const past = Object.entries(advConfRaw(s.id).terms || {}).filter(([t]) => t !== advTerm()); return past.length ? `<h2>Earlier conferences</h2>${past.map(([t, x]) => `<div class="ck">${advTermName(t)}: ${x.outcome === 'met' ? 'met' : x.outcome === 'missed' ? 'unable to meet' + (x.reason ? ' (' + esc(x.reason) + ')' : '') : 'not recorded'}${x.notes ? ' · ' + esc(x.notes.slice(0, 120)) : ''}</div>`).join('')}` : ''; })()}
       <h2>Eligibility this semester</h2><p>${weeks.length ? `On the ineligible list ${on.length} of ${weeks.length} week${weeks.length === 1 ? '' : 's'} checked${on.length ? ': ' + on.map((w) => esc(advDate(w.date))).join(', ') : ''}.` : 'No weeks saved yet.'}</p>
       <h2>Parent contacts this semester</h2>${cs.length ? `<table>${cs.map((x) => `<tr><td>${esc(advDate(x.date))}</td><td>${esc(x.method)}</td><td>${esc(x.who)}</td><td>${esc(x.reason)}${x.notes ? ' — ' + esc(x.notes) : ''}</td></tr>`).join('')}</table>` : '<p>None logged.</p>'}
       <h2>Notes</h2>${c.notes ? `<pre>${esc(c.notes)}</pre>` : ''}<div class="lines">${'<div></div>'.repeat(c.notes ? 3 : 7)}</div></section>`;
@@ -43360,6 +43380,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-24', text: 'Advisory: your advisees now stay with you until they graduate. Grades go up by themselves every July, seniors move to Graduated, and conferences are kept by semester, so each fall and spring starts fresh and the printed sheet shows earlier conferences.' },
   { date: '2026-11-24', text: 'Advisory → Conferences: move checklist items up or down with ▲ ▼ to put them in the order you go over them. Grades and absences are now two separate items, with separate boxes under Notes & grades and separate sections on the printed sheet.' },
   { date: '2026-11-24', text: 'Advisory: Oklahoma’s Promise now uses the school checklist’s choices (Complete, Incomplete, Did not apply, Does not qualify). Copy your tab of the OK Promise Advisory List and paste it under Bring in your advisory list; it adds your advisees and their Oklahoma’s Promise status.' },
   { date: '2026-11-24', text: 'Advisory → Conferences: record whether each advisee’s parents can see grades on Sylogist (Yes / No, needs help). It’s next to Oklahoma’s Promise in the list and under Notes & grades, with a count, and the question prints on each conference sheet.' },
@@ -43516,6 +43537,7 @@ function helpScreen(open) {
         ['Next to each advisee on the list: ', B('✉️ Draft email'), ' opens a message to the parents in your mail app (read it over and change anything before sending), ', B('📞 Call script'), ' shows their numbers and what to say, and ', B('📝 Log a contact'), ' records the call or email.'],
         [B('📞 Parent contacts'), ': every contact you logged, newest first. Pick an advisee to log any other contact.'],
         [B('🗂 Conferences'), ' (ICAP conferences): under ', B('📅 Conference day'), ' set the date, place, and times (4:00 to 8:00 in 15-minute slots to start). On the ', B('🕓 Schedule'), ', pick an advisee for each time; ', B('🖨 Print schedule'), ' prints it like the school’s scheduling sheet, with the parents you were unable to meet. ', B('📱 Text parents'), ': the scheduling text asks for their preferred time (change the wording under Wording of the texts); if a parent doesn’t answer the text, ', B('✉️ No reply? Email'), ' lists the advisees who still don’t have a time and opens a ready-to-send email to their parents in your mail app; the reminder text is for the week before (a yellow banner shows up then). On your phone (Android or iPhone), open this page and tap a parent: Messages opens with the text filled in, sent from your own number. On a computer, the button copies the text instead; a Mac that’s paired with an iPhone can also open it in Messages. Each text is logged in 📞 Parent contacts. After the conference, mark each advisee Met or Unable to meet (with the reason) under ', B('Notes & grades'), '. ', B('Oklahoma’s Promise'), ': pick Signed up, Not yet, or Not eligible for each advisee in the Conference sheets list (or under Notes & grades), and the same for whether the parents can see grades on Sylogist; the counts show below the list, and each printed sheet has the question with the boxes checked, plus how to apply if they haven’t.'],
+        [B('Each year'), ': your advisees stay with you from 9th grade until they graduate. Each advisee’s grade goes up by itself every July (the list shows their class year), and seniors move to 🎓 Graduated after they finish. Conference times, texts, notes, grades, absences, and MAP results are kept by semester (fall and spring), so each semester starts fresh, and earlier conferences show on the printed sheet. Oklahoma’s Promise status carries over.'],
         [B('Conference checklist and sheets'), ': it starts with grades, absences, MAP testing results, the school calendar, and the attendance policy; use ▲ ▼ to put the items in the order you go over them. Paste a link next to a handout (the calendar or attendance policy from Google Drive or the school website) and a 🖨 button appears to open and print it. Type the items in the school’s conference packet once (put grades like 9 or 11,12 next to items only some grades get). ', B('Notes & grades'), ' on an advisee: paste the grades and absences from their progress report, check off items, and add notes. ', B('🖨 Print conference sheets'), ' makes one page per advisee with parents, the checklist for their grade, the grades and absences, this semester’s eligibility weeks and parent contacts, and lines for notes.']),
       P(B('If a name is missed: '), 'the list is matched by last name plus first name or nickname. Add the name the list uses as the advisee’s nickname. A PDF that’s a scanned picture can’t be read; ask for a regular PDF.')]],
     ['year', `${hasLessons ? 13 : 12}. End of the school year`, [
