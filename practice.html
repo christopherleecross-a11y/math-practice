@@ -43566,9 +43566,16 @@ function helpScreen(open) {
         el('li', {}, B('Still stuck?'), ' Ask Mr. Cross.'))]],
     ['new', 'What’s new', [wnList(wnMine())]],
   ];
+  // Open all ⇄ Close all (follows the topics as they're opened and closed one at a time too)
+  const helpOpenAll = el('a', { href: '#', style: 'color:var(--accent);font-weight:600' }, 'Open all');
+  const secs = () => [...app.querySelectorAll('details.helpsec')].filter((d) => d.style.display !== 'none');
+  const allOpen = () => secs().length && secs().every((d) => d.open);
+  const label = () => { helpOpenAll.textContent = allOpen() ? 'Close all' : 'Open all'; };
+  helpOpenAll.onclick = (e) => { e.preventDefault(); const o = !allOpen(); secs().forEach((d) => (d.open = o)); label(); };
+  app.addEventListener('toggle', label, true);
   app.append(el('div', { class: 'card' },
     el('p', { style: 'margin:0' }, `How to use this site${TEACHER_ID || CONFIG.TEACHER_NAME ? `, ${CONFIG.TEACHER_NAME}` : ''}. Click a topic to open it. `,
-      el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); app.querySelectorAll('details').forEach((d) => (d.open = true)); } }, 'Open all'), ' · ',
+      helpOpenAll, ' · ',
       el('a', { href: '#', style: 'color:var(--accent);font-weight:600', onclick: (e) => { e.preventDefault(); helpPrint(); } }, 'Print this page')),
     el('div', { class: 'noprint' }, helpSearchBox())));
   sections.forEach(([id, title, body]) => app.append(el('details', { class: 'card helpsec', id: 'help-' + id, ...(id === open ? { open: '' } : {}), style: 'padding:10px 14px' },
