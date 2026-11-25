@@ -40167,6 +40167,8 @@ function advContactsTab() {
 // ---- conference day: the time slots (like the school's ICAP scheduling sheet), texts to parents from the teacher's own phone, and who couldn't be met
 const ADV_DAY_DEFAULT = { date: '', place: 'the cafetorium', start: '14:00', end: '20:00', len: 15, name: '',
   invite: 'Hello, this is {teacher}, {student}’s advisor at Atoka High School. Parent/Teacher conferences are {date}, from {from} to {to} in {place}. Meeting times are in {len}-minute intervals. Please reply with your preferred time as soon as possible, so I can get you on the schedule. Thank you!',
+  emailSubject: 'Parent/Teacher conference for {student}',
+  email: 'Hello{parent},\n\nThis is {teacher}, {student}’s advisor at Atoka High School. I sent a text message about Parent/Teacher conferences but haven’t heard back, so I wanted to reach out by email as well.\n\nParent/Teacher conferences are {date}, from {from} to {to} in {place}. Meeting times are in {len}-minute intervals. Please reply with your preferred time as soon as possible, so I can get you on the schedule.\n\nThank you,\n{teacher}\nAtoka High School',
   remind: 'Hello, this is {teacher}, {student}’s advisor at Atoka High School. This is a reminder that your Parent/Teacher conference is {date}, at {time} in {place}. If that time no longer works, please reply so I can find you another time. Thank you!' };
 const advDay = () => { const r = advOf('set').find((x) => x.id === 'confday'); return { ...ADV_DAY_DEFAULT, ...((r && r.data) || {}) }; };
 const advMin = (t) => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
@@ -40179,26 +40181,28 @@ const advTextDate = (s) => { if (!s) return '(date)'; const [y, m, d] = s.split(
   return `${x.toLocaleDateString('en-US', { weekday: 'long' })}, ${x.toLocaleDateString('en-US', { month: 'long' })} ${d}${th}`; };
 function advText(kind, s, g, D = advDay()) {
   const c = advConf(s.id), first = advFirst(s.name), time = c.time != null && c.time !== '' ? advTextClock(+c.time) : '';
-  const slots = advSlots(D), fill = (t) => t.replace(/\{parent\}/g, g && g.name ? ' ' + g.name.split(/\s+/)[0] : '').replace(/\{teacher\}/g, D.name || CONFIG.TEACHER_NAME).replace(/\{student\}/g, first)
+  const slots = advSlots(D), fill = (t) => t.replace(/\{parent\}/g, g && g.name ? ' ' + (/ and /.test(g.name) ? g.name : g.name.split(/\s+/)[0]) : '').replace(/\{teacher\}/g, D.name || CONFIG.TEACHER_NAME).replace(/\{student\}/g, first)
     .replace(/\{from\}/g, slots.length ? advTextClock(slots[0]) : '').replace(/\{to\}/g, slots.length ? advTextClock(slots[slots.length - 1] + (+D.len || 15)) : '').replace(/\{len\}/g, String(+D.len || 15))
     .replace(/\{date\}/g, advTextDate(D.date)).replace(/\{time\}/g, time || '(time)').replace(/\{place\}/g, D.place || '');
   const appt = time ? `I have a ${+D.len || 15}-minute appointment set aside for you, {student}, and me on {date} at {time} in {place}. If that time doesn’t work, just text me back and we’ll find another.`
     : `Conferences are {date}, from {from} to {to} in {place}. What time works best for you?`;
-  return fill(fill(kind === 'remind' ? D.remind : D.invite).replace(/\{appointment\}/g, appt));
+  return fill(fill(kind === 'remind' ? D.remind : kind === 'email' ? D.email : kind === 'emailSubject' ? D.emailSubject : D.invite).replace(/\{appointment\}/g, appt));
 }
 function advDayCard() {
   const D = advDay(), msg = el('span', { class: 'small', style: 'margin-left:8px' });
   const f = { name: el('input', { type: 'text', value: D.name, placeholder: CONFIG.TEACHER_NAME, style: 'width:150px' }), date: el('input', { type: 'date', value: D.date, style: 'width:auto' }), place: el('input', { type: 'text', value: D.place, style: 'width:260px' }),
     start: el('input', { type: 'time', value: D.start, style: 'width:auto' }), end: el('input', { type: 'time', value: D.end, style: 'width:auto' }),
     len: el('input', { type: 'number', value: D.len, min: '5', max: '60', step: '5', style: 'width:70px' }),
-    invite: el('textarea', { rows: '4', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.invite), remind: el('textarea', { rows: '3', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.remind) };
+    invite: el('textarea', { rows: '4', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.invite),
+    emailSubject: el('input', { type: 'text', value: D.emailSubject, style: 'width:100%;box-sizing:border-box' }), email: el('textarea', { rows: '8', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.email), remind: el('textarea', { rows: '3', style: 'width:100%;box-sizing:border-box;font:inherit' }, D.remind) };
   const save = async () => { try { await advSave('set', 'confday', Object.fromEntries(Object.entries(f).map(([k, x]) => [k, k === 'len' ? +x.value || 15 : x.value.trim()]))); msg.textContent = '✓ Saved'; advisoryScreen(); } catch (e) { msg.textContent = e.message; } };
   return el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, '📅 Conference day'),
     el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, el('span', {}, 'Date ', f.date), el('span', {}, 'Where ', f.place), el('span', {}, 'From ', f.start, ' to ', f.end), el('span', {}, f.len, ' minutes each'), el('span', {}, 'Your name in texts ', f.name)),
     el('details', { style: 'margin-top:8px' }, el('summary', { style: 'cursor:pointer' }, 'Wording of the texts'),
       el('p', { class: 'small', style: 'margin:4px 0' }, 'These fill themselves in: {student} (first name), {parent} (a space and the parent’s first name), {teacher}, {date}, {from} and {to} (the first and last times), {len}, {time} (their time), {place}. {appointment} becomes “I have a 15-minute appointment set aside for you… at (time)” once you’ve given them a time, or asks what time works if you haven’t.'),
       el('label', {}, 'Scheduling text'), f.invite, el('label', { style: 'display:block;margin-top:6px' }, 'Reminder text (a week before)'), f.remind,
-      el('button', { class: 'btn secondary', type: 'button', style: 'margin:6px 0 0', onclick: () => { f.invite.value = ADV_DAY_DEFAULT.invite; f.remind.value = ADV_DAY_DEFAULT.remind; } }, 'Go back to the original wording')),
+      el('label', { style: 'display:block;margin-top:6px' }, 'Follow-up email (when a text gets no reply): subject'), f.emailSubject, el('label', { style: 'display:block;margin-top:4px' }, 'and message'), f.email,
+      el('button', { class: 'btn secondary', type: 'button', style: 'margin:6px 0 0', onclick: () => { ['invite', 'remind', 'email', 'emailSubject'].forEach((k) => { f[k].value = ADV_DAY_DEFAULT[k]; }); } }, 'Go back to the original wording')),
     el('div', {}, el('button', { class: 'btn', type: 'button', style: 'margin:8px 0 0', onclick: save }, 'Save'), msg));
 }
 function advScheduleCard() {
@@ -40225,11 +40229,12 @@ function advTextCard() {
   const days = D.date ? Math.round((new Date(D.date + 'T12:00') - new Date(advToday() + 'T12:00')) / 864e5) : null; if (days !== null && days <= 8 && days >= 0) kind = 'remind';
   const draw = () => {
     box.innerHTML = '';
+    if (kind === 'email') { advEmailRows(box, studs, D, draw); return; }
     studs.forEach((s) => {
       const c = advConf(s.id), sent = (c.texted || {})[kind], gs = (s.guardians || []).filter((g) => g.phone);
       if (kind === 'remind' && (c.time === undefined || c.time === '')) return;
       box.append(el('div', { style: 'border-top:1px solid var(--line);padding:8px 0' },
-        el('div', {}, el('b', {}, s.name), c.time !== undefined && c.time !== '' ? el('span', { class: 'small' }, ` · ${advClock(+c.time, true)}`) : '', sent ? el('span', { style: 'margin-left:8px;color:#1b7a3d;font-weight:700;font-size:13px' }, `✓ texted ${advDate(sent)}`) : ''),
+        el('div', {}, el('b', {}, s.name), c.time !== undefined && c.time !== '' ? el('span', { class: 'small' }, ` · ${advClock(+c.time, true)}`) : kind === 'invite' && sent ? el('span', { class: 'small', style: 'color:#8a5a00' }, ' · no time yet (no reply? use ✉️ No reply? Email)') : '', sent ? el('span', { style: 'margin-left:8px;color:#1b7a3d;font-weight:700;font-size:13px' }, `✓ texted ${advDate(sent)}`) : ''),
         gs.length ? el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:4px' }, ...gs.map((g) => {
           const body = advText(kind, s, g, D), num = String(g.phone).split(',')[0].replace(/[^\d+]/g, '');
           const done = async () => { try { await advConfSet(s.id, { texted: { ...(advConf(s.id).texted || {}), [kind]: advToday() } }); await advSave('contact', '', { sid: s.id, date: advToday(), method: 'Text', who: g.name, reason: kind === 'remind' ? 'Conference reminder' : 'Conference scheduling', notes: '' }); } catch (e) {} };
@@ -40243,12 +40248,28 @@ function advTextCard() {
     });
     if (!box.children.length) box.append(el('p', { class: 'small' }, kind === 'remind' ? 'Give advisees times on the schedule first.' : 'Add advisees first.'));
   };
-  const tabs = el('div', { style: 'display:flex;gap:6px;margin:6px 0' }, ...[['invite', 'Scheduling text'], ['remind', 'Reminder text']].map(([k, t]) => el('button', { type: 'button', class: 'btn' + (k === kind ? '' : ' secondary'), style: 'margin:0;padding:5px 12px', onclick: (e) => { kind = k; [...tabs.children].forEach((b) => (b.className = 'btn secondary')); e.target.className = 'btn'; draw(); } }, t)));
+  const tabs = el('div', { style: 'display:flex;gap:6px;margin:6px 0' }, ...[['invite', 'Scheduling text'], ['email', '✉️ No reply? Email'], ['remind', 'Reminder text']].map(([k, t]) => el('button', { type: 'button', class: 'btn' + (k === kind ? '' : ' secondary'), style: 'margin:0;padding:5px 12px', onclick: (e) => { kind = k; [...tabs.children].forEach((b) => (b.className = 'btn secondary')); e.target.className = 'btn'; draw(); } }, t)));
   draw();
   return el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 4px' }, '📱 Text parents'),
     el('p', { class: 'small', style: 'margin:0' }, phone ? 'Tap a parent: Messages opens with the text filled in, from your own number. Press send, come back, and tap the next one. Each one is logged in 📞 Parent contacts.'
       : 'Easiest on your phone: open this page on your Android or iPhone and each button opens Messages with the text filled in. On this computer, each button copies the text to paste into Google Messages for web; with an iPhone, “open in Messages” sends it from the Messages app on your Mac.'),
     tabs, box);
+}
+function advEmailRows(box, studs, D, redraw) {
+  const waiting = studs.filter((s) => { const c = advConf(s.id); return (c.time === undefined || c.time === '') && c.outcome !== 'met'; });
+  box.append(el('p', { class: 'small', style: 'margin:2px 0 6px' }, 'Advisees who don’t have a time yet. The ones you texted come first. Each button opens an email to their parents in your mail app, ready to send.'));
+  waiting.sort((a, b) => (((advConf(b.id).texted || {}).invite ? 1 : 0) - ((advConf(a.id).texted || {}).invite ? 1 : 0))).forEach((s) => {
+    const c = advConf(s.id), t = c.texted || {}, gs = (s.guardians || []).filter((g) => g.email), to = gs.map((g) => g.email.split(',')[0].trim()).join(',');
+    const who = { name: gs.map((g) => (g.name || '').split(/\s+/)[0]).filter(Boolean).join(' and ') };
+    const body = advText('email', s, who, D), subj = advText('emailSubject', s, who, D);
+    const done = async () => { try { await advConfSet(s.id, { texted: { ...(advConf(s.id).texted || {}), email: advToday() } }); await advSave('contact', '', { sid: s.id, date: advToday(), method: 'Email', who: gs.map((g) => g.name).filter(Boolean).join(', '), reason: 'Conference scheduling (no reply to text)', notes: '' }); } catch (e) {} };
+    box.append(el('div', { style: 'border-top:1px solid var(--line);padding:8px 0' },
+      el('div', {}, el('b', {}, s.name), el('span', { class: 'small', style: 'margin-left:8px' }, t.invite ? `texted ${advDate(t.invite)}, no time yet` : 'not texted yet'), t.email ? el('span', { style: 'margin-left:8px;color:#1b7a3d;font-weight:700;font-size:13px' }, `✓ emailed ${advDate(t.email)}`) : ''),
+      gs.length ? el('a', { class: 'btn secondary', style: 'margin:4px 0 0;padding:6px 12px;display:inline-block', href: `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`, onclick: () => { setTimeout(() => { done().then(redraw); }, 300); } }, `✉️ Email ${gs.map((g) => g.name || g.email).join(' & ')}`)
+        : el('div', { class: 'small', style: 'color:#b3261e' }, 'No email on file. Add one on 👥 Advisees & parents (or paste their Sylogist page again with the contact opened).'),
+      el('details', { class: 'small', style: 'margin-top:4px' }, el('summary', { style: 'cursor:pointer' }, 'See the email'), el('div', { style: 'white-space:pre-wrap;background:#fafaf7;border:1px solid var(--line);border-radius:8px;padding:6px;margin-top:4px' }, `Subject: ${subj}\n\n${body}`))));
+  });
+  if (!waiting.length) box.append(el('p', { class: 'small' }, '✓ Every advisee has a time.'));
 }
 function advPrintSchedule() {
   const D = advDay(), esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])), slots = advSlots(D), studs = advStudents(), at = {};
@@ -43310,6 +43331,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-24', text: 'Advisory → Conferences → Text parents has a new ✉️ No reply? Email tab: it lists advisees who still don’t have a conference time (the ones you texted first) and opens a ready-to-send email to their parents in your mail app. You can change the wording under Wording of the texts.' },
   { date: '2026-11-24', subjects: ['calc3'], text: 'Calculus III: every practice question type now has a “Watch a video of one like it” video (79 new videos for 11.1–13.4), the same as the other subjects.' },
   { date: '2026-11-24', text: 'Advisory → Conferences now does ICAP conference scheduling: set the day and 15-minute times, put each advisee in a time slot, print the schedule (with the parents you were unable to meet), and text each parent from your own phone with the scheduling text or a reminder the week before. Open the page on your phone and each tap opens Messages with the text already written.' },
   { date: '2026-11-24', text: 'New Advisory tab for your advisory group: bring in your advisees and their parents’ contact information by copying your advisory list from Sylogist, choose the weekly ineligible-list PDF to see which advisees are on it (and who’s new this week), draft the parent email or call, log contacts, and print a conference sheet for each advisee with a checklist for their grade, their grades and absences, eligibility weeks, and contacts. See Help, section on Advisory.' },
@@ -43459,7 +43481,7 @@ function helpScreen(open) {
         [B('📋 Ineligible list'), ': save the week’s PDF from the email, set the week, and choose the PDF. In a few seconds it shows which of your advisees are on it, with their lines from the list, and marks who’s ', B('NEW this week'), '. Click ', B('Save this week'), '; only your advisees’ lines are kept. ', B('Past weeks'), ' shows each advisee’s weeks and how many weeks in a row.'],
         ['Next to each advisee on the list: ', B('✉️ Draft email'), ' opens a message to the parents in your mail app (read it over and change anything before sending), ', B('📞 Call script'), ' shows their numbers and what to say, and ', B('📝 Log a contact'), ' records the call or email.'],
         [B('📞 Parent contacts'), ': every contact you logged, newest first. Pick an advisee to log any other contact.'],
-        [B('🗂 Conferences'), ' (ICAP conferences): under ', B('📅 Conference day'), ' set the date, place, and times (4:00 to 8:00 in 15-minute slots to start). On the ', B('🕓 Schedule'), ', pick an advisee for each time; ', B('🖨 Print schedule'), ' prints it like the school’s scheduling sheet, with the parents you were unable to meet. ', B('📱 Text parents'), ': the scheduling text asks for their preferred time (change the wording under Wording of the texts); the reminder text is for the week before (a yellow banner shows up then). On your phone (Android or iPhone), open this page and tap a parent: Messages opens with the text filled in, sent from your own number. On a computer, the button copies the text instead; a Mac that’s paired with an iPhone can also open it in Messages. Each text is logged in 📞 Parent contacts. After the conference, mark each advisee Met or Unable to meet (with the reason) under ', B('Notes & grades'), '.'],
+        [B('🗂 Conferences'), ' (ICAP conferences): under ', B('📅 Conference day'), ' set the date, place, and times (4:00 to 8:00 in 15-minute slots to start). On the ', B('🕓 Schedule'), ', pick an advisee for each time; ', B('🖨 Print schedule'), ' prints it like the school’s scheduling sheet, with the parents you were unable to meet. ', B('📱 Text parents'), ': the scheduling text asks for their preferred time (change the wording under Wording of the texts); if a parent doesn’t answer the text, ', B('✉️ No reply? Email'), ' lists the advisees who still don’t have a time and opens a ready-to-send email to their parents in your mail app; the reminder text is for the week before (a yellow banner shows up then). On your phone (Android or iPhone), open this page and tap a parent: Messages opens with the text filled in, sent from your own number. On a computer, the button copies the text instead; a Mac that’s paired with an iPhone can also open it in Messages. Each text is logged in 📞 Parent contacts. After the conference, mark each advisee Met or Unable to meet (with the reason) under ', B('Notes & grades'), '.'],
         [B('Conference checklist and sheets'), ': type the items in the school’s conference packet once (put grades like 9 or 11,12 next to items only some grades get). ', B('Notes & grades'), ' on an advisee: paste the grades and absences from their progress report, check off items, and add notes. ', B('🖨 Print conference sheets'), ' makes one page per advisee with parents, the checklist for their grade, the grades and absences, this semester’s eligibility weeks and parent contacts, and lines for notes.']),
       P(B('If a name is missed: '), 'the list is matched by last name plus first name or nickname. Add the name the list uses as the advisee’s nickname. A PDF that’s a scanned picture can’t be read; ask for a regular PDF.')]],
     ['year', `${hasLessons ? 13 : 12}. End of the school year`, [
