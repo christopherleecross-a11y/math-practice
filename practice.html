@@ -39991,13 +39991,13 @@ function advCells(text) {
 function advGrade(v) { const m = String(v || '').match(/^(?:gr(?:ade)?\.?\s*)?0?(9|1[0-2])(?:th)?$/i); return m ? m[1] : ''; }
 function advParseList(rows) {
   rows = rows.filter((r) => r.some((x) => x));
-  const isHead = (r) => r.filter((c) => /\b(name|student|parent|guardian|contact|phone|cell|e-?mail|grade|gr|relationship|relation|first|last)\b/i.test(c) && !ADV_EMAIL.test(c) && !/\d{3}/.test(c)).length >= 2;
+  const isHead = (r) => r.filter((c) => /\b(name|student|parent|guardian|contact|phone|cell|e-?mail|grade|gr|relationship|relation|first|last|advisor|promise)\b/i.test(c) && !ADV_EMAIL.test(c) && !/\d{3}/.test(c)).length >= 2;
   ADV_EMAIL.lastIndex = 0;
-  const out = new Map(), add = (name, grade, gs) => {
+  const out = new Map(), add = (name, grade, gs, okp) => {
     name = String(name || '').replace(/\s+/g, ' ').trim(); if (!name || !/[a-z]/i.test(name)) return;
     const tc = (t) => (/[a-z]/.test(t) ? t : t.toLowerCase().replace(/(^|[\s,'’\-]|\bmc)([a-z])/g, (m, a, b) => a + b.toUpperCase())); // SMITH, AVA → Smith, Ava
     name = tc(name); gs.forEach((g) => { if (g.name) g.name = tc(g.name); });
-    const k = lastFirst(name), s = out.get(k) || { name, grade: '', guardians: [] }; if (grade && !s.grade) s.grade = grade;
+    const k = lastFirst(name), s = out.get(k) || { name, grade: '', guardians: [] }; if (grade && !s.grade) s.grade = grade; if (okp) s.okp = okp;
     gs.forEach((g) => { g.name = (g.name || '').trim(); if (!g.name && !g.phone && !g.email) return;
       const same = s.guardians.find((x) => (g.name && x.name && lastFirst(x.name) === lastFirst(g.name)) || (g.email && x.email === g.email) || (g.phone && x.phone === g.phone));
       if (same) ['name', 'rel', 'phone', 'email'].forEach((f) => { if (!same[f] && g[f]) same[f] = g[f]; }); else s.guardians.push(g); });
@@ -40017,6 +40017,8 @@ function advParseList(rows) {
     const H = rows[0].map((h) => h.toLowerCase()), seen = {};
     const roles = H.map((h) => {
       const guard = /parent|guardian|contact|mother|father|mom|dad|emergency/.test(h), n = (h.match(/\b([1-4])\b|#\s*([1-4])/) || [])[1] || (h.match(/#\s*([1-4])/) || [])[1];
+      const ok = /promise\s*complete/.test(h) ? 'yes' : /promise\s*incomplete/.test(h) ? 'inc' : /did not apply/.test(h) ? 'no' : /not qualify/.test(h) ? 'na' : '';
+      if (ok) return { f: 'okp', v: ok };
       let f = /e-?mail/.test(h) ? 'email' : /phone|cell|mobile|number/.test(h) || (/\b(home|work)\b/.test(h) && !/room/.test(h)) ? 'phone' : /relation/.test(h) ? 'rel' : /grade|^gr\.?$|grd/.test(h) && !guard ? 'grade'
         : guard && /first/.test(h) ? 'gfirst' : guard && /last/.test(h) ? 'glast' : guard ? 'gname' : /first/.test(h) ? 'sfirst' : /last/.test(h) ? 'slast' : /student|^name$|full name/.test(h) ? 'sname' : '';
       if (!f) return null; if (['sname', 'sfirst', 'slast', 'grade'].includes(f)) return { f };
@@ -40025,13 +40027,14 @@ function advParseList(rows) {
       const gi = n ? +n - 1 : (seen[gk] = (seen[gk] ?? -1) + 1); return { f, gi };
     });
     rows.slice(1).forEach((r) => {
-      let name = '', first = '', last = '', grade = ''; const gs = [];
+      let name = '', first = '', last = '', grade = '', okp = ''; const gs = [];
       r.forEach((c, i) => { const ro = roles[i]; if (!ro || !c) return;
+        if (ro.f === 'okp') { if (/\S/.test(c) && !/^n\/?a$/i.test(c)) okp = ro.v; return; }
         if (ro.f === 'sname') name = c; else if (ro.f === 'sfirst') first = c; else if (ro.f === 'slast') last = c; else if (ro.f === 'grade') grade = advGrade(c);
         else { const g = (gs[ro.gi] = gs[ro.gi] || {}); if (ro.f === 'gname') { const left = pull(c, g); g.name = left; } else if (ro.f === 'gfirst') g._f = c; else if (ro.f === 'glast') g._l = c;
           else if (ro.f === 'email') pull(c, g); else if (ro.f === 'phone') { g.phone = g.phone ? g.phone + ', ' + c : c; } else g.rel = c; } });
       gs.forEach((g) => { if (g && (g._f || g._l)) g.name = g.name || `${g._f || ''} ${g._l || ''}`.trim(); if (g) { delete g._f; delete g._l; } });
-      add(name || (first || last ? `${first} ${last}` : ''), grade, gs.filter(Boolean));
+      add(name || (first || last ? `${first} ${last}` : ''), grade, gs.filter(Boolean), okp);
     });
   } else {
     rows.forEach((r) => {
@@ -40052,7 +40055,7 @@ function advParseList(rows) {
       add(name, grade, gs);
     });
   }
-  return [...out.values()].map((s) => ({ ...s, guardians: s.guardians.map((g) => ({ name: g.name || '', rel: g.rel || '', phone: g.phone || '', email: [g.email, g.email2].filter(Boolean).join(', ') })) }));
+  return [...out.values()].map((s) => ({ ...s, okp: s.okp || '', guardians: s.guardians.map((g) => ({ name: g.name || '', rel: g.rel || '', phone: g.phone || '', email: [g.email, g.email2].filter(Boolean).join(', ') })) }));
 }
 // Sylogist's page for one student (Student Information → a student's name): Name, Grade, then Contacts, each "NAME (Relationship)"
 // with Default Phone / Other Phones / Default Email when that contact is opened. Several students' pages can be pasted one after another.
@@ -40127,13 +40130,13 @@ function advStudentsTab() {
       const chosen = list.filter((_, k) => pick[k].checked); let n = 0;
       for (const r of chosen) { const ex = studs.find((s) => lastFirst(s.name) === lastFirst(r.name));
         const d = { ...(ex || {}), name: ex ? ex.name : r.name, grade: r.grade || (ex && ex.grade) || '9', guardians: r.guardians.length ? r.guardians : (ex && ex.guardians) || [] }; delete d.id;
-        try { await advSave('student', ex ? ex.id : '', d); n++; pmsg.textContent = `Saving ${n} of ${chosen.length}…`; } catch (e) { pmsg.textContent = e.message; return; } }
+        try { const id = await advSave('student', ex ? ex.id : '', d); if (r.okp) await advConfSet(id, { okp: r.okp }); n++; pmsg.textContent = `Saving ${n} of ${chosen.length}…`; } catch (e) { pmsg.textContent = e.message; return; } }
       advisoryScreen();
     };
     prev.append(el('p', { class: 'small', style: 'margin:8px 0 4px' }, 'Here’s what was read (', String(list.length), list.length === 1 ? ' student' : ' students', '). To add more parents, paste the next advisee’s page below what’s already in the box. Uncheck anyone who isn’t your advisee (like a heading row). Advisees you already have are updated.'),
       el('div', { style: 'max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px' }, el('table', { style: 'width:100%;border-collapse:collapse;font-size:14px' },
         el('tr', {}, ...['', 'Advisee', 'Grade', 'Parents / guardians'].map((t) => el('th', { style: 'text-align:left;padding:4px;position:sticky;top:0;background:#fff' }, t))),
-        ...list.map((r, k) => el('tr', { style: 'border-top:1px solid var(--line)' }, el('td', { style: 'padding:4px' }, pick[k]), el('td', {}, r.name, studs.some((s) => lastFirst(s.name) === lastFirst(r.name)) ? el('span', { class: 'small' }, ' (update)') : ''), el('td', {}, r.grade || '?'),
+        ...list.map((r, k) => el('tr', { style: 'border-top:1px solid var(--line)' }, el('td', { style: 'padding:4px' }, pick[k]), el('td', {}, r.name, studs.some((s) => lastFirst(s.name) === lastFirst(r.name)) ? el('span', { class: 'small' }, ' (update)') : ''), el('td', {}, r.grade || '?', r.okp ? el('div', { class: 'small' }, 'OK Promise: ' + (ADV_OKP.find((o) => o[0] === r.okp) || ['', ''])[1]) : ''),
           el('td', { class: 'small' }, ...(r.guardians.length ? r.guardians.flatMap((g, i) => [i ? el('br') : '', [g.name, g.rel && `(${g.rel})`, g.phone, g.email].filter(Boolean).join(' ')]) : ['—'])))))), go);
   };
   paste.addEventListener('paste', () => setTimeout(() => preview(advParseText(paste.value)), 0));
@@ -40302,7 +40305,7 @@ function advConfTab() {
   const rows = studs.map((s) => { const c = advConf(s.id); return el('tr', { style: 'border-top:1px solid var(--line)' }, el('td', { style: 'padding:6px 4px' }, el('label', {}, el('input', { type: 'checkbox', class: 'advPick', value: s.id, checked: '' }), ' ', s.name)),
     el('td', { class: 'small' }, c.outcome === 'met' ? `✓ Met${c.date ? ' ' + advDate(c.date) : ''}` : c.outcome === 'missed' ? `Unable to meet${c.reason ? ': ' + c.reason : ''}` : c.time !== undefined && c.time !== '' ? `Scheduled ${advClock(+c.time, true)}` : '—'), el('td', {}, advOkpSelect(s, () => okpCount())), el('td', {}, advOkpSelect(s, () => okpCount(), 'portal', ADV_PORTAL, 'Parents can see grades on Sylogist')), el('td', {}, el('button', { class: 'btn secondary', type: 'button', style: 'margin:0;padding:4px 10px', onclick: () => advConfEdit(s) }, 'Notes & grades'))); });
   const okpLine = el('p', { class: 'small', style: 'margin:6px 0 0' }), okpCount = () => { const n = (v) => studs.filter((s) => (advConf(s.id).okp || '') === v).length;
-    okpLine.innerHTML = ''; okpLine.append(el('b', {}, 'Oklahoma’s Promise: '), `${n('yes')} signed up · ${n('no')} not yet · ${n('na')} not eligible/not applying · ${n('')} not asked yet. `,
+    okpLine.innerHTML = ''; okpLine.append(el('b', {}, 'Oklahoma’s Promise: '), `${n('yes')} complete · ${n('inc')} incomplete · ${n('no')} did not apply · ${n('na')} do not qualify · ${n('')} not asked yet. `,
       el('a', { href: 'https://okpromise.org', target: '_blank', rel: 'noopener' }, 'okpromise.org'), ' (apply online at OKcollegestart.org; 8th–11th graders are encouraged to apply by June 30, and seniors must apply by December 31 of senior year).',
       el('br'), el('b', {}, 'Grades on Sylogist: '), `${studs.filter((s) => advConf(s.id).portal === 'yes').length} can see them · ${studs.filter((s) => advConf(s.id).portal === 'no').length} need help · ${studs.filter((s) => !advConf(s.id).portal).length} not asked yet.`); };
   okpCount();
@@ -40322,7 +40325,7 @@ function advConfEdit(s) {
   const outcome = el('select', { style: 'width:auto' }, el('option', { value: '' }, 'Not yet'), el('option', { value: 'met' }, 'Met with them'), el('option', { value: 'missed' }, 'Unable to meet')); outcome.value = c.outcome || '';
   const reason = el('input', { type: 'text', value: c.reason || '', placeholder: 'Reason unable to meet or make contact', style: 'width:320px;max-width:100%' });
   const checks = advItemsFor(s).map((it) => { const k = el('input', { type: 'checkbox' }); k.checked = !!(c.done || {})[it.t]; k.dataset.t = it.t; return el('label', { style: 'display:block;margin:2px 0' }, k, ' ', it.t); });
-  box.append(el('h3', { style: 'margin:0 0 6px' }, `${s.name}: conference`), el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, el('span', {}, 'Conference date ', date), outcome, reason), el('div', { style: 'margin-top:6px' }, 'Signed up for Oklahoma’s Promise? ', okp), el('div', { style: 'margin-top:6px' }, 'Can the parents see grades on Sylogist? ', portal), el('div', { style: 'margin:8px 0' }, ...checks),
+  box.append(el('h3', { style: 'margin:0 0 6px' }, `${s.name}: conference`), el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, el('span', {}, 'Conference date ', date), outcome, reason), el('div', { style: 'margin-top:6px' }, 'Oklahoma’s Promise: ', okp), el('div', { style: 'margin-top:6px' }, 'Can the parents see grades on Sylogist? ', portal), el('div', { style: 'margin:8px 0' }, ...checks),
     el('label', {}, 'Grades and absences'), grades, el('label', { style: 'display:block;margin-top:6px' }, 'MAP testing results'), map, el('label', { style: 'display:block;margin-top:6px' }, 'Notes'), notes,
     el('div', { style: 'display:flex;gap:8px;margin-top:8px' }, el('button', { class: 'btn', type: 'button', style: 'margin:0', onclick: async () => {
       const done = {}; box.querySelectorAll('input[type=checkbox]').forEach((k) => { if (k.checked) done[k.dataset.t] = true; });
@@ -40330,7 +40333,7 @@ function advConfEdit(s) {
     el('button', { class: 'btn secondary', type: 'button', style: 'margin:0', onclick: () => box.remove() }, 'Cancel'), msg));
   app.append(box); box.scrollIntoView({ block: 'start' });
 }
-const ADV_OKP = [['', 'Not asked yet'], ['yes', 'Signed up'], ['no', 'Not yet'], ['na', 'Not eligible / not applying']];
+const ADV_OKP = [['', 'Not asked yet'], ['yes', 'Complete'], ['inc', 'Incomplete'], ['no', 'Did not apply'], ['na', 'Does not qualify']]; // the same as the school's Oklahoma's Promise checklist
 const ADV_PORTAL = [['', 'Not asked yet'], ['yes', 'Yes, they can'], ['no', 'No, needs help']];
 const advOkpSelect = (s, onSaved, key = 'okp', opts = ADV_OKP, title = 'Oklahoma’s Promise') => { const c = advConf(s.id), sel = el('select', { style: 'width:auto', title }, ...opts.map(([v, t]) => el('option', { value: v }, t))); sel.value = c[key] || '';
   sel.onchange = async () => { try { await advConfSet(s.id, { [key]: sel.value }); if (onSaved) onSaved(); } catch (e) { alert(e.message); } }; return sel; };
@@ -40343,8 +40346,8 @@ function advPrint(ids) {
     return `<section class="pg"><h1>${esc(s.name)} <small>Grade ${esc(s.grade || '')} · Advisor: ${esc(CONFIG.TEACHER_NAME)}</small></h1>
       <p class="sub">Parent–teacher conference${c.date ? ' · ' + esc(advDate(c.date)) : ' · date: ____________'}${c.time !== undefined && c.time !== '' ? ' · ' + advClock(+c.time, true) : ''}</p>
       <h2>Parents / guardians</h2>${(s.guardians || []).length ? `<table>${s.guardians.map((g) => `<tr><td>${esc(g.name)}${g.rel ? ' (' + esc(g.rel) + ')' : ''}</td><td>${esc(g.phone)}</td><td>${esc(g.email)}</td></tr>`).join('')}</table>` : '<p class="blank">______________________________________________</p>'}
-      <h2>Oklahoma’s Promise</h2><div class="ck">Signed up? ${[['yes', 'Yes'], ['no', 'Not yet'], ['na', 'Not eligible / not applying']].map(([v, t]) => `${c.okp === v ? '☑' : '☐'} ${t}`).join('&nbsp;&nbsp;&nbsp;')}</div>
-      ${c.okp === 'yes' || c.okp === 'na' ? '' : '<div class="ck" style="color:#555;font-size:12.5px">Apply online at OKcollegestart.org (okpromise.org has the income limits and requirements). Students in 8th–11th grade are encouraged to apply by June 30; seniors must apply by December 31 of their senior year.</div>'}
+      <h2>Oklahoma’s Promise</h2><div class="ck">${ADV_OKP.slice(1).map(([v, t]) => `${c.okp === v ? '☑' : '☐'} ${t}`).join('&nbsp;&nbsp;&nbsp;')}</div>
+      ${c.okp === 'yes' || c.okp === 'na' ? '' : c.okp === 'inc' ? '<div class="ck" style="color:#555;font-size:12.5px">Incomplete: finish the application or send the missing documents at OKcollegestart.org.</div>' : '<div class="ck" style="color:#555;font-size:12.5px">Apply online at OKcollegestart.org (okpromise.org has the income limits and requirements). Students in 8th–11th grade are encouraged to apply by June 30; seniors must apply by December 31 of their senior year.</div>'}
       <h2>Grades on Sylogist</h2><div class="ck">Are you able to see ${esc(advFirst(s.name))}’s grades on Sylogist? ${[['yes', 'Yes'], ['no', 'No, needs help']].map(([v, t]) => `${c.portal === v ? '☑' : '☐'} ${t}`).join('&nbsp;&nbsp;&nbsp;')}</div>
       <h2>Checklist</h2>${advItemsFor(s).map((it) => `<div class="ck">${(c.done || {})[it.t] ? '☑' : '☐'} ${esc(it.t)}</div>`).join('')}
       <h2>Grades and absences</h2>${c.grades ? `<pre>${esc(c.grades)}</pre>` : '<p class="blank">(from the progress report)<br><br><br><br></p>'}
@@ -43351,6 +43354,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-24', text: 'Advisory: Oklahoma’s Promise now uses the school checklist’s choices (Complete, Incomplete, Did not apply, Does not qualify). Copy your tab of the OK Promise Advisory List and paste it under Bring in your advisory list; it adds your advisees and their Oklahoma’s Promise status.' },
   { date: '2026-11-24', text: 'Advisory → Conferences: record whether each advisee’s parents can see grades on Sylogist (Yes / No, needs help). It’s next to Oklahoma’s Promise in the list and under Notes & grades, with a count, and the question prints on each conference sheet.' },
   { date: '2026-11-24', text: 'Advisory → Conferences: the checklist now includes MAP testing results, the school calendar, and the attendance policy. Paste a link to the calendar or policy and print copies from there. Each advisee’s Notes & grades has a place for their MAP results, and it prints on their conference sheet.' },
   { date: '2026-11-24', text: 'Advisory → Conferences: track whether each advisee has signed up for Oklahoma’s Promise (Signed up / Not yet / Not eligible). There’s a count under the list, and each printed conference sheet has the question, with how to apply for families who haven’t.' },
