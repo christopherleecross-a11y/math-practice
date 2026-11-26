@@ -44048,6 +44048,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-26', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Year at a glance: the pacing check now goes by what most of a period’s assignments are, so an assignment posted to the wrong class no longer puts that period under the other course.' },
   { date: '2026-11-26', text: 'There’s a 🚪 Log out tab at the end of the tabs. It signs you out of teacher tools (and the crossword) on that computer, so the next person needs your password. Good to use on a shared or school computer.' },
   { date: '2026-11-26', text: 'The Teacher tools home page no longer repeats the list of buttons; everything is in the tabs at the top.' },
   { date: '2026-11-25', text: 'Each interactive’s page now has a “← All interactives” link at the top to get back to the list.' },
@@ -44933,11 +44934,16 @@ async function paceCard(subject) {
         PACE.err === 'offline' ? '' : linkBtn('Connect', () => dashLogin('', () => { PACE.err = ''; yagScreen(subject); }))));
       return;
     }
+    // which course each period is: whatever most of its assignments are (so one assignment posted to the wrong class doesn't count)
+    const keyOf = (p) => { const k = String(p.key || ''); return k.startsWith('custom:') ? k.split('|')[0] : k; }, tally = {};
+    const count = (period, key) => { const sec = period && paceSection(key); if (!sec || !sec.subject) return; const T = (tally[period] = tally[period] || {}); T[sec.subject] = (T[sec.subject] || 0) + 1; };
+    (D.posted || []).forEach((p) => count(p.period, keyOf(p))); (D.results || []).forEach((r) => count(r.period, r.set));
+    const isCourse = (period) => { const T = tally[period] || {}, top = Math.max(0, ...Object.values(T)); return (T[subject] || 0) === top; };
     // each period's newest assignment in this course: Classroom posts first, then turned-in work
     const latest = {};
-    const see = (period, key, t, title) => { if (!period) return; const sec = paceSection(key); if (!sec || sec.subject !== subject || !sec.num) return; const k = period;
+    const see = (period, key, t, title) => { if (!period || !isCourse(period)) return; const sec = paceSection(key); if (!sec || sec.subject !== subject || !sec.num) return; const k = period;
       if (!latest[k] || t > latest[k].t) latest[k] = { t, num: sec.num, title }; };
-    (D.posted || []).forEach((p) => { const k = String(p.key || ''); see(p.period, k.startsWith('custom:') ? k.split('|')[0] : k, p.t, p.title); });
+    (D.posted || []).forEach((p) => see(p.period, keyOf(p), p.t, p.title));
     (D.results || []).forEach((r) => see(r.period, r.set, r.t, r.title));
     const periods = Object.keys(latest).sort((a, b) => perOrder(a) - perOrder(b));
     if (!periods.length) { box.append(el('p', { class: 'small' }, `No ${SUBJECTS[subject]} assignments in the last 200 days yet, so there’s nothing to compare.`)); return; }
@@ -44954,7 +44960,7 @@ async function paceCard(subject) {
     });
     box.append(el('div', { style: 'overflow-x:auto' }, el('table', { class: 'dash-std', style: 'width:100%;border-collapse:collapse;font-size:15px;margin-top:6px' },
       el('thead', {}, el('tr', {}, ...['Period', 'Newest assignment', 'Unit', 'Compared with the guide'].map((h) => el('th', { style: 'text-align:left' }, h)))), el('tbody', {}, ...rows))),
-      el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Where a period is comes from the newest assignment you posted to it (or it turned in) for this course, and how far into its unit that section is. School days are counted Monday–Friday, so holidays make it look a little behind. A review that covers older sections can make a period look behind until you assign the next new section.'));
+      el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Where a period is comes from the newest assignment you posted to it (or it turned in) for this course, and how far into its unit that section is. A period counts as this course when most of its assignments are, so one posted to the wrong class doesn’t put it here. School days are counted Monday–Friday, so holidays make it look a little behind. A review that covers older sections can make a period look behind until you assign the next new section.'));
   })();
   return box;
 }
