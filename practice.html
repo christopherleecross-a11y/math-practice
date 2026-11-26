@@ -44048,6 +44048,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-26', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Year at a glance: the pacing check loads much faster (it shows the last saved copy right away), and each period’s place is now the furthest section it’s had in the last two weeks, so a review assignment doesn’t make it look behind.' },
   { date: '2026-11-26', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Year at a glance: the pacing check now goes by what most of a period’s assignments are, so an assignment posted to the wrong class no longer puts that period under the other course.' },
   { date: '2026-11-26', text: 'There’s a 🚪 Log out tab at the end of the tabs. It signs you out of teacher tools (and the crossword) on that computer, so the next person needs your password. Good to use on a shared or school computer.' },
   { date: '2026-11-26', text: 'The Teacher tools home page no longer repeats the list of buttons; everything is in the tabs at the top.' },
@@ -44188,7 +44189,7 @@ function helpScreen(open) {
     ['yag', `${hasLessons ? 8 : 7}. Year at a glance (pacing guide)`, [
       P('The ', B('Year at a glance'), ' tab shows the district’s pacing guide for each of your courses: every quarter’s units, how many days each gets, and its ', B('Priority'), ', ', B('Supporting'), ', and ', B('Recurring'), ' standards. Click a unit’s standards to read them. The current quarter is outlined.'),
       P('Each unit has a ', B('📄 Unit plan'), ' link (the district’s Google Doc; open it with your school account), its book sections with links to their lesson plans, and ', B('🧩 Build a unit review'), ', which opens Build an assignment with every section of the unit filled in so you can trim it.'),
-      P(B('📍 Pacing check'), ' (at the top) says which unit the guide has for today and, for each period, its newest assignment in that course and whether it’s on pace, behind, or ahead (in school days). It counts Monday–Friday, so holidays make a period look a little behind.'),
+      P(B('📍 Pacing check'), ' (at the top) says which unit the guide has for today and, for each period, how far along it is: the furthest section it’s had in the two weeks before its newest assignment, so a review of older sections doesn’t make it look behind. A period counts as a course when most of its assignments are, so one posted to the wrong class is ignored. It shows the last saved copy right away and then checks your Sheet for anything newer. It says whether each period is on pace, behind, or ahead (in school days), counting Monday–Friday, so holidays make a period look a little behind.'),
       P('In Build an assignment, a ', B('★'), ' after a standard means it’s a priority standard in the Year at a Glance.')]],
     ['ix', `${hasLessons ? 9 : 8}. Interactives`, [
       P('The ', B('Interactives'), ' tab opens a page of hands-on demos in a new tab, ready to put on the TV, grouped by subject (your subjects first): ', B('Geometry'), ' (congruence shortcuts, dilations and similar triangles, SOH CAH TOA, volume and surface area, parallel lines and a transversal, circle angles, triangle centers, transformations), ', B('Pre-Calculus'), ' (unit circle, trig graphs, the ambiguous case, polar graphs, vectors, sine-curve modeling), ', B('Algebra I and II'), ' (slope and lines, exponential growth and compound interest, inequalities and linear programming, systems, quadratics, transformations, inverses), and ', B('ACT and calculators'), ' (a probability simulator and a TI-Nspire key-press walkthrough). Drag the points and sliders right on the touchscreen.'),
@@ -44878,13 +44879,19 @@ function yagBuild(subject, u) {
 }
 /* ---------- Pacing check: where each period is (the newest section assigned) vs. where the Year at a Glance says to be today ---------- */
 const PACE = { data: null, loading: null, err: '' };
-async function paceLoad() {
-  if (DASH.data) return DASH.data;
-  if (PACE.data) return PACE.data;
+const PACE_CACHE = { get() { try { return JSON.parse(localStorage.getItem(TK('pace-cache')) || 'null'); } catch { return null; } }, set(v) { try { localStorage.setItem(TK('pace-cache'), JSON.stringify(v)); } catch {} } };
+// one line per period and assignment: { kind: 'p' posted to Classroom or 'r' turned in, period, key, title, t }
+function paceItemsFrom(D) { const out = []; (D.posted || []).forEach((p) => { const k = String(p.key || ''); out.push({ kind: 'p', period: p.period, key: k.startsWith('custom:') ? k.split('|')[0] : k, title: p.title, t: p.t }); });
+  (D.results || []).forEach((r) => out.push({ kind: 'r', period: r.period, key: r.set, title: r.title, t: r.t })); return out; }
+async function paceLoad(fresh) {
+  if (DASH.data) return paceItemsFrom(DASH.data);
+  if (PACE.data && !fresh) return PACE.data;
   if (!CONFIG.SCRIPT_URL || !dashPw.get()) return null;
-  PACE.loading = PACE.loading || (async () => {
-    try { const res = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'dashboard', password: dashPw.get(), days: 200 }) });
-      const g = await res.json(); if (g.ok) PACE.data = g; else PACE.err = g.wrong ? 'wrong' : g.error || 'error'; } catch (e) { PACE.err = 'offline'; }
+  PACE.loading = (!fresh && PACE.loading) || (async () => {
+    const post = (body) => fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) }).then((r) => r.json());
+    try { let g = await post({ action: 'pace', password: dashPw.get(), days: 150 });
+      if (g && !g.ok && /unknown action/.test(g.error || '')) { g = await post({ action: 'dashboard', password: dashPw.get(), days: 150 }); if (g && g.ok) g = { ok: true, items: paceItemsFrom(g) }; } // the Sheet's script hasn't updated yet
+      if (g && g.ok) { PACE.data = g.items || []; PACE.err = ''; PACE_CACHE.set({ t: Date.now(), items: PACE.data }); } else PACE.err = g && g.wrong ? 'wrong' : (g && g.error) || 'error'; } catch (e) { PACE.err = 'offline'; }
   })();
   await PACE.loading; return PACE.data;
 }
@@ -44928,39 +44935,44 @@ async function paceCard(subject) {
     box.append(el('p', { style: 'margin:6px 0' }, !today ? 'Today is between quarters in the Year at a Glance.' :
       today.day > quarterDays ? `Quarter ${today.q}, school day ${today.day}: the guide’s units for this quarter (${quarterDays} days) are done, so this is time for review and catching up.` :
       el('span', {}, `Quarter ${today.q}, school day ${today.day}. The guide says: `, el('b', {}, guideUnit.u.name), ` (day ${guideDay - guideUnit.start} of ${guideUnit.u.days}).`)));
-    const D = await paceLoad();
+    const head = box.children.length, cached = !DASH.data && !PACE.data && PACE_CACHE.get();
+    const show = (items, when) => {
+      while (box.children.length > head) box.lastChild.remove();
+      // which course each period is: whatever most of its different assignments are (so one posted to the wrong class doesn't count)
+      const tally = {}; items.forEach((it) => { const sec = it.period && paceSection(it.key); if (!sec || !sec.subject) return; const T = (tally[it.period] = tally[it.period] || {}); (T[sec.subject] = T[sec.subject] || new Set()).add(it.key); });
+      const isCourse = (period) => { const T = tally[period] || {}, n = (k) => (T[k] ? T[k].size : 0), top = Math.max(0, ...Object.keys(T).map(n)); return n(subject) === top; };
+      // where a period is: the furthest-along section among its assignments from the two weeks before its newest one (a review of older sections doesn't pull it back)
+      const posOf = (num) => { const at = units.find((x) => x.nums.includes(num)); return at ? { at, you: at.start + (at.nums.indexOf(num) + 1) / at.nums.length * at.u.days } : null; };
+      const per = {}; items.forEach((it) => { if (!it.period || !isCourse(it.period)) return; const sec = paceSection(it.key); if (!sec || sec.subject !== subject || !sec.num) return; (per[it.period] = per[it.period] || []).push({ ...it, num: sec.num, pos: posOf(sec.num) }); });
+      const latest = {}; Object.entries(per).forEach(([p, list]) => { const newest = Math.max(...list.map((x) => x.t)), recent = list.filter((x) => x.t >= newest - 14 * 864e5);
+        latest[p] = recent.reduce((best, x) => (!best || (x.pos ? x.pos.you : -1) > (best.pos ? best.pos.you : -1) || ((x.pos ? x.pos.you : -1) === (best.pos ? best.pos.you : -1) && x.t > best.t) ? x : best), null); });
+      const periods = Object.keys(latest).sort((a, b) => perOrder(a) - perOrder(b));
+      if (!periods.length) { box.append(el('p', { class: 'small' }, `No ${SUBJECTS[subject]} assignments in the last 150 days yet, so there’s nothing to compare.`)); return; }
+      const rows = periods.map((p) => {
+        const L = latest[p], at = L.pos && L.pos.at;
+        let vs = '—', bg = '';
+        if (at && guideDay != null) {
+          const diff = Math.round(guideDay - L.pos.you);
+          vs = Math.abs(diff) <= 3 ? 'on pace' : diff > 0 ? `about ${diff} school days behind` : `about ${-diff} school days ahead`;
+          bg = Math.abs(diff) <= 3 ? '#e7f3e4' : Math.abs(diff) <= 10 ? '#fbf1dc' : '#f9e1de';
+        }
+        return el('tr', {}, el('td', { style: 'font-weight:700' }, p), el('td', {}, L.title || L.num, el('div', { class: 'small' }, `${L.num} · ${dashDate(L.t)}`)),
+          el('td', {}, at ? at.u.name : el('span', { class: 'small' }, `${L.num} isn’t in a unit`)), el('td', { style: bg ? `background:${bg}` : '' }, vs));
+      });
+    box.append(el('div', { style: 'overflow-x:auto' }, el('table', { class: 'dash-std', style: 'width:100%;border-collapse:collapse;font-size:15px;margin-top:6px' },
+      el('thead', {}, el('tr', {}, ...['Period', 'Furthest along (last 2 weeks)', 'Unit', 'Compared with the guide'].map((h) => el('th', { style: 'text-align:left' }, h)))), el('tbody', {}, ...rows))),
+      el('p', { class: 'small', style: 'margin:8px 0 0' }, when ? `${when} ` : '', 'Where a period is comes from the furthest-along section it’s had in the two weeks before its newest assignment (posted to it, or turned in), so a review of older sections doesn’t pull it back. A period counts as this course when most of its assignments are, so one posted to the wrong class doesn’t put it here. School days are counted Monday–Friday, so holidays make it look a little behind. A review that covers older sections can make a period look behind until you assign the next new section.'));
+    };
+    if (cached && cached.items) show(cached.items, `Saved ${dashDate(cached.t)}; checking your Sheet for anything newer…`);
+    const D = await paceLoad(!!cached);
     if (!D) {
-      box.append(el('p', { class: 'small', style: 'margin:4px 0 0' }, PACE.err === 'offline' ? 'Couldn’t reach your Practice Results sheet, so your classes’ places aren’t shown.' : 'To compare each period with the guide, connect with your dashboard password: ',
+      if (cached && cached.items) return;
+      while (box.children.length > head) box.lastChild.remove();
+      box.append(el('p', { class: 'small', style: 'margin:4px 0 0' }, PACE.err === 'offline' ? 'Couldn’t reach your Practice Results sheet, so your classes’ places aren’t shown.' : 'To compare each period with the guide, connect with your dashboard password or PIN: ',
         PACE.err === 'offline' ? '' : linkBtn('Connect', () => dashLogin('', () => { PACE.err = ''; yagScreen(subject); }))));
       return;
     }
-    // which course each period is: whatever most of its assignments are (so one assignment posted to the wrong class doesn't count)
-    const keyOf = (p) => { const k = String(p.key || ''); return k.startsWith('custom:') ? k.split('|')[0] : k; }, tally = {};
-    const count = (period, key) => { const sec = period && paceSection(key); if (!sec || !sec.subject) return; const T = (tally[period] = tally[period] || {}); T[sec.subject] = (T[sec.subject] || 0) + 1; };
-    (D.posted || []).forEach((p) => count(p.period, keyOf(p))); (D.results || []).forEach((r) => count(r.period, r.set));
-    const isCourse = (period) => { const T = tally[period] || {}, top = Math.max(0, ...Object.values(T)); return (T[subject] || 0) === top; };
-    // each period's newest assignment in this course: Classroom posts first, then turned-in work
-    const latest = {};
-    const see = (period, key, t, title) => { if (!period || !isCourse(period)) return; const sec = paceSection(key); if (!sec || sec.subject !== subject || !sec.num) return; const k = period;
-      if (!latest[k] || t > latest[k].t) latest[k] = { t, num: sec.num, title }; };
-    (D.posted || []).forEach((p) => see(p.period, keyOf(p), p.t, p.title));
-    (D.results || []).forEach((r) => see(r.period, r.set, r.t, r.title));
-    const periods = Object.keys(latest).sort((a, b) => perOrder(a) - perOrder(b));
-    if (!periods.length) { box.append(el('p', { class: 'small' }, `No ${SUBJECTS[subject]} assignments in the last 200 days yet, so there’s nothing to compare.`)); return; }
-    const rows = periods.map((p) => {
-      const L = latest[p], at = units.find((x) => x.nums.includes(L.num));
-      let vs = '—', bg = '';
-      if (at && guideDay != null) {
-        const frac = (at.nums.indexOf(L.num) + 1) / at.nums.length, you = at.start + frac * at.u.days, diff = Math.round(guideDay - you);
-        vs = Math.abs(diff) <= 3 ? 'on pace' : diff > 0 ? `about ${diff} school days behind` : `about ${-diff} school days ahead`;
-        bg = Math.abs(diff) <= 3 ? '#e7f3e4' : Math.abs(diff) <= 10 ? '#fbf1dc' : '#f9e1de';
-      }
-      return el('tr', {}, el('td', { style: 'font-weight:700' }, p), el('td', {}, L.title || L.num, el('div', { class: 'small' }, dashDate(L.t))),
-        el('td', {}, at ? at.u.name : el('span', { class: 'small' }, `${L.num} isn’t in a unit`)), el('td', { style: bg ? `background:${bg}` : '' }, vs));
-    });
-    box.append(el('div', { style: 'overflow-x:auto' }, el('table', { class: 'dash-std', style: 'width:100%;border-collapse:collapse;font-size:15px;margin-top:6px' },
-      el('thead', {}, el('tr', {}, ...['Period', 'Newest assignment', 'Unit', 'Compared with the guide'].map((h) => el('th', { style: 'text-align:left' }, h)))), el('tbody', {}, ...rows))),
-      el('p', { class: 'small', style: 'margin:8px 0 0' }, 'Where a period is comes from the newest assignment you posted to it (or it turned in) for this course, and how far into its unit that section is. A period counts as this course when most of its assignments are, so one posted to the wrong class doesn’t put it here. School days are counted Monday–Friday, so holidays make it look a little behind. A review that covers older sections can make a period look behind until you assign the next new section.'));
+    show(D, '');
   })();
   return box;
 }

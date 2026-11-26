@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-26.1'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-26.2'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -222,6 +222,7 @@ function doPost(e) {
     try { out = { ok: true, found: hasResult_(d) }; } catch (err) { out = { ok: false, error: String(err) }; }
     return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
   }
+  if (d.action === 'pace') { let out; try { out = pace_(d); } catch (err) { out = { ok: false, error: String(err) }; } return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON); }
   if (d.action === 'dashboard') {
     let out;
     try { out = dashboard_(d); } catch (err) { out = { ok: false, error: String(err) }; }
@@ -1494,6 +1495,23 @@ function teacherAuth_(d) {
   if (who && (!owner || owner === who)) { if (!owner) props.setProperty('PIN_OWNER', who); return null; }
   if (!pw && !who) return { ok: false, setup: true };
   cache.put('dashFails', String(fails + 1), 900); Utilities.sleep(800); return { ok: false, wrong: true };
+}
+// For the pacing check on Year at a glance: just which assignments each period has had (one line per period and assignment,
+// with the newest time), so it loads much faster than the whole dashboard
+function pace_(d) {
+  const bad = teacherAuth_(d); if (bad) return bad;
+  const ss = SpreadsheetApp.getActiveSpreadsheet(), since = Date.now() - Math.max(30, Math.min(400, Number(d.days) || 150)) * 864e5, seen = {};
+  const add = function (kind, period, key, title, t) { if (!period || !key || !(t >= since)) return; const k = kind + '|' + period + '|' + key; if (!seen[k] || t > seen[k].t) seen[k] = { kind: kind, period: period, key: key, title: title, t: t }; };
+  ss.getSheets().forEach(function (sh) {
+    const n = sh.getLastRow() - 1; if (n < 1 || sh.getLastColumn() < 12) return;
+    const head = sh.getRange(1, 1, 1, 12).getValues()[0].map(String); if (head[0] !== 'Timestamp' || head[3] !== 'Assignment' || head[11] !== 'Set key') return;
+    const a = sh.getRange(2, 1, n, 4).getValues(), b = sh.getRange(2, 12, n, 1).getValues();
+    a.forEach(function (r, i) { const t = r[0] instanceof Date ? r[0].getTime() : Date.parse(r[0]); add('r', String(r[1]), String(b[i][0]), String(r[3]), t); });
+  });
+  const ash = ss.getSheetByName(POSTED_TAB);
+  if (ash && ash.getLastRow() > 1) ash.getRange(2, 1, ash.getLastRow() - 1, 4).getValues().forEach(function (r) { const t = r[0] instanceof Date ? r[0].getTime() : Date.parse(r[0]); add('p', String(r[3]), String(r[1]), String(r[2]), t); });
+  const items = Object.keys(seen).map(function (k) { return seen[k]; });
+  return { ok: true, items: items };
 }
 function dashboard_(d) {
   const bad = teacherAuth_(d); if (bad) return bad;
