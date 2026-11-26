@@ -45132,6 +45132,195 @@ IX.work = { subjects: ['apcalc'],
   } };
 // earlier interactives that also fit AP Calculus
 ['funcTest', 'polynomial', 'piecewise', 'compose', 'transform', 'inverse', 'logs', 'exponential', 'wave', 'invTrig', 'sequences', 'parametric', 'polar', 'vectors'].forEach((k) => { if (IX[k] && !IX[k].subjects.includes('apcalc')) IX[k].subjects.push('apcalc'); });
+
+// ---- The Chain Rule: rates multiply
+const IX_CHAIN = {
+  a: { name: 'y = u⁵, u = x² + 1', g: (x) => x * x + 1, gd: (x) => 2 * x, f: (u) => u ** 5, fd: (u) => 5 * u ** 4, gs: 'x² + 1', fs: 'u⁵', gds: '2x', fds: '5u⁴', x: 0.5, xr: [-1.1, 1.1] },
+  b: { name: 'f(x) = (3x² − 5)⁴', g: (x) => 3 * x * x - 5, gd: (x) => 6 * x, f: (u) => u ** 4, fd: (u) => 4 * u ** 3, gs: '3x² − 5', fs: 'u⁴', gds: '6x', fds: '4u³', x: 1, xr: [-1.8, 1.8] },
+  c: { name: 'y = e^(x² − 3x)', g: (x) => x * x - 3 * x, gd: (x) => 2 * x - 3, f: Math.exp, fd: Math.exp, gs: 'x² − 3x', fs: 'eᵘ', gds: '2x − 3', fds: 'eᵘ', x: 1, xr: [-0.5, 3.5] },
+  d: { name: 'y = sin(4x)', g: (x) => 4 * x, gd: () => 4, f: Math.sin, fd: Math.cos, gs: '4x', fs: 'sin u', gds: '4', fds: 'cos u', x: 0.3, xr: [-1.6, 1.6] },
+  e: { name: 'y = (x² − 3)³', g: (x) => x * x - 3, gd: (x) => 2 * x, f: (u) => u ** 3, fd: (u) => 3 * u * u, gs: 'x² − 3', fs: 'u³', gds: '2x', fds: '3u²', x: 2, xr: [-2.5, 2.5] } };
+IX.chainRule = { subjects: ['apcalc'],
+  title: 'The Chain Rule: rates multiply', hint: 'Nudge x by a small Δx. Watch u change by about (du/dx)·Δx and y change by about (dy/du)·Δu. So dy/dx = (dy/du)(du/dx).',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(640, 560), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_CHAIN[o.k] ? o.k : 'a', x: null, dx: 0.1 };
+    function draw() {
+      const C = IX_CHAIN[S.k], x = S.x ?? C.x, dx = S.dx, u = C.g(x), y = C.f(u), u2 = C.g(x + dx), y2 = C.f(u2), du = C.gd(x), dy = C.fd(u); ctx.clearRect(0, 0, 640, 560);
+      // three gauges: each shows a window around its value, with the change highlighted, all at the same scale per unit of Δx
+      const gauge = (yy, name, v, v2, col, sub) => { const sc = 260 / Math.max(Math.abs(v2 - v), Math.abs(dx), 1e-9) * Math.min(1, 0.5), cx = 320; ixLine(ctx, [40, yy], [600, yy], IXC.ink, 2);
+        const a = cx, b = cx + (v2 - v) * sc * 0 + (v2 - v) / Math.max(Math.abs(v2 - v), 1e-12) * Math.min(260, Math.abs(v2 - v) / Math.abs(dx) * 22); ctx.save(); ctx.fillStyle = col + '40'; ctx.fillRect(Math.min(a, b), yy - 10, Math.abs(b - a), 20); ctx.restore(); ixArrow(ctx, [a, yy], [b, yy], col, 3);
+        ixDot(ctx, a, yy, IXC.ink, 6); ixLabel(ctx, `${name} = ${ixN(v, 4)}`, 40, yy - 34, 18, 'left', col); ixLabel(ctx, sub, 600, yy - 34, 16, 'right', col); };
+      gauge(70, 'x', x, x + dx, IXC.blue, `Δx = ${ixN(dx, 3)}`); gauge(170, 'u', u, u2, IXC.green, `Δu = ${ixN(u2 - u, 4)} ≈ ${ixN(du, 3)} · Δx`); gauge(270, 'y', y, y2, IXC.red, `Δy = ${ixN(y2 - y, 4)} ≈ ${ixN(dy, 3)} · Δu`);
+      ixLabel(ctx, '(arrow lengths: change compared with Δx)', 320, 300, 13, 'center', IXC.gray);
+      // the composite graph with its tangent
+      const yf = (t) => C.f(C.g(t)); let lo = Infinity, hi = -Infinity; for (let t = C.xr[0]; t <= C.xr[1]; t += (C.xr[1] - C.xr[0]) / 200) { const v = yf(t); if (isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+      const pad = (hi - lo) * 0.1 || 1, G0 = ixView({ _w: 640, _h: 240 }, C.xr, [lo - pad, hi + pad], 26), G = { ...G0, Y: (v) => 320 + G0.Y(v) }; ixGrid2(ctx, G, 0.5, (hi - lo) / 4 || 1, 1, (hi - lo) / 2 || 1);
+      ixCurve(ctx, G, yf, IXC.blue, { w: 2.8 }); ixCurve(ctx, G, (t) => y + dy * du * (t - x), IXC.red, { w: 2, dash: true, a: x - 0.6, b: x + 0.6 }); ixDot(ctx, G.X(x), G.Y(y), IXC.red, 6, true);
+      ixRead(read, [{ h: C.name }, `u = ${C.gs}, y = ${C.fs}`, { h: `At x = ${ixN(x, 2)}` }, `du/dx = ${C.gds} = ${ixN(du, 4)}`, `dy/du = ${C.fds} = ${ixN(dy, 4)} (at u = ${ixN(u, 3)})`, `dy/dx = (dy/du)(du/dx) = ${ixN(dy * du, 4)}`,
+        `check, Δy/Δx = ${ixN((y2 - y) / dx, 4)} with Δx = ${ixN(dx, 3)}`, { note: 'Outside derivative (evaluated at the inside) times inside derivative. Make Δx smaller and Δy/Δx gets closer to dy/dx.' }]);
+    }
+    const xS = ixSlider('x', -2, 3.5, 0.05, 0.5, (v) => ixN(v, 2), (v) => { S.x = v; draw(); });
+    ctl.append(ixSel(Object.entries(IX_CHAIN).map(([k, C]) => [k, C.name]), S.k, (k) => { S.k = k; S.x = null; xS.set(IX_CHAIN[k].x); draw(); }, 'Function'), xS, ixSlider('Δx', 0.001, 0.3, 0.001, S.dx, (v) => ixN(v, 3), (v) => { S.dx = v; draw(); }));
+    xS.set(IX_CHAIN[S.k].x); draw();
+  } };
+
+// ---- Implicit differentiation: tangent lines on curves that aren’t functions
+const IX_IMP = {
+  circ: { name: 'x² + y² = 25', F: (x, y) => x * x + y * y - 25, Fx: (x) => 2 * x, Fy: (x, y) => 2 * y, dyx: 'dy/dx = −x/y', steps: ['2x + 2y (dy/dx) = 0', 'dy/dx = −x/y'], P: [3, -4], R: 7 },
+  ell: { name: 'x² + xy + y² = 7', F: (x, y) => x * x + x * y + y * y - 7, Fx: (x, y) => 2 * x + y, Fy: (x, y) => x + 2 * y, dyx: 'dy/dx = −(2x + y)/(x + 2y)', steps: ['2x + y + x (dy/dx) + 2y (dy/dx) = 0', 'dy/dx = −(2x + y)/(x + 2y)'], P: [1, 2], R: 4.5 },
+  hyp: { name: 'x² + 3xy + y² = −1', F: (x, y) => x * x + 3 * x * y + y * y + 1, Fx: (x, y) => 2 * x + 3 * y, Fy: (x, y) => 3 * x + 2 * y, dyx: 'dy/dx = −(2x + 3y)/(3x + 2y)', steps: ['2x + 3y + 3x (dy/dx) + 2y (dy/dx) = 0', 'dy/dx = −(2x + 3y)/(3x + 2y)'], P: [1, -2], R: 5 },
+  fol: { name: 'x³ + y³ = 6xy (folium)', F: (x, y) => x ** 3 + y ** 3 - 6 * x * y, Fx: (x, y) => 3 * x * x - 6 * y, Fy: (x, y) => 3 * y * y - 6 * x, dyx: 'dy/dx = (2y − x²)/(y² − 2x)', steps: ['3x² + 3y² (dy/dx) = 6y + 6x (dy/dx)', 'dy/dx = (2y − x²)/(y² − 2x)'], P: [3, 3], R: 5 } };
+IX.implicit = { subjects: ['apcalc'],
+  title: 'Implicit differentiation', hint: 'These curves aren’t functions, but they still have tangent lines. Drag the red point along the curve: the tangent’s slope is dy/dx, found by differentiating both sides with respect to x.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(560, 560), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_IMP[o.k] ? o.k : 'circ', P: null };
+    const snap = (C, p) => { let [x, y] = p; for (let i = 0; i < 30; i++) { const f = C.F(x, y), gx = C.Fx(x, y), gy = C.Fy(x, y), g2 = gx * gx + gy * gy || 1; x -= f * gx / g2; y -= f * gy / g2; } return [x, y]; };
+    function draw() {
+      const C = IX_IMP[S.k], V = ixView(cv, [-C.R, C.R], [-C.R, C.R], 24), P = S.P || C.P; ctx.clearRect(0, 0, 560, 560); ixGrid(ctx, V, { step: 1, lab: C.R > 5 ? 2 : 1 });
+      ixContour(C.F, C.R, 0, 220).forEach(([a, b]) => ixLine(ctx, [V.X(a[0]), V.Y(a[1])], [V.X(b[0]), V.Y(b[1])], IXC.blue, 3));
+      const [x, y] = P, fx = C.Fx(x, y), fy = C.Fy(x, y), vert = Math.abs(fy) < 1e-6 * Math.max(1, Math.abs(fx)), m = -fx / fy;
+      if (vert) ixLine(ctx, [V.X(x), V.Y(-C.R)], [V.X(x), V.Y(C.R)], IXC.red, 2.4); else ixCurve(ctx, V, (t) => y + m * (t - x), IXC.red, { w: 2.4 });
+      ixDot(ctx, V.X(x), V.Y(y), IXC.red, 8, true);
+      ixRead(read, [{ h: C.name }, 'differentiate both sides with respect to x (remember dy/dx on every y):', ...C.steps, { h: `At (${ixN(x, 2)}, ${ixN(y, 2)})` }, vert ? 'dy/dx is undefined: a vertical tangent' : `dy/dx = ${ixN(m, 4)}`, !vert && Math.abs(m) < 1e-3 ? { note: 'Horizontal tangent: the top of the numerator is 0.' } : null,
+        vert ? null : `tangent line: y ${y < 0 ? '+' : '−'} ${ixN(Math.abs(y), 2)} = ${ixN(m, 3)}(x ${x < 0 ? '+' : '−'} ${ixN(Math.abs(x), 2)})`, { note: 'Where the bottom of dy/dx is 0, the tangent is vertical; where the top is 0, it’s horizontal.' }]);
+    }
+    ctl.append(ixSel(Object.entries(IX_IMP).map(([k, C]) => [k, C.name]), S.k, (k) => { S.k = k; S.P = null; draw(); }, 'Curve'), el('div', { class: 'small' }, 'Drag the red point; it stays on the curve.'));
+    ixDrag(cv, () => 'p', (h, px, py) => { const C = IX_IMP[S.k], V = ixView(cv, [-C.R, C.R], [-C.R, C.R], 24), q = snap(C, [V.ix(px), V.iy(py)]); if (q.every(isFinite) && Math.hypot(q[0] - V.ix(px), q[1] - V.iy(py)) < C.R / 2.5) { S.P = q; draw(); } });
+    draw();
+  } };
+
+// ---- Derivatives of inverse functions
+const IX_INVD = {
+  cub: { name: 'f(x) = x³ + x + 1', f: (x) => x ** 3 + x + 1, d: (x) => 3 * x * x + 1, dom: [-1.6, 1.6], a: 1, R: 5, ds: 'f′(x) = 3x² + 1' },
+  sin: { name: 'f(x) = sin x (−π/2 ≤ x ≤ π/2)', f: Math.sin, d: Math.cos, dom: [-Math.PI / 2, Math.PI / 2], a: Math.PI / 6, R: 2, ds: 'f′(x) = cos x; so (sin⁻¹)′(x) = 1/√(1 − x²)' },
+  tan: { name: 'f(x) = tan x (−π/2 < x < π/2)', f: Math.tan, d: (x) => 1 / Math.cos(x) ** 2, dom: [-1.35, 1.35], a: Math.PI / 3, R: 4, ds: 'f′(x) = sec²x; so (tan⁻¹)′(x) = 1/(1 + x²)' },
+  exp: { name: 'f(x) = eˣ', f: Math.exp, d: Math.exp, dom: [-3, 1.6], a: 0.5, R: 5, ds: 'f′(x) = eˣ; so (ln)′(x) = 1/x' } };
+IX.invDeriv = { subjects: ['apcalc'],
+  title: 'Derivatives of inverse functions', hint: 'f (blue) and its inverse (red) are reflections over y = x. The point (a, b) on f matches (b, a) on f⁻¹, and their tangent slopes are reciprocals.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(560, 560), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_INVD[o.k] ? o.k : 'cub', a: null };
+    function draw() {
+      const F = IX_INVD[S.k], R = F.R, V = ixView(cv, [-R, R], [-R, R], 24), a = S.a ?? F.a, b = F.f(a), m = F.d(a); ctx.clearRect(0, 0, 560, 560); ixGrid(ctx, V, { step: R > 3 ? 1 : 0.5, lab: R > 3 ? 1 : 1 });
+      ixLine(ctx, [V.X(-R), V.Y(-R)], [V.X(R), V.Y(R)], IXC.gray, 1.4, true); ixCurve(ctx, V, F.f, IXC.blue, { w: 3.2, a: F.dom[0], b: F.dom[1] });
+      ctx.save(); ctx.strokeStyle = IXC.red; ctx.lineWidth = 3.2; ctx.beginPath(); for (let j = 0; j <= 300; j++) { const t = F.dom[0] + (F.dom[1] - F.dom[0]) * j / 300, X = V.X(F.f(t)), Y = V.Y(t); j ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); } ctx.stroke(); ctx.restore();
+      ixCurve(ctx, V, (t) => b + m * (t - a), IXC.blue, { w: 1.8, dash: true, a: a - 1.2, b: a + 1.2 }); ixCurve(ctx, V, (t) => a + (t - b) / m, IXC.red, { w: 1.8, dash: true, a: b - 1.2 * m, b: b + 1.2 * m });
+      ixDot(ctx, V.X(a), V.Y(b), IXC.blue, 7, true); ixDot(ctx, V.X(b), V.Y(a), IXC.red, 7, true); ixLine(ctx, [V.X(a), V.Y(b)], [V.X(b), V.Y(a)], IXC.purple, 1.4, true);
+      ixRead(read, [{ h: F.name }, F.ds, { h: `a = ${ixN(a, 3)}, b = f(a) = ${ixN(b, 3)}` }, `slope of f at (a, b): f′(a) = ${ixN(m, 4)}`, `slope of f⁻¹ at (b, a): 1/f′(a) = ${ixN(1 / m, 4)}`, { note: '(f⁻¹)′(b) = 1/f′(a), where f(a) = b. Find a first: the x that f sends to b.' },
+        S.k === 'cub' ? { note: 'Example: g′(3)? f(1) = 3, so g′(3) = 1/f′(1) = 1/4.' } : null]);
+    }
+    const aS = ixSlider('a', -1.5, 1.5, 0.05, 1, (v) => ixN(v, 2), (v) => { S.a = v; draw(); });
+    ctl.append(ixSel(Object.entries(IX_INVD).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; S.a = null; const i = aS.querySelector('input'); i.min = IX_INVD[k].dom[0] + 0.05; i.max = IX_INVD[k].dom[1] - 0.05; aS.set(IX_INVD[k].a); draw(); }, 'Function'), aS);
+    aS.set(IX_INVD[S.k].a); draw();
+  } };
+
+// ---- Antiderivatives: a family of curves, and one initial value
+const IX_ANTI = {
+  cos: { name: 'f(x) = cos x', F: Math.sin, Fs: 'sin x + C', xr: [-2 * Math.PI, 2 * Math.PI], yr: [-5, 5] },
+  poly: { name: 'f(x) = 6x² − 4x + 5', F: (x) => 2 * x ** 3 - 2 * x * x + 5 * x, Fs: '2x³ − 2x² + 5x + C', xr: [-2, 2.5], yr: [-15, 20] },
+  explog: { name: 'f(x) = eˣ + 1/x, x > 0', F: (x) => (x > 0 ? Math.exp(x) + Math.log(x) : NaN), Fs: 'eˣ + ln x + C', xr: [0, 2.5], yr: [-6, 14] },
+  lin: { name: 'dy/dx = 2x + 3', F: (x) => x * x + 3 * x, Fs: 'x² + 3x + C', xr: [-5, 3], yr: [-6, 12], P: [0, 4] } };
+IX.antideriv = { subjects: ['apcalc'],
+  title: 'Antiderivatives and initial values', hint: 'Every curve F(x) + C has the same slope at each x, so they’re vertical shifts of each other. Drag the red point to choose the one curve through it: that’s an initial value problem.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 540), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_ANTI[o.k] ? o.k : 'cos', P: null, x: null };
+    function draw() {
+      const A = IX_ANTI[S.k], V = ixView(cv, A.xr, A.yr, 26), sp = (A.yr[1] - A.yr[0]) / 10; ctx.clearRect(0, 0, 580, 540); ixGrid2(ctx, V, A.xr[1] > 5 ? Math.PI / 2 : 0.5, sp / 2, A.xr[1] > 5 ? Math.PI : 1, sp);
+      for (let c = -5; c <= 5; c++) ixCurve(ctx, V, (x) => A.F(x) + c * sp, '#b7c8de', { w: 1.6 });
+      const P = S.P || A.P || [A.xr[0] + (A.xr[1] - A.xr[0]) * 0.6, A.F(A.xr[0] + (A.xr[1] - A.xr[0]) * 0.6)], C = P[1] - A.F(P[0]);
+      ixCurve(ctx, V, (x) => A.F(x) + C, IXC.red, { w: 3.4 });
+      const x = S.x ?? (A.xr[0] + (A.xr[1] - A.xr[0]) * 0.35), m = ixD(A.F, x); for (let c = -5; c <= 5; c++) { const y = A.F(x) + c * sp; if (y > A.yr[0] && y < A.yr[1]) ixCurve(ctx, V, (t) => y + m * (t - x), IXC.green, { w: 2, a: x - 0.15 * (A.xr[1] - A.xr[0]) / 4, b: x + 0.15 * (A.xr[1] - A.xr[0]) / 4 }); }
+      ixLine(ctx, [V.X(x), V.Y(A.yr[0])], [V.X(x), V.Y(A.yr[1])], IXC.gray, 1, true); ixDot(ctx, V.X(P[0]), V.Y(P[1]), IXC.red, 8, true);
+      ixRead(read, [{ h: A.name }, `all antiderivatives: F(x) = ${A.Fs}`, { note: `At x = ${ixN(x, 2)} every curve has the same slope, ${ixN(m, 3)} (the green segments are parallel).` },
+        { h: `Through (${ixN(P[0], 2)}, ${ixN(P[1], 2)})` }, `${ixN(P[1], 2)} = F(${ixN(P[0], 2)}) + C`, `C = ${ixN(C, 3)}`, `y = ${Math.abs(C) < 1e-9 ? A.Fs.replace(' + C', '') : A.Fs.replace('C', ixN(C, 3))}`.replace('+ −', '− '), { note: 'An initial condition picks out exactly one curve from the family.' }]);
+    }
+    ctl.append(ixSel(Object.entries(IX_ANTI).map(([k, A]) => [k, A.name]), S.k, (k) => { S.k = k; S.P = null; S.x = null; draw(); }, 'Function'), el('div', { class: 'small' }, 'Drag the red point to choose the initial value; drag elsewhere to move the green slopes.'));
+    ixDrag(cv, (px, py) => { const A = IX_ANTI[S.k], V = ixView(cv, A.xr, A.yr, 26), P = S.P || A.P || [A.xr[0] + (A.xr[1] - A.xr[0]) * 0.6, A.F(A.xr[0] + (A.xr[1] - A.xr[0]) * 0.6)]; return Math.hypot(px - V.X(P[0]), py - V.Y(P[1])) < 30 ? 'p' : 'x'; },
+      (h, px, py) => { const A = IX_ANTI[S.k], V = ixView(cv, A.xr, A.yr, 26); if (h === 'p') S.P = [Math.round(V.ix(px) * 4) / 4, Math.round(V.iy(py) * 2) / 2]; else S.x = Math.max(A.xr[0], Math.min(A.xr[1], V.ix(px))); draw(); });
+    draw();
+  } };
+
+// ---- Separable differential equations: growth, decay, and cooling
+IX.separable = { subjects: ['apcalc'],
+  title: 'Growth, decay, and Newton’s Law of Cooling', hint: 'Each model comes from a separable differential equation. Slide the doubling time, half-life, or room temperature, and slide t to read the value and the rate.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 500), ctx = cv._ctx; main.append(cv);
+    const S = { m: ['grow', 'decay', 'cool'].includes(o.m) ? o.m : 'cool', y0: 200, dbl: 5, half: 10, T0: 90, Ta: 20, hc: 10, t: 15, field: false }, box = {};
+    function draw() {
+      ctx.clearRect(0, 0, 600, 500); let f, df, L, tmax, ymax, eq;
+      if (S.m === 'grow') { const k = Math.log(2) / S.dbl; f = (t) => S.y0 * Math.exp(k * t); df = (t, y) => k * y; tmax = 4 * S.dbl; ymax = S.y0 * 18; eq = 'dy/dt = ky';
+        L = [{ h: 'Exponential growth' }, 'dy/dt = ky → dy/y = k dt → ln y = kt + C → y = y₀eᵏᵗ', `doubles every ${S.dbl} hours: k = ln 2/${S.dbl} ≈ ${ixN(k, 4)}`, `y = ${S.y0}e^(${ixN(k, 4)}t)`, `t = ${ixN(S.t, 1)}: y ≈ ${ixN(f(S.t), 1)}`, `rate dy/dt ≈ ${ixN(k * f(S.t), 2)} per hour`]; }
+      else if (S.m === 'decay') { const k = -Math.log(2) / S.half; f = (t) => 100 * Math.exp(k * t); df = (t, y) => k * y; tmax = 4 * S.half; ymax = 110; eq = 'dA/dt = kA';
+        L = [{ h: 'Exponential decay' }, 'A = A₀eᵏᵗ with k < 0', `half-life ${S.half} years: k = −ln 2/${S.half} ≈ ${ixN(k, 4)}`, `t = ${ixN(S.t, 1)}: ${ixN(f(S.t), 2)}% remains`, `rate ≈ ${ixN(k * f(S.t), 3)}% per year`]; }
+      else { const k = Math.log(2) / S.hc; f = (t) => S.Ta + (S.T0 - S.Ta) * Math.exp(-k * t); df = (t, T) => -k * (T - S.Ta); tmax = 60; ymax = Math.max(S.T0, S.Ta) + 10; eq = 'dT/dt = −k(T − Tₐ)';
+        L = [{ h: 'Newton’s Law of Cooling' }, 'dT/dt = −k(T − Tₐ): the rate is proportional to the difference from the room', `T = ${S.Ta} + ${S.T0 - S.Ta}e^(−${ixN(k, 4)}t)`, `the difference halves every ${S.hc} min: k = ln 2/${S.hc}`, `t = ${ixN(S.t, 1)} min: T ≈ ${ixN(f(S.t), 1)}°`, `rate ≈ ${ixN(df(S.t, f(S.t)), 2)}° per minute`, { note: 'It cools fastest at first, when it’s hottest compared with the room, and levels off at the room temperature.' }]; }
+      const V = ixView(cv, [0, tmax], [S.m === 'cool' ? Math.min(0, S.Ta - 10) : 0, ymax], 36), ys = Math.pow(10, Math.floor(Math.log10(ymax / 5))); ixGrid2(ctx, V, tmax / 12, ys, tmax / 6, ys * 2);
+      if (S.field) for (let t = 0; t <= tmax; t += tmax / 16) for (let y = V.yr[0]; y <= ymax; y += (ymax - V.yr[0]) / 12) { const m = df(t, y) * (tmax / 600) / ((ymax - V.yr[0]) / 460), L2 = 9 / Math.sqrt(1 + m * m); ixLine(ctx, [V.X(t) - L2, V.Y(y) + m * L2], [V.X(t) + L2, V.Y(y) - m * L2], IXC.gray, 1.4); }
+      if (S.m === 'cool') ixLine(ctx, [V.X(0), V.Y(S.Ta)], [V.X(tmax), V.Y(S.Ta)], IXC.green, 2, true);
+      ixCurve(ctx, V, f, IXC.blue, { w: 3.2 }); const y = f(S.t); ixDot(ctx, V.X(S.t), V.Y(y), IXC.red, 7, true); ixCurve(ctx, V, (t) => y + df(S.t, y) * (t - S.t), IXC.red, { w: 1.8, dash: true, a: S.t - tmax / 10, b: S.t + tmax / 10 });
+      ixLabel(ctx, eq, 590, 8, 16, 'right', IXC.ink); ixRead(read, L);
+    }
+    const sl = (k, lab, a, b, st, fmt) => ixSlider(lab, a, b, st, S[k], fmt || ((v) => ixN(v)), (v) => { S[k] = v; draw(); });
+    box.grow = el('div', {}, sl('y0', 'start y₀', 50, 500, 10), sl('dbl', 'doubling time (hours)', 1, 10, 0.5)); box.decay = el('div', {}, sl('half', 'half-life (years)', 2, 30, 1)); box.cool = el('div', {}, sl('T0', 'starting temperature', 40, 100, 1, (v) => v + '°'), sl('Ta', 'room temperature', 0, 30, 1, (v) => v + '°'), sl('hc', 'difference halves every (min)', 3, 20, 1));
+    const tS = ixSlider('t', 0, 60, 0.5, S.t, (v) => ixN(v, 1), (v) => { S.t = v; draw(); });
+    const vis = () => { Object.entries(box).forEach(([k, b]) => (b.style.display = k === S.m ? '' : 'none')); const mx = { grow: 4 * S.dbl, decay: 4 * S.half, cool: 60 }[S.m]; tS.querySelector('input').max = mx; S.t = Math.min(S.t, mx); tS.set(S.t); };
+    ctl.append(ixSeg([['grow', 'Growth (doubling)'], ['decay', 'Decay (half-life)'], ['cool', 'Cooling']], S.m, (k) => { S.m = k; vis(); draw(); }), box.grow, box.decay, box.cool, tS, ixCheck('Show the slope field', S.field, (v) => { S.field = v; draw(); }));
+    vis(); draw();
+  } };
+
+// ---- Improper integrals
+const IX_IMPR = {
+  sq: { name: '∫ from 1 to ∞ of 1/x² dx', f: (x) => 1 / (x * x), a: 1, inf: 'b', val: (b) => 1 - 1 / b, lim: 1, xr: [0, 12], yr: [-0.1, 1.3], note: 'The area levels off at 1: it converges.' },
+  rec: { name: '∫ from 1 to ∞ of 1/x dx', f: (x) => 1 / x, a: 1, inf: 'b', val: (b) => Math.log(b), lim: Infinity, xr: [0, 12], yr: [-0.1, 1.3], note: 'ln b keeps growing (slowly): it diverges, even though 1/x → 0.' },
+  root: { name: '∫ from 0 to 1 of 1/√x dx', f: (x) => 1 / Math.sqrt(x), b: 1, inf: 'a', val: (a) => 2 - 2 * Math.sqrt(a), lim: 2, xr: [-0.1, 1.5], yr: [-0.3, 8], note: 'An infinite height, but the area levels off at 2: it converges.' },
+  exp: { name: '∫ from 0 to ∞ of e^(−2x) dx', f: (x) => Math.exp(-2 * x), a: 0, inf: 'b', val: (b) => (1 - Math.exp(-2 * b)) / 2, lim: 0.5, xr: [-0.2, 5], yr: [-0.1, 1.2], note: 'The area approaches 1/2: it converges.' },
+  atan: { name: '∫ from −∞ to ∞ of 1/(1 + x²) dx', f: (x) => 1 / (1 + x * x), inf: 'both', val: (b) => 2 * Math.atan(b), lim: Math.PI, xr: [-12, 12], yr: [-0.1, 1.3], note: 'Split at 0: each half approaches π/2, so the total is π.' } };
+IX.improper = { subjects: ['apcalc'],
+  title: 'Improper integrals', hint: 'Slide the limit toward ∞ (or toward the asymptote). If the shaded area levels off at a number, the integral converges; if it keeps growing, it diverges.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 500), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_IMPR[o.k] ? o.k : 'sq', t: 0.5 };
+    function draw() {
+      const D = IX_IMPR[S.k], V = ixView(cv, D.xr, D.yr, 30); ctx.clearRect(0, 0, 600, 500); ixGrid2(ctx, V, D.xr[1] > 6 ? 1 : 0.25, D.yr[1] > 3 ? 1 : 0.25, D.xr[1] > 6 ? 2 : 0.5, D.yr[1] > 3 ? 2 : 0.5);
+      let lo, hi, lab; if (D.inf === 'b') { lo = D.a; hi = D.a + Math.pow(1000, S.t) - 1 + 0.01; lab = `b = ${ixN(hi, 2)}`; } else if (D.inf === 'a') { lo = Math.pow(10, -6 * S.t) * 0.999; hi = D.b; lab = `a = ${ixN(lo, 6)}`; } else { hi = Math.pow(1000, S.t) - 1 + 0.01; lo = -hi; lab = `from −${ixN(hi, 2)} to ${ixN(hi, 2)}`; }
+      const N = 400; for (let i = 0; i < N; i++) { const x0 = lo + (Math.min(hi, D.xr[1]) - lo) * i / N, x1 = lo + (Math.min(hi, D.xr[1]) - lo) * (i + 1) / N, y = Math.min(D.f((x0 + x1) / 2), D.yr[1]); ctx.save(); ctx.fillStyle = 'rgba(31,95,168,.28)'; ctx.fillRect(V.X(x0), V.Y(y), V.X(x1) - V.X(x0) + 0.5, V.Y(0) - V.Y(y)); ctx.restore(); }
+      ixCurve(ctx, V, D.f, IXC.ink, { w: 3, a: D.inf === 'a' ? 0.002 : D.xr[0], n: 1500 });
+      const v = D.inf === 'a' ? D.val(lo) : D.val(hi);
+      ixRead(read, [{ h: D.name }, lab, `area so far = ${ixN(v, 5)}`, isFinite(D.lim) ? `limit: ${ixN(D.lim, 5)}` : 'limit: ∞', isFinite(D.lim) ? { note: 'Converges. ' + D.note, good: true } : { note: 'Diverges. ' + D.note, bad: true }, { note: 'Write it as a limit: ∫ from a to ∞ = lim b→∞ ∫ from a to b.' }]);
+    }
+    ctl.append(ixSel(Object.entries(IX_IMPR).map(([k, D]) => [k, D.name]), S.k, (k) => { S.k = k; draw(); }, 'Integral'), ixSlider('push the limit', 0, 1, 0.01, S.t, (v) => Math.round(v * 100) + '%', (v) => { S.t = v; draw(); }));
+    draw();
+  } };
+
+// ---- Comparison tests for series
+const IX_CMP = {
+  e1: { name: 'Σ 1/(k² + 1) vs Σ 1/k²', a: (k) => 1 / (k * k + 1), b: (k) => 1 / (k * k), k0: 1, an: '1/(k² + 1)', bn: '1/k²', conv: true, test: 'Direct comparison: 1/(k² + 1) < 1/k², and Σ 1/k² converges (p = 2), so the smaller series converges.' },
+  e2: { name: 'Σ 1/(√k − 1) vs Σ 1/√k', a: (k) => 1 / (Math.sqrt(k) - 1), b: (k) => 1 / Math.sqrt(k), k0: 2, an: '1/(√k − 1)', bn: '1/√k', conv: false, test: 'Direct comparison: 1/(√k − 1) > 1/√k, and Σ 1/√k diverges (p = ½), so the bigger series diverges.' },
+  e3: { name: 'Σ (k + 3)/(k² + 1) vs Σ 1/k', a: (k) => (k + 3) / (k * k + 1), b: (k) => 1 / k, k0: 1, an: '(k + 3)/(k² + 1)', bn: '1/k', conv: false, test: 'Limit comparison: aₖ/bₖ → 1 (a positive number), so both do the same thing. Σ 1/k diverges, so this one diverges.' },
+  e4: { name: 'Σ √k/(k² + 1) vs Σ 1/k^(3/2)', a: (k) => Math.sqrt(k) / (k * k + 1), b: (k) => 1 / k ** 1.5, k0: 1, an: '√k/(k² + 1)', bn: '1/k^(3/2)', conv: true, test: 'Limit comparison: aₖ/bₖ → 1, and Σ 1/k^(3/2) converges (p = 3/2), so this one converges.' },
+  e5: { name: 'Σ 1/(k² + 5) vs Σ 1/k²', a: (k) => 1 / (k * k + 5), b: (k) => 1 / (k * k), k0: 1, an: '1/(k² + 5)', bn: '1/k²', conv: true, test: 'Direct comparison with the p-series Σ 1/k² (p = 2): converges.' } };
+IX.compareSeries = { subjects: ['apcalc'],
+  title: 'Comparison tests for series', hint: 'Blue is the series you’re testing; green is a known series to compare with. If the bigger one converges, so does the smaller. If the smaller one diverges, so does the bigger. The ratio aₖ/bₖ is the limit comparison.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(640, 540), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_CMP[o.k] ? o.k : 'e1', N: 30 };
+    function draw() {
+      const C = IX_CMP[S.k], ks = Array.from({ length: S.N }, (_, i) => C.k0 + i), A = ks.map(C.a), B = ks.map(C.b), SA = A.reduce((s, v, i) => [...s, (s[i - 1] || 0) + v], []), SB = B.reduce((s, v, i) => [...s, (s[i - 1] || 0) + v], []);
+      ctx.clearRect(0, 0, 640, 540); const top = Math.max(...A, ...B), T0 = ixView({ _w: 640, _h: 240 }, [C.k0 - 1, C.k0 + S.N], [0, top * 1.1], 30), T = T0, w = Math.max(1.5, (T.X(1) - T.X(0)) * 0.36);
+      ixGrid2(ctx, T, S.N > 40 ? 10 : 5, top / 4, S.N > 40 ? 20 : 5, top / 2); ixLabel(ctx, 'terms', 630, 6, 14, 'right', IXC.gray);
+      ks.forEach((k, i) => { ctx.save(); ctx.fillStyle = 'rgba(31,95,168,.6)'; ctx.fillRect(T.X(k) - w, T.Y(A[i]), w, T.Y(0) - T.Y(A[i])); ctx.fillStyle = 'rgba(46,125,79,.6)'; ctx.fillRect(T.X(k), T.Y(B[i]), w, T.Y(0) - T.Y(B[i])); ctx.restore(); });
+      const sTop = Math.max(...SA, ...SB), P0 = ixView({ _w: 640, _h: 290 }, [C.k0 - 1, C.k0 + S.N], [0, sTop * 1.1], 30), P = { ...P0, Y: (y) => 250 + P0.Y(y) }; ixGrid2(ctx, P, S.N > 40 ? 10 : 5, sTop / 4, S.N > 40 ? 20 : 5, sTop / 2); ixLabel(ctx, 'partial sums', 630, 256, 14, 'right', IXC.gray);
+      [[SA, IXC.blue], [SB, IXC.green]].forEach(([Sm, col]) => { ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 2.6; ctx.beginPath(); Sm.forEach((s, i) => (i ? ctx.lineTo(P.X(ks[i]), P.Y(s)) : ctx.moveTo(P.X(ks[i]), P.Y(s)))); ctx.stroke(); ctx.restore(); });
+      const n = ks[S.N - 1];
+      ixRead(read, [{ h: C.name }, `blue: aₖ = ${C.an}; green: bₖ = ${C.bn}`, `k = ${n}: aₖ = ${ixN(A[S.N - 1], 5)}, bₖ = ${ixN(B[S.N - 1], 5)}`, `aₖ/bₖ = ${ixN(A[S.N - 1] / B[S.N - 1], 4)}`, `partial sums: ${ixN(SA[S.N - 1], 4)} (blue), ${ixN(SB[S.N - 1], 4)} (green)`,
+        C.conv ? { note: C.test, good: true } : { note: C.test, bad: true }]);
+    }
+    ctl.append(ixSel(Object.entries(IX_CMP).map(([k, C]) => [k, C.name]), S.k, (k) => { S.k = k; draw(); }, 'Series'), ixSlider('number of terms', 5, 200, 1, S.N, String, (v) => { S.N = v; draw(); }));
+    draw();
+  } };
 // ======== end of the new interactives ========
 
 // which lessons get which interactive, right before which example, and what to do with it
@@ -45351,6 +45540,17 @@ const LP_DEMOS_CALC = {
   "calc-10-9": [["taylor", "Example 1", {"f": "exp"}, "Raise the degree and watch the Maclaurin polynomial hug eˣ, sin x, and cos x."]],
   "calc-10-10": [["taylor", "Example 3", {"f": "sin"}, "Compare the actual error with the Lagrange error bound."]] };
 Object.entries(LP_DEMOS_CALC).forEach(([k, v]) => { LP_DEMOS[k] = [...(LP_DEMOS[k] || []), ...v]; });
+// pairings for the second set of AP Calculus interactives
+const LP_DEMOS_CALC2 = {
+  "calc-3-1": [["chainRule", "Example 1", {"k": "a"}, "Nudge x: u changes by about (du/dx)Δx, and y by about (dy/du)Δu. The rates multiply."]],
+  "calc-3-2": [["implicit", "Example 1", {"k": "circ"}, "Drag around the circle: dy/dx = −x/y. Then pick the curves from Examples 2 and 3, and find where the tangent is vertical."]],
+  "calc-3-3": [["invDeriv", "Example 1", {"k": "cub"}, "(a, b) on f matches (b, a) on f⁻¹, and the slopes are reciprocals: g′(3) = 1/f′(1) = 1/4. Then try sin and tan."]],
+  "calc-5-6": [["antideriv", "Example 1", {"k": "cos"}, "All of sin x + C have the same slope at each x. For Example 4, pick dy/dx = 2x + 3 and drag the point to (0, 4)."]],
+  "calc-7-2": [["separable", "Example 3", {"m": "grow"}, "Doubling every 5 hours from 200; then Decay for the half-life example and Cooling for the coffee (90° in a 20° room)."]],
+  "calc-6-12": [["improper", "Example 1", {"k": "sq"}, "Push b toward ∞: the area under 1/x² levels off at 1. Then compare with 1/x, which never levels off."]],
+  "calc-10-4": [["compareSeries", "Example 1", {"k": "e1"}, "Blue is the series being tested, green the known one. Use the partial sums to see which way the comparison goes."]],
+  "calc-10-7": [["compareSeries", "Example 4", {"k": "e5"}, "Compare with the p-series Σ 1/k² to decide."]] };
+Object.entries(LP_DEMOS_CALC2).forEach(([k, v]) => { LP_DEMOS[k] = [...(LP_DEMOS[k] || []), ...v]; });
 // the interactives of a subject, in the order their lessons come up in the course (ones with no lesson in that subject last)
 function ixInOrder(sub) {
   const num = (t) => { const m = /^(\d+|P)\.(\d+)/.exec(t || ''); return m ? (m[1] === 'P' ? 0 : +m[1]) * 100 + +m[2] : 1e4; };
@@ -46497,6 +46697,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-26', subjects: ['apcalc'], text: '7 more AP Calculus interactives, each paired with its lesson: the Chain Rule as linked rates (3.1), implicit differentiation with a tangent line you drag around the curve (3.2), derivatives of inverse functions (3.3), antiderivatives as a family of curves with an initial value (5.6), growth, decay, and Newton’s Law of Cooling (7.2), improper integrals (6.12), and the comparison tests for series (10.4, 10.7).' },
   { date: '2026-11-26', text: 'Lesson plans: 25 opening activities that used Desmos now use the matching interactive instead (Pre-Calc P.8, 1.5, 1.7, 6.4, 6.5, 6.8, 6.9; AP Calculus P.2, 1.6, 2.1, 2.2, 4.1, 4.2, 5.1, 5.3, 6.3; Algebra I 3.7, 4.6; Algebra II 1.2, 1.4, 2.1, 3.6, 4.1, 5.3, 6.4). Students open it from a link: in the plan’s Interactives list, click 🔗 Copy student link and post it in Google Classroom (it’s in each plan’s Before class list). The student sheets are updated to match. 14 hands-on discoveries (Geometry 5.3, 5.6, 8.2, 8.4, 9.4, 9.5, 10.6; Algebra I 9.1; Algebra II 9.1, 9.2, 9.5; AP Calculus 4.3, 5.5, 8.2) now end with a 2–3 minute interactive check on the TV. The probability simulator has two new experiments: heads in 10 coin flips, and a coin and a die.' },
   { date: '2026-11-26', subjects: ['apcalc'], text: 'AP Calculus now has its own interactives (26 new), each paired with its lesson: limits and continuity, ε-δ, the Squeeze Theorem, secant to tangent, graphing f′ from f, motion on a line, linear approximation, related rates, L’Hôpital’s Rule, the Mean Value Theorem, curve sketching with f′ and f″, optimization, Riemann sums/trapezoids/Simpson, the Fundamental Theorem (area function), average value, slope fields and Euler’s Method, logistic growth, area between curves, disks/washers/shells, known cross sections, arc length, work, polar area, motion along a curve, series convergence, and Taylor polynomials. Chapter P lessons also get the matching Pre-Calc ones (functions, inverses, logs, trig graphs, and more).' },
   { date: '2026-11-26', text: '33 more interactives, each paired with its lesson (so they show up on the TV in those lesson plans). Geometry: the triangle midsegment, a quadrilateral sorter, special right triangles, triangle proportionality, chord/secant/tangent segments, equations of circles, cross sections, similar solids, solids of revolution, and distance/midpoint/partitioning. Pre-Calculus: the Law of Cosines, double- and half-angle formulas, graphing identities, composition of functions, rotation of axes, and polar conics. Algebra: lines of fit and residuals, piecewise and absolute value, exponent rules with tiles, two-way tables and Venn diagrams, solving by graphing, completing the square, the discriminant, synthetic division, direct and inverse variation, sequences and series, sampling and margin of error, and three planes. Calculus III: surfaces and level curves, the cross product, and the gradient. ACT: matrices and percent change.' },
@@ -46647,7 +46848,7 @@ function helpScreen(open) {
       P(B('📍 Pacing check'), ' (at the top) says which unit the guide has for today and, for each period, how far along it is: the furthest section it’s had in the two weeks before its newest assignment, so a review of older sections doesn’t make it look behind. A period counts as a course when most of its assignments are, so one posted to the wrong class is ignored. It shows the last saved copy right away and then checks your Sheet for anything newer. It says whether each period is on pace, behind, or ahead (in school days), counting Monday–Friday, so holidays make a period look a little behind.'),
       P('In Build an assignment, a ', B('★'), ' after a standard means it’s a priority standard in the Year at a Glance.')]],
     ['ix', `${hasLessons ? 9 : 8}. Interactives`, [
-      P('The ', B('Interactives'), ' tab opens a page of hands-on demos in a new tab, ready to put on the TV, grouped by subject (your subjects first): ', B('Geometry'), ' (congruence shortcuts, dilations and similar triangles, the midsegment, classifying quadrilaterals, special right triangles, triangle proportionality, SOH CAH TOA, volume and surface area, cross sections, similar solids, solids of revolution, parallel lines and a transversal, circle angles and segments, equations of circles, triangle centers, transformations, the Pythagorean theorem, the triangle inequality, polygon angles, arc length and sectors, compass constructions, distance and midpoint, geometric probability), ', B('Pre-Calculus'), ' (unit circle, trig graphs with reciprocals, identities, sum and difference, double- and half-angle formulas, inverse trig, the Law of Cosines, composition, rotation of axes, polar conics, the ambiguous case, polar graphs, vectors, complex numbers and De Moivre, parametric equations, conic sections, sine-curve modeling), ', B('Algebra I and II'), ' (algebra tiles, completing the square, the discriminant, synthetic division, exponent rules, balance-scale equations, solving by graphing, piecewise and absolute value, lines of fit, two-way tables, variation, sequences and series, sampling, three-variable systems, functions and the vertical line test, slope and lines, exponential growth, logarithms, polynomials, rational functions, inequalities and linear programming, systems, quadratics, transformations, inverses), ', B('AP Calculus'), ' (limits and continuity, secant to tangent, graphing f′, motion, related rates, curve sketching, optimization, Riemann sums, the Fundamental Theorem, slope fields and Euler’s Method, volumes of revolution, series, and Taylor polynomials), ', B('Calculus III'), ' (vectors, surfaces and level curves, the cross product, the gradient), and ', B('ACT and calculators'), ' (mean and median, box plots, the normal curve, matrices, percent change, a probability simulator, and a TI-Nspire key-press walkthrough). Drag the points and sliders right on the touchscreen. Under each one, a ', B('Goes with'), ' line names the lessons it fits; those lesson plans already include it on the TV, right before the example it goes with.'),
+      P('The ', B('Interactives'), ' tab opens a page of hands-on demos in a new tab, ready to put on the TV, grouped by subject (your subjects first): ', B('Geometry'), ' (congruence shortcuts, dilations and similar triangles, the midsegment, classifying quadrilaterals, special right triangles, triangle proportionality, SOH CAH TOA, volume and surface area, cross sections, similar solids, solids of revolution, parallel lines and a transversal, circle angles and segments, equations of circles, triangle centers, transformations, the Pythagorean theorem, the triangle inequality, polygon angles, arc length and sectors, compass constructions, distance and midpoint, geometric probability), ', B('Pre-Calculus'), ' (unit circle, trig graphs with reciprocals, identities, sum and difference, double- and half-angle formulas, inverse trig, the Law of Cosines, composition, rotation of axes, polar conics, the ambiguous case, polar graphs, vectors, complex numbers and De Moivre, parametric equations, conic sections, sine-curve modeling), ', B('Algebra I and II'), ' (algebra tiles, completing the square, the discriminant, synthetic division, exponent rules, balance-scale equations, solving by graphing, piecewise and absolute value, lines of fit, two-way tables, variation, sequences and series, sampling, three-variable systems, functions and the vertical line test, slope and lines, exponential growth, logarithms, polynomials, rational functions, inequalities and linear programming, systems, quadratics, transformations, inverses), ', B('AP Calculus'), ' (limits and continuity, secant to tangent, graphing f′, the Chain Rule, implicit differentiation, motion, related rates, curve sketching, optimization, Riemann sums, the Fundamental Theorem, slope fields and Euler’s Method, growth and cooling, improper integrals, volumes of revolution, series and comparison tests, and Taylor polynomials), ', B('Calculus III'), ' (vectors, surfaces and level curves, the cross product, the gradient), and ', B('ACT and calculators'), ' (mean and median, box plots, the normal curve, matrices, percent change, a probability simulator, and a TI-Nspire key-press walkthrough). Drag the points and sliders right on the touchscreen. Under each one, a ', B('Goes with'), ' line names the lessons it fits; those lesson plans already include it on the TV, right before the example it goes with.'),
       P('Each interactive opens on its own page. To let students explore one on their Chromebooks, copy that page’s address from the browser’s address bar and post it in Google Classroom. Nothing is graded. In a lesson plan, the interactives it uses have a ', B('🔗 Copy student link'), ' button right beside them. You can add interactives to any lesson plan (see Lesson plans above).')]],
     ['roster', `${hasLessons ? 10 : 9}. Classes & roster (instead of opening the Google Sheet)`, [
       OL(['The first time: match each Google Classroom class to its period, click ', B('Save periods'), ', then ', B('Refresh roster from Classroom'), '. Yellow boxes are guesses; check them.'],
