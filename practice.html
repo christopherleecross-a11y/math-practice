@@ -42773,13 +42773,23 @@ IX.probability = { subjects: ['act', 'algebra1', 'algebra2', 'geometry'],
   } };
 
 // ---- TI-Nspire CX II: which keys to press, one step at a time
-const IX_NS_KEYS = [ // [label, x, y, w, h] on a 360 × 560 drawing
-  ['esc', 30, 150, 52, 30], ['⌂ on', 278, 150, 52, 30], ['tab', 30, 190, 52, 30], ['menu', 278, 190, 52, 30], ['ctrl', 30, 230, 52, 30], ['shift', 92, 230, 52, 30], ['doc', 216, 230, 52, 30], ['del', 278, 230, 52, 30],
-  ['=', 30, 275, 40, 30], ['trig', 76, 275, 40, 30], ['7', 126, 275, 46, 32], ['8', 178, 275, 46, 32], ['9', 230, 275, 46, 32], ['×', 284, 275, 46, 32],
-  ['^', 30, 312, 40, 30], ['x²', 76, 312, 40, 30], ['4', 126, 312, 46, 32], ['5', 178, 312, 46, 32], ['6', 230, 312, 46, 32], ['÷', 284, 312, 46, 32],
-  ['eˣ', 30, 349, 40, 30], ['10ˣ', 76, 349, 40, 30], ['1', 126, 349, 46, 32], ['2', 178, 349, 46, 32], ['3', 230, 349, 46, 32], ['+', 284, 349, 46, 32],
-  ['(', 30, 386, 40, 30], [')', 76, 386, 40, 30], ['0', 126, 386, 46, 32], ['.', 178, 386, 46, 32], ['(−)', 230, 386, 46, 32], ['−', 284, 386, 46, 32],
-  ['EE', 30, 423, 40, 30], [',', 76, 423, 40, 30], ['var', 126, 423, 46, 30], ['enter', 230, 423, 100, 32]];
+const IX_NS_KEYS = (() => { // [label, x, y, w, h, kind, label above] on a 400 × 900 drawing, laid out like the CX II
+  const K = [];
+  [['esc', 330, ''], ['▤', 380, 'save'], ['tab', 430, '']].forEach(([l, y, a]) => K.push([l, 56, y, 54, 30, 'w', a]));
+  [['⌂on', 330, 'off'], ['doc', 380, '+page'], ['menu', 430, '']].forEach(([l, y, a]) => K.push([l, 290, y, 54, 30, 'w', a]));
+  [['ctrl', 56, 'g', ''], ['⇧shift', 142, 'w', 'CAPS'], ['var', 216, 'w', 'sto→'], ['del', 290, 'w', 'clear']].forEach(([l, x, k, a]) => K.push([l, x, 500, l === 'ctrl' ? 54 : 54, 30, k, a]));
+  const L = [[['=', '≠≥▸'], ['trig', '?']], [['^', 'ⁿ√x'], ['x²', '√']], [['eˣ', 'ln'], ['10ˣ', 'log']], [['(', '[ ]'], [')', '{ }']]];
+  const R = [[['⊞', ':='], ['📖', '∞β°']], [['×', '“□”'], ['÷', '□/□']], [['+', ''], ['−', '']]];
+  const N = [['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['0', '.', '(−)']], NA = [['', '', ''], ['', '', ''], ['', '', ''], ['', 'capture', 'ans']];
+  for (let r = 0; r < 4; r++) { const y = 560 + r * 46;
+    L[r].forEach(([l, a], c) => K.push([l, 52 + c * 38, y, 36, 30, 'w', a]));
+    N[r].forEach((l, c) => K.push([l, 138 + c * 50, y - 1, 44, 33, 'd', NA[r][c]]));
+    if (r < 3) R[r].forEach(([l, a], c) => K.push([l, 286 + c * 34, y, 30, 30, 'w', a])); }
+  K.push(['enter', 286, 698, 64, 30, 'w', '≈']);
+  const rows = [['EE', 'A', 'B', 'C', 'D', 'E', 'F', 'G', '?!▸'], ['π▸', 'H', 'I', 'J', 'K', 'L', 'M', 'N', '⚑▸'], [',', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', '↵'], ['V', 'W', 'X', 'Y', 'Z', '␣']];
+  rows.forEach((row, r) => row.forEach((l, c) => { const x = (r === 3 ? 74 : 44) + c * 36, dark = r === 3 && /[XYZ]/.test(l); K.push([l, x, 750 + r * 31, l === '␣' ? 62 : 30, 24, dark ? 'd' : 'w', '']); }));
+  return K; })();
+const IX_NS_ALIAS = { '⌂ on': '⌂on', shift: '⇧shift' };
 const IX_NS_STEPS = {
   trig: { title: 'sin 35° (degree mode)', steps: [['', 'Check the corner: it should say DEG. (If it says RAD, click it.)', 'DEG'], ['trig', 'Press trig. A menu of trig functions opens.', 'sin  cos  tan\nsin⁻¹ cos⁻¹ tan⁻¹'], ['enter', 'sin is already picked: press enter (or click it).', 'sin(▮)'], ['3', 'Type the angle.', 'sin(3▮)'], ['5', '', 'sin(35▮)'], ['enter', 'Press enter.', 'sin(35)      0.573576']] },
   invtrig: { title: 'tan⁻¹(8/5) (degree mode)', steps: [['trig', 'Press trig.', 'sin  cos  tan\nsin⁻¹ cos⁻¹ tan⁻¹'], ['enter', 'Move to tan⁻¹ on the second row with the touchpad, then press enter.', 'tan⁻¹(▮)'], ['ctrl', 'For a fraction box, press ctrl …', 'tan⁻¹(▮)'], ['÷', '… then ÷.', 'tan⁻¹(▮/□)'], ['8', 'Type the top.', 'tan⁻¹(8/□)'], ['tab', 'Press tab (or ▼ on the touchpad) to get to the bottom.', 'tan⁻¹(8/▮)'], ['5', 'Type the bottom.', 'tan⁻¹(8/5)'], ['enter', 'Press enter.', 'tan⁻¹(8/5)     57.9946']] },
@@ -42792,23 +42802,36 @@ const IX_NS_STEPS = {
 IX.nspire = { subjects: ['act', 'algebra1', 'algebra2', 'geometry', 'precalc'],
   title: 'TI-Nspire CX II key presses', hint: 'Pick a skill and press Next (or tap the glowing key) to walk through the key presses one at a time.',
   build({ main, ctl, read }, o) {
-    const cv = ixCanvas(360, 560), ctx = cv._ctx; main.append(cv);
+    const cv = ixCanvas(400, 900), ctx = cv._ctx; main.append(cv); cv.style.maxWidth = '420px';
     const S = { k: IX_NS_STEPS[o.skill] ? o.skill : 'trig', i: 0, t: 0 };
     const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+    const txt = (t, x, y, px, col, al = 'center', font = 'system-ui, sans-serif', wt = '') => { ctx.save(); ctx.fillStyle = col; ctx.font = `${wt} ${px}px ${font}`; ctx.textAlign = al; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y); ctx.restore(); };
     function draw() {
-      const Q = IX_NS_STEPS[S.k], st = Q.steps[Math.min(S.i, Q.steps.length - 1)], key = S.i < Q.steps.length ? st[0] : '';
-      ctx.clearRect(0, 0, 360, 560);
-      ctx.save(); rr(6, 4, 348, 552, 30); ctx.fillStyle = '#f2c230'; ctx.fill(); ctx.strokeStyle = '#b8901c'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); // the yellow school calculators
-      ctx.save(); rr(28, 18, 304, 120, 6); ctx.fillStyle = '#e9efe6'; ctx.fill(); ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
-      ctx.save(); ctx.fillStyle = '#1d1d1b'; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.fillText(S.k === 'trig' || S.k === 'invtrig' ? 'DEG' : 'RAD', 322, 34);
-      if (S.i === 0 && S.k === 'trig') { ctx.strokeStyle = IXC.red; ctx.lineWidth = 2; ctx.strokeRect(292, 22, 34, 17); }
-      ctx.font = '19px "Times New Roman", serif'; ctx.textAlign = 'left'; const scr = S.i ? Q.steps[S.i - 1][2] : (st[0] ? '' : st[2] === 'DEG' ? '' : st[2]);
-      String(S.i < Q.steps.length && S.i ? Q.steps[S.i - 1][2] : S.i >= Q.steps.length ? Q.steps[Q.steps.length - 1][2] : '').split('\n').forEach((ln, j) => ctx.fillText(ln, 40, 66 + j * 24)); void scr; ctx.restore();
-      ctx.save(); ctx.fillStyle = '#3a3a38'; rr(110, 150, 140, 70, 14); ctx.fill(); ctx.restore(); ixLabel(ctx, 'touchpad', 180, 177, 13, 'center', '#ddd');
-      IX_NS_KEYS.forEach(([lab, x, y, w, h]) => { const on = lab === key; ctx.save(); rr(x, y, w, h, 7); ctx.fillStyle = on ? '#ffb000' : ['enter'].includes(lab) ? '#2e2e2c' : /^[0-9.]$|\(−\)/.test(lab) ? '#ffffff' : '#3a3a38'; ctx.fill();
-        if (on) { ctx.shadowColor = '#ff6a00'; ctx.shadowBlur = 18 + 8 * Math.sin(S.t / 3); ctx.strokeStyle = '#b5482b'; ctx.lineWidth = 3; ctx.stroke(); } ctx.restore();
-        ixLabel(ctx, lab, x + w / 2, y + h / 2 + 1, lab.length > 3 ? 13 : 16, 'center', on ? '#1d1d1b' : /^[0-9.]$|\(−\)/.test(lab) ? '#1d1d1b' : '#ffffff', 'middle'); });
-      ixLabel(ctx, '(letter keys are below these)', 180, 470, 13, 'center', '#6b5410');
+      const Q = IX_NS_STEPS[S.k], st = Q.steps[Math.min(S.i, Q.steps.length - 1)], key = S.i < Q.steps.length ? (IX_NS_ALIAS[st[0]] || st[0]) : '';
+      ctx.clearRect(0, 0, 400, 900);
+      // the case: white face between yellow-orange rails
+      ctx.save(); rr(14, 8, 372, 884, 26); ctx.fillStyle = '#f4a81f'; ctx.fill(); ctx.restore();
+      ctx.save(); rr(34, 8, 332, 884, 14); ctx.fillStyle = '#fbfbf8'; ctx.fill(); ctx.strokeStyle = '#d9d6cc'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.strokeStyle = '#e2dfd6'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(34, 482); ctx.lineTo(366, 482); ctx.stroke(); ctx.restore();
+      txt('TI-nspire CX II', 200, 34, 22, '#444', 'center', 'Georgia, serif', 'italic'); txt('Texas Instruments', 200, 58, 12, '#333', 'center', 'Georgia, serif', 'bold');
+      // the screen, with its tab bar and the angle mode
+      ctx.save(); rr(56, 76, 288, 214, 4); ctx.fillStyle = '#222'; ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.fillRect(62, 82, 276, 202); ctx.fillStyle = '#e6eef7'; ctx.fillRect(62, 82, 276, 20); ctx.restore();
+      txt('1.1', 82, 92, 12, '#1d1d1b'); txt('*Scratchpad', 180, 92, 12, '#1d1d1b'); const mode = S.k === 'trig' || S.k === 'invtrig' ? 'DEG' : 'RAD'; txt(mode, 304, 92, 11, '#1d1d1b');
+      if (S.i === 0 && S.k === 'trig') { ctx.save(); ctx.strokeStyle = IXC.red; ctx.lineWidth = 2; ctx.strokeRect(288, 84, 32, 16); ctx.restore(); }
+      const upto = Math.min(S.i, Q.steps.length), cur = upto ? Q.steps[upto - 1][2] : '', done = Q.steps.slice(0, Math.max(0, upto - 1)).map((x) => x[2]).filter((x) => /\S\s{4,}\S/.test(x) && !x.includes('\n')); // earlier answers stay on the screen, like the real scratchpad
+      const scr = [...done, ...(done.includes(cur) ? [] : [cur])].filter(Boolean).join('\n');
+      String(scr || '').split('\n').forEach((ln, j) => { const parts = ln.split(/\s{4,}/); txt(parts[0], 72, 124 + j * 24, 18, '#1d1d1b', 'left', '"Times New Roman", serif'); if (parts[1]) txt(parts[1], 328, 124 + j * 24, 18, '#1d1d1b', 'right', '"Times New Roman", serif'); });
+      // the touchpad
+      ctx.save(); rr(128, 316, 144, 150, 22); ctx.fillStyle = '#f4a81f'; ctx.fill(); rr(134, 322, 132, 138, 18); ctx.fillStyle = '#eceae4'; ctx.fill(); rr(144, 332, 112, 118, 14); ctx.fillStyle = '#f7f6f2'; ctx.fill(); ctx.strokeStyle = '#c9c5bb'; ctx.stroke();
+      rr(180, 370, 40, 40, 8); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke(); ctx.restore(); txt('▴', 200, 342, 12, '#555'); txt('▾', 200, 440, 12, '#555'); txt('◂', 154, 391, 12, '#555'); txt('▸', 246, 391, 12, '#555'); txt('click', 200, 391, 11, '#777');
+      IX_NS_KEYS.forEach(([lab, x, y, w, h, kind, above]) => { const on = lab === key, dark = kind === 'd', gray = kind === 'g';
+        if (above) txt(above, x + w / 2, y - 8, 10, '#6b675e');
+        ctx.save(); rr(x, y, w, h, 6); ctx.fillStyle = on ? '#ffb000' : dark ? '#2f3437' : gray ? '#8d8f91' : '#ffffff'; ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 2; ctx.shadowOffsetY = 1.5; ctx.fill(); ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = on ? '#b5482b' : dark ? '#1c1f21' : '#b9b6ae'; ctx.lineWidth = on ? 3 : 1; ctx.stroke();
+        if (on) { ctx.shadowColor = '#ff6a00'; ctx.shadowBlur = 14 + 8 * Math.sin(S.t / 3); ctx.stroke(); } ctx.restore();
+        const sz = h < 26 ? (lab.length > 1 ? 11 : 13) : lab.length > 4 ? 14 : lab.length > 2 ? 15 : 19;
+        txt(lab, x + w / 2, y + h / 2 + 1, sz, on ? '#1d1d1b' : dark || gray ? '#ffffff' : '#1d1d1b', 'center', 'system-ui, sans-serif', dark && h > 26 ? 'bold' : ''); });
+      txt('SCHOOL PROPERTY', 200, 880, 15, '#555', 'center', 'Georgia, serif', 'bold');
       const L = [{ h: Q.title }];
       Q.steps.forEach(([k, txt], j) => { if (j < S.i) L.push(`✓ ${k ? k : '·'} ${txt ? '— ' + txt : ''}`); });
       if (S.i < Q.steps.length) L.push({ note: `Step ${S.i + 1} of ${Q.steps.length}: ${st[1] || 'Press ' + st[0] + '.'}${st[0] ? '  (key: ' + st[0] + ')' : ''}`, good: true });
@@ -42818,7 +42841,7 @@ IX.nspire = { subjects: ['act', 'algebra1', 'algebra2', 'geometry', 'precalc'],
     const next = () => { const Q = IX_NS_STEPS[S.k]; if (S.i < Q.steps.length) S.i++; draw(); };
     ctl.append(ixSeg(Object.entries(IX_NS_STEPS).map(([k, Q]) => [k, Q.title]), S.k, (k) => { S.k = k; S.i = 0; draw(); }),
       el('div', { class: 'ix-btns' }, ixBtn('◀ Back', () => { S.i = Math.max(0, S.i - 1); draw(); }), ixBtn('Next ▶', next), ixBtn('Start over', () => { S.i = 0; draw(); })));
-    ixDrag(cv, (x, y) => { const Q = IX_NS_STEPS[S.k], st = Q.steps[S.i]; if (!st) return null; if (!st[0]) return 'go'; const K = IX_NS_KEYS.find((k) => k[0] === st[0]); return K && x >= K[1] - 6 && x <= K[1] + K[3] + 6 && y >= K[2] - 6 && y <= K[2] + K[4] + 6 ? 'go' : null; }, () => {}, () => next());
+    ixDrag(cv, (x, y) => { const Q = IX_NS_STEPS[S.k], st = Q.steps[S.i]; if (!st) return null; if (!st[0]) return 'go'; const K = IX_NS_KEYS.find((k) => k[0] === (IX_NS_ALIAS[st[0]] || st[0])); return K && x >= K[1] - 6 && x <= K[1] + K[3] + 6 && y >= K[2] - 6 && y <= K[2] + K[4] + 6 ? 'go' : null; }, () => {}, () => next());
     const pulse = setInterval(() => { if (!cv.isConnected) { clearInterval(pulse); return; } S.t++; draw(); }, 120);
     draw();
   } };
