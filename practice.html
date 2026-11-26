@@ -40400,10 +40400,21 @@ function advPrint(ids) {
 }
 
 // Log out: forget the teacher sign-in in this tab and the remembered dashboard password on this computer (and the crossword's), then go to the student page
-function teacherLogout() {
+function teacherLogout(to = 'student') {
   try { Object.keys(sessionStorage).filter((k) => /^teacher-ok:|^crossword-practice$/.test(k)).forEach((k) => sessionStorage.removeItem(k)); } catch {}
   try { Object.keys(localStorage).filter((k) => /dash:pw$|crossword-tkeep/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch {}
-  const t = params.get('t'); location.replace('practice.html' + (t ? '?t=' + encodeURIComponent(t) : ''));
+  const t = params.get('t'), q = [t ? 't=' + encodeURIComponent(t) : '', to === 'pin' ? 'teacher=1' : ''].filter(Boolean).join('&');
+  location.replace('practice.html' + (q ? '?' + q : ''));
+}
+// ask where to land after logging out: the student sign-in page or the teacher PIN page
+function teacherLogoutAsk() {
+  const close = () => box.remove(), b = (t, fn, cls = 'btn') => el('button', { type: 'button', class: cls, style: 'margin:4px 0;width:100%', onclick: fn }, t);
+  const box = el('div', { style: 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px', onclick: (e) => { if (e.target === box) close(); } },
+    el('div', { class: 'card', role: 'dialog', 'aria-label': 'Log out', style: 'max-width:420px;width:100%;margin:0' },
+      el('h3', { style: 'margin:0 0 4px' }, '🚪 Log out'), el('p', { class: 'small', style: 'margin:0 0 10px' }, 'This signs you out on this computer and forgets your saved dashboard password. Then go to:'),
+      b('The student sign-in page', () => teacherLogout('student')), b('The teacher PIN page', () => teacherLogout('pin')), b('Cancel', close, 'btn secondary')));
+  document.body.append(box); box.querySelector('button').focus();
+  const esc = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } }; document.addEventListener('keydown', esc);
 }
 function teacherNav(active) {
   let nav = document.getElementById('tnav');
@@ -40424,7 +40435,7 @@ function teacherNav(active) {
     ['crossword', 'Crossword', () => { location.href = 'crossword.html?t=' + TEACHER_ID; }],
     ['ix', 'Interactives', () => window.open(ixLink(''), '_blank')],
     ['help', 'Help', go(() => helpScreen())],
-    ['logout', '🚪 Log out', () => { if (confirm('Log out of teacher tools on this computer? You’ll need your password to get back in.')) teacherLogout(); }],
+    ['logout', '🚪 Log out', () => teacherLogoutAsk()],
   ];
   nav.innerHTML = '';
   tabs.forEach(([id, label, fn]) => nav.append(el('button', { type: 'button', onclick: fn, 'aria-current': id === active ? 'page' : 'false',
@@ -44131,7 +44142,7 @@ function helpScreen(open) {
       P('Your teacher page (bookmark it on your own computer, not a student Chromebook):'), codeBox(teacherLink),
       P('Type your ', B('teacher PIN'), ' or your ', B('Results dashboard password'), '. The dashboard password does more: once you type it on a computer, the Results dashboard, Classes & roster, and your saved assignments open there without asking again.'),
       P('The link students use for everything is below. They open it on their Chromebooks, already signed in to their school Google accounts, so their scores land in your gradebook by themselves.'), codeBox(studentLink),
-      P(B('Log out: '), 'the 🚪 Log out tab (at the end of the tabs) signs you out on that computer and forgets the remembered dashboard password, here and on the crossword page. Use it on any computer other than your own.'),
+      P(B('Log out: '), 'the 🚪 Log out tab (at the end of the tabs) signs you out on that computer and forgets the remembered dashboard password, here and on the crossword page. Then pick where to go: the student sign-in page (to hand the computer to a student) or the teacher PIN page (for another teacher). Use it on any computer other than your own.'),
       P(B('Wrong password too many times? '), 'Wait 15 minutes and try again.')]],
     ['practice', '2. Assign a section’s Practice (homework)', [
       P(`Every section of ${subjNames} already has a ready-made Practice assignment. Students can pick it from the Assignment menu on the student link, but a direct link is easier:`),
