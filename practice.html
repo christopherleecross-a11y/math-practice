@@ -40873,7 +40873,7 @@ function lessonEdit(key, start, startNote) {
     demoBox.innerHTML = '';
     const labels = [...new Set(P.steps.flatMap((st) => (st.show || []).map((x) => x.label)).filter((x) => x && !/^Interactive: /.test(x)))];
     P.demos.forEach((d, j) => {
-      const pick = el('select', { 'aria-label': 'Interactive' }, ...[...new Set([...(CONFIG.SUBJECTS || []), 'geometry', 'precalc', 'algebra1', 'algebra2', 'calc3', 'act'])].map((sub) => { const list = ixInOrder(sub); return list.length ? el('optgroup', { label: IX_SUBJ_NAMES[sub] || sub }, ...list.map(([id, D]) => el('option', { value: id }, D.title))) : ''; }).filter(Boolean));
+      const pick = el('select', { 'aria-label': 'Interactive' }, ...[...new Set([...(CONFIG.SUBJECTS || []), 'geometry', 'precalc', 'algebra1', 'algebra2', 'apcalc', 'calc3', 'act'])].map((sub) => { const list = ixInOrder(sub); return list.length ? el('optgroup', { label: IX_SUBJ_NAMES[sub] || sub }, ...list.map(([id, D]) => el('option', { value: id }, D.title))) : ''; }).filter(Boolean));
       pick.value = IX[d[0]] ? d[0] : Object.keys(IX)[0]; d[0] = pick.value;
       pick.addEventListener('change', () => { d[0] = pick.value; d[2] = {}; touch(); drawDemos(); }); // another interactive starts with its usual settings
       const at = el('select', { 'aria-label': 'Show it right before' }, ...labels.map((l) => el('option', { value: l }, l)));
@@ -41593,7 +41593,7 @@ function demoScreen(id) {
   document.getElementById('subtitle').textContent = CONFIG.TEACHER_NAME;
   const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '1240px';
   if (!IX[id]) {
-    const mine = CONFIG.SUBJECTS || [], order = [...new Set([...mine, 'geometry', 'precalc', 'algebra1', 'algebra2', 'calc3', 'act'])];
+    const mine = CONFIG.SUBJECTS || [], order = [...new Set([...mine, 'geometry', 'precalc', 'algebra1', 'algebra2', 'apcalc', 'calc3', 'act'])];
     app.append(el('div', { class: 'card' }, el('p', { style: 'margin:0' }, 'Pick one to explore. Some fit more than one subject, so they’re listed under each, in the order their lessons come up.')));
     order.forEach((sub) => { const list = ixInOrder(sub); if (!list.length) return;
       app.append(el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, IX_SUBJ_NAMES[sub] || sub), el('ul', { class: 'lp-ul' }, ...list.map(([k, D]) => el('li', { style: 'margin-bottom:6px' }, el('a', { href: ixLink(k) }, D.title), ' — ', D.hint, ixGoesWith(k, sub)))))); });
@@ -44493,6 +44493,635 @@ IX.percent = { subjects: ['act', 'algebra1'],
     const vis = () => { two.style.display = S.mode === 'two' ? '' : 'none'; sale.style.display = S.mode === 'two' ? 'none' : ''; };
     ctl.append(ixSeg([['two', 'Two changes in a row'], ['sale', 'Find the original price']], S.mode, (k) => { S.mode = k; vis(); draw(); }), two, sale); vis(); draw();
   } };
+
+// ======== AP Calculus ========
+// numeric helpers: derivative, second derivative, Simpson’s rule, and roots on an interval
+const ixD = (f, x, h = 1e-4) => (f(x + h) - f(x - h)) / (2 * h);
+const ixD2 = (f, x, h = 1e-3) => (f(x + h) - 2 * f(x) + f(x - h)) / (h * h);
+const ixInt = (f, a, b, n = 600) => { if (a === b) return 0; const h = (b - a) / n; let s = f(a) + f(b); for (let i = 1; i < n; i++) s += f(a + i * h) * (i % 2 ? 4 : 2); return s * h / 3; };
+const ixRoots = (f, a, b, n = 2000) => { const out = []; let x0 = a, y0 = f(a); for (let i = 1; i <= n; i++) { const x1 = a + (b - a) * i / n, y1 = f(x1); if (isFinite(y0) && isFinite(y1)) { if (y0 === 0) out.push(x0); else if (y0 * y1 < 0) { let lo = x0, hi = x1; for (let j = 0; j < 50; j++) { const m = (lo + hi) / 2; (f(lo) * f(m) <= 0) ? (hi = m) : (lo = m); } out.push((lo + hi) / 2); } } x0 = x1; y0 = y1; } return out.filter((x, i, A) => !i || x - A[i - 1] > 1e-6); };
+const ixArrow = (ctx, A, B, col, w = 3, lab) => { ixLine(ctx, A, B, col, w); const an = Math.atan2(B[1] - A[1], B[0] - A[0]); if (Math.hypot(B[0] - A[0], B[1] - A[1]) > 6) { ctx.save(); ctx.fillStyle = col; ctx.translate(B[0], B[1]); ctx.rotate(an); ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-10, -6); ctx.lineTo(-10, 6); ctx.fill(); ctx.restore(); } if (lab) ixLabel(ctx, lab, B[0] + 8, B[1] - 6, 18, 'left', col, 'bottom'); };
+const ixOpen = (ctx, x, y, col, r = 6) => { ctx.save(); ctx.fillStyle = '#fff'; ctx.strokeStyle = col; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill(); ctx.stroke(); ctx.restore(); };
+const ixSel = (opts, cur, on, lab) => { const s = el('select', { 'aria-label': lab || 'Pick', style: 'font-size:16px;padding:5px;max-width:100%' }, ...opts.map(([k, t]) => el('option', { value: k }, t))); s.value = cur; s.addEventListener('change', () => on(s.value)); return el('label', { class: 'ix-sl', style: 'display:block' }, lab ? el('span', {}, lab) : '', s); };
+const ixLim = (v) => (v === Infinity ? '∞' : v === -Infinity ? '−∞' : Number.isNaN(v) ? 'does not exist' : ixN(v, 4));
+
+// ---- Limits from a graph and a table
+const IX_LIMS = {
+  hole: { name: '(x² − 4)/(x − 2) at x = 2', f: (x) => (x * x - 4) / (x - 2), a: 2, val: NaN, L: 4, R: 4, yr: [-2, 7] },
+  moved: { name: 'x², but f(1) = 3', f: (x) => x * x, a: 1, val: 3, L: 1, R: 1, yr: [-1, 5] },
+  jump: { name: 'x + 1 (x < 1), x − 1 (x ≥ 1)', f: (x) => (x < 1 ? x + 1 : x - 1), a: 1, val: 0, L: 2, R: 0, yr: [-3, 4] },
+  vert: { name: '1/(x − 1)² at x = 1', f: (x) => 1 / (x - 1) ** 2, a: 1, val: NaN, L: Infinity, R: Infinity, yr: [-1, 10] },
+  sign: { name: '1/(x − 1) at x = 1', f: (x) => 1 / (x - 1), a: 1, val: NaN, L: -Infinity, R: Infinity, yr: [-8, 8] },
+  osc: { name: 'sin(1/x) at x = 0', f: (x) => Math.sin(1 / x), a: 0, val: NaN, L: NaN, R: NaN, yr: [-2, 2], xr: [-1, 1] },
+  cont: { name: 'x² − 1 at x = 2', f: (x) => x * x - 1, a: 2, val: 3, L: 3, R: 3, yr: [-2, 8] } };
+IX.limit = { subjects: ['apcalc', 'precalc'],
+  title: 'Limits and continuity', hint: 'Pick a function. Slide x closer to a from both sides and watch the table. The limit is where the y-values head, not necessarily f(a).',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 540), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_LIMS[o.k] ? o.k : 'hole', e: 0 };
+    function draw() {
+      const F = IX_LIMS[S.k], a = F.a, xr = F.xr || [a - 4, a + 4], V = ixView(cv, xr, F.yr, 26); ctx.clearRect(0, 0, 600, 540); ixGrid(ctx, V, { step: 1, lab: 1 });
+      if (S.k === 'jump') { ixCurve(ctx, V, F.f, IXC.blue, { w: 3.2, b: a - 1e-9 }); ixCurve(ctx, V, F.f, IXC.blue, { w: 3.2, a }); } else ixCurve(ctx, V, (x) => (Math.abs(x - a) < 1e-9 ? NaN : F.f(x)), IXC.blue, { w: 3.2, n: S.k === 'osc' ? 6000 : 1200 });
+      ixLine(ctx, [V.X(a), V.Y(F.yr[0])], [V.X(a), V.Y(F.yr[1])], IXC.gray, 1.4, true);
+      if (isFinite(F.L) && S.k !== 'osc') ixOpen(ctx, V.X(a), V.Y(F.L), IXC.blue); if (isFinite(F.R) && F.R !== F.L) ixOpen(ctx, V.X(a), V.Y(F.R), IXC.blue); if (isFinite(F.val)) ixDot(ctx, V.X(a), V.Y(F.val), IXC.blue, 7);
+      const h = Math.pow(10, -S.e) * (S.k === 'osc' ? 0.5 : 1.5), xl = a - h, xR = a + h;
+      [[xl, IXC.red], [xR, IXC.green]].forEach(([x, c]) => { const y = F.f(x); if (isFinite(y) && y > F.yr[0] && y < F.yr[1]) { ixDot(ctx, V.X(x), V.Y(y), c, 7, true); ixLine(ctx, [V.X(x), V.Y(y)], [V.X(x), V.Y(0)], c, 1.4, true); } });
+      const hs = [1, 0.1, 0.01, 0.001], row = (d) => `${hs.map((t) => ixN(F.f(a + d * t), 4)).join(', ')}`;
+      const lim = F.L === F.R ? F.L : NaN, cont = isFinite(F.val) && isFinite(lim) && Math.abs(F.val - lim) < 1e-9;
+      ixRead(read, [{ h: F.name }, { h: `From the left (x = ${a} − 1, − 0.1, − 0.01, − 0.001)` }, row(-1), { h: 'From the right' }, row(1),
+        { h: 'Limits' }, `lim x→${a}⁻ f(x) = ${ixLim(F.L)}`, `lim x→${a}⁺ f(x) = ${ixLim(F.R)}`, `lim x→${a} f(x) = ${F.L === F.R ? ixLim(F.L) : 'does not exist (left ≠ right)'}`, `f(${a}) = ${isFinite(F.val) ? ixN(F.val) : 'undefined'}`,
+        cont ? { note: 'Continuous at a: f(a) exists, the limit exists, and they’re equal.', good: true } : { note: `Not continuous at x = ${a}: ${!isFinite(F.val) ? 'f(a) is undefined' : !isFinite(lim) ? 'the limit doesn’t exist (as a number)' : 'the limit isn’t f(a)'}. ${S.k === 'hole' || S.k === 'moved' ? 'It’s a removable discontinuity (a hole).' : S.k === 'jump' ? 'It’s a jump discontinuity.' : S.k === 'osc' ? 'It oscillates forever.' : 'It’s an infinite discontinuity (vertical asymptote).'}`, bad: true }]);
+    }
+    ctl.append(ixSel(Object.entries(IX_LIMS).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; draw(); }, 'Function'), ixSlider('move closer to a', 0, 3, 0.1, S.e, (v) => 'h = ' + ixN(Math.pow(10, -v) * 1.5, 4), (v) => { S.e = v; draw(); }));
+    draw();
+  } };
+
+// ---- ε-δ definition of a limit
+IX.epsDelta = { subjects: ['apcalc'],
+  title: 'The ε-δ definition of a limit', hint: 'Pick ε (the red band around L). Then find a δ (the blue band around a) small enough that the graph over the blue band stays inside the red band.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 540), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'lin', eps: 1, del: 0.8 }, F = { lin: { name: 'f(x) = 2x + 1, a = 2, L = 5', f: (x) => 2 * x + 1, a: 2, L: 5, rule: (e) => e / 2, ruleT: 'δ = ε/2' }, sq: { name: 'f(x) = x², a = 2, L = 4', f: (x) => x * x, a: 2, L: 4, rule: (e) => Math.min(1, e / 5), ruleT: 'δ = min(1, ε/5)' } };
+    function draw() {
+      const D = F[S.k], V = ixView(cv, [-0.5, 4.5], [0, 10], 26); ctx.clearRect(0, 0, 580, 540); ixGrid(ctx, V, { step: 1, lab: 1 });
+      ctx.save(); ctx.fillStyle = 'rgba(181,72,43,.12)'; ctx.fillRect(V.X(-0.5), V.Y(D.L + S.eps), V.X(4.5) - V.X(-0.5), V.Y(D.L - S.eps) - V.Y(D.L + S.eps)); ctx.fillStyle = 'rgba(31,95,168,.12)'; ctx.fillRect(V.X(D.a - S.del), V.Y(10), V.X(D.a + S.del) - V.X(D.a - S.del), V.Y(0) - V.Y(10)); ctx.restore();
+      ixCurve(ctx, V, D.f, IXC.ink, { w: 2.4 }); let ok = true; for (let x = D.a - S.del; x <= D.a + S.del; x += S.del / 200) if (Math.abs(D.f(x) - D.L) >= S.eps) { ok = false; break; }
+      ixCurve(ctx, V, D.f, ok ? IXC.green : IXC.red, { w: 4, a: D.a - S.del, b: D.a + S.del }); ixOpen(ctx, V.X(D.a), V.Y(D.L), IXC.ink);
+      ixLabel(ctx, 'L + ε', V.X(-0.45), V.Y(D.L + S.eps) - 2, 15, 'left', IXC.red, 'bottom'); ixLabel(ctx, 'L − ε', V.X(-0.45), V.Y(D.L - S.eps) + 2, 15, 'left', IXC.red);
+      ixRead(read, [{ h: D.name }, `ε = ${ixN(S.eps, 3)}, δ = ${ixN(S.del, 3)}`, ok ? { note: 'This δ works: whenever 0 < |x − a| < δ, |f(x) − L| < ε (the green piece stays in the red band).', good: true } : { note: 'This δ is too big: part of the graph over the blue band leaves the red band.', bad: true },
+        { h: 'A δ that always works' }, `${D.ruleT} = ${ixN(D.rule(S.eps), 4)}`, { note: 'The definition: for every ε > 0 there is a δ > 0 such that 0 < |x − a| < δ implies |f(x) − L| < ε. Shrink ε and find a new δ.' }]);
+    }
+    const dS = ixSlider('δ', 0.02, 2, 0.01, S.del, (v) => ixN(v, 2), (v) => { S.del = v; draw(); });
+    ctl.append(ixSeg([['lin', '2x + 1'], ['sq', 'x²']], S.k, (k) => { S.k = k; draw(); }), ixSlider('ε', 0.1, 3, 0.05, S.eps, (v) => ixN(v, 2), (v) => { S.eps = v; draw(); }), dS,
+      el('div', { class: 'ix-btns' }, ixBtn('Use the rule for δ', () => { S.del = Math.max(0.02, F[S.k].rule(S.eps)); dS.set(S.del); draw(); })));
+    draw();
+  } };
+
+// ---- The Squeeze Theorem
+IX.squeeze = { subjects: ['apcalc'],
+  title: 'The Squeeze Theorem', hint: 'The function (blue) is trapped between two others (red and green) that have the same limit. Zoom in: it has nowhere to go but that limit.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 520), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'x2', z: 0 }, F = { x2: { name: 'x² sin(1/x) at x = 0', f: (x) => x * x * Math.sin(1 / x), lo: (x) => -x * x, hi: (x) => x * x, L: 0, lt: '−x² ≤ x² sin(1/x) ≤ x²' }, sinx: { name: 'sin x / x at x = 0', f: (x) => Math.sin(x) / x, lo: Math.cos, hi: () => 1, L: 1, lt: 'cos x ≤ sin x / x ≤ 1' } };
+    function draw() {
+      const D = F[S.k], w = 2 * Math.pow(10, -S.z) * (S.k === 'sinx' ? 1.6 : 1), V = ixView(cv, [-w, w], S.k === 'sinx' ? [1 - w * w * 0.6 - 0.05 * w, 1 + w * w * 0.2 + 0.05 * w] : [-w * w * 1.2, w * w * 1.2], 30);
+      ctx.clearRect(0, 0, 580, 520); ixGrid2(ctx, V, w / 4, (V.yr[1] - V.yr[0]) / 8, w / 2, (V.yr[1] - V.yr[0]) / 4);
+      ixCurve(ctx, V, D.lo, IXC.red, { w: 2.6 }); ixCurve(ctx, V, D.hi, IXC.green, { w: 2.6 }); ixCurve(ctx, V, D.f, IXC.blue, { w: 2.4, n: 5000 }); ixOpen(ctx, V.X(0), V.Y(D.L), IXC.ink);
+      ixRead(read, [{ h: D.name }, D.lt, `both outside functions → ${D.L} as x → 0`, `so lim x→0 = ${D.L}`, { note: 'Squeeze Theorem: if g(x) ≤ f(x) ≤ h(x) near a, and g and h have the same limit L at a, then f has limit L too.' }, `window: −${ixN(w, 5)} < x < ${ixN(w, 5)}`]);
+    }
+    ctl.append(ixSeg([['x2', 'x² sin(1/x)'], ['sinx', 'sin x / x']], S.k, (k) => { S.k = k; draw(); }), ixSlider('zoom in', 0, 2, 0.1, S.z, (v) => '×' + ixN(Math.pow(10, v), 1), (v) => { S.z = v; draw(); }));
+    draw();
+  } };
+
+// ---- functions with known derivatives, for the derivative interactives
+const IX_CFN = {
+  sq: { name: 'x²', f: (x) => x * x, d: (x) => 2 * x, ds: '2x', xr: [-3, 3], yr: [-2, 9] },
+  cub: { name: 'x³ − 3x', f: (x) => x ** 3 - 3 * x, d: (x) => 3 * x * x - 3, ds: '3x² − 3', xr: [-3, 3], yr: [-6, 6] },
+  sin: { name: 'sin x', f: Math.sin, d: Math.cos, ds: 'cos x', xr: [-2 * Math.PI, 2 * Math.PI], yr: [-2, 2] },
+  exp: { name: 'eˣ', f: Math.exp, d: Math.exp, ds: 'eˣ', xr: [-3, 2.5], yr: [-1, 8] },
+  ln: { name: 'ln x', f: (x) => (x > 0 ? Math.log(x) : NaN), d: (x) => (x > 0 ? 1 / x : NaN), ds: '1/x', xr: [-0.5, 6], yr: [-3, 3] },
+  sqrt: { name: '√x', f: (x) => (x >= 0 ? Math.sqrt(x) : NaN), d: (x) => (x > 0 ? 0.5 / Math.sqrt(x) : NaN), ds: '1/(2√x)', xr: [-0.5, 9], yr: [-1, 4] },
+  abs: { name: '|x|', f: Math.abs, d: (x) => (x > 0 ? 1 : x < 0 ? -1 : NaN), ds: '−1 (x < 0), 1 (x > 0)', xr: [-3, 3], yr: [-1, 4] } };
+
+// ---- Secant lines become the tangent line
+IX.secant = { subjects: ['apcalc'],
+  title: 'From secant line to tangent line', hint: 'Slide h toward 0. The secant line through (a, f(a)) and (a + h, f(a + h)) turns into the tangent line, and its slope becomes the derivative f′(a).',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 540), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'sq', a: 1, h: 1.5 };
+    function draw() {
+      const F = IX_CFN[S.k], V = ixView(cv, F.xr, F.yr, 26), a = S.a, h = S.h; ctx.clearRect(0, 0, 580, 540); ixGrid(ctx, V, { step: 1, lab: 1, ...(S.k === 'sin' ? { piX: 0.5 } : {}) });
+      ixCurve(ctx, V, F.f, IXC.blue, { w: 3.2 }); const fa = F.f(a), fb = F.f(a + h), m = (fb - fa) / h, mt = F.d(a);
+      if (isFinite(mt)) ixCurve(ctx, V, (x) => fa + mt * (x - a), IXC.green, { w: 2, dash: true }); if (isFinite(m) && h) ixCurve(ctx, V, (x) => fa + m * (x - a), IXC.red, { w: 2.6 });
+      ixDot(ctx, V.X(a), V.Y(fa), IXC.ink, 7); if (isFinite(fb)) ixDot(ctx, V.X(a + h), V.Y(fb), IXC.red, 7, true);
+      const tbl = [1, 0.1, 0.01, 0.001].map((t) => `h = ${t}: ${ixN((F.f(a + t) - fa) / t, 5)}`);
+      ixRead(read, [{ h: `f(x) = ${F.name}, a = ${ixN(a, 2)}` }, { h: 'Slope of the secant (red)' }, '(f(a + h) − f(a))/h', `= (${ixN(fb, 4)} − ${ixN(fa, 4)})/${ixN(h, 3)} = ${ixN(m, 4)}`, { h: 'As h → 0' }, ...tbl, { h: 'Slope of the tangent (green)' }, `f′(a) = ${isFinite(mt) ? ixN(mt, 4) : 'undefined'}`, `f′(x) = ${F.ds}`]);
+    }
+    const aS = ixSlider('a', -2, 2, 0.1, S.a, (v) => ixN(v, 2), (v) => { S.a = v; draw(); }), hS = ixSlider('h', -2, 2, 0.01, S.h, (v) => ixN(v, 2), (v) => { S.h = v || 0.01; draw(); });
+    ctl.append(ixSeg(Object.entries(IX_CFN).filter(([k]) => k !== 'abs').map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; const F = IX_CFN[k], lo = Math.max(F.xr[0], k === 'ln' || k === 'sqrt' ? 0.5 : -2), i = aS.querySelector('input'); i.min = lo; i.max = Math.min(F.xr[1] - 0.5, 4); S.a = Math.max(lo, Math.min(+i.max, S.a)); aS.set(S.a); draw(); }), aS, hS,
+      el('div', { class: 'ix-btns' }, ...[1, 0.5, 0.1, 0.01].map((v) => ixBtn('h = ' + v, () => { S.h = v; hS.set(v); draw(); }))));
+    draw();
+  } };
+
+// ---- The graph of f and the graph of f′
+IX.derivGraph = { subjects: ['apcalc'],
+  title: 'Graphing f′ from f', hint: 'Drag along the top graph. The slope of the tangent line at each x is plotted as the height of f′ below. Where f rises, f′ is above the axis; at a peak or valley, f′ = 0.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 600), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'cub', x: -1.5, trace: true };
+    function draw() {
+      const F = IX_CFN[S.k], T0 = ixView({ _w: 600, _h: 300 }, F.xr, F.yr, 24), T = T0, dmax = Math.max(2, ...Array.from({ length: 101 }, (_, i) => Math.abs(F.d(F.xr[0] + (F.xr[1] - F.xr[0]) * i / 100)) || 0).filter(isFinite).map((v) => Math.min(v, 9)));
+      const B0 = ixView({ _w: 600, _h: 300 }, F.xr, [-dmax * 1.15, dmax * 1.15], 24), B = { ...B0, Y: (y) => 300 + B0.Y(y) }; ctx.clearRect(0, 0, 600, 600);
+      const piX = S.k === 'sin' ? { piX: 0.5 } : {}; ixGrid(ctx, T, { step: 1, lab: F.yr[1] - F.yr[0] > 8 ? 2 : 1, ...piX }); ixGrid(ctx, B, { step: 1, lab: dmax > 4 ? 2 : 1, ...piX }); ixLine(ctx, [0, 300], [600, 300], '#cfcabd', 2);
+      ixLabel(ctx, `f(x) = ${F.name}`, 590, 6, 17, 'right', IXC.blue); ixLabel(ctx, `f′(x)`, 590, 306, 17, 'right', IXC.red);
+      ixCurve(ctx, T, F.f, IXC.blue, { w: 3 }); if (S.trace) ixCurve(ctx, B, F.d, IXC.red, { w: 2.6, b: S.x }); else ixCurve(ctx, B, F.d, IXC.red, { w: 2.6 });
+      const x = S.x, y = F.f(x), m = F.d(x); if (isFinite(y)) { if (isFinite(m)) ixCurve(ctx, T, (t) => y + m * (t - x), IXC.green, { w: 2, a: x - 1.2, b: x + 1.2 }); ixDot(ctx, T.X(x), T.Y(y), IXC.blue, 7, true); }
+      if (isFinite(m)) { ixDot(ctx, B.X(x), B.Y(m), IXC.red, 7, true); ixLine(ctx, [B.X(x), B.Y(0)], [B.X(x), B.Y(m)], IXC.red, 1.4, true); }
+      ixLine(ctx, [T.X(x), 0], [T.X(x), 600], IXC.gray, 1, true);
+      ixRead(read, [{ h: `At x = ${ixN(x, 2)}` }, `f(x) = ${ixN(y, 3)}`, `slope of the tangent = f′(x) = ${isFinite(m) ? ixN(m, 3) : 'undefined'}`, isFinite(m) ? { note: Math.abs(m) < 0.05 ? 'Flat tangent: f′ = 0 (a possible peak or valley).' : m > 0 ? 'f is increasing here, so f′ > 0.' : 'f is decreasing here, so f′ < 0.' } : { note: 'No tangent line here (a corner or the edge of the domain): f′ doesn’t exist.', bad: true },
+        { h: 'The derivative' }, `f′(x) = ${F.ds}`]);
+    }
+    ctl.append(ixSeg(Object.entries(IX_CFN).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; S.x = IX_CFN[k].xr[0] + 0.3; draw(); }), ixCheck('Trace f′ as you drag (unchecked: show all of f′)', S.trace, (v) => { S.trace = v; draw(); }), el('div', { class: 'small' }, 'Drag left and right on either graph.'));
+    ixDrag(cv, () => 'x', (h, px) => { const F = IX_CFN[S.k], V = ixView({ _w: 600, _h: 300 }, F.xr, F.yr, 24); S.x = Math.max(F.xr[0], Math.min(F.xr[1], V.ix(px))); draw(); });
+    draw();
+  } };
+
+// ---- Motion along a line
+const IX_MOT = { a: { name: 's(t) = t³ − 6t² + 9t', s: (t) => t ** 3 - 6 * t * t + 9 * t, v: (t) => 3 * t * t - 12 * t + 9, a: (t) => 6 * t - 12, T: 5 }, b: { name: 's(t) = 2t² − 8t + 3', s: (t) => 2 * t * t - 8 * t + 3, v: (t) => 4 * t - 8, a: () => 4, T: 4 }, c: { name: 's(t) = 4 sin t', s: (t) => 4 * Math.sin(t), v: (t) => 4 * Math.cos(t), a: (t) => -4 * Math.sin(t), T: 2 * Math.PI } };
+IX.motion = { subjects: ['apcalc'],
+  title: 'Position, velocity, and acceleration', hint: 'Press ▶ or slide t. The particle moves along the line; the arrow is its velocity. It speeds up when v and a have the same sign, and slows down when they’re opposite.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(620, 540), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'a', t: 0.5, play: null };
+    function draw() {
+      const M = IX_MOT[S.k], t = S.t, s = M.s(t), v = M.v(t), a = M.a(t); ctx.clearRect(0, 0, 620, 540);
+      let lo = 0, hi = 0; for (let u = 0; u <= M.T; u += M.T / 200) { lo = Math.min(lo, M.s(u)); hi = Math.max(hi, M.s(u)); } const X = (x) => 40 + (x - lo + 1) / (hi - lo + 2) * 540;
+      ixLine(ctx, [20, 70], [600, 70], IXC.ink, 2); for (let k = Math.ceil(lo - 1); k <= hi + 1; k++) { ixLine(ctx, [X(k), 64], [X(k), 76], IXC.ink, 1.2); if (k % 2 === 0) ixLabel(ctx, String(k), X(k), 80, 13, 'center', IXC.axis); }
+      ixDot(ctx, X(s), 70, IXC.blue, 11); if (Math.abs(v) > 0.05) ixArrow(ctx, [X(s), 40], [X(s) + Math.sign(v) * Math.min(120, 12 + Math.abs(v) * 10), 40], IXC.green, 3, 'v'); ixLabel(ctx, 's', 30, 60, 16, 'center', IXC.gray, 'bottom');
+      let vmax = 1; for (let u = 0; u <= M.T; u += M.T / 200) vmax = Math.max(vmax, Math.abs(M.s(u)), Math.abs(M.v(u)), Math.abs(M.a(u))); const G0 = ixView({ _w: 620, _h: 420 }, [0, M.T], [-vmax * 1.1, vmax * 1.1], 30), G = { ...G0, Y: (y) => 120 + G0.Y(y) };
+      ixGrid2(ctx, G, M.T > 6 ? 1 : 0.5, Math.ceil(vmax / 4), 1, Math.ceil(vmax / 2)); ixCurve(ctx, G, M.s, IXC.blue, { w: 2.8 }); ixCurve(ctx, G, M.v, IXC.green, { w: 2.4 }); ixCurve(ctx, G, M.a, IXC.orange, { w: 2, dash: true });
+      ixLine(ctx, [G.X(t), G.Y(-vmax * 1.1)], [G.X(t), G.Y(vmax * 1.1)], IXC.gray, 1.4, true); [[s, IXC.blue], [v, IXC.green], [a, IXC.orange]].forEach(([y, c]) => ixDot(ctx, G.X(t), G.Y(y), c, 6));
+      ixLabel(ctx, 's(t)', 600, 128, 16, 'right', IXC.blue); ixLabel(ctx, 'v(t) = s′(t)', 600, 148, 16, 'right', IXC.green); ixLabel(ctx, 'a(t) = v′(t)', 600, 168, 16, 'right', IXC.orange);
+      const rest = Math.abs(v) < 0.05, sp = v * a > 0;
+      ixRead(read, [{ h: M.name }, `t = ${ixN(t, 2)}`, `position s = ${ixN(s, 3)}`, `velocity v = ${ixN(v, 3)} (${rest ? 'at rest' : v > 0 ? 'moving right' : 'moving left'})`, `acceleration a = ${ixN(a, 3)}`, `speed |v| = ${ixN(Math.abs(v), 3)}`,
+        rest ? { note: 'v = 0: the particle is at rest (it may be turning around).' } : { note: sp ? 'v and a have the same sign: speeding up.' : Math.abs(a) < 1e-9 ? 'a = 0: constant speed for an instant.' : 'v and a have opposite signs: slowing down.', good: sp }]);
+    }
+    const stop = () => { if (S.play) { clearInterval(S.play); S.play = null; } }, tS = ixSlider('t', 0, 5, 0.01, S.t, (v) => ixN(v, 2), (v) => { stop(); S.t = v; draw(); });
+    ctl.append(ixSeg(Object.entries(IX_MOT).map(([k, M]) => [k, M.name]), S.k, (k) => { stop(); S.k = k; S.t = 0; const i = tS.querySelector('input'); i.max = IX_MOT[k].T; tS.set(0); draw(); }), tS,
+      el('div', { class: 'ix-btns' }, ixBtn('▶ Play', () => { stop(); S.t = 0; S.play = setInterval(() => { S.t += IX_MOT[S.k].T / 300; if (S.t >= IX_MOT[S.k].T || !cv.isConnected) { S.t = Math.min(S.t, IX_MOT[S.k].T); stop(); } tS.set(S.t); draw(); }, 30); })));
+    draw();
+  } };
+
+// ---- Linear approximation
+const IX_LIN = { sqrt: { name: '√x near 4', f: Math.sqrt, a: 4, x: 4.3 }, cbrt: { name: '∛x near 8', f: Math.cbrt, a: 8, x: 8.5 }, sin: { name: 'sin x near 0', f: Math.sin, a: 0, x: 0.3 }, exp: { name: 'eˣ near 0', f: Math.exp, a: 0, x: 0.2 }, ln: { name: 'ln x near 1', f: Math.log, a: 1, x: 1.2 } };
+IX.linApprox = { subjects: ['apcalc'],
+  title: 'Linear approximation', hint: 'Near x = a, the tangent line L(x) is very close to the curve. Zoom in to see the curve look straight. Use L(x) to estimate f(x).',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 540), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'sqrt', dx: 0.3, z: 0 };
+    function draw() {
+      const F = IX_LIN[S.k], a = F.a, fa = F.f(a), m = ixD(F.f, a), L = (x) => fa + m * (x - a), x = a + S.dx, w = 3 / Math.pow(10, S.z), V = ixView(cv, [a - w, a + w], [fa - w * Math.max(1, Math.abs(m)) * 0.9, fa + w * Math.max(1, Math.abs(m)) * 0.9], 30);
+      ctx.clearRect(0, 0, 580, 540); ixGrid2(ctx, V, w / 6, (V.yr[1] - V.yr[0]) / 8, w / 3, (V.yr[1] - V.yr[0]) / 4);
+      ixCurve(ctx, V, F.f, IXC.blue, { w: 3.2 }); ixCurve(ctx, V, L, IXC.red, { w: 2.2, dash: true }); ixDot(ctx, V.X(a), V.Y(fa), IXC.ink, 6);
+      if (Math.abs(S.dx) <= w) { ixDot(ctx, V.X(x), V.Y(F.f(x)), IXC.blue, 6); ixDot(ctx, V.X(x), V.Y(L(x)), IXC.red, 6); ixLine(ctx, [V.X(x), V.Y(F.f(x))], [V.X(x), V.Y(L(x))], IXC.purple, 2.4); }
+      const c2 = ixD2(F.f, a);
+      ixRead(read, [{ h: `f(x) = ${F.name}` }, `L(x) = f(a) + f′(a)(x − a)`, `L(x) = ${ixN(fa, 4)} + ${ixN(m, 4)}(x − ${a})`, { h: `Estimate at x = ${ixN(x, 3)}` }, `L(${ixN(x, 3)}) = ${ixN(L(x), 5)}`, `actual f(${ixN(x, 3)}) = ${ixN(F.f(x), 5)}`, `error = ${ixN(Math.abs(L(x) - F.f(x)), 5)}`,
+        { note: Math.abs(c2) < 1e-6 ? 'f″(a) = 0 here, so the estimate is especially good.' : c2 < 0 ? 'f is concave down near a, so the tangent line is above the curve: the estimate is too big (an overestimate).' : 'f is concave up near a, so the tangent line is below the curve: the estimate is too small (an underestimate).' }, { note: 'Differential form: dy = f′(a) dx.' }]);
+    }
+    ctl.append(ixSeg(Object.entries(IX_LIN).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; draw(); }), ixSlider('Δx = x − a', -1, 1, 0.05, S.dx, (v) => ixN(v, 2), (v) => { S.dx = v; draw(); }), ixSlider('zoom in', 0, 2, 0.1, S.z, (v) => '×' + ixN(Math.pow(10, v), 1), (v) => { S.z = v; draw(); }));
+    draw();
+  } };
+
+// ---- Related rates: a sliding ladder, a growing ripple
+IX.relatedRates = { subjects: ['apcalc'],
+  title: 'Related rates', hint: 'Ladder: the bottom slides out at a steady rate; watch how fast the top slides down. It speeds up near the ground. Ripple: the radius grows steadily, but the area grows faster and faster.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 500), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'ladder', x: 6, rate: 2, L: 10, play: null };
+    function draw() {
+      ctx.clearRect(0, 0, 600, 500); let L;
+      if (S.k === 'ladder') { const u = 40, ox = 80, oy = 460, x = S.x, y = Math.sqrt(S.L * S.L - x * x), dy = -x / y * S.rate;
+        ixLine(ctx, [ox, oy], [580, oy], IXC.ink, 3); ixLine(ctx, [ox, oy], [ox, 40], IXC.ink, 6); ctx.save(); ctx.fillStyle = '#e9e5da'; ctx.fillRect(ox - 30, 40, 30, oy - 40); ctx.restore();
+        ixLine(ctx, [ox + x * u, oy], [ox, oy - y * u], IXC.orange, 7); ixRightMark(ctx, [ox, oy], [ox + 20, oy], [ox, oy - 20]);
+        ixArrow(ctx, [ox + x * u, oy + 18], [ox + x * u + 50, oy + 18], IXC.green, 3, `${S.rate} ft/s`); ixArrow(ctx, [ox + 14, oy - y * u], [ox + 14, oy - y * u + Math.min(150, 25 * Math.abs(dy))], IXC.red, 3, `${ixN(Math.abs(dy), 2)} ft/s`);
+        ixLabel(ctx, `x = ${ixN(x, 2)}`, ox + x * u / 2, oy + 4, 17, 'center', IXC.green); ixLabel(ctx, `y = ${ixN(y, 2)}`, ox + 34, oy - y * u / 2, 17, 'left', IXC.blue, 'middle'); ixLabel(ctx, `${S.L} ft`, ox + x * u / 2 + 14, oy - y * u / 2 - 10, 18, 'left', IXC.orange, 'bottom');
+        L = [{ h: 'A 10-foot ladder slides down a wall' }, 'x² + y² = 100', 'differentiate with respect to t:', '2x (dx/dt) + 2y (dy/dt) = 0', 'dy/dt = −(x/y)(dx/dt)', `= −(${ixN(x, 2)}/${ixN(y, 2)})(${S.rate}) = ${ixN(dy, 3)} ft/s`, { note: 'The top slides down faster and faster as the bottom gets near the wall’s full length away.' }]; }
+      else { const r = S.x, dA = 2 * Math.PI * r * S.rate, u = 26; [r * 0.33, r * 0.66, r].forEach((rr, i) => { ctx.save(); ctx.strokeStyle = IXC.blue; ctx.globalAlpha = 0.4 + i * 0.3; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(300, 250, rr * u, 0, 2 * Math.PI); ctx.stroke(); ctx.restore(); });
+        ctx.save(); ctx.fillStyle = 'rgba(31,95,168,.10)'; ctx.beginPath(); ctx.arc(300, 250, r * u, 0, 2 * Math.PI); ctx.fill(); ctx.restore(); ixLine(ctx, [300, 250], [300 + r * u, 250], IXC.green, 3); ixLabel(ctx, `r = ${ixN(r, 2)}`, 300 + r * u / 2, 254, 17, 'center', IXC.green);
+        L = [{ h: 'A ripple spreads in a pond' }, `dr/dt = ${S.rate} ft/s (steady)`, 'A = πr²', 'dA/dt = 2πr (dr/dt)', `= 2π(${ixN(r, 2)})(${S.rate}) ≈ ${ixN(dA, 2)} ft²/s`, { note: 'The radius grows steadily, but the area grows faster as the circle gets bigger: each new ring has more circumference.' }]; }
+      ixRead(read, L);
+    }
+    const stop = () => { if (S.play) { clearInterval(S.play); S.play = null; } }, xS = ixSlider('x (bottom’s distance) / r', 0.5, 9.6, 0.05, S.x, (v) => ixN(v, 2), (v) => { stop(); S.x = v; draw(); });
+    ctl.append(ixSeg([['ladder', 'Sliding ladder'], ['ripple', 'Ripple']], S.k, (k) => { stop(); S.k = k; S.x = k === 'ladder' ? 6 : 3; xS.set(S.x); draw(); }), xS, ixSlider('rate (ft/s)', 1, 4, 0.5, S.rate, (v) => ixN(v), (v) => { S.rate = v; draw(); }),
+      el('div', { class: 'ix-btns' }, ixBtn('▶ Play', () => { stop(); S.x = 0.5; S.play = setInterval(() => { S.x += S.rate * 0.03 * (S.k === 'ladder' ? 0.5 : 0.5); if (S.x >= 9.6 || !cv.isConnected) { S.x = Math.min(S.x, 9.6); stop(); } xS.set(S.x); draw(); }, 30); })));
+    draw();
+  } };
+
+// ---- L’Hôpital’s Rule
+const IX_LH = { sin: { name: 'sin x / x, x → 0', f: Math.sin, g: (x) => x, a: 0, L: 1 }, exp: { name: '(eˣ − 1)/x, x → 0', f: (x) => Math.exp(x) - 1, g: (x) => x, a: 0, L: 1 }, ln: { name: 'ln x / (x − 1), x → 1', f: Math.log, g: (x) => x - 1, a: 1, L: 1 }, cos: { name: '(1 − cos x)/x², x → 0', f: (x) => 1 - Math.cos(x), g: (x) => x * x, a: 0, L: 0.5 }, poly: { name: '(x² − 9)/(x − 3), x → 3', f: (x) => x * x - 9, g: (x) => x - 3, a: 3, L: 6 } };
+IX.lhopital = { subjects: ['apcalc'],
+  title: 'L’Hôpital’s Rule', hint: 'Both the top f (blue) and bottom g (red) go to 0. Zoom in: near a, each looks like its tangent line, so f/g is about the ratio of their slopes, f′(a)/g′(a).',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 520), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'sin', z: 0 };
+    function draw() {
+      const F = IX_LH[S.k], a = F.a, w = 2 / Math.pow(10, S.z), V = ixView(cv, [a - w, a + w], [-w * 1.6, w * 1.6], 30); ctx.clearRect(0, 0, 580, 520); ixGrid2(ctx, V, w / 4, w / 4, w / 2, w / 2);
+      ixCurve(ctx, V, F.f, IXC.blue, { w: 3 }); ixCurve(ctx, V, F.g, IXC.red, { w: 3 });
+      ixDot(ctx, V.X(a), V.Y(0), IXC.ink, 5); const fp = ixD(F.f, a), gp = ixD(F.g, a), x = a + w / 2;
+      ixLabel(ctx, 'f', V.X(a + w * 0.85), V.Y(F.f(a + w * 0.85)) - 8, 20, 'center', IXC.blue, 'bottom'); ixLabel(ctx, 'g', V.X(a + w * 0.85), V.Y(F.g(a + w * 0.85)) + 6, 20, 'center', IXC.red);
+      const fpp = ixD2(F.f, a), gpp = ixD2(F.g, a), twice = Math.abs(gp) < 1e-6;
+      ixRead(read, [{ h: F.name }, `at x = ${a}: f = ${ixN(F.f(a), 3)}, g = ${ixN(F.g(a), 3)} → 0/0`, `f/g at x = ${ixN(x, 5)}: ${ixN(F.f(x) / F.g(x), 5)}`, { h: 'L’Hôpital’s Rule' }, 'lim f/g = lim f′/g′', twice ? `f′(${a}) = ${ixN(fp, 3)}, g′(${a}) = ${ixN(gp, 3)}: still 0/0, so use it again` : `= f′(${a})/g′(${a}) = ${ixN(fp, 4)}/${ixN(gp, 4)} = ${ixN(fp / gp, 4)}`, twice ? `= f″(${a})/g″(${a}) = ${ixN(fpp, 3)}/${ixN(gpp, 3)} = ${ixN(fpp / gpp, 3)}` : null,
+        { note: 'It only applies to 0/0 or ∞/∞. Take derivatives of the top and bottom separately (not the quotient rule).' }]);
+    }
+    ctl.append(ixSel(Object.entries(IX_LH).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; draw(); }, 'Limit'), ixSlider('zoom in', 0, 2, 0.1, S.z, (v) => '×' + ixN(Math.pow(10, v), 1), (v) => { S.z = v; draw(); }));
+    draw();
+  } };
+
+// ---- Mean Value Theorem and Rolle’s Theorem
+const IX_MVTF = { cub: { name: 'x³ − 3x', f: (x) => x ** 3 - 3 * x, xr: [-3, 3], yr: [-6, 6] }, sin: { name: 'sin x + x/3', f: (x) => Math.sin(x) + x / 3, xr: [-4, 4], yr: [-3, 3] }, sqrt: { name: '√x', f: (x) => (x >= 0 ? Math.sqrt(x) : NaN), xr: [-0.5, 8], yr: [-1, 3.5] }, quart: { name: 'x⁴ − 4x²', f: (x) => x ** 4 - 4 * x * x, xr: [-2.5, 2.5], yr: [-5, 5] } };
+IX.mvt = { subjects: ['apcalc'],
+  title: 'The Mean Value Theorem', hint: 'Slide a and b. The red secant line has the average rate of change. Somewhere between a and b there’s a c where the tangent line (green) is parallel to it.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 520), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'cub', a: -2, b: 2.5 };
+    function draw() {
+      const F = IX_MVTF[S.k], V = ixView(cv, F.xr, F.yr, 26); ctx.clearRect(0, 0, 580, 520); ixGrid(ctx, V, { step: 1, lab: 1 }); ixCurve(ctx, V, F.f, IXC.blue, { w: 3.2 });
+      const { a, b } = S, fa = F.f(a), fb = F.f(b), m = (fb - fa) / (b - a); ixCurve(ctx, V, (x) => fa + m * (x - a), IXC.red, { w: 2.2 }); [[a, fa], [b, fb]].forEach(([x, y]) => ixDot(ctx, V.X(x), V.Y(y), IXC.red, 7));
+      const cs = b > a ? ixRoots((x) => ixD(F.f, x) - m, a + 1e-6, b - 1e-6) : []; cs.forEach((c) => { const y = F.f(c); ixCurve(ctx, V, (x) => y + m * (x - c), IXC.green, { w: 2, dash: true, a: c - 1.5, b: c + 1.5 }); ixDot(ctx, V.X(c), V.Y(y), IXC.green, 7, true); ixLabel(ctx, 'c', V.X(c), V.Y(y) + 12, 18, 'center', IXC.green); });
+      const rolle = Math.abs(fa - fb) < 1e-6;
+      ixRead(read, [{ h: `f(x) = ${F.name} on [${ixN(a, 2)}, ${ixN(b, 2)}]` }, 'average rate of change:', `(f(b) − f(a))/(b − a) = (${ixN(fb, 3)} − ${ixN(fa, 3)})/(${ixN(b - a, 2)}) = ${ixN(m, 4)}`, { h: 'f′(c) = that slope at' }, cs.length ? cs.map((c) => 'c = ' + ixN(c, 4)).join(', ') : '—',
+        rolle ? { note: 'f(a) = f(b): this is Rolle’s Theorem, so somewhere f′(c) = 0 (a flat tangent).', good: true } : { note: 'MVT: if f is continuous on [a, b] and differentiable on (a, b), then f′(c) = (f(b) − f(a))/(b − a) for some c in (a, b).' }]);
+    }
+    const aS = ixSlider('a', -3, 3, 0.1, S.a, (v) => ixN(v, 2), (v) => { S.a = v; draw(); }), bS = ixSlider('b', -3, 3, 0.1, S.b, (v) => ixN(v, 2), (v) => { S.b = v; draw(); });
+    ctl.append(ixSeg(Object.entries(IX_MVTF).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; const F = IX_MVTF[k]; [aS, bS].forEach((s) => { const i = s.querySelector('input'); i.min = Math.max(F.xr[0], k === 'sqrt' ? 0 : -9); i.max = F.xr[1]; }); S.a = k === 'sqrt' ? 0 : F.xr[0] + 1; S.b = F.xr[1] - 0.5; aS.set(S.a); bS.set(S.b); draw(); }), aS, bS,
+      el('div', { class: 'ix-btns' }, ixBtn('Rolle (f(a) = f(b))', () => { S.k = 'quart'; ctl.querySelector('.ix-seg').set('quart'); S.a = -2; S.b = 2; aS.set(-2); bS.set(2); draw(); })));
+    draw();
+  } };
+
+// ---- Curve sketching with f′ and f″
+const IX_SK = { cub: { name: 'x³ − 3x', f: (x) => x ** 3 - 3 * x, xr: [-3, 3], yr: [-5, 5] }, quart: { name: 'x⁴ − 4x³', f: (x) => x ** 4 - 4 * x ** 3, xr: [-1.5, 4.5], yr: [-30, 15] }, xex: { name: 'x e⁻ˣ', f: (x) => x * Math.exp(-x), xr: [-1, 6], yr: [-1.5, 0.7] }, rat: { name: 'x/(x² + 1)', f: (x) => x / (x * x + 1), xr: [-5, 5], yr: [-0.8, 0.8] }, sin: { name: 'x + 2 sin x', f: (x) => x + 2 * Math.sin(x), xr: [-6, 6], yr: [-8, 8] } };
+IX.curveSketch = { subjects: ['apcalc'],
+  title: 'Curve sketching with f′ and f″', hint: 'The graph is green where f increases and red where it decreases; solid where it’s concave up, dashed where concave down. The sign charts below show why.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(620, 580), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'cub' };
+    function draw() {
+      const F = IX_SK[S.k], V = ixView({ _w: 620, _h: 440 }, F.xr, F.yr, 28), f = F.f, d1 = (x) => ixD(f, x), d2 = (x) => ixD2(f, x); ctx.clearRect(0, 0, 620, 580);
+      const st = (F.yr[1] - F.yr[0]) > 20 ? 5 : (F.yr[1] - F.yr[0]) > 4 ? 1 : 0.25; ixGrid2(ctx, V, 1, st, 1, st * 2);
+      ctx.save(); ctx.beginPath(); ctx.rect(V.X(F.xr[0]), V.Y(F.yr[1]), V.X(F.xr[1]) - V.X(F.xr[0]), V.Y(F.yr[0]) - V.Y(F.yr[1])); ctx.clip();
+      const N = 600; for (let i = 0; i < N; i++) { const x0 = F.xr[0] + (F.xr[1] - F.xr[0]) * i / N, x1 = x0 + (F.xr[1] - F.xr[0]) / N, xm = (x0 + x1) / 2; ctx.strokeStyle = d1(xm) >= 0 ? IXC.green : IXC.red; ctx.lineWidth = 3.6; ctx.setLineDash([]); if (d2(xm) < 0 && i % 4 > 1) continue; ctx.beginPath(); ctx.moveTo(V.X(x0), V.Y(f(x0))); ctx.lineTo(V.X(x1), V.Y(f(x1))); ctx.stroke(); } ctx.restore();
+      const crit = ixRoots(d1, F.xr[0], F.xr[1], 3000), infl = ixRoots(d2, F.xr[0], F.xr[1], 3000).filter((x) => Math.sign(d2(x - 0.01)) !== Math.sign(d2(x + 0.01)));
+      crit.forEach((x) => ixDot(ctx, V.X(x), V.Y(f(x)), IXC.blue, 7, true)); infl.forEach((x) => ixDot(ctx, V.X(x), V.Y(f(x)), IXC.purple, 6));
+      // sign charts
+      const chart = (y, g, pts, lab, pos, neg) => { ixLabel(ctx, lab, 10, y, 17, 'left', IXC.ink, 'middle'); ixLine(ctx, [V.X(F.xr[0]), y], [V.X(F.xr[1]), y], IXC.ink, 1.6); const cuts = [F.xr[0], ...pts, F.xr[1]];
+        for (let i = 0; i < cuts.length - 1; i++) { const m = (cuts[i] + cuts[i + 1]) / 2, s = g(m) > 0; ixLabel(ctx, s ? '+' : '−', V.X(m), y - 4, 22, 'center', s ? IXC.green : IXC.red, 'bottom'); ixLabel(ctx, s ? pos : neg, V.X(m), y + 6, 12, 'center', IXC.gray); }
+        pts.forEach((x) => { ixLine(ctx, [V.X(x), y - 12], [V.X(x), y + 4], IXC.ink, 1.4); ixLabel(ctx, ixN(x, 2), V.X(x), y - 28, 12, 'center', IXC.axis, 'bottom'); }); };
+      chart(480, d1, crit, 'f′', 'increasing', 'decreasing'); chart(548, d2, infl, 'f″', 'concave up', 'concave down');
+      const kind = (x) => (d2(x) < -1e-6 ? 'local max' : d2(x) > 1e-6 ? 'local min' : Math.sign(d1(x - 0.01)) === Math.sign(d1(x + 0.01)) ? 'neither' : d1(x - 0.01) > 0 ? 'local max' : 'local min');
+      ixRead(read, [{ h: `f(x) = ${F.name}` }, { h: 'Critical numbers (f′ = 0), blue' }, crit.length ? crit.map((x) => `x = ${ixN(x, 3)}: ${kind(x)}, f = ${ixN(f(x), 3)}`).join('; ') : 'none', { h: 'Inflection points (f″ changes sign), purple' }, infl.length ? infl.map((x) => `(${ixN(x, 3)}, ${ixN(f(x), 3)})`).join(', ') : 'none',
+        { note: 'Green: increasing (f′ > 0). Red: decreasing (f′ < 0). Solid: concave up (f″ > 0). Dashed: concave down (f″ < 0).' }, { note: 'Second Derivative Test: f′(c) = 0 and f″(c) < 0 → local max; f″(c) > 0 → local min.' }]);
+    }
+    ctl.append(ixSeg(Object.entries(IX_SK).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; draw(); }));
+    draw();
+  } };
+
+// ---- Optimization
+IX.optimize = { subjects: ['apcalc'],
+  title: 'Optimization', hint: 'Box: cut squares of side x from the corners of a 12 × 12 sheet and fold up the sides. Fence: 200 ft of fence along a river (no fence on the river side). Slide x and find the maximum on the graph.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(640, 520), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'box', x: 1 };
+    function draw() {
+      ctx.clearRect(0, 0, 640, 520); const box = S.k === 'box', x = S.x, f = box ? (t) => t * (12 - 2 * t) ** 2 : (t) => t * (200 - 2 * t), best = box ? 2 : 50, xmax = box ? 6 : 100, ymax = box ? 150 : 5500;
+      if (box) { const u = 18, ox = 30, oy = 30; ctx.save(); ctx.fillStyle = 'rgba(31,95,168,.10)'; ctx.fillRect(ox, oy, 12 * u, 12 * u); ctx.strokeStyle = IXC.ink; ctx.strokeRect(ox, oy, 12 * u, 12 * u); ctx.restore();
+        [[0, 0], [12 - x, 0], [0, 12 - x], [12 - x, 12 - x]].forEach(([a, b]) => { ctx.save(); ctx.fillStyle = '#fff'; ctx.strokeStyle = IXC.red; ctx.setLineDash([4, 4]); ctx.fillRect(ox + a * u, oy + b * u, x * u, x * u); ctx.strokeRect(ox + a * u, oy + b * u, x * u, x * u); ctx.restore(); });
+        ctx.save(); ctx.strokeStyle = IXC.gray; ctx.setLineDash([5, 5]); ctx.strokeRect(ox + x * u, oy + x * u, (12 - 2 * x) * u, (12 - 2 * x) * u); ctx.restore(); ixLabel(ctx, 'x', ox + x * u / 2, oy + x * u + 2, 16, 'center', IXC.red); ixLabel(ctx, `${ixN(12 - 2 * x, 2)}`, ox + 6 * u, oy + 6 * u, 18, 'center', IXC.blue, 'middle');
+        // the folded box
+        const s = 15, P = (X, Y, Z) => [300 + X * s + Y * s * 0.5, 230 - Z * s - Y * s * 0.35], L = 12 - 2 * x, b = [P(0, 0, 0), P(L, 0, 0), P(L, L, 0), P(0, L, 0)], t = [P(0, 0, x), P(L, 0, x), P(L, L, x), P(0, L, x)];
+        ix3Poly(ctx, [b[0], b[1], t[1], t[0]], 'rgba(31,95,168,.18)', IXC.blue, 2); ix3Poly(ctx, [b[1], b[2], t[2], t[1]], 'rgba(31,95,168,.12)', IXC.blue, 2); ix3Poly(ctx, t, null, IXC.blue, 2);
+      } else { const u = 2.2, ox = 340, oy = 40, W = 200 - 2 * x; ctx.save(); ctx.fillStyle = 'rgba(31,95,168,.25)'; ctx.fillRect(20, oy - 26, 600, 24); ctx.restore(); ixLabel(ctx, 'river', 30, oy - 24, 15, 'left', IXC.blue);
+        const x0 = 320 - W * u / 2; ctx.save(); ctx.fillStyle = 'rgba(46,125,79,.12)'; ctx.fillRect(x0, oy, W * u, x * u); ctx.strokeStyle = IXC.orange; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x0, oy); ctx.lineTo(x0, oy + x * u); ctx.lineTo(x0 + W * u, oy + x * u); ctx.lineTo(x0 + W * u, oy); ctx.stroke(); ctx.restore();
+        ixLabel(ctx, `x = ${x}`, x0 - 6, oy + x * u / 2, 16, 'right', IXC.orange, 'middle'); ixLabel(ctx, `200 − 2x = ${W}`, 320, oy + x * u + 6, 16, 'center', IXC.orange); }
+      const G0 = ixView({ _w: 640, _h: 250 }, [0, xmax], [0, ymax], 34), G = { ...G0, Y: (y) => 265 + G0.Y(y) }; ixGrid2(ctx, G, xmax / 12, ymax / 5, xmax / 6, ymax / 5);
+      ixCurve(ctx, G, f, IXC.blue, { w: 3 }); ixDot(ctx, G.X(x), G.Y(f(x)), IXC.red, 7, true); ixDot(ctx, G.X(best), G.Y(f(best)), IXC.green, 5);
+      ixRead(read, box ? [{ h: 'Open box from a 12 × 12 sheet' }, 'V(x) = x(12 − 2x)²', `V(${ixN(x, 2)}) = ${ixN(f(x), 3)}`, { h: 'Find the maximum' }, "V′(x) = (12 − 2x)² − 4x(12 − 2x) = (12 − 2x)(12 − 6x)", 'V′ = 0 at x = 2 (x = 6 makes no box)', `V(2) = 128 cubic units`, { note: 'Domain: 0 < x < 6. Check the endpoints and critical numbers.' }]
+        : [{ h: 'Fence along a river' }, 'A(x) = x(200 − 2x)', `A(${x}) = ${ixN(f(x))} ft²`, { h: 'Find the maximum' }, "A′(x) = 200 − 4x = 0 → x = 50", 'A(50) = 50 · 100 = 5000 ft²', { note: 'The side parallel to the river is twice each other side.' }]);
+    }
+    const xS = ixSlider('x', 0.1, 5.9, 0.1, S.x, (v) => ixN(v, 2), (v) => { S.x = v; draw(); });
+    ctl.append(ixSeg([['box', 'Open box'], ['fence', 'Fence along a river']], S.k, (k) => { S.k = k; const i = xS.querySelector('input'); if (k === 'box') { i.min = 0.1; i.max = 5.9; i.step = 0.1; S.x = 1; } else { i.min = 5; i.max = 95; i.step = 5; S.x = 30; } xS.set(S.x); draw(); }), xS);
+    draw();
+  } };
+
+// ---- functions for the integral interactives
+const IX_IF = {
+  quad: { name: 'x²/4 + 1', f: (x) => x * x / 4 + 1, ab: [0, 4], xr: [-0.5, 5], yr: [-0.5, 6] },
+  sin: { name: 'sin x + 1.5', f: (x) => Math.sin(x) + 1.5, ab: [0, Math.PI * 1.5], xr: [-0.5, 6.5], yr: [-0.5, 3] },
+  exp: { name: 'e^(x/2)', f: (x) => Math.exp(x / 2), ab: [0, 3], xr: [-0.5, 4], yr: [-0.5, 5] },
+  sqrt: { name: '√x', f: (x) => Math.sqrt(Math.max(0, x)), ab: [0, 4], xr: [-0.5, 5], yr: [-0.5, 3] },
+  cub: { name: 'x³ − 3x', f: (x) => x ** 3 - 3 * x, ab: [-2, 2.5], xr: [-2.5, 3], yr: [-4, 6] } };
+
+// ---- Riemann sums, trapezoids, and Simpson’s Rule
+IX.riemann = { subjects: ['apcalc'],
+  title: 'Riemann sums and approximating integrals', hint: 'Pick a method and slide n. Left, right, and midpoint sums use rectangles; the Trapezoidal Rule uses trapezoids; Simpson’s Rule uses parabolas. As n grows, the sum approaches the integral.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 500), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'quad', m: o.m || 'left', n: 4 };
+    const sum = (F, m, n) => { const [a, b] = F.ab, h = (b - a) / n, f = F.f; let s = 0;
+      if (m === 'left') for (let i = 0; i < n; i++) s += f(a + i * h); else if (m === 'right') for (let i = 1; i <= n; i++) s += f(a + i * h); else if (m === 'mid') for (let i = 0; i < n; i++) s += f(a + (i + 0.5) * h);
+      else if (m === 'trap') { s = (f(a) + f(b)) / 2; for (let i = 1; i < n; i++) s += f(a + i * h); } else { const N = n % 2 ? n + 1 : n, H = (b - a) / N; let t = f(a) + f(b); for (let i = 1; i < N; i++) t += f(a + i * H) * (i % 2 ? 4 : 2); return t * H / 3; } return s * h; };
+    function draw() {
+      const F = IX_IF[S.k], V = ixView(cv, F.xr, F.yr, 28), [a, b] = F.ab, n = S.m === 'simp' && S.n % 2 ? S.n + 1 : S.n, h = (b - a) / n, f = F.f; ctx.clearRect(0, 0, 600, 500); ixGrid(ctx, V, { step: 1, lab: 1 });
+      for (let i = 0; i < n; i++) { const x0 = a + i * h, x1 = x0 + h, col = 'rgba(31,95,168,.22)';
+        if (S.m === 'trap') ix3Poly(ctx, [[V.X(x0), V.Y(0)], [V.X(x0), V.Y(f(x0))], [V.X(x1), V.Y(f(x1))], [V.X(x1), V.Y(0)]], col, IXC.blue, 1.4);
+        else if (S.m === 'simp') { if (i % 2) continue; const xm = x1, x2 = x0 + 2 * h, y0 = f(x0), y1 = f(xm), y2 = f(x2), P = (x) => y0 * (x - xm) * (x - x2) / ((x0 - xm) * (x0 - x2)) + y1 * (x - x0) * (x - x2) / ((xm - x0) * (xm - x2)) + y2 * (x - x0) * (x - xm) / ((x2 - x0) * (x2 - xm));
+          const pts = [[V.X(x0), V.Y(0)]]; for (let j = 0; j <= 30; j++) { const x = x0 + 2 * h * j / 30; pts.push([V.X(x), V.Y(P(x))]); } pts.push([V.X(x2), V.Y(0)]); ix3Poly(ctx, pts, col, IXC.blue, 1.4); }
+        else { const xs = S.m === 'left' ? x0 : S.m === 'right' ? x1 : (x0 + x1) / 2, y = f(xs); ix3Poly(ctx, [[V.X(x0), V.Y(0)], [V.X(x0), V.Y(y)], [V.X(x1), V.Y(y)], [V.X(x1), V.Y(0)]], y < 0 ? 'rgba(181,72,43,.22)' : col, y < 0 ? IXC.red : IXC.blue, 1.4); ixDot(ctx, V.X(xs), V.Y(y), IXC.orange, 4); } }
+      ixCurve(ctx, V, f, IXC.ink, { w: 3 });
+      const exact = ixInt(f, a, b, 2000), approx = sum(F, S.m, n), nm = { left: 'Left Riemann sum', right: 'Right Riemann sum', mid: 'Midpoint sum', trap: 'Trapezoidal Rule', simp: 'Simpson’s Rule' }[S.m];
+      const formula = { left: 'Δx[f(x₀) + f(x₁) + … + f(xₙ₋₁)]', right: 'Δx[f(x₁) + f(x₂) + … + f(xₙ)]', mid: 'Δx[f(m₁) + f(m₂) + … + f(mₙ)]', trap: '(Δx/2)[f(x₀) + 2f(x₁) + … + 2f(xₙ₋₁) + f(xₙ)]', simp: '(Δx/3)[f(x₀) + 4f(x₁) + 2f(x₂) + … + 4f(xₙ₋₁) + f(xₙ)]' }[S.m];
+      ixRead(read, [{ h: `∫ from ${ixN(a, 2)} to ${ixN(b, 2)} of ${F.name} dx` }, { h: `${nm}, n = ${n}` }, formula, `Δx = (b − a)/n = ${ixN(h, 4)}`, `≈ ${ixN(approx, 5)}`, `exact ≈ ${ixN(exact, 5)}`, `error = ${ixN(Math.abs(approx - exact), 5)}`,
+        S.m === 'simp' && S.n % 2 ? { note: 'Simpson’s Rule needs an even n, so n was rounded up.' } : null, { note: 'For an increasing function, left sums underestimate and right sums overestimate. Concave up: trapezoids overestimate, midpoints underestimate.' }]);
+    }
+    ctl.append(ixSeg(Object.entries(IX_IF).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; draw(); }), ixSeg([['left', 'Left'], ['right', 'Right'], ['mid', 'Midpoint'], ['trap', 'Trapezoid'], ['simp', 'Simpson']], S.m, (k) => { S.m = k; draw(); }), ixSlider('n (subintervals)', 1, 50, 1, S.n, String, (v) => { S.n = v; draw(); }));
+    draw();
+  } };
+
+// ---- The Fundamental Theorem of Calculus: the area function
+const IX_FTC = { cos: { name: 'cos t', f: Math.cos, xr: [0, 2 * Math.PI], yr: [-1.5, 1.5] }, lin: { name: 't − 2', f: (t) => t - 2, xr: [0, 5], yr: [-3, 3.5] }, wave: { name: '2 sin t + 0.5', f: (t) => 2 * Math.sin(t) + 0.5, xr: [0, 2 * Math.PI], yr: [-2, 4] }, exp: { name: 'e^(−t)', f: (t) => Math.exp(-t), xr: [0, 5], yr: [-0.3, 1.3] } };
+IX.ftc = { subjects: ['apcalc'],
+  title: 'The Fundamental Theorem: the area function', hint: 'Slide x. The top shows the signed area under f from 0 to x (blue above the axis, red below). The bottom graphs that area, A(x). Its slope at each x is f(x).',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 600), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'cos', x: 2 };
+    function draw() {
+      const F = IX_FTC[S.k], x = S.x, A = (u) => ixInt(F.f, 0, u, 200), T = ixView({ _w: 600, _h: 290 }, F.xr, F.yr, 26); let lo = 0, hi = 0; for (let u = F.xr[0]; u <= F.xr[1]; u += (F.xr[1] - F.xr[0]) / 100) { const v = A(u); lo = Math.min(lo, v); hi = Math.max(hi, v); }
+      const B0 = ixView({ _w: 600, _h: 300 }, F.xr, [lo - 0.4, hi + 0.4], 26), B = { ...B0, Y: (y) => 300 + B0.Y(y) }, piX = F.xr[1] > 6 ? { piX: 0.5 } : {}; ctx.clearRect(0, 0, 600, 600);
+      ixGrid(ctx, T, { step: 1, lab: 1, ...piX }); ixGrid(ctx, B, { step: 1, lab: 1, ...piX }); ixLine(ctx, [0, 296], [600, 296], '#cfcabd', 2);
+      const N = 200; for (let i = 0; i < N; i++) { const u0 = x * i / N, u1 = x * (i + 1) / N, y = F.f((u0 + u1) / 2); ctx.save(); ctx.fillStyle = y >= 0 ? 'rgba(31,95,168,.30)' : 'rgba(181,72,43,.30)'; ctx.fillRect(T.X(u0), Math.min(T.Y(0), T.Y(y)), T.X(u1) - T.X(u0) + 0.5, Math.abs(T.Y(y) - T.Y(0))); ctx.restore(); }
+      ixCurve(ctx, T, F.f, IXC.ink, { w: 3 }); ixLine(ctx, [T.X(x), T.Y(0)], [T.X(x), T.Y(F.f(x))], IXC.orange, 2.4); ixLabel(ctx, `f(t) = ${F.name}`, 590, 6, 16, 'right', IXC.ink);
+      ixCurve(ctx, B, A, IXC.purple, { w: 3, n: 300 }); const ax = A(x); ixDot(ctx, B.X(x), B.Y(ax), IXC.purple, 7, true); ixCurve(ctx, B, (u) => ax + F.f(x) * (u - x), IXC.orange, { w: 2, dash: true, a: x - 0.8, b: x + 0.8 }); ixLabel(ctx, 'A(x) = ∫₀ˣ f(t) dt', 590, 304, 16, 'right', IXC.purple);
+      ixRead(read, [{ h: `x = ${ixN(x, 2)}` }, `A(x) = ∫ from 0 to x of f(t) dt ≈ ${ixN(ax, 4)}`, `f(x) = ${ixN(F.f(x), 4)}`, `slope of A at x ≈ ${ixN(ixD(A, x, 1e-3), 4)}`, { note: 'FTC Part 1: A′(x) = f(x). The orange tangent on A has slope equal to the height of f.', good: true },
+        { note: F.f(x) > 0 ? 'f > 0 here, so A is increasing.' : F.f(x) < 0 ? 'f < 0 here (red area counts as negative), so A is decreasing.' : 'f = 0 here: A has a flat tangent.' }, { note: 'FTC Part 2: ∫ from a to b of f = F(b) − F(a) for any antiderivative F.' }]);
+    }
+    const xS = ixSlider('x', 0, 6.28, 0.02, S.x, (v) => ixN(v, 2), (v) => { S.x = v; draw(); });
+    ctl.append(ixSeg(Object.entries(IX_FTC).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; const i = xS.querySelector('input'); i.max = IX_FTC[k].xr[1]; S.x = Math.min(S.x, +i.max); xS.set(S.x); draw(); }), xS);
+    draw();
+  } };
+
+// ---- Average value and the Mean Value Theorem for Integrals
+IX.avgValue = { subjects: ['apcalc'],
+  title: 'Average value of a function', hint: 'The orange rectangle has the same area as the region under f from a to b. Its height is the average value; f equals it at some c (the MVT for integrals).',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 500), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'quad', a: 0, b: 4 };
+    function draw() {
+      const F = IX_IF[S.k], V = ixView(cv, F.xr, F.yr, 28), { a, b } = S, f = F.f; ctx.clearRect(0, 0, 580, 500); ixGrid(ctx, V, { step: 1, lab: 1 });
+      if (b <= a) { ixRead(read, [{ note: 'Make b bigger than a.', bad: true }]); ixCurve(ctx, V, f, IXC.ink, { w: 3 }); return; }
+      const I = ixInt(f, a, b), avg = I / (b - a), pts = [[V.X(a), V.Y(0)]]; for (let j = 0; j <= 100; j++) { const x = a + (b - a) * j / 100; pts.push([V.X(x), V.Y(f(x))]); } pts.push([V.X(b), V.Y(0)]);
+      ix3Poly(ctx, pts, 'rgba(31,95,168,.22)', null); ix3Poly(ctx, [[V.X(a), V.Y(0)], [V.X(a), V.Y(avg)], [V.X(b), V.Y(avg)], [V.X(b), V.Y(0)]], 'rgba(210,123,18,.18)', IXC.orange, 2.4);
+      ixCurve(ctx, V, f, IXC.ink, { w: 3 }); const cs = ixRoots((x) => f(x) - avg, a, b); cs.forEach((c) => { ixDot(ctx, V.X(c), V.Y(avg), IXC.green, 7, true); ixLabel(ctx, 'c', V.X(c), V.Y(avg) - 14, 18, 'center', IXC.green, 'bottom'); });
+      ixRead(read, [{ h: `f(x) = ${F.name} on [${ixN(a, 2)}, ${ixN(b, 2)}]` }, 'average value = (1/(b − a)) ∫ from a to b of f(x) dx', `= (1/${ixN(b - a, 2)})(${ixN(I, 4)}) = ${ixN(avg, 4)}`, { h: 'f(c) = average at' }, cs.length ? cs.map((c) => 'c = ' + ixN(c, 4)).join(', ') : '—', { note: 'The blue region and the orange rectangle have the same area.' }]);
+    }
+    ctl.append(ixSeg(Object.entries(IX_IF).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; [S.a, S.b] = IX_IF[k].ab; ctl.querySelectorAll('.ix-sl')[0].set(S.a); ctl.querySelectorAll('.ix-sl')[1].set(S.b); draw(); }),
+      ixSlider('a', -2, 5, 0.1, S.a, (v) => ixN(v, 2), (v) => { S.a = v; draw(); }), ixSlider('b', -2, 6, 0.1, S.b, (v) => ixN(v, 2), (v) => { S.b = v; draw(); }));
+    draw();
+  } };
+
+// ---- Slope fields and Euler’s Method
+const IX_DE = { x: { name: 'dy/dx = x', f: (x, y) => x, sol: 'y = x²/2 + C' }, y: { name: 'dy/dx = y', f: (x, y) => y, sol: 'y = Ceˣ' }, xpy: { name: 'dy/dx = x + y', f: (x, y) => x + y, sol: 'y = Ceˣ − x − 1' }, xmy: { name: 'dy/dx = x − y', f: (x, y) => x - y, sol: 'y = x − 1 + Ce⁻ˣ' }, circ: { name: 'dy/dx = −x/y', f: (x, y) => -x / y, sol: 'x² + y² = C' }, xy: { name: 'dy/dx = xy', f: (x, y) => x * y, sol: 'y = Ce^(x²/2)' } };
+IX.slopeField = { subjects: ['apcalc'],
+  title: 'Slope fields and Euler’s Method', hint: 'Each little segment has the slope dy/dx at that point. Drag the red point to start a solution curve. Turn on Euler’s Method to step along with straight segments.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(560, 560), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'xmy', P: [0, 2], euler: o.euler === '1', h: 0.5, steps: 4 }, V = ixView(cv, [-4, 4], [-4, 4], 24);
+    const step = (f, x, y, h) => { const k1 = f(x, y), k2 = f(x + h / 2, y + h * k1 / 2), k3 = f(x + h / 2, y + h * k2 / 2), k4 = f(x + h, y + h * k3); return y + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6; };
+    function draw() {
+      const D = IX_DE[S.k], f = D.f; ctx.clearRect(0, 0, 560, 560); ixGrid(ctx, V, { step: 1, lab: 1 });
+      for (let x = -4; x <= 4.001; x += 0.5) for (let y = -4; y <= 4.001; y += 0.5) { const m = f(x, y); if (!isFinite(m)) continue; const L = 0.18 / Math.sqrt(1 + m * m); ixLine(ctx, [V.X(x - L), V.Y(y - m * L)], [V.X(x + L), V.Y(y + m * L)], IXC.gray, 1.6); }
+      [-1, 1].forEach((dir) => { ctx.save(); ctx.beginPath(); ctx.rect(V.X(-4), V.Y(4), V.X(4) - V.X(-4), V.Y(-4) - V.Y(4)); ctx.clip(); ctx.strokeStyle = IXC.blue; ctx.lineWidth = 3; ctx.beginPath(); let [x, y] = S.P; ctx.moveTo(V.X(x), V.Y(y));
+        for (let i = 0; i < 800; i++) { const ny = step(f, x, y, dir * 0.01); x += dir * 0.01; if (!isFinite(ny) || Math.abs(ny) > 50 || (S.k === 'circ' && Math.abs(y) < 0.05)) break; y = ny; ctx.lineTo(V.X(x), V.Y(y)); } ctx.stroke(); ctx.restore(); });
+      const L = [{ h: D.name }, `general solution: ${D.sol}`, `starting point (${ixN(S.P[0], 2)}, ${ixN(S.P[1], 2)})`];
+      if (S.euler) { let [x, y] = S.P; const rows = []; ctx.save(); ctx.strokeStyle = IXC.red; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(V.X(x), V.Y(y));
+        for (let i = 0; i < S.steps; i++) { const m = f(x, y); rows.push(`x = ${ixN(x, 2)}, y = ${ixN(y, 4)}, slope = ${ixN(m, 4)}`); y += S.h * m; x += S.h; ctx.lineTo(V.X(x), V.Y(y)); } ctx.stroke(); ctx.restore();
+        let [ex, ey] = S.P; for (let i = 0; i <= S.steps; i++) { ixDot(ctx, V.X(ex), V.Y(ey), IXC.red, 5); if (i < S.steps) { ey += S.h * f(ex, ey); ex += S.h; } }
+        let ty = S.P[1]; for (let u = S.P[0]; u < x - 1e-9; u += 0.001) ty = step(f, u, ty, 0.001);
+        L.push({ h: `Euler’s Method, h = ${S.h}` }, 'yₙ₊₁ = yₙ + h · (slope at (xₙ, yₙ))', ...rows, `estimate: y(${ixN(x, 2)}) ≈ ${ixN(y, 4)}`, `actual: y(${ixN(x, 2)}) ≈ ${ixN(ty, 4)}`, { note: 'Smaller steps (smaller h) follow the curve more closely.' }); }
+      ixDot(ctx, V.X(S.P[0]), V.Y(S.P[1]), IXC.red, 8, true); ixRead(read, L);
+    }
+    const eu = el('div', {}, ixSlider('step size h', 0.1, 1, 0.1, S.h, (v) => ixN(v, 1), (v) => { S.h = v; draw(); }), ixSlider('number of steps', 1, 10, 1, S.steps, String, (v) => { S.steps = v; draw(); }));
+    ctl.append(ixSel(Object.entries(IX_DE).map(([k, D]) => [k, D.name]), S.k, (k) => { S.k = k; draw(); }, 'Differential equation'), ixCheck('Euler’s Method', S.euler, (v) => { S.euler = v; eu.style.display = v ? '' : 'none'; draw(); }), eu, el('div', { class: 'small' }, 'Drag the red point (or click anywhere).'));
+    eu.style.display = S.euler ? '' : 'none';
+    ixDrag(cv, () => 'p', (h, x, y) => { S.P = [Math.round(V.ix(x) * 4) / 4, Math.round(V.iy(y) * 4) / 4]; draw(); });
+    draw();
+  } };
+
+// ---- Logistic growth
+IX.logistic = { subjects: ['apcalc'],
+  title: 'Logistic growth', hint: 'Slide the carrying capacity K, the starting population P₀, and the rate k. The population levels off at K, and grows fastest when P = K/2.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 520), ctx = cv._ctx; main.append(cv);
+    const S = { K: 1000, P0: 50, k: 0.5, t: 6 };
+    function draw() {
+      const { K, P0, k } = S, A = (K - P0) / P0, P = (t) => K / (1 + A * Math.exp(-k * t)), V = ixView(cv, [0, 25], [0, Math.max(K, P0) * 1.15], 34); ctx.clearRect(0, 0, 600, 520); ixGrid2(ctx, V, 1, 100, 5, 200);
+      ixLine(ctx, [V.X(0), V.Y(K)], [V.X(25), V.Y(K)], IXC.green, 2, true); ixLabel(ctx, `K = ${K}`, V.X(25) - 4, V.Y(K) - 4, 16, 'right', IXC.green, 'bottom'); ixLine(ctx, [V.X(0), V.Y(K / 2)], [V.X(25), V.Y(K / 2)], IXC.gray, 1.2, true);
+      ixCurve(ctx, V, P, IXC.blue, { w: 3.2 }); const ti = Math.log(A) / k; if (A > 0 && ti > 0 && ti < 25) { ixDot(ctx, V.X(ti), V.Y(K / 2), IXC.purple, 7); ixLabel(ctx, 'fastest growth', V.X(ti) + 10, V.Y(K / 2) + 6, 15, 'left', IXC.purple); }
+      const p = P(S.t), r = k * p * (1 - p / K); ixDot(ctx, V.X(S.t), V.Y(p), IXC.red, 7, true); ixCurve(ctx, V, (t) => p + r * (t - S.t), IXC.red, { w: 2, dash: true, a: S.t - 2, b: S.t + 2 });
+      ixRead(read, [{ h: 'dP/dt = kP(1 − P/K)' }, `P(t) = K/(1 + Ae^(−kt)), A = (K − P₀)/P₀ = ${ixN(A, 3)}`, `P(t) = ${K}/(1 + ${ixN(A, 3)}e^(−${k}t))`, { h: `At t = ${ixN(S.t, 1)}` }, `P ≈ ${ixN(p, 1)}`, `dP/dt ≈ ${ixN(r, 2)} per unit time`,
+        { note: `As t → ∞, P → K = ${K}. The growth rate is largest when P = K/2 = ${K / 2}${A > 0 ? `, at t ≈ ${ixN(ti, 2)}` : ''}.` }]);
+    }
+    ctl.append(ixSlider('carrying capacity K', 200, 1500, 50, S.K, String, (v) => { S.K = v; draw(); }), ixSlider('starting P₀', 10, 1500, 10, S.P0, String, (v) => { S.P0 = v; draw(); }), ixSlider('rate k', 0.1, 1.5, 0.05, S.k, (v) => ixN(v, 2), (v) => { S.k = v; draw(); }), ixSlider('t', 0, 25, 0.5, S.t, (v) => ixN(v, 1), (v) => { S.t = v; draw(); }));
+    draw();
+  } };
+
+// ---- Area between curves
+const IX_AB = { a: { name: 'y = x and y = x²', f: (x) => x, g: (x) => x * x, xr: [-1, 2.5], yr: [-1, 4] }, b: { name: 'y = 4 − x² and y = x + 2', f: (x) => 4 - x * x, g: (x) => x + 2, xr: [-3, 2], yr: [-2, 5] }, c: { name: 'y = √x and y = x/2', f: (x) => Math.sqrt(Math.max(0, x)), g: (x) => x / 2, xr: [-0.5, 5], yr: [-0.5, 3] }, d: { name: 'y = sin x and y = cos x', f: Math.sin, g: Math.cos, xr: [0, 2 * Math.PI], yr: [-1.5, 1.5] }, e: { name: 'y = x³ and y = x', f: (x) => x ** 3, g: (x) => x, xr: [-1.6, 1.6], yr: [-2, 2] } };
+IX.areaBetween = { subjects: ['apcalc'],
+  title: 'Area between two curves', hint: 'The region between the curves is shaded. A typical rectangle has height top − bottom. Where the curves cross, top and bottom switch, so split the integral there.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 520), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'a', x: 0.5 };
+    function draw() {
+      const D = IX_AB[S.k], V = ixView(cv, D.xr, D.yr, 26); ctx.clearRect(0, 0, 580, 520); ixGrid(ctx, V, { step: 1, lab: 1, ...(S.k === 'd' ? { piX: 0.5 } : {}) });
+      let xs = ixRoots((x) => D.f(x) - D.g(x), D.xr[0] + 1e-6, D.xr[1] - 1e-6); if (S.k === 'c') xs = [0, 4]; if (S.k === 'd') xs = [Math.PI / 4, 5 * Math.PI / 4];
+      const a = xs[0], b = xs[xs.length - 1];
+      for (let i = 0; i < 300; i++) { const x0 = a + (b - a) * i / 300, x1 = x0 + (b - a) / 300, m = (x0 + x1) / 2, t = Math.max(D.f(m), D.g(m)), bo = Math.min(D.f(m), D.g(m)); ctx.save(); ctx.fillStyle = D.f(m) >= D.g(m) ? 'rgba(31,95,168,.22)' : 'rgba(46,125,79,.22)'; ctx.fillRect(V.X(x0), V.Y(t), V.X(x1) - V.X(x0) + 0.5, V.Y(bo) - V.Y(t)); ctx.restore(); }
+      ixCurve(ctx, V, D.f, IXC.blue, { w: 3 }); ixCurve(ctx, V, D.g, IXC.green, { w: 3 }); xs.forEach((x) => ixDot(ctx, V.X(x), V.Y(D.f(x)), IXC.ink, 6));
+      const x = Math.max(a, Math.min(b, S.x)), t = Math.max(D.f(x), D.g(x)), bo = Math.min(D.f(x), D.g(x)); ctx.save(); ctx.fillStyle = 'rgba(181,72,43,.35)'; ctx.strokeStyle = IXC.red; ctx.lineWidth = 2; ctx.fillRect(V.X(x) - 6, V.Y(t), 12, V.Y(bo) - V.Y(t)); ctx.strokeRect(V.X(x) - 6, V.Y(t), 12, V.Y(bo) - V.Y(t)); ctx.restore();
+      const area = xs.slice(1).reduce((s, x1, i) => s + Math.abs(ixInt((u) => D.f(u) - D.g(u), xs[i], x1)), 0);
+      ixRead(read, [{ h: D.name }, `they cross at x = ${xs.map((v) => ixN(v, 3)).join(', ')}`, { h: 'Typical rectangle (red)' }, `height = top − bottom = ${ixN(t, 3)} − ${ixN(bo, 3)} = ${ixN(t - bo, 3)}`, 'width = dx',
+        { h: 'Area' }, xs.length > 2 ? 'split at each crossing: A = Σ ∫ |f − g| dx' : `A = ∫ from ${ixN(a, 3)} to ${ixN(b, 3)} of (top − bottom) dx`, `A ≈ ${ixN(area, 4)}`, { note: 'Always top minus bottom, so every piece of area counts as positive.' }]);
+    }
+    const xS = ixSlider('rectangle at x', -3, 6.3, 0.02, S.x, (v) => ixN(v, 2), (v) => { S.x = v; draw(); });
+    ctl.append(ixSel(Object.entries(IX_AB).map(([k, D]) => [k, D.name]), S.k, (k) => { S.k = k; draw(); }, 'Curves'), xS);
+    draw();
+  } };
+
+// ---- Volumes of revolution: disks, washers, and shells
+const IX_VR = { disk: { name: 'Disks: y = √x, 0 ≤ x ≤ 4, about the x-axis', f: (x) => Math.sqrt(x), g: () => 0, a: 0, b: 4, ax: 'x', V: 8 * Math.PI, vf: 'V = π ∫₀⁴ (√x)² dx = 8π' },
+  washer: { name: 'Washers: between y = x and y = x², about the x-axis', f: (x) => x, g: (x) => x * x, a: 0, b: 1, ax: 'x', V: 2 * Math.PI / 15, vf: 'V = π ∫₀¹ (x² − x⁴) dx = 2π/15' },
+  shell: { name: 'Shells: y = 2x − x², about the y-axis', f: (x) => 2 * x - x * x, g: () => 0, a: 0, b: 2, ax: 'y', V: 8 * Math.PI / 3, vf: 'V = 2π ∫₀² x(2x − x²) dx = 8π/3' } };
+IX.volumeRev = { subjects: ['apcalc'],
+  title: 'Volumes of revolution: disks, washers, and shells', hint: 'Pick a method. The flat region (red) spins around the axis to make the solid. Slide x to move one slice: a disk, a washer, or a cylindrical shell. Drag to turn.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(640, 520), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_VR[o.m] ? o.m : 'disk', x: 1, az: o.m === 'shell' ? -0.5 : -0.2, el: 0.35, spin: 300 };
+    function draw() {
+      const D = IX_VR[S.k], X = D.ax === 'x', sc = X ? Math.min(230, 300 / (D.b - D.a)) : 150, T = ix3(320, X ? 300 : 270, sc * (X ? 1 : 1.1), S); ctx.clearRect(0, 0, 640, 520);
+      // world: about the x-axis → (x, y cos φ, y sin φ) centered; about the y-axis → (x cos φ, x sin φ, y)
+      const mid = X ? (D.a + D.b) / 2 : 0, W = (x, y, p) => (X ? [x - mid, -y * Math.sin(p), y * Math.cos(p)] : [x * Math.cos(p), x * Math.sin(p), y - 0.5]), sp = S.spin * Math.PI / 180;
+      ixLine(ctx, T(X ? [D.a - mid - 0.6, 0, 0] : [0, 0, -0.9]), T(X ? [D.b - mid + 0.6, 0, 0] : [0, 0, 1.6]), IXC.gray, 2, true);
+      const prof = (h) => { const P = []; for (let j = 0; j <= 40; j++) { const x = D.a + (D.b - D.a) * j / 40; P.push([x, h(x)]); } return P; }, top = prof(D.f), bot = prof(D.g);
+      for (let p = 0; p <= sp + 1e-9; p += Math.PI / 10) { [top, bot].forEach((P, q) => { if (q && S.k === 'disk') return; ctx.save(); ctx.strokeStyle = 'rgba(31,95,168,.35)'; ctx.lineWidth = 1.2; ctx.beginPath(); P.forEach(([x, y], i) => { const s = T(W(x, y, p)); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.stroke(); ctx.restore(); }); }
+      ix3Poly(ctx, [...top, ...bot.slice().reverse()].map(([x, y]) => T(W(x, y, 0))), 'rgba(181,72,43,.30)', IXC.red, 2.4);
+      const x = Math.max(D.a, Math.min(D.b, S.x)), ring = (r, f2) => { const P = []; for (let j = 0; j <= 48; j++) P.push(T(f2(r, j * 2 * Math.PI / 48))); return P; };
+      let L;
+      if (X) { const R = D.f(x), r = D.g(x); ix3Poly(ctx, ring(R, (rr, p) => W(x, rr, p)), 'rgba(46,125,79,.35)', IXC.green, 2.4); if (r > 0) ix3Poly(ctx, ring(r, (rr, p) => W(x, rr, p)), '#fff', IXC.green, 2);
+        L = [{ h: D.name }, S.k === 'disk' ? `disk at x = ${ixN(x, 2)}: radius R = ${ixN(R, 3)}` : `washer at x = ${ixN(x, 2)}: R = ${ixN(R, 3)}, r = ${ixN(r, 3)}`, S.k === 'disk' ? `area = πR² = ${ixN(Math.PI * R * R, 3)}` : `area = π(R² − r²) = ${ixN(Math.PI * (R * R - r * r), 3)}`, 'thickness dx']; }
+      else { const h = D.f(x), cyl = (p) => [x * Math.cos(p), x * Math.sin(p)]; for (let j = 0; j < 48; j++) { const p0 = j * 2 * Math.PI / 48, p1 = p0 + 2 * Math.PI / 48, [a0, b0] = cyl(p0), [a1, b1] = cyl(p1); ix3Poly(ctx, [T([a0, b0, -0.5]), T([a1, b1, -0.5]), T([a1, b1, h - 0.5]), T([a0, b0, h - 0.5])], 'rgba(46,125,79,.18)', null); }
+        ix3Poly(ctx, ring(x, (rr, p) => [rr * Math.cos(p), rr * Math.sin(p), h - 0.5]), null, IXC.green, 2.4); ix3Poly(ctx, ring(x, (rr, p) => [rr * Math.cos(p), rr * Math.sin(p), -0.5]), null, IXC.green, 2);
+        L = [{ h: D.name }, `shell at x = ${ixN(x, 2)}: radius x = ${ixN(x, 2)}, height ${ixN(h, 3)}`, `unrolled: 2πx · h = ${ixN(2 * Math.PI * x * h, 3)} (times thickness dx)`]; }
+      ixRead(read, [...L, { h: 'Volume' }, D.vf, `≈ ${ixN(D.V, 4)}`, { note: S.k === 'shell' ? 'Shells: V = 2π ∫ (radius)(height) dx. Good when spinning around the y-axis with x-slices.' : 'Disks and washers: V = π ∫ (R² − r²) dx, slices perpendicular to the axis.' }]);
+    }
+    const xS = ixSlider('slice at x', 0, 4, 0.02, S.x, (v) => ixN(v, 2), (v) => { S.x = v; draw(); });
+    ctl.append(ixSeg([['disk', 'Disks'], ['washer', 'Washers'], ['shell', 'Shells']], S.k, (k) => { S.k = k; S.az = k === 'shell' ? -0.5 : -0.2; const i = xS.querySelector('input'); i.min = IX_VR[k].a; i.max = IX_VR[k].b; S.x = (IX_VR[k].a + IX_VR[k].b) / 2; xS.set(S.x); draw(); }), xS,
+      ixSlider('spin', 0, 360, 10, S.spin, (v) => v + '°', (v) => { S.spin = v; draw(); }), el('div', { class: 'small' }, 'Drag the picture to turn it.'));
+    if (S.k !== 'disk') { const i = xS.querySelector('input'); i.min = IX_VR[S.k].a; i.max = IX_VR[S.k].b; }
+    ix3Turn(cv, S, draw); draw();
+  } };
+
+// ---- Volumes with known cross sections
+IX.knownCross = { subjects: ['apcalc'],
+  title: 'Volumes with known cross sections', hint: 'The base is the region between y = √x and the x-axis (0 ≤ x ≤ 4). Each slice perpendicular to the x-axis is a square, semicircle, or triangle standing on the base. Drag to turn.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(640, 520), ctx = cv._ctx; main.append(cv);
+    const S = { sh: 'sq', x: 2, n: 12, az: -0.9, el: 0.45 }, f = (x) => Math.sqrt(x), a = 0, b = 4;
+    const SH = { sq: { name: 'Squares', A: (s) => s * s, At: 's²', pts: (s) => [[0, 0], [s, 0], [s, s], [0, s]], V: 8 }, semi: { name: 'Semicircles', A: (s) => Math.PI * s * s / 8, At: '(π/8)s²', pts: (s) => Array.from({ length: 21 }, (_, i) => [s / 2 - s / 2 * Math.cos(i * Math.PI / 20), s / 2 * Math.sin(i * Math.PI / 20)]), V: Math.PI }, tri: { name: 'Equilateral triangles', A: (s) => Math.sqrt(3) / 4 * s * s, At: '(√3/4)s²', pts: (s) => [[0, 0], [s, 0], [s / 2, s * Math.sqrt(3) / 2]], V: 2 * Math.sqrt(3) } };
+    function draw() {
+      const T = ix3(300, 290, 88, S), H = SH[S.sh], W = (x, u, h) => [x - 2, u, h]; ctx.clearRect(0, 0, 640, 520);
+      const base = []; for (let j = 0; j <= 40; j++) base.push(T(W(4 * j / 40, f(4 * j / 40), 0))); for (let j = 40; j >= 0; j--) base.push(T(W(4 * j / 40, 0, 0))); ix3Poly(ctx, base, 'rgba(31,95,168,.18)', IXC.blue, 2.4);
+      for (let i = 0; i < S.n; i++) { const x = a + (b - a) * (i + 0.5) / S.n, s = f(x); ix3Poly(ctx, H.pts(s).map(([u, h]) => T(W(x, u, h))), 'rgba(46,125,79,.18)', 'rgba(46,125,79,.6)', 1.2); }
+      const s = f(S.x); ix3Poly(ctx, H.pts(s).map(([u, h]) => T(W(S.x, u, h))), 'rgba(181,72,43,.45)', IXC.red, 2.6);
+      ixRead(read, [{ h: `${H.name} on the base` }, `side s = √x (the width of the base at x)`, `at x = ${ixN(S.x, 2)}: s = ${ixN(s, 3)}, area A = ${H.At} = ${ixN(H.A(s), 3)}`, { h: 'Volume' }, 'V = ∫ from 0 to 4 of A(x) dx', `= ∫₀⁴ ${H.At.replace('s²', '(√x)²').replace('s', '')} dx = ${ixN(H.V, 4)}`, { note: 'Add up the volumes of thin slices: area × thickness dx.' }]);
+    }
+    ctl.append(ixSeg(Object.entries(SH).map(([k, H]) => [k, H.name]), S.sh, (k) => { S.sh = k; draw(); }), ixSlider('slice at x', 0.05, 4, 0.05, S.x, (v) => ixN(v, 2), (v) => { S.x = v; draw(); }), ixSlider('number of slices shown', 4, 30, 1, S.n, String, (v) => { S.n = v; draw(); }), el('div', { class: 'small' }, 'Drag the picture to turn it.'));
+    ix3Turn(cv, S, draw); draw();
+  } };
+
+// ---- Arc length
+const IX_ARC = { a: { name: 'x²/2, 0 ≤ x ≤ 2', f: (x) => x * x / 2, a: 0, b: 2, xr: [-0.3, 2.5], yr: [-0.3, 2.5] }, b: { name: 'x^(3/2), 0 ≤ x ≤ 4', f: (x) => Math.pow(Math.max(0, x), 1.5), a: 0, b: 4, xr: [-0.3, 4.5], yr: [-0.3, 8.5], ex: '(8/27)(10√10 − 1)' }, c: { name: 'sin x, 0 ≤ x ≤ π', f: Math.sin, a: 0, b: Math.PI, xr: [-0.2, 3.4], yr: [-0.5, 1.5] } };
+IX.arcLength = { subjects: ['apcalc'],
+  title: 'Arc length', hint: 'Slide n: the curve is approximated by n straight segments, each with length √(Δx² + Δy²). As n grows, the total approaches the arc length ∫ √(1 + (f′)²) dx.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 520), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'b', n: 4 };
+    function draw() {
+      const D = IX_ARC[S.k], V = ixView(cv, D.xr, D.yr, 26); ctx.clearRect(0, 0, 580, 520); ixGrid(ctx, V, { step: 1, lab: 1 }); ixCurve(ctx, V, D.f, IXC.blue, { w: 3.2, a: D.a, b: D.b });
+      let tot = 0; for (let i = 0; i < S.n; i++) { const x0 = D.a + (D.b - D.a) * i / S.n, x1 = D.a + (D.b - D.a) * (i + 1) / S.n, p = [V.X(x0), V.Y(D.f(x0))], q = [V.X(x1), V.Y(D.f(x1))]; tot += Math.hypot(x1 - x0, D.f(x1) - D.f(x0)); ixLine(ctx, p, q, IXC.red, 2.4); ixDot(ctx, ...p, IXC.red, 4); }
+      const exact = ixInt((x) => Math.sqrt(1 + ixD(D.f, x, 1e-6) ** 2), D.a + 1e-7, D.b, 2000);
+      ixRead(read, [{ h: `y = ${D.name}` }, `${S.n} segments: total ≈ ${ixN(tot, 5)}`, { h: 'Arc length' }, 'L = ∫ from a to b of √(1 + (dy/dx)²) dx', `≈ ${ixN(exact, 5)}${D.ex ? ' = ' + D.ex : ''}`, { note: 'Each segment is the hypotenuse of a tiny right triangle with legs Δx and Δy ≈ f′(x)Δx.' }]);
+    }
+    ctl.append(ixSeg(Object.entries(IX_ARC).map(([k, D]) => [k, D.name]), S.k, (k) => { S.k = k; draw(); }), ixSlider('n (segments)', 1, 40, 1, S.n, String, (v) => { S.n = v; draw(); }));
+    draw();
+  } };
+
+// ---- Area of a polar region
+const IX_PA = { card: { name: 'r = 1 + cos θ', r: (t) => 1 + Math.cos(t), full: [0, 2 * Math.PI], R: 2.2, ex: '3π/2' }, rose: { name: 'r = 2 sin 3θ', r: (t) => 2 * Math.sin(3 * t), full: [0, Math.PI / 3], R: 2.2, ex: 'π/3 (one petal)' }, circ: { name: 'r = 2 sin θ', r: (t) => 2 * Math.sin(t), full: [0, Math.PI], R: 2.2, ex: 'π' }, lim: { name: 'r = 1 + 2 cos θ', r: (t) => 1 + 2 * Math.cos(t), full: [2 * Math.PI / 3, 4 * Math.PI / 3], R: 3.2, ex: 'π − 3√3/2 (inner loop)' } };
+IX.polarArea = { subjects: ['apcalc'],
+  title: 'Area in polar coordinates', hint: 'The region is cut into thin sectors (pie slices) with area about ½r²Δθ. Slide the angles α and β, and n, the number of sectors.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(560, 560), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'card', al: 0, be: 2 * Math.PI, n: 12 }, sl = {};
+    function draw() {
+      const D = IX_PA[S.k], V = ixView(cv, [-D.R, D.R], [-D.R, D.R], 24); ctx.clearRect(0, 0, 560, 560); ixGrid(ctx, V, { step: 0.5, lab: 1 });
+      ctx.save(); ctx.strokeStyle = IXC.blue; ctx.lineWidth = 3; ctx.beginPath(); for (let j = 0; j <= 600; j++) { const t = j * 2 * Math.PI / 600, r = D.r(t); j ? ctx.lineTo(V.X(r * Math.cos(t)), V.Y(r * Math.sin(t))) : ctx.moveTo(V.X(r * Math.cos(t)), V.Y(r * Math.sin(t))); } ctx.stroke(); ctx.restore();
+      const { al, be, n } = S, dt = (be - al) / n; let approx = 0;
+      for (let i = 0; i < n; i++) { const t0 = al + i * dt, tm = t0 + dt / 2, r = Math.abs(D.r(tm)); approx += 0.5 * r * r * dt; const sg = D.r(tm) < 0 ? -1 : 1; ctx.save(); ctx.fillStyle = 'rgba(181,72,43,.25)'; ctx.strokeStyle = IXC.red; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(V.X(0), V.Y(0)); const a0 = sg > 0 ? t0 : t0 + Math.PI; ctx.arc(V.X(0), V.Y(0), r * V.sx, -a0, -(a0 + dt), true); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+      const exact = ixInt((t) => 0.5 * D.r(t) ** 2, al, be, 1000);
+      ixRead(read, [{ h: D.name }, `from θ = ${ixPi(al / Math.PI)} to θ = ${ixPi(be / Math.PI)}`, `${n} sectors: ≈ ${ixN(approx, 5)}`, { h: 'Area' }, 'A = ½ ∫ from α to β of r² dθ', `≈ ${ixN(exact, 5)}`, Math.abs(al - D.full[0]) < 1e-6 && Math.abs(be - D.full[1]) < 1e-6 ? `= ${D.ex}` : null, { note: 'Find the θ-values where the curve starts and ends (often where r = 0) so you trace the region exactly once.' }]);
+    }
+    sl.al = ixSlider('α', 0, 2 * Math.PI, Math.PI / 12, S.al, (v) => ixPi(v / Math.PI), (v) => { S.al = Math.min(v, S.be); draw(); }); sl.be = ixSlider('β', 0, 2 * Math.PI, Math.PI / 12, S.be, (v) => ixPi(v / Math.PI), (v) => { S.be = Math.max(v, S.al); draw(); });
+    ctl.append(ixSeg(Object.entries(IX_PA).map(([k, D]) => [k, D.name]), S.k, (k) => { S.k = k; [S.al, S.be] = IX_PA[k].full; sl.al.set(S.al); sl.be.set(S.be); draw(); }), sl.al, sl.be, ixSlider('n (sectors)', 1, 60, 1, S.n, String, (v) => { S.n = v; draw(); }));
+    draw();
+  } };
+
+// ---- Infinite series: do the partial sums settle down?
+const IX_SER = {
+  geo: { name: 'Σ (1/2)ⁿ, n ≥ 1', a: (n) => 0.5 ** n, sum: 1, test: 'Geometric with r = 1/2: converges to a/(1 − r) = 1.' },
+  tele: { name: 'Σ 1/(n(n + 1))', a: (n) => 1 / (n * (n + 1)), sum: 1, test: 'Telescoping: 1/n − 1/(n + 1), so Sₙ = 1 − 1/(n + 1) → 1.' },
+  p2: { name: 'Σ 1/n²', a: (n) => 1 / (n * n), sum: Math.PI ** 2 / 6, test: 'p-series with p = 2 > 1: converges (to π²/6).' },
+  harm: { name: 'Σ 1/n (harmonic)', a: (n) => 1 / n, sum: Infinity, test: 'p-series with p = 1: diverges, even though the terms → 0 (very slowly, like ln n).' },
+  sqrt: { name: 'Σ 1/√n', a: (n) => 1 / Math.sqrt(n), sum: Infinity, test: 'p-series with p = ½ ≤ 1: diverges.' },
+  alt: { name: 'Σ (−1)ⁿ⁺¹/n', a: (n) => (n % 2 ? 1 : -1) / n, sum: Math.log(2), test: 'Alternating Series Test: terms shrink to 0, so it converges (to ln 2), but only conditionally. Error ≤ the next term.' },
+  nth: { name: 'Σ n/(n + 1)', a: (n) => n / (n + 1), sum: Infinity, test: 'nth Term Test: the terms → 1, not 0, so it diverges.' },
+  ratio: { name: 'Σ n/2ⁿ', a: (n) => n / 2 ** n, sum: 2, test: 'Ratio Test: aₙ₊₁/aₙ → 1/2 < 1, so it converges (to 2).' } };
+IX.series = { subjects: ['apcalc'],
+  title: 'Infinite series: convergence', hint: 'Bars are the terms aₙ; the red dots are the partial sums Sₙ. Slide N to add more terms. A series converges if the partial sums level off at a number.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(640, 500), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_SER[o.s] ? o.s : 'harm', N: 30 };
+    function draw() {
+      const D = IX_SER[S.k], N = S.N, A = Array.from({ length: N }, (_, i) => D.a(i + 1)), Sm = A.reduce((acc, v) => [...acc, (acc.at(-1) || 0) + v], []);
+      const hi = Math.max(1.2, ...Sm, isFinite(D.sum) ? D.sum * 1.1 : 0), lo = Math.min(0, ...A, ...Sm), V = ixView(cv, [0, N + 1], [lo - 0.1, hi * 1.08], 34); ctx.clearRect(0, 0, 640, 500); ixGrid2(ctx, V, N > 60 ? 10 : N > 20 ? 5 : 1, hi > 6 ? 1 : 0.25, N > 60 ? 20 : N > 20 ? 5 : 2, hi > 6 ? 2 : 0.5);
+      const bw = Math.max(1.5, (V.X(2) - V.X(1)) * 0.6); A.forEach((v, i) => { ctx.save(); ctx.fillStyle = v >= 0 ? 'rgba(31,95,168,.45)' : 'rgba(210,123,18,.55)'; ctx.fillRect(V.X(i + 1) - bw / 2, Math.min(V.Y(0), V.Y(v)), bw, Math.abs(V.Y(v) - V.Y(0))); ctx.restore(); });
+      ctx.save(); ctx.strokeStyle = IXC.red; ctx.lineWidth = 2; ctx.beginPath(); Sm.forEach((s, i) => (i ? ctx.lineTo(V.X(i + 1), V.Y(s)) : ctx.moveTo(V.X(i + 1), V.Y(s)))); ctx.stroke(); ctx.restore(); if (N <= 60) Sm.forEach((s, i) => ixDot(ctx, V.X(i + 1), V.Y(s), IXC.red, 3.5));
+      if (isFinite(D.sum)) { ixLine(ctx, [V.X(0), V.Y(D.sum)], [V.X(N + 1), V.Y(D.sum)], IXC.green, 2, true); ixLabel(ctx, `sum = ${ixN(D.sum, 4)}`, V.X(N + 1) - 4, V.Y(D.sum) - 4, 15, 'right', IXC.green, 'bottom'); }
+      ixRead(read, [{ h: D.name }, `a${'₀₁₂₃₄₅₆₇₈₉'[N % 10]} … the ${N}th term: ${ixN(A[N - 1], 5)}`, `S${N} = ${ixN(Sm[N - 1], 5)}`, isFinite(D.sum) ? { note: 'Converges: ' + D.test, good: true } : { note: 'Diverges: ' + D.test, bad: true }]);
+    }
+    ctl.append(ixSel(Object.entries(IX_SER).map(([k, D]) => [k, D.name]), S.k, (k) => { S.k = k; draw(); }, 'Series'), ixSlider('N (number of terms)', 1, 200, 1, S.N, String, (v) => { S.N = v; draw(); }));
+    draw();
+  } };
+
+// ---- Taylor polynomials
+const IX_TAY = {
+  exp: { name: 'eˣ', f: Math.exp, c: (k) => 1 / ixFact(k), yr: [-2, 8], xr: [-4, 3], R: Infinity, series: '1 + x + x²/2! + x³/3! + …' },
+  sin: { name: 'sin x', f: Math.sin, c: (k) => (k % 2 ? (((k - 1) / 2) % 2 ? -1 : 1) / ixFact(k) : 0), yr: [-3, 3], xr: [-8, 8], R: Infinity, series: 'x − x³/3! + x⁵/5! − …' },
+  cos: { name: 'cos x', f: Math.cos, c: (k) => (k % 2 ? 0 : ((k / 2) % 2 ? -1 : 1) / ixFact(k)), yr: [-3, 3], xr: [-8, 8], R: Infinity, series: '1 − x²/2! + x⁴/4! − …' },
+  ln: { name: 'ln(1 + x)', f: (x) => (x > -1 ? Math.log(1 + x) : NaN), c: (k) => (k ? (k % 2 ? 1 : -1) / k : 0), yr: [-3, 2], xr: [-1.5, 2.5], R: 1, iv: '−1 < x ≤ 1', series: 'x − x²/2 + x³/3 − …' },
+  geo: { name: '1/(1 − x)', f: (x) => 1 / (1 - x), c: () => 1, yr: [-2, 6], xr: [-2, 1.8], R: 1, iv: '−1 < x < 1', series: '1 + x + x² + x³ + …' },
+  atan: { name: 'tan⁻¹ x', f: Math.atan, c: (k) => (k % 2 ? (((k - 1) / 2) % 2 ? -1 : 1) / k : 0), yr: [-2, 2], xr: [-2.5, 2.5], R: 1, iv: '−1 ≤ x ≤ 1', series: 'x − x³/3 + x⁵/5 − …' } };
+const ixFact = (k) => { let p = 1; for (let i = 2; i <= k; i++) p *= i; return p; };
+IX.taylor = { subjects: ['apcalc'],
+  title: 'Taylor and Maclaurin polynomials', hint: 'Slide the degree n: the polynomial (red) hugs the function (blue) over a wider and wider interval. Outside the interval of convergence (shaded edges), it can’t keep up.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 520), ctx = cv._ctx; main.append(cv);
+    const S = { k: IX_TAY[o.f] ? o.f : 'sin', n: 3, x: 1 };
+    function draw() {
+      const F = IX_TAY[S.k], V = ixView(cv, F.xr, F.yr, 26), P = (x) => { let s = 0; for (let k = 0; k <= S.n; k++) s += F.c(k) * x ** k; return s; }; ctx.clearRect(0, 0, 600, 520);
+      if (isFinite(F.R)) { ctx.save(); ctx.fillStyle = 'rgba(46,125,79,.10)'; ctx.fillRect(V.X(-F.R), V.Y(F.yr[1]), V.X(F.R) - V.X(-F.R), V.Y(F.yr[0]) - V.Y(F.yr[1])); ctx.restore(); }
+      ixGrid(ctx, V, { step: 1, lab: F.xr[1] > 5 ? 2 : 1 }); ixCurve(ctx, V, F.f, IXC.blue, { w: 4 }); ixCurve(ctx, V, P, IXC.red, { w: 2.6 });
+      const x = S.x, fx = F.f(x), px = P(x); ixDot(ctx, V.X(x), V.Y(fx), IXC.blue, 6); if (Math.abs(px) < 50) ixDot(ctx, V.X(x), V.Y(px), IXC.red, 6);
+      const terms = []; for (let k = 0; k <= S.n; k++) { const c = F.c(k); if (Math.abs(c) < 1e-12) continue; const fr = ixFrac(Math.abs(c), [2, 3, 4, 5, 6, 7, 8, 24, 120, 720, 5040, 40320]); terms.push(`${terms.length ? (c < 0 ? ' − ' : ' + ') : c < 0 ? '−' : ''}${k === 0 ? fr : (fr === '1' ? '' : fr.startsWith('1/') ? fr.replace('1/', 'x' + (k > 1 ? ixSup(String(k)) : '') + '/') : fr.includes('/') ? fr.replace('/', 'x' + (k > 1 ? ixSup(String(k)) : '') + '/') : fr) + (fr.includes('/') ? '' : 'x' + (k > 1 ? ixSup(String(k)) : ''))}`); }
+      const err = Math.abs(fx - px), lag = isFinite(F.R) ? null : Math.max(1, S.k === 'exp' ? Math.exp(Math.max(0, x)) : 1) * Math.abs(x) ** (S.n + 1) / ixFact(S.n + 1);
+      ixRead(read, [{ h: `${F.name} ≈ P${'₀₁₂₃₄₅₆₇₈₉'[S.n % 10]}${S.n > 9 ? '' : ''}(x)` }, terms.join('') || '0', `series: ${F.series}`, { h: `At x = ${ixN(x, 2)}` }, `f(x) = ${ixN(fx, 6)}`, `P(x) = ${ixN(px, 6)}`, `error = ${ixN(err, 6)}`,
+        lag != null ? `Lagrange bound: |R| ≤ M|x|ⁿ⁺¹/(n + 1)! ≈ ${ixN(lag, 6)}` : null, isFinite(F.R) ? { note: `Interval of convergence: ${F.iv} (green). Outside it, more terms make it worse, not better.` } : { note: 'This series converges for every x: more terms → better everywhere.' }]);
+    }
+    ctl.append(ixSeg(Object.entries(IX_TAY).map(([k, F]) => [k, F.name]), S.k, (k) => { S.k = k; draw(); }), ixSlider('degree n', 0, 15, 1, S.n, String, (v) => { S.n = v; draw(); }), ixSlider('x', -3, 3, 0.05, S.x, (v) => ixN(v, 2), (v) => { S.x = v; draw(); }));
+    draw();
+  } };
+
+// ---- Motion along a curve: velocity and acceleration vectors
+const IX_CM = { ell: { name: 'x = 3cos t, y = 2sin t', r: (t) => [3 * Math.cos(t), 2 * Math.sin(t)], T: 2 * Math.PI, R: 4 }, proj: { name: 'x = 4t, y = 8t − 4t²', r: (t) => [4 * t, 8 * t - 4 * t * t], T: 2, R: 9, shift: [-4, -1] }, cyc: { name: 'x = t − sin t, y = 1 − cos t', r: (t) => [t - Math.sin(t), 1 - Math.cos(t)], T: 4 * Math.PI, R: 7, shift: [-6.3, -1] }, lis: { name: 'x = 3sin 2t, y = 3sin 3t', r: (t) => [3 * Math.sin(2 * t), 3 * Math.sin(3 * t)], T: 2 * Math.PI, R: 4 } };
+IX.curveMotion = { subjects: ['apcalc', 'calc3'],
+  title: 'Motion along a curve: velocity and acceleration', hint: 'A particle moves along a parametric curve. The green arrow is velocity (tangent to the path); the orange arrow is acceleration. Slide t or press ▶.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(580, 560), ctx = cv._ctx; main.append(cv);
+    const S = { k: 'ell', t: 1, play: null };
+    function draw() {
+      const C = IX_CM[S.k], sh = C.shift || [0, 0], V = ixView(cv, [-C.R + sh[0] * -1 + (sh[0] ? 0 : 0), C.R - sh[0] * 0], [-C.R, C.R], 24), Q = ixView(cv, [-C.R - sh[0], C.R - sh[0]], [-C.R - sh[1], C.R - sh[1]], 24); ctx.clearRect(0, 0, 580, 560); ixGrid(ctx, Q, { step: 1, lab: 2 });
+      ctx.save(); ctx.strokeStyle = IXC.blue; ctx.lineWidth = 3; ctx.beginPath(); for (let j = 0; j <= 600; j++) { const p = C.r(C.T * j / 600); j ? ctx.lineTo(Q.X(p[0]), Q.Y(p[1])) : ctx.moveTo(Q.X(p[0]), Q.Y(p[1])); } ctx.stroke(); ctx.restore();
+      const t = S.t, p = C.r(t), v = [ixD((u) => C.r(u)[0], t), ixD((u) => C.r(u)[1], t)], a = [ixD2((u) => C.r(u)[0], t), ixD2((u) => C.r(u)[1], t)], sp = Math.hypot(...v), P = [Q.X(p[0]), Q.Y(p[1])];
+      ixArrow(ctx, P, [Q.X(p[0] + v[0] * 0.5), Q.Y(p[1] + v[1] * 0.5)], IXC.green, 3.4, 'v'); ixArrow(ctx, P, [Q.X(p[0] + a[0] * 0.35), Q.Y(p[1] + a[1] * 0.35)], IXC.orange, 3, 'a'); ixDot(ctx, ...P, IXC.red, 8, true);
+      const slope = v[0] ? v[1] / v[0] : NaN;
+      ixRead(read, [{ h: C.name }, `t = ${ixN(t, 2)}: position (${ixN(p[0], 3)}, ${ixN(p[1], 3)})`, `velocity ⟨x′, y′⟩ = ⟨${ixN(v[0], 3)}, ${ixN(v[1], 3)}⟩`, `speed = √((x′)² + (y′)²) = ${ixN(sp, 3)}`, `acceleration ⟨x″, y″⟩ = ⟨${ixN(a[0], 3)}, ${ixN(a[1], 3)}⟩`,
+        { h: 'Slope of the path' }, `dy/dx = (dy/dt)/(dx/dt) = ${isFinite(slope) ? ixN(slope, 3) : 'undefined (vertical tangent)'}`, Math.abs(v[1]) < 0.02 ? { note: 'dy/dt = 0: horizontal tangent.' } : Math.abs(v[0]) < 0.02 ? { note: 'dx/dt = 0: vertical tangent.' } : null, { note: 'Distance traveled = ∫ speed dt.' }]);
+    }
+    const stop = () => { if (S.play) { clearInterval(S.play); S.play = null; } }, tS = ixSlider('t', 0, 2 * Math.PI, 0.01, S.t, (v) => ixN(v, 2), (v) => { stop(); S.t = v; draw(); });
+    ctl.append(ixSeg(Object.entries(IX_CM).map(([k, C]) => [k, C.name]), S.k, (k) => { stop(); S.k = k; S.t = IX_CM[k].T / 4; const i = tS.querySelector('input'); i.max = IX_CM[k].T; tS.set(S.t); draw(); }), tS,
+      el('div', { class: 'ix-btns' }, ixBtn('▶ Play', () => { stop(); S.t = 0; S.play = setInterval(() => { S.t += IX_CM[S.k].T / 400; if (S.t >= IX_CM[S.k].T || !cv.isConnected) { S.t = Math.min(S.t, IX_CM[S.k].T); stop(); } tS.set(S.t); draw(); }, 30); })));
+    draw();
+  } };
+
+// ---- Work: area under a force graph
+IX.work = { subjects: ['apcalc'],
+  title: 'Work done by a variable force', hint: 'Work is force times distance; when the force changes, work is the area under the force graph. Stretch the spring from a to b.',
+  build({ main, ctl, read }, o) {
+    const cv = ixCanvas(600, 500), ctx = cv._ctx; main.append(cv);
+    const S = { k: 20, a: 0, b: 0.5 };
+    function draw() {
+      ctx.clearRect(0, 0, 600, 500); const { k, a, b } = S, u = 600; const x0 = 60, y0 = 90, stretch = b * u * 0.6;
+      ctx.save(); ctx.fillStyle = '#cfcabd'; ctx.fillRect(20, 40, 30, 100); ctx.restore(); ctx.save(); ctx.strokeStyle = IXC.ink; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(50, y0); const L = 160 + stretch, coils = 14; for (let i = 0; i <= coils * 4; i++) ctx.lineTo(50 + L * i / (coils * 4), y0 + (i % 4 === 1 ? -14 : i % 4 === 3 ? 14 : 0)); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.fillStyle = IXC.blue; ctx.fillRect(50 + L, y0 - 22, 34, 44); ctx.restore(); ixLabel(ctx, `stretched ${ixN(b, 2)} m`, 50 + L + 40, y0, 16, 'left', IXC.blue, 'middle');
+      const V0 = ixView({ _w: 600, _h: 330 }, [0, 1], [0, 30], 40), V = { ...V0, Y: (y) => 170 + V0.Y(y) }; ixGrid2(ctx, V, 0.1, 5, 0.2, 10);
+      ix3Poly(ctx, [[V.X(a), V.Y(0)], [V.X(a), V.Y(k * a)], [V.X(b), V.Y(k * b)], [V.X(b), V.Y(0)]], 'rgba(31,95,168,.25)', IXC.blue, 1.6); ixCurve(ctx, V, (x) => k * x, IXC.red, { w: 3, a: 0, b: 1 });
+      ixLabel(ctx, 'F(x) = kx (newtons)', V.X(0.98), V.Y(k * 0.98) - 6, 15, 'right', IXC.red, 'bottom'); ixLabel(ctx, 'x (meters)', V.X(1), V.Y(0) + 18, 14, 'right', IXC.gray);
+      const W = k / 2 * (b * b - a * a);
+      ixRead(read, [{ h: 'Hooke’s Law: F(x) = kx' }, `k = ${k} N/m`, { h: `Stretch from ${ixN(a, 2)} m to ${ixN(b, 2)} m` }, 'W = ∫ from a to b of kx dx = (k/2)(b² − a²)', `= (${k}/2)(${ixN(b, 2)}² − ${ixN(a, 2)}²) = ${ixN(W, 3)} J`, { note: 'The shaded area under the force graph is the work. Stretching further takes more work for each extra meter.' }]);
+    }
+    ctl.append(ixSlider('spring constant k', 5, 30, 1, S.k, String, (v) => { S.k = v; draw(); }), ixSlider('from a', 0, 0.9, 0.05, S.a, (v) => ixN(v, 2), (v) => { S.a = Math.min(v, S.b); draw(); }), ixSlider('to b', 0.05, 1, 0.05, S.b, (v) => ixN(v, 2), (v) => { S.b = Math.max(v, S.a); draw(); }));
+    draw();
+  } };
+// earlier interactives that also fit AP Calculus
+['funcTest', 'polynomial', 'piecewise', 'compose', 'transform', 'inverse', 'logs', 'exponential', 'wave', 'invTrig', 'sequences', 'parametric', 'polar', 'vectors'].forEach((k) => { if (IX[k] && !IX[k].subjects.includes('apcalc')) IX[k].subjects.push('apcalc'); });
 // ======== end of the new interactives ========
 
 // which lessons get which interactive, right before which example, and what to do with it
@@ -44656,6 +45285,62 @@ const LP_DEMOS_MORE2 = {
   "alg2-9-2": [["sampling", "Example 1", {}, "Take 100 samples: they pile up around the true percent."]],
   "alg2-9-5": [["sampling", "Example 3", {}, "Compare n = 25, 100, and 400: the margin of error is about ±1/√n."]] };
 Object.entries(LP_DEMOS_MORE2).forEach(([k, v]) => { LP_DEMOS[k] = [...(LP_DEMOS[k] || []), ...v]; });
+// pairings for the AP Calculus lessons
+const LP_DEMOS_CALC = {
+  "calc-p-1": [["funcTest", "Example 1", {}, "Mapping diagrams and the vertical line test: is it a function?"]],
+  "calc-p-2": [["polynomial", "Example 1", {}, "Change the degree and leading coefficient for end behavior; change multiplicities for crossing vs. bouncing."], ["piecewise", "Example 2", {}, "Check “Step function instead” for the floor function."]],
+  "calc-p-3": [["compose", "Example 1", {}, "Slide x through g then f, and watch the domain of the composition."], ["transform", "Example 3", {}, "Shift, reflect, and stretch one slider at a time."]],
+  "calc-p-4": [["inverse", "Example 1", {}, "Reflect over y = x; use the red line for the Horizontal Line Test."]],
+  "calc-p-5": [["logs", "Example 1", {}, "An exponential and its log are reflections over y = x. Try base e."]],
+  "calc-p-6": [["wave", "Example 1", {"fn": "sin"}, "Change amplitude, period, phase shift, and vertical shift one at a time."]],
+  "calc-p-7": [["invTrig", "Example 1", {}, "Show the restricted pieces that make sin⁻¹, cos⁻¹, and tan⁻¹ functions."]],
+  "calc-p-8": [["sequences", "Example 1", {"t": "arith"}, "Bars are the terms; the red dots are the partial sums."]],
+  "calc-1-1": [["limit", "Example 1", {"k": "hole"}, "Slide x closer to a and read the table from both sides; then try the jump and the asymptote."], ["secant", "Example 5", {"k": "sq"}, "Slide h toward 0: the secant slopes approach the slope of the tangent."]],
+  "calc-1-2": [["lhopital", "Example 1", {"k": "poly"}, "Preview: why (x² − 9)/(x − 3) has a limit even though it’s 0/0 at x = 3. Factor and cancel."]],
+  "calc-1-3": [["limit", "Example 1", {"k": "moved"}, "Go through the three-part test for continuity with each function: hole, jump, asymptote, continuous."]],
+  "calc-1-4": [["squeeze", "Example 1", {}, "Zoom in on x² sin(1/x): it’s trapped between −x² and x². Then show sin x / x."]],
+  "calc-1-5": [["limit", "Example 1", {"k": "vert"}, "Infinite limits: compare 1/(x − 1)² (both sides go to ∞) with 1/(x − 1) (opposite signs)."]],
+  "calc-1-6": [["epsDelta", "Example 1", {}, "Pick ε, then find a δ that keeps the graph inside the red band. Shrink ε and repeat."]],
+  "calc-2-1": [["secant", "Example 1", {}, "Use the h buttons: 1, 0.5, 0.1, 0.01. The difference quotient becomes f′(a)."]],
+  "calc-2-2": [["derivGraph", "Example 1", {}, "Drag along f: the slope of the tangent is the height of f′. Try |x| to see where f′ doesn’t exist."]],
+  "calc-2-3": [["derivGraph", "Example 1", {}, "Check the power rule visually: drag along x² and x³ − 3x and compare f′ with the rule."]],
+  "calc-4-1": [["motion", "Example 1", {}, "Press ▶: when is it at rest, moving left, speeding up, slowing down?"]],
+  "calc-4-2": [["linApprox", "Example 1", {}, "Zoom in until the curve looks straight; compare L(x) with the actual value."]],
+  "calc-4-3": [["relatedRates", "Example 1", {}, "Press ▶ on the ladder: the bottom moves steadily, but the top speeds up."]],
+  "calc-4-4": [["lhopital", "Example 1", {}, "Zoom in: f and g look like lines, so f/g → f′(a)/g′(a)."]],
+  "calc-5-1": [["curveSketch", "Example 1", {}, "Find the critical numbers (blue) and decide max, min, or neither."]],
+  "calc-5-2": [["mvt", "Example 1", {}, "Use the Rolle button first, then slide a and b to find c with f′(c) = average rate."]],
+  "calc-5-3": [["curveSketch", "Example 2", {}, "Read the f′ and f″ sign charts: increasing/decreasing and concavity, with the inflection points."]],
+  "calc-5-4": [["curveSketch", "Example 1", {}, "Go through each function: critical numbers, inflection points, then the shape."]],
+  "calc-5-5": [["optimize", "Example 1", {}, "Slide x and watch the volume graph; then find the maximum with V′(x) = 0."]],
+  "calc-6-1": [["riemann", "Example 1", {"m": "left"}, "Compare left, right, and midpoint sums; slide n up."]],
+  "calc-6-2": [["riemann", "Example 1", {"m": "right"}, "As n → ∞ the Riemann sums approach the definite integral."]],
+  "calc-6-3": [["ftc", "Example 1", {}, "Slide x: the slope of the area function A(x) equals f(x)."]],
+  "calc-6-4": [["avgValue", "Example 2", {}, "The rectangle with height = average value has the same area as the region."]],
+  "calc-6-11": [["riemann", "Example 1", {"m": "trap"}, "Compare the Trapezoidal Rule, the Midpoint Rule, and Simpson’s Rule at the same n."]],
+  "calc-7-3": [["slopeField", "Example 1", {}, "Drag the starting point and watch the solution curve follow the slope segments."]],
+  "calc-7-4": [["slopeField", "Example 1", {"euler": "1"}, "Step along with Euler’s Method; make h smaller to get closer to the curve."]],
+  "calc-7-5": [["logistic", "Example 1", {}, "Change K, P₀, and k. The population levels off at K; fastest growth at K/2."]],
+  "calc-8-1": [["areaBetween", "Example 1", {}, "Top minus bottom; split where the curves cross."]],
+  "calc-8-2": [["volumeRev", "Example 1", {"m": "disk"}, "Spin the region and slide the disk; then switch to washers for Example 3."]],
+  "calc-8-3": [["volumeRev", "Example 1", {"m": "shell"}, "Slide the shell: radius x, height f(x), unrolled area 2πx·f(x)."]],
+  "calc-8-4": [["knownCross", "Example 1", {}, "Squares, semicircles, and triangles standing on the base: integrate the area of a slice."]],
+  "calc-8-5": [["arcLength", "Example 1", {}, "Increase the number of segments: the total approaches the arc length integral."]],
+  "calc-8-6": [["work", "Example 1", {}, "Work is the area under the force graph."]],
+  "calc-9-1": [["parametric", "Example 1", {"c": "ellipse"}, "Press ▶ to see the orientation, then eliminate the parameter."]],
+  "calc-9-2": [["curveMotion", "Example 2", {}, "dy/dx = (dy/dt)/(dx/dt): find where the tangent is horizontal or vertical."]],
+  "calc-9-3": [["polar", "Example 1", {}, "Graph polar equations; then find slopes."]],
+  "calc-9-4": [["polarArea", "Example 1", {}, "Cut the region into sectors with area ½r²Δθ; then set the limits for one petal or the inner loop."]],
+  "calc-9-5": [["vectors", "Example 1", {}, "Review vectors in component form before vector-valued functions."]],
+  "calc-9-6": [["curveMotion", "Example 1", {}, "Velocity is tangent to the path; speed is its length."]],
+  "calc-10-2": [["series", "Example 1", {"s": "geo"}, "Geometric and telescoping series level off; the harmonic series keeps growing."]],
+  "calc-10-3": [["series", "Example 1", {"s": "p2"}, "Compare Σ 1/n² (levels off) with Σ 1/n and Σ 1/√n (keep growing)."]],
+  "calc-10-5": [["series", "Example 1", {"s": "alt"}, "The partial sums zigzag toward ln 2; the error is less than the next term."]],
+  "calc-10-6": [["series", "Example 1", {"s": "ratio"}, "Σ n/2ⁿ: the ratio of terms → 1/2 < 1."]],
+  "calc-10-8": [["taylor", "Example 2", {"f": "geo"}, "Outside the interval of convergence, adding terms makes it worse."]],
+  "calc-10-9": [["taylor", "Example 1", {"f": "exp"}, "Raise the degree and watch the Maclaurin polynomial hug eˣ, sin x, and cos x."]],
+  "calc-10-10": [["taylor", "Example 3", {"f": "sin"}, "Compare the actual error with the Lagrange error bound."]] };
+Object.entries(LP_DEMOS_CALC).forEach(([k, v]) => { LP_DEMOS[k] = [...(LP_DEMOS[k] || []), ...v]; });
 // the interactives of a subject, in the order their lessons come up in the course (ones with no lesson in that subject last)
 function ixInOrder(sub) {
   const num = (t) => { const m = /^(\d+|P)\.(\d+)/.exec(t || ''); return m ? (m[1] === 'P' ? 0 : +m[1]) * 100 + +m[2] : 1e4; };
@@ -45802,6 +46487,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-26', subjects: ['apcalc'], text: 'AP Calculus now has its own interactives (26 new), each paired with its lesson: limits and continuity, ε-δ, the Squeeze Theorem, secant to tangent, graphing f′ from f, motion on a line, linear approximation, related rates, L’Hôpital’s Rule, the Mean Value Theorem, curve sketching with f′ and f″, optimization, Riemann sums/trapezoids/Simpson, the Fundamental Theorem (area function), average value, slope fields and Euler’s Method, logistic growth, area between curves, disks/washers/shells, known cross sections, arc length, work, polar area, motion along a curve, series convergence, and Taylor polynomials. Chapter P lessons also get the matching Pre-Calc ones (functions, inverses, logs, trig graphs, and more).' },
   { date: '2026-11-26', text: '33 more interactives, each paired with its lesson (so they show up on the TV in those lesson plans). Geometry: the triangle midsegment, a quadrilateral sorter, special right triangles, triangle proportionality, chord/secant/tangent segments, equations of circles, cross sections, similar solids, solids of revolution, and distance/midpoint/partitioning. Pre-Calculus: the Law of Cosines, double- and half-angle formulas, graphing identities, composition of functions, rotation of axes, and polar conics. Algebra: lines of fit and residuals, piecewise and absolute value, exponent rules with tiles, two-way tables and Venn diagrams, solving by graphing, completing the square, the discriminant, synthetic division, direct and inverse variation, sequences and series, sampling and margin of error, and three planes. Calculus III: surfaces and level curves, the cross product, and the gradient. ACT: matrices and percent change.' },
   { date: '2026-11-26', text: 'The Interactives page (and the interactive picker in lesson plans) now lists each subject’s interactives in the order their lessons come up in the course.' },
   { date: '2026-11-26', text: 'Every interactive now comes paired with the lesson(s) it fits. On the Interactives page, each one shows a “Goes with” line (for example, Algebra tiles goes with 7.2 and 7.5 in Algebra 1), and those lesson plans now include it on the TV right before the example it fits, with a note on how to use it. If you already edited a plan’s interactives, your list is kept.' },
@@ -45950,7 +46636,7 @@ function helpScreen(open) {
       P(B('📍 Pacing check'), ' (at the top) says which unit the guide has for today and, for each period, how far along it is: the furthest section it’s had in the two weeks before its newest assignment, so a review of older sections doesn’t make it look behind. A period counts as a course when most of its assignments are, so one posted to the wrong class is ignored. It shows the last saved copy right away and then checks your Sheet for anything newer. It says whether each period is on pace, behind, or ahead (in school days), counting Monday–Friday, so holidays make a period look a little behind.'),
       P('In Build an assignment, a ', B('★'), ' after a standard means it’s a priority standard in the Year at a Glance.')]],
     ['ix', `${hasLessons ? 9 : 8}. Interactives`, [
-      P('The ', B('Interactives'), ' tab opens a page of hands-on demos in a new tab, ready to put on the TV, grouped by subject (your subjects first): ', B('Geometry'), ' (congruence shortcuts, dilations and similar triangles, the midsegment, classifying quadrilaterals, special right triangles, triangle proportionality, SOH CAH TOA, volume and surface area, cross sections, similar solids, solids of revolution, parallel lines and a transversal, circle angles and segments, equations of circles, triangle centers, transformations, the Pythagorean theorem, the triangle inequality, polygon angles, arc length and sectors, compass constructions, distance and midpoint, geometric probability), ', B('Pre-Calculus'), ' (unit circle, trig graphs with reciprocals, identities, sum and difference, double- and half-angle formulas, inverse trig, the Law of Cosines, composition, rotation of axes, polar conics, the ambiguous case, polar graphs, vectors, complex numbers and De Moivre, parametric equations, conic sections, sine-curve modeling), ', B('Algebra I and II'), ' (algebra tiles, completing the square, the discriminant, synthetic division, exponent rules, balance-scale equations, solving by graphing, piecewise and absolute value, lines of fit, two-way tables, variation, sequences and series, sampling, three-variable systems, functions and the vertical line test, slope and lines, exponential growth, logarithms, polynomials, rational functions, inequalities and linear programming, systems, quadratics, transformations, inverses), ', B('Calculus III'), ' (vectors, surfaces and level curves, the cross product, the gradient), and ', B('ACT and calculators'), ' (mean and median, box plots, the normal curve, matrices, percent change, a probability simulator, and a TI-Nspire key-press walkthrough). Drag the points and sliders right on the touchscreen. Under each one, a ', B('Goes with'), ' line names the lessons it fits; those lesson plans already include it on the TV, right before the example it goes with.'),
+      P('The ', B('Interactives'), ' tab opens a page of hands-on demos in a new tab, ready to put on the TV, grouped by subject (your subjects first): ', B('Geometry'), ' (congruence shortcuts, dilations and similar triangles, the midsegment, classifying quadrilaterals, special right triangles, triangle proportionality, SOH CAH TOA, volume and surface area, cross sections, similar solids, solids of revolution, parallel lines and a transversal, circle angles and segments, equations of circles, triangle centers, transformations, the Pythagorean theorem, the triangle inequality, polygon angles, arc length and sectors, compass constructions, distance and midpoint, geometric probability), ', B('Pre-Calculus'), ' (unit circle, trig graphs with reciprocals, identities, sum and difference, double- and half-angle formulas, inverse trig, the Law of Cosines, composition, rotation of axes, polar conics, the ambiguous case, polar graphs, vectors, complex numbers and De Moivre, parametric equations, conic sections, sine-curve modeling), ', B('Algebra I and II'), ' (algebra tiles, completing the square, the discriminant, synthetic division, exponent rules, balance-scale equations, solving by graphing, piecewise and absolute value, lines of fit, two-way tables, variation, sequences and series, sampling, three-variable systems, functions and the vertical line test, slope and lines, exponential growth, logarithms, polynomials, rational functions, inequalities and linear programming, systems, quadratics, transformations, inverses), ', B('AP Calculus'), ' (limits and continuity, secant to tangent, graphing f′, motion, related rates, curve sketching, optimization, Riemann sums, the Fundamental Theorem, slope fields and Euler’s Method, volumes of revolution, series, and Taylor polynomials), ', B('Calculus III'), ' (vectors, surfaces and level curves, the cross product, the gradient), and ', B('ACT and calculators'), ' (mean and median, box plots, the normal curve, matrices, percent change, a probability simulator, and a TI-Nspire key-press walkthrough). Drag the points and sliders right on the touchscreen. Under each one, a ', B('Goes with'), ' line names the lessons it fits; those lesson plans already include it on the TV, right before the example it goes with.'),
       P('Each interactive opens on its own page. To let students explore one on their Chromebooks, copy that page’s address from the browser’s address bar and post it in Google Classroom. Nothing is graded. In a lesson plan, the interactives it uses have a ', B('🔗 Copy student link'), ' button right beside them. You can add interactives to any lesson plan (see Lesson plans above).')]],
     ['roster', `${hasLessons ? 10 : 9}. Classes & roster (instead of opening the Google Sheet)`, [
       OL(['The first time: match each Google Classroom class to its period, click ', B('Save periods'), ', then ', B('Refresh roster from Classroom'), '. Yellow boxes are guesses; check them.'],
