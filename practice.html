@@ -40873,7 +40873,7 @@ function lessonEdit(key, start, startNote) {
     demoBox.innerHTML = '';
     const labels = [...new Set(P.steps.flatMap((st) => (st.show || []).map((x) => x.label)).filter((x) => x && !/^Interactive: /.test(x)))];
     P.demos.forEach((d, j) => {
-      const pick = el('select', { 'aria-label': 'Interactive' }, ...[...new Set([...(CONFIG.SUBJECTS || []), 'geometry', 'precalc', 'algebra1', 'algebra2', 'calc3', 'act'])].map((sub) => { const list = Object.entries(IX).filter(([, D]) => (D.subjects || []).includes(sub)); return list.length ? el('optgroup', { label: IX_SUBJ_NAMES[sub] || sub }, ...list.map(([id, D]) => el('option', { value: id }, D.title))) : ''; }).filter(Boolean));
+      const pick = el('select', { 'aria-label': 'Interactive' }, ...[...new Set([...(CONFIG.SUBJECTS || []), 'geometry', 'precalc', 'algebra1', 'algebra2', 'calc3', 'act'])].map((sub) => { const list = ixInOrder(sub); return list.length ? el('optgroup', { label: IX_SUBJ_NAMES[sub] || sub }, ...list.map(([id, D]) => el('option', { value: id }, D.title))) : ''; }).filter(Boolean));
       pick.value = IX[d[0]] ? d[0] : Object.keys(IX)[0]; d[0] = pick.value;
       pick.addEventListener('change', () => { d[0] = pick.value; d[2] = {}; touch(); drawDemos(); }); // another interactive starts with its usual settings
       const at = el('select', { 'aria-label': 'Show it right before' }, ...labels.map((l) => el('option', { value: l }, l)));
@@ -41594,8 +41594,8 @@ function demoScreen(id) {
   const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '1240px';
   if (!IX[id]) {
     const mine = CONFIG.SUBJECTS || [], order = [...new Set([...mine, 'geometry', 'precalc', 'algebra1', 'algebra2', 'calc3', 'act'])];
-    app.append(el('div', { class: 'card' }, el('p', { style: 'margin:0' }, 'Pick one to explore. Some fit more than one subject, so they’re listed under each.')));
-    order.forEach((sub) => { const list = Object.entries(IX).filter(([, D]) => (D.subjects || []).includes(sub)); if (!list.length) return;
+    app.append(el('div', { class: 'card' }, el('p', { style: 'margin:0' }, 'Pick one to explore. Some fit more than one subject, so they’re listed under each, in the order their lessons come up.')));
+    order.forEach((sub) => { const list = ixInOrder(sub); if (!list.length) return;
       app.append(el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, IX_SUBJ_NAMES[sub] || sub), el('ul', { class: 'lp-ul' }, ...list.map(([k, D]) => el('li', { style: 'margin-bottom:6px' }, el('a', { href: ixLink(k) }, D.title), ' — ', D.hint, ixGoesWith(k, sub)))))); });
     return;
   }
@@ -43284,7 +43284,7 @@ const IX_REL = {
   side: { name: 'x = y²', f: (x) => (x >= 0 ? [Math.sqrt(x), -Math.sqrt(x)] : []) },
   circ: { name: 'x² + y² = 16', f: (x) => (Math.abs(x) <= 4 ? [Math.sqrt(16 - x * x), -Math.sqrt(16 - x * x)] : []) },
   abs: { name: 'y = |x| − 2', f: (x) => [Math.abs(x) - 2] } };
-IX.funcTest = { subjects: ['algebra1', 'algebra2'],
+IX.funcTest = { subjects: ['algebra1', 'algebra2', 'precalc'],
   title: 'Functions: mapping diagrams and the vertical line test', hint: 'Pick a relation. Drag the red vertical line across the graph: if it ever hits the graph twice, it’s not a function.',
   build({ main, ctl, read }, o) {
     const cv = ixCanvas(820, 480), ctx = cv._ctx; main.append(cv);
@@ -43592,6 +43592,12 @@ const LP_DEMOS_MORE = {
   "alg1-9-6": [["nspire", "Example 1", {"skill": "ncr"}, "Show nCr on the TI-Nspire before students check their counts."]],
   "precalc-1-5": [["sinModel", "Example 5", {}, "Pick a real data set (Ferris wheel, tides, temperature) and fit a, b, c, d to it, the same way Example 5 builds an equation from a maximum, minimum, and period."]] };
 Object.entries(LP_DEMOS_MORE).forEach(([k, v]) => { LP_DEMOS[k] = [...(LP_DEMOS[k] || []), ...v]; });
+// the interactives of a subject, in the order their lessons come up in the course (ones with no lesson in that subject last)
+function ixInOrder(sub) {
+  const num = (t) => { const m = /^(\d+|P)\.(\d+)/.exec(t || ''); return m ? (m[1] === 'P' ? 0 : +m[1]) * 100 + +m[2] : 1e4; };
+  const first = (id) => { const L = ixLessons(id), mine = L.filter((x) => x.subject === sub); return mine.length ? num(mine[0].title) : 1e5 + (L.length ? num(L[0].title) : 1e4); };
+  return Object.entries(IX).filter(([, D]) => (D.subjects || []).includes(sub)).map((e, i) => [e, first(e[0]), i]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map((x) => x[0]);
+}
 // the lessons an interactive goes with, in course order
 function ixLessons(id) {
   const order = ['geometry', 'algebra1', 'algebra2', 'precalc', 'calc3', 'apcalc'], num = (t) => { const m = /^(\d+|P)\.(\d+)/.exec(t || ''); return m ? (m[1] === 'P' ? 0 : +m[1]) * 100 + +m[2] : 1e4; };
