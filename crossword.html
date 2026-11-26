@@ -458,7 +458,7 @@ osmosis: Movement of water across a membrane"></textarea>
   <div class="tp-wrap">
     <header class="tp-head">
       <div><h1>Crossword · Teacher</h1><p id="tpWho" class="muted"></p></div>
-      <div class="tp-acts"><a class="btn practice-link" id="tpBack" href="practice.html">← Math practice</a><button class="btn" id="tpPlay" type="button">See the puzzle</button><button class="btn" id="tpLock" type="button">Lock</button><a class="btn practice-link" id="tpHelp" data-help="crossword" href="practice.html?help=crossword" target="_blank" rel="noopener">Help</a></div>
+      <div class="tp-acts"><a class="btn practice-link" id="tpBack" href="practice.html">← Math practice</a><button class="btn" id="tpPlay" type="button">See the puzzle</button><button class="btn" id="tpLock" type="button">🚪 Log out</button><a class="btn practice-link" id="tpHelp" data-help="crossword" href="practice.html?help=crossword" target="_blank" rel="noopener">Help</a></div>
     </header>
     <nav class="tp-tabs" role="tablist">
       <button type="button" role="tab" data-tab="make">Make a puzzle</button>
@@ -2488,6 +2488,7 @@ $('#tpPlay').addEventListener('click', () => showPuzzleView('Teacher view: ' + v
 $('#tvBack').addEventListener('click', () => openTeacherPage());
 $('#tpLock').addEventListener('click', () => {
   store.set(KEEP, null);
+  try { Object.keys(localStorage).filter((k) => /dash:pw$/.test(k)).forEach((k) => localStorage.removeItem(k)); Object.keys(sessionStorage).filter((k) => /^teacher-ok:/.test(k)).forEach((k) => sessionStorage.removeItem(k)); } catch {} // signed out of the practice site's teacher tools too
   try { sessionStorage.removeItem('crossword-practice'); } catch {}
   location.replace(siteURL());
 });

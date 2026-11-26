@@ -40399,6 +40399,12 @@ function advPrint(ids) {
   w.document.close();
 }
 
+// Log out: forget the teacher sign-in in this tab and the remembered dashboard password on this computer (and the crossword's), then go to the student page
+function teacherLogout() {
+  try { Object.keys(sessionStorage).filter((k) => /^teacher-ok:|^crossword-practice$/.test(k)).forEach((k) => sessionStorage.removeItem(k)); } catch {}
+  try { Object.keys(localStorage).filter((k) => /dash:pw$|crossword-tkeep/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch {}
+  const t = params.get('t'); location.replace('practice.html' + (t ? '?t=' + encodeURIComponent(t) : ''));
+}
 function teacherNav(active) {
   let nav = document.getElementById('tnav');
   if (!nav) {
@@ -40418,6 +40424,7 @@ function teacherNav(active) {
     ['crossword', 'Crossword', () => { location.href = 'crossword.html?t=' + TEACHER_ID; }],
     ['ix', 'Interactives', () => window.open(ixLink(''), '_blank')],
     ['help', 'Help', go(() => helpScreen())],
+    ['logout', '🚪 Log out', () => { if (confirm('Log out of teacher tools on this computer? You’ll need your password to get back in.')) teacherLogout(); }],
   ];
   nav.innerHTML = '';
   tabs.forEach(([id, label, fn]) => nav.append(el('button', { type: 'button', onclick: fn, 'aria-current': id === active ? 'page' : 'false',
@@ -44024,6 +44031,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-26', text: 'There’s a 🚪 Log out tab at the end of the tabs. It signs you out of teacher tools (and the crossword) on that computer, so the next person needs your password. Good to use on a shared or school computer.' },
   { date: '2026-11-26', text: 'The Teacher tools home page no longer repeats the list of buttons; everything is in the tabs at the top.' },
   { date: '2026-11-25', text: 'Each interactive’s page now has a “← All interactives” link at the top to get back to the list.' },
   { date: '2026-11-25', text: '14 new interactives, and the Interactives page is now grouped by subject. Geometry: congruence (SSS, SAS, ASA, AAS, and why SSA fails), dilations and similar triangles, SOH CAH TOA, volume and surface area with nets, parallel lines and a transversal. Pre-Calculus: the ambiguous case, polar graphs, vectors, modeling with sine curves. Algebra: slope and equations of lines, exponential growth and compound interest, inequalities and linear programming. ACT and calculators: a probability simulator and a TI-Nspire key-press walkthrough.' },
@@ -44123,6 +44131,7 @@ function helpScreen(open) {
       P('Your teacher page (bookmark it on your own computer, not a student Chromebook):'), codeBox(teacherLink),
       P('Type your ', B('teacher PIN'), ' or your ', B('Results dashboard password'), '. The dashboard password does more: once you type it on a computer, the Results dashboard, Classes & roster, and your saved assignments open there without asking again.'),
       P('The link students use for everything is below. They open it on their Chromebooks, already signed in to their school Google accounts, so their scores land in your gradebook by themselves.'), codeBox(studentLink),
+      P(B('Log out: '), 'the 🚪 Log out tab (at the end of the tabs) signs you out on that computer and forgets the remembered dashboard password, here and on the crossword page. Use it on any computer other than your own.'),
       P(B('Wrong password too many times? '), 'Wait 15 minutes and try again.')]],
     ['practice', '2. Assign a section’s Practice (homework)', [
       P(`Every section of ${subjNames} already has a ready-made Practice assignment. Students can pick it from the Assignment menu on the student link, but a direct link is easier:`),
