@@ -44024,6 +44024,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-26', text: 'The Teacher tools home page no longer repeats the list of buttons; everything is in the tabs at the top.' },
   { date: '2026-11-25', text: 'Each interactive’s page now has a “← All interactives” link at the top to get back to the list.' },
   { date: '2026-11-25', text: '14 new interactives, and the Interactives page is now grouped by subject. Geometry: congruence (SSS, SAS, ASA, AAS, and why SSA fails), dilations and similar triangles, SOH CAH TOA, volume and surface area with nets, parallel lines and a transversal. Pre-Calculus: the ambiguous case, polar graphs, vectors, modeling with sine curves. Algebra: slope and equations of lines, exponential growth and compound interest, inequalities and linear programming. ACT and calculators: a probability simulator and a TI-Nspire key-press walkthrough.' },
   { date: '2026-11-25', text: 'Help: “Print this page” works now. It prints every topic, opened up (or just the topics that match your search).' },
@@ -44085,7 +44086,7 @@ function whatsNewCard() {
   const card = el('div', { class: 'card', style: 'border-left:4px solid #c9a227;background:#fffaf0' },
     el('strong', {}, '✨ What’s new'), wnList(fresh),
     el('div', { style: 'margin-top:8px;display:flex;gap:8px;flex-wrap:wrap' },
-      el('button', { class: 'btn', type: 'button', onclick: () => { wnSeen.set(mine[0].date); card.remove(); } }, 'Got it'),
+      el('button', { class: 'btn', type: 'button', onclick: () => { wnSeen.set(mine[0].date); card.remove(); if (document.getElementById('title').textContent === 'Teacher tools' && !app.querySelector('.card')) teacherMenu(); } }, 'Got it'),
       el('button', { class: 'btn secondary', type: 'button', onclick: () => helpScreen('new') }, 'See all changes')));
   return card;
 }
@@ -44271,17 +44272,10 @@ function teacherMenu() {
   teacherNav('');
   const wrap = document.querySelector('.wrap'); if (wrap) wrap.style.maxWidth = '';
   app.innerHTML = '';
-  app.append(whatsNewCard());
-  app.append(el('div', { class: 'card' },
-    el('p', {}, 'What would you like to do?'),
-    el('button', { class: 'btn', onclick: builder }, 'Build an assignment'), ' ',
-    el('button', { class: 'btn', onclick: () => { DASH.title = ''; DASH.student = null; dashboard(); } }, 'Results dashboard'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => { document.getElementById('title').textContent = 'Answer key'; startScreen(true); } }, 'Look up a student’s answer key'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => printScreen() }, 'Print an assignment'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => lessonScreen() }, 'Lesson plans'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => window.open(ixLink(''), '_blank') }, 'Interactives'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => { location.href = 'crossword.html?t=' + TEACHER_ID; } }, 'Vocabulary crossword'), ' ',
-    el('button', { class: 'btn secondary', onclick: () => helpScreen() }, 'Help')));
+  // everything is in the tabs at the top; the home page is just what's new
+  const wn = whatsNewCard();
+  if (wn && wn.nodeType) app.append(wn);
+  if (!app.querySelector('.card')) app.append(el('div', { class: 'card' }, el('p', { style: 'margin:0' }, '👆 Pick what you’d like to do from the tabs at the top. ', linkBtn('See what’s new', () => helpScreen()), '.')));
 }
 
 /* ---------- printing (teacher only): paper copies in one or more versions, with an answer key ---------- */
