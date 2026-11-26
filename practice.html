@@ -44980,21 +44980,45 @@ IX.volumeRev = { subjects: ['apcalc'],
   } };
 
 // ---- Volumes with known cross sections
+const IX_XBASE = {
+  sqrt: { name: 'under y = √x, 0 ≤ x ≤ 4', lo: () => 0, hi: (x) => Math.sqrt(Math.max(0, x)), a: 0, b: 4, s: '√x' },
+  para: { name: 'between y = 1 − x² and the x-axis', lo: () => 0, hi: (x) => 1 - x * x, a: -1, b: 1, s: '1 − x²' },
+  disk: { name: 'the disk x² + y² ≤ 4', lo: (x) => -Math.sqrt(Math.max(0, 4 - x * x)), hi: (x) => Math.sqrt(Math.max(0, 4 - x * x)), a: -2, b: 2, s: '2√(4 − x²)' },
+  lens: { name: 'between y = 2x and y = x²', lo: (x) => x * x, hi: (x) => 2 * x, a: 0, b: 2, s: '2x − x²' },
+  tri: { name: 'the triangle under y = 2 − x, x ≥ 0', lo: () => 0, hi: (x) => 2 - x, a: 0, b: 2, s: '2 − x' } };
+const IX_XSHAPE = {
+  sq: { name: 'Squares', k: 1, kt: '', A: 's²', pts: (s) => [[0, 0], [s, 0], [s, s], [0, s]] },
+  semi: { name: 'Semicircles (diameter on the base)', k: Math.PI / 8, kt: 'π/8', A: '(π/8)s²', pts: (s) => Array.from({ length: 25 }, (_, i) => [s / 2 - s / 2 * Math.cos(i * Math.PI / 24), s / 2 * Math.sin(i * Math.PI / 24)]) },
+  eq: { name: 'Equilateral triangles', k: Math.sqrt(3) / 4, kt: '√3/4', A: '(√3/4)s²', pts: (s) => [[0, 0], [s, 0], [s / 2, s * Math.sqrt(3) / 2]] },
+  leg: { name: 'Isosceles right triangles, leg on the base', k: 0.5, kt: '1/2', A: '(1/2)s²', pts: (s) => [[0, 0], [s, 0], [0, s]] },
+  hyp: { name: 'Isosceles right triangles, hypotenuse on the base', k: 0.25, kt: '1/4', A: '(1/4)s²', pts: (s) => [[0, 0], [s, 0], [s / 2, s / 2]] },
+  rect: { name: 'Rectangles of height 2', k: 2, kt: '2', A: '2s', lin: true, pts: (s) => [[0, 0], [s, 0], [s, 2], [0, 2]] },
+  halfh: { name: 'Rectangles with height = half the base', k: 0.5, kt: '1/2', A: '(1/2)s²', pts: (s) => [[0, 0], [s, 0], [s, s / 2], [0, s / 2]] } };
 IX.knownCross = { subjects: ['apcalc'],
-  title: 'Volumes with known cross sections', hint: 'The base is the region between y = √x and the x-axis (0 ≤ x ≤ 4). Each slice perpendicular to the x-axis is a square, semicircle, or triangle standing on the base. Drag to turn.',
+  title: 'Volumes with known cross sections', hint: 'Pick a base region (blue, lying flat) and a cross-section shape. Each slice perpendicular to the x-axis stands on the base with side s = top − bottom. Volume = ∫ A(x) dx. Drag to turn.',
   build({ main, ctl, read }, o) {
     const cv = ixCanvas(640, 520), ctx = cv._ctx; main.append(cv);
-    const S = { sh: 'sq', x: 2, n: 12, az: -0.9, el: 0.45 }, f = (x) => Math.sqrt(x), a = 0, b = 4;
-    const SH = { sq: { name: 'Squares', A: (s) => s * s, At: 's²', pts: (s) => [[0, 0], [s, 0], [s, s], [0, s]], V: 8 }, semi: { name: 'Semicircles', A: (s) => Math.PI * s * s / 8, At: '(π/8)s²', pts: (s) => Array.from({ length: 21 }, (_, i) => [s / 2 - s / 2 * Math.cos(i * Math.PI / 20), s / 2 * Math.sin(i * Math.PI / 20)]), V: Math.PI }, tri: { name: 'Equilateral triangles', A: (s) => Math.sqrt(3) / 4 * s * s, At: '(√3/4)s²', pts: (s) => [[0, 0], [s, 0], [s / 2, s * Math.sqrt(3) / 2]], V: 2 * Math.sqrt(3) } };
+    const S = { base: IX_XBASE[o.base] ? o.base : 'sqrt', sh: IX_XSHAPE[o.sh] ? o.sh : 'sq', x: null, n: 14, az: -0.9, el: 0.45 };
+    // an exact value from a decimal, when it is a simple fraction (times π or √3)
+    const exact = (v, fac, ft) => { const r = v / fac; for (let q = 1; q <= 105; q++) { const p = Math.round(r * q); if (p && Math.abs(p / q - r) < 1e-7) { const f = q === 1 ? String(p) : `${p}/${q}`; return ft ? (f === '1' ? ft : `${f.includes('/') ? '(' + f + ')' : f}${ft}`) : f; } } return null; };
     function draw() {
-      const T = ix3(300, 290, 88, S), H = SH[S.sh], W = (x, u, h) => [x - 2, u, h]; ctx.clearRect(0, 0, 640, 520);
-      const base = []; for (let j = 0; j <= 40; j++) base.push(T(W(4 * j / 40, f(4 * j / 40), 0))); for (let j = 40; j >= 0; j--) base.push(T(W(4 * j / 40, 0, 0))); ix3Poly(ctx, base, 'rgba(31,95,168,.18)', IXC.blue, 2.4);
-      for (let i = 0; i < S.n; i++) { const x = a + (b - a) * (i + 0.5) / S.n, s = f(x); ix3Poly(ctx, H.pts(s).map(([u, h]) => T(W(x, u, h))), 'rgba(46,125,79,.18)', 'rgba(46,125,79,.6)', 1.2); }
-      const s = f(S.x); ix3Poly(ctx, H.pts(s).map(([u, h]) => T(W(S.x, u, h))), 'rgba(181,72,43,.45)', IXC.red, 2.6);
-      ixRead(read, [{ h: `${H.name} on the base` }, `side s = √x (the width of the base at x)`, `at x = ${ixN(S.x, 2)}: s = ${ixN(s, 3)}, area A = ${H.At} = ${ixN(H.A(s), 3)}`, { h: 'Volume' }, 'V = ∫ from 0 to 4 of A(x) dx', `= ∫₀⁴ ${H.At.replace('s²', '(√x)²').replace('s', '')} dx = ${ixN(H.V, 4)}`, { note: 'Add up the volumes of thin slices: area × thickness dx.' }]);
+      const B = IX_XBASE[S.base], H = IX_XSHAPE[S.sh], w = (x) => Math.max(0, B.hi(x) - B.lo(x)), cx = (B.a + B.b) / 2;
+      let ymin = Infinity, ymax = -Infinity; for (let t = B.a; t <= B.b; t += (B.b - B.a) / 50) { ymin = Math.min(ymin, B.lo(t)); ymax = Math.max(ymax, B.hi(t)); }
+      const smax = Math.max(...Array.from({ length: 51 }, (_, i) => w(B.a + (B.b - B.a) * i / 50))), sc = Math.min(380 / (B.b - B.a), 300 / (ymax - ymin), 250 / Math.max(smax, H.lin ? 2 : 0.1)), cy = (ymin + ymax) / 2;
+      const T = ix3(320, 300, sc, S), W = (x, u, h) => [x - cx, u - cy, h]; ctx.clearRect(0, 0, 640, 520);
+      const base = []; for (let j = 0; j <= 60; j++) { const x = B.a + (B.b - B.a) * j / 60; base.push(T(W(x, B.hi(x), 0))); } for (let j = 60; j >= 0; j--) { const x = B.a + (B.b - B.a) * j / 60; base.push(T(W(x, B.lo(x), 0))); } ix3Poly(ctx, base, 'rgba(31,95,168,.18)', IXC.blue, 2.4);
+      ixLine(ctx, T(W(B.a - 0.3 * (B.b - B.a) / 4, 0, 0)), T(W(B.b + 0.4 * (B.b - B.a) / 4, 0, 0)), IXC.gray, 1.4); ixLabel(ctx, 'x', T(W(B.b + 0.4 * (B.b - B.a) / 4, 0, 0))[0] + 6, T(W(B.b + 0.4 * (B.b - B.a) / 4, 0, 0))[1], 16, 'left', IXC.gray, 'middle');
+      for (let i = 0; i < S.n; i++) { const x = B.a + (B.b - B.a) * (i + 0.5) / S.n, s = w(x); if (s > 1e-6) ix3Poly(ctx, H.pts(s).map(([u, h]) => T(W(x, B.lo(x) + u, h))), 'rgba(46,125,79,.16)', 'rgba(46,125,79,.6)', 1.2); }
+      const x = S.x ?? B.a + (B.b - B.a) * 0.55, s = w(x), A = H.lin ? H.k * s : H.k * s * s; if (s > 1e-6) ix3Poly(ctx, H.pts(s).map(([u, h]) => T(W(x, B.lo(x) + u, h))), 'rgba(181,72,43,.45)', IXC.red, 2.6);
+      const I = ixInt((t) => (H.lin ? w(t) : w(t) ** 2), B.a, B.b, 2000), V = H.k * I, fac = S.sh === 'semi' ? Math.PI : S.sh === 'eq' ? Math.sqrt(3) : 1, ex = exact(V, fac, S.sh === 'semi' ? 'π' : S.sh === 'eq' ? '√3' : '');
+      ixRead(read, [{ h: 'Base' }, B.name, `side s = top − bottom = ${B.s}`, { h: H.name }, `area of a slice: A = ${H.A}`, `at x = ${ixN(x, 2)}: s = ${ixN(s, 3)}, A = ${ixN(A, 3)}`, { h: 'Volume' }, `V = ∫ from ${ixN(B.a)} to ${ixN(B.b)} of ${H.A.replace(/s/g, `(${B.s})`)} dx`, ex && /^-?\d+$/.test(ex) ? `V = ${ex}` : `V = ${ex ? ex + ' ≈ ' : '≈ '}${ixN(V, 5)}`,
+        { note: 'Slices perpendicular to the x-axis: write s in terms of x, put it into the area formula, and integrate from a to b.' }]);
     }
-    ctl.append(ixSeg(Object.entries(SH).map(([k, H]) => [k, H.name]), S.sh, (k) => { S.sh = k; draw(); }), ixSlider('slice at x', 0.05, 4, 0.05, S.x, (v) => ixN(v, 2), (v) => { S.x = v; draw(); }), ixSlider('number of slices shown', 4, 30, 1, S.n, String, (v) => { S.n = v; draw(); }), el('div', { class: 'small' }, 'Drag the picture to turn it.'));
-    ix3Turn(cv, S, draw); draw();
+    const xS = ixSlider('slice at x', -2, 4, 0.02, 2, (v) => ixN(v, 2), (v) => { S.x = v; draw(); });
+    const fit = () => { const B = IX_XBASE[S.base], i = xS.querySelector('input'); i.min = B.a; i.max = B.b; S.x = B.a + (B.b - B.a) * 0.55; xS.set(S.x); };
+    ctl.append(ixSel(Object.entries(IX_XBASE).map(([k, B]) => [k, 'Base: ' + B.name]), S.base, (k) => { S.base = k; fit(); draw(); }, 'Base'), ixSel(Object.entries(IX_XSHAPE).map(([k, H]) => [k, H.name]), S.sh, (k) => { S.sh = k; draw(); }, 'Cross sections'),
+      xS, ixSlider('number of slices shown', 4, 30, 1, S.n, String, (v) => { S.n = v; draw(); }), el('div', { class: 'small' }, 'Drag the picture to turn it.'));
+    fit(); ix3Turn(cv, S, draw); draw();
   } };
 
 // ---- Arc length
@@ -45523,7 +45547,7 @@ const LP_DEMOS_CALC = {
   "calc-8-1": [["areaBetween", "Example 1", {}, "Top minus bottom; split where the curves cross."]],
   "calc-8-2": [["volumeRev", "Example 1", {"m": "disk"}, "Spin the region and slide the disk; then switch to washers for Example 3."]],
   "calc-8-3": [["volumeRev", "Example 1", {"m": "shell"}, "Slide the shell: radius x, height f(x), unrolled area 2πx·f(x)."]],
-  "calc-8-4": [["knownCross", "Example 1", {}, "Squares, semicircles, and triangles standing on the base: integrate the area of a slice."]],
+  "calc-8-4": [["knownCross", "Example 1", {}, "Squares on the base under √x; then switch to semicircles for Example 2."], ["knownCross", "Example 3", {"base": "para", "sh": "eq"}, "Equilateral triangles on the base under y = 1 − x²; then try isosceles right triangles (Example 4)."]],
   "calc-8-5": [["arcLength", "Example 1", {}, "Increase the number of segments: the total approaches the arc length integral."]],
   "calc-8-6": [["work", "Example 1", {}, "Work is the area under the force graph."]],
   "calc-9-1": [["parametric", "Example 1", {"c": "ellipse"}, "Press ▶ to see the orientation, then eliminate the parameter."]],
@@ -46697,6 +46721,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-26', subjects: ['apcalc'], text: 'Volumes with known cross sections now has 5 bases (under √x, under 1 − x², a disk, between y = 2x and y = x², and a triangle) and 7 cross-section shapes (squares, semicircles, equilateral triangles, isosceles right triangles with a leg or the hypotenuse on the base, rectangles of height 2, and rectangles half as tall as wide), with the exact volume when it’s a simple fraction.' },
   { date: '2026-11-26', subjects: ['apcalc'], text: '7 more AP Calculus interactives, each paired with its lesson: the Chain Rule as linked rates (3.1), implicit differentiation with a tangent line you drag around the curve (3.2), derivatives of inverse functions (3.3), antiderivatives as a family of curves with an initial value (5.6), growth, decay, and Newton’s Law of Cooling (7.2), improper integrals (6.12), and the comparison tests for series (10.4, 10.7).' },
   { date: '2026-11-26', text: 'Lesson plans: 25 opening activities that used Desmos now use the matching interactive instead (Pre-Calc P.8, 1.5, 1.7, 6.4, 6.5, 6.8, 6.9; AP Calculus P.2, 1.6, 2.1, 2.2, 4.1, 4.2, 5.1, 5.3, 6.3; Algebra I 3.7, 4.6; Algebra II 1.2, 1.4, 2.1, 3.6, 4.1, 5.3, 6.4). Students open it from a link: in the plan’s Interactives list, click 🔗 Copy student link and post it in Google Classroom (it’s in each plan’s Before class list). The student sheets are updated to match. 14 hands-on discoveries (Geometry 5.3, 5.6, 8.2, 8.4, 9.4, 9.5, 10.6; Algebra I 9.1; Algebra II 9.1, 9.2, 9.5; AP Calculus 4.3, 5.5, 8.2) now end with a 2–3 minute interactive check on the TV. The probability simulator has two new experiments: heads in 10 coin flips, and a coin and a die.' },
   { date: '2026-11-26', subjects: ['apcalc'], text: 'AP Calculus now has its own interactives (26 new), each paired with its lesson: limits and continuity, ε-δ, the Squeeze Theorem, secant to tangent, graphing f′ from f, motion on a line, linear approximation, related rates, L’Hôpital’s Rule, the Mean Value Theorem, curve sketching with f′ and f″, optimization, Riemann sums/trapezoids/Simpson, the Fundamental Theorem (area function), average value, slope fields and Euler’s Method, logistic growth, area between curves, disks/washers/shells, known cross sections, arc length, work, polar area, motion along a curve, series convergence, and Taylor polynomials. Chapter P lessons also get the matching Pre-Calc ones (functions, inverses, logs, trig graphs, and more).' },
