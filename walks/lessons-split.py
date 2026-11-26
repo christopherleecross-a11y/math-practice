@@ -6,8 +6,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 P, J = os.path.join(ROOT, 'practice.html'), os.path.join(ROOT, 'lessons.js')
 s = open(P, encoding='utf-8').read()
 head = 'const LESSONS = {\n'
-i = s.index(head)
 if not os.path.exists(J) or 'const LESSONS = { /* index */' not in s:  # first run: cut the object out
+    i = s.index(head)
     j = s.index('\n};\n', i) + 4
     body = s[i + len(head): j - 3]
     open(J, 'w', encoding='utf-8').write('/* Lesson plans for practice.html: loaded only when a lesson page or a student’s Notes needs them (see lessonsReady). */\nObject.assign(LESSONS, {\n' + body + '\n});\nlessonsDone();\n')
