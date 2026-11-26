@@ -444,6 +444,7 @@ const TEACHERS = {
     SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxjKMy-XuQt8LR0Cd5ILEGk_lverjHGze1ob4_k-HAro1tV7wGVznySDxaQrToUfwoH/exec', // his first deployment ("Anyone")
     SIGNIN_URL: 'https://script.google.com/a/macros/atoka.org/s/AKfycbz2j4eEizsnhR9tzIxJI7xBETVirVtdnyBOeUTMUw5n82Wpe9WzRGjeXA82Us42Jt2b/exec', // his second deployment ("Anyone within atoka.org")
     TEACHER_PIN_HASH: '8784073231394646', // he opens practice.html?t=spencer&makehash=HIS-PIN and sends you the number it shows
+    TEACHER_PIN_HASHES: ['354987549906268'], // the same PIN typed in lowercase (any capitalization works)
     AI_GRADING: false,
     HIDE_MENU: false, // he still sees the menu assignments
   },
@@ -700,6 +701,11 @@ const SETS = {
 
 
 /* ---------- seeded randomness ---------- */
+// is this the teacher's PIN? extra spaces and capitalization don't matter when the lowercase hash is listed too
+function pinOk(v) {
+  const a = String(v || '').trim(), hs = [CONFIG.TEACHER_PIN_HASH, ...(CONFIG.TEACHER_PIN_HASHES || [])].filter(Boolean).map(String);
+  return !!a && (hs.includes(String(cyrb53(a))) || hs.includes(String(cyrb53(a.toLowerCase()))));
+}
 function cyrb53(str, seed = 0) {
   let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
   for (let i = 0; i < str.length; i++) {
@@ -38781,7 +38787,7 @@ function showFrozen() {
   const pin = el('input', { type: 'password', placeholder: 'Teacher PIN', autocomplete: 'off', style: 'max-width:200px;margin:8px auto 0;display:block' });
   const msg = el('div', { class: 'err' });
   const unlock = () => {
-    if (!CONFIG.TEACHER_PIN_HASH || String(cyrb53(pin.value)) !== CONFIG.TEACHER_PIN_HASH) { msg.textContent = 'That PIN didn’t work.'; pin.value = ''; return; }
+    if (!pinOk(pin.value)) { msg.textContent = 'That PIN didn’t work.'; pin.value = ''; return; }
     state.frozen = false; state.leaveBase = state.tabAways; state.unlocks = (state.unlocks || 0) + 1; saveState();
     clearInterval(frozenPoll); frozenPoll = null; hideShield(); startLockdown();
   };
@@ -38827,7 +38833,7 @@ window.addEventListener('resize', () => {
 /* ==== RESULTS DASHBOARD BEGIN ==== */
 /* ---------- teacher results dashboard: reads your Sheet through the script (password in Script properties) ---------- */
 const DASH = { data: null, subject: '', period: '', title: '', student: null, sort: 'name', dir: 1, days: 200, q: '' };
-const dashPw = { get() { try { return localStorage.getItem(TK('dash:pw')) || ''; } catch { return ''; } }, set(v) { try { v ? localStorage.setItem(TK('dash:pw'), v) : localStorage.removeItem(TK('dash:pw')); } catch {} } };
+const dashPw = { get() { try { return localStorage.getItem(TK('dash:pw')) || sessionStorage.getItem(TK('pin')) || ''; } catch { return ''; } }, set(v) { try { v ? localStorage.setItem(TK('dash:pw'), v) : localStorage.removeItem(TK('dash:pw')); } catch {} } };
 const perOrder = (p) => { const n = parseInt(p, 10); return isNaN(n) ? 99 : n; };
 // sort students by class period, then last name, then first name ("Smith, Ava" works too; Jr./III are skipped)
 function lastFirst(name) {
@@ -38980,7 +38986,7 @@ function dashLogin(msg, next) {
   const go = () => { if (!pw.value) return; dashPw.set(pw.value); (next || dashboard)(); };
   pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   app.append(el('div', { class: 'card' }, el('label', {}, 'Dashboard password'), pw, msg ? el('div', { class: 'err' }, msg) : '',
-    el('p', { class: 'small' }, teacherSession() ? 'You signed in with your PIN, which opens the teacher pages. The dashboard, Classes & roster, and Advisory read your Google Sheet, which needs your dashboard password (the DASHBOARD_PASSWORD in your Apps Script’s Script properties). Type it once and this computer remembers it until you log out. Tip: on your own computer, sign in with the dashboard password instead of the PIN and you won’t be asked twice.' : 'This is the DASHBOARD_PASSWORD you saved in your Apps Script’s Script properties. It’s remembered on this computer only.'),
+    el('p', { class: 'small' }, teacherSession() ? 'Your PIN opens this too, as soon as your Sheet’s script picks up PIN sign-in (it updates itself within about 10 minutes). Until then, type your PIN again or your dashboard password (the DASHBOARD_PASSWORD in your Apps Script’s Script properties).' : 'This is the DASHBOARD_PASSWORD you saved in your Apps Script’s Script properties. It’s remembered on this computer only.'),
     el('button', { class: 'btn', onclick: go }, 'Open dashboard')));
   pw.focus();
 }
@@ -40401,7 +40407,7 @@ function advPrint(ids) {
 
 // Log out: forget the teacher sign-in in this tab and the remembered dashboard password on this computer (and the crossword's), then go to the student page
 function teacherLogout(to = 'student') {
-  try { Object.keys(sessionStorage).filter((k) => /^teacher-ok:|^crossword-practice$/.test(k)).forEach((k) => sessionStorage.removeItem(k)); } catch {}
+  try { Object.keys(sessionStorage).filter((k) => /^teacher-ok:|^crossword-practice$|(^|:)pin$/.test(k)).forEach((k) => sessionStorage.removeItem(k)); } catch {}
   try { Object.keys(localStorage).filter((k) => /dash:pw$|crossword-tkeep/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch {}
   const t = params.get('t'), q = [t ? 't=' + encodeURIComponent(t) : '', to === 'pin' ? 'teacher=1' : ''].filter(Boolean).join('&');
   location.replace('practice.html' + (q ? '?' + q : ''));
@@ -44140,7 +44146,7 @@ function helpScreen(open) {
   const sections = [
     ['start', '1. Getting in', [
       P('Your teacher page (bookmark it on your own computer, not a student Chromebook):'), codeBox(teacherLink),
-      P('Type your ', B('teacher PIN'), ' or your ', B('Results dashboard password'), '. The dashboard password does more: once you type it on a computer, the Results dashboard, Classes & roster, and your saved assignments open there without asking again.'),
+      P('Type your ', B('teacher PIN'), ' (capital letters and extra spaces don’t matter) or your ', B('Results dashboard password'), '. Either one opens everything, including the Results dashboard, Classes & roster, and Advisory. The PIN is forgotten when you close the tab or log out; the dashboard password is remembered on that computer until you log out.'),
       P('The link students use for everything is below. They open it on their Chromebooks, already signed in to their school Google accounts, so their scores land in your gradebook by themselves.'), codeBox(studentLink),
       P(B('Log out: '), 'the 🚪 Log out tab (at the end of the tabs) signs you out on that computer and forgets the remembered dashboard password, here and on the crossword page. Then pick where to go: the student sign-in page (to hand the computer to a student) or the teacher PIN page (for another teacher). Use it on any computer other than your own.'),
       P(B('Wrong password too many times? '), 'Wait 15 minutes and try again.')]],
@@ -45610,7 +45616,7 @@ function init() {
     const go = async () => {
       if (busy) return;
       const v = pin.value; err.textContent = '';
-      if (CONFIG.TEACHER_PIN_HASH && String(cyrb53(v)) === CONFIG.TEACHER_PIN_HASH) { teacherSession(true); return teacherMenu(); }
+      if (pinOk(v)) { try { sessionStorage.setItem(TK('pin'), v.trim()); } catch {} teacherSession(true); return teacherMenu(); }
       if (!CONFIG.SCRIPT_URL || !v) { err.textContent = CONFIG.TEACHER_PIN_HASH ? 'Wrong PIN.' : 'No teacher PIN is set up yet. Open this page with &makehash=YOUR-PIN added to the address to make one.'; return; }
       busy = true; btn.textContent = 'Checking…';
       try {
@@ -45623,7 +45629,7 @@ function init() {
     };
     const btn = el('button', { class: 'btn', onclick: go }, 'Continue');
     app.append(el('div', { class: 'card' }, el('label', {}, CONFIG.SCRIPT_URL ? 'Teacher PIN or Results dashboard password' : 'Teacher PIN'), pin, btn, err,
-      CONFIG.SCRIPT_URL ? el('p', { class: 'small', style: 'margin-bottom:0' }, 'Your dashboard password also opens the Results dashboard and syncs your assignments on this computer. On a student’s Chromebook, use your PIN.') : ''));
+      CONFIG.SCRIPT_URL ? el('p', { class: 'small', style: 'margin-bottom:0' }, 'Your PIN opens everything, including the Results dashboard; it’s forgotten when you close this tab. (Your dashboard password works too and is remembered on this computer.) On a student’s Chromebook, use your PIN.') : ''));
     pin.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
     return;
   }

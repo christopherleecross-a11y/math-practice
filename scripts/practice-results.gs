@@ -88,7 +88,7 @@
  * Without the password the script returns nothing, so students can't see anyone's scores. After 10 wrong
  * passwords in 15 minutes it stops answering for 15 minutes. This Sheet still stores everything.
  */
-var SCRIPT_BUILD = '2026-11-24.1'; // which copy this is (Check for updates now shows it)
+var SCRIPT_BUILD = '2026-11-26.1'; // which copy this is (Check for updates now shows it)
 
 
 // Each subject gets its own tab (Geometry, Pre-Calculus, ACT Prep). Created automatically.
@@ -1467,13 +1467,33 @@ function logVisit_(d) {
   } finally { lock.releaseLock(); }
 }
 
+// The teacher PIN works here too, the same as the dashboard password. These are the same hashes as TEACHER_PIN_HASH(ES)
+// in practice.html (never the PINs themselves). The first PIN that opens this Sheet decides whose Sheet it is, so
+// another teacher's PIN can't open it after that.
+const PIN_HASHES = { main: ['676594817605674'], spencer: ['8784073231394646', '354987549906268'] };
+function pinHash_(str) { // cyrb53, the same as practice.html
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return String(4294967296 * (2097151 & h2) + (h1 >>> 0));
+}
+function pinOwner_(given) {
+  const v = String(given || '').trim(); if (!v) return '';
+  const hs = [pinHash_(v), pinHash_(v.toLowerCase())];
+  for (const k in PIN_HASHES) if (PIN_HASHES[k].some(function (h) { return hs.indexOf(h) >= 0; })) return k;
+  return '';
+}
 function teacherAuth_(d) {
-  const pw = PropertiesService.getScriptProperties().getProperty('DASHBOARD_PASSWORD');
-  if (!pw) return { ok: false, setup: true };
+  const props = PropertiesService.getScriptProperties(), pw = props.getProperty('DASHBOARD_PASSWORD');
   const cache = CacheService.getScriptCache(), fails = Number(cache.get('dashFails') || 0);
   if (fails >= 10) return { ok: false, locked: true };
-  if (String(d.password || '') !== pw) { cache.put('dashFails', String(fails + 1), 900); Utilities.sleep(800); return { ok: false, wrong: true }; }
-  return null;
+  const given = String(d.password || '');
+  if (pw && given === pw) return null;
+  const who = pinOwner_(given), owner = props.getProperty('PIN_OWNER');
+  if (who && (!owner || owner === who)) { if (!owner) props.setProperty('PIN_OWNER', who); return null; }
+  if (!pw && !who) return { ok: false, setup: true };
+  cache.put('dashFails', String(fails + 1), 900); Utilities.sleep(800); return { ok: false, wrong: true };
 }
 function dashboard_(d) {
   const bad = teacherAuth_(d); if (bad) return bad;
