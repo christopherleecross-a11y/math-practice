@@ -41596,10 +41596,10 @@ function demoScreen(id) {
     const mine = CONFIG.SUBJECTS || [], order = [...new Set([...mine, 'geometry', 'precalc', 'algebra1', 'algebra2', 'calc3', 'act'])];
     app.append(el('div', { class: 'card' }, el('p', { style: 'margin:0' }, 'Pick one to explore. Some fit more than one subject, so they’re listed under each.')));
     order.forEach((sub) => { const list = Object.entries(IX).filter(([, D]) => (D.subjects || []).includes(sub)); if (!list.length) return;
-      app.append(el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, IX_SUBJ_NAMES[sub] || sub), el('ul', { class: 'lp-ul' }, ...list.map(([k, D]) => el('li', {}, el('a', { href: ixLink(k) }, D.title), ' — ', D.hint))))); });
+      app.append(el('div', { class: 'card' }, el('h3', { style: 'margin:0 0 6px' }, IX_SUBJ_NAMES[sub] || sub), el('ul', { class: 'lp-ul' }, ...list.map(([k, D]) => el('li', { style: 'margin-bottom:6px' }, el('a', { href: ixLink(k) }, D.title), ' — ', D.hint, ixGoesWith(k, sub)))))); });
     return;
   }
-  app.append(el('div', { style: 'margin:0 0 10px' }, el('a', { href: ixLink(''), style: 'color:var(--accent);font-weight:600;font-size:17px' }, '← All interactives')), el('div', { class: 'card ix-page' }, ixMount(id, opts)));
+  app.append(el('div', { style: 'margin:0 0 10px' }, el('a', { href: ixLink(''), style: 'color:var(--accent);font-weight:600;font-size:17px' }, '← All interactives'), ixGoesWith(id)), el('div', { class: 'card ix-page' }, ixMount(id, opts)));
 }
 
 // ---- Unit circle: drag the point; sin, cos, tan (and the reciprocals) update; the quadrant's signs and the reference angle show
@@ -43111,7 +43111,7 @@ IX.complex = { subjects: ['precalc'],
   title: 'Complex numbers, De Moivre, and roots', hint: 'Drag z (blue) and w (green). Multiplying multiplies the lengths and adds the angles. Switch to roots to see the n roots spaced evenly around a circle.',
   build({ main, ctl, read }, o) {
     const cv = ixCanvas(580, 580), ctx = cv._ctx; main.append(cv);
-    const S = { z: [2, 1], w: [1, 1], mode: 'mult', n: 3 }, V = ixView(cv, [-6, 6], [-6, 6], 22);
+    const S = { z: [2, 1], w: [1, 1], mode: ['power', 'roots'].includes(o.mode) ? o.mode : 'mult', n: 3 }, V = ixView(cv, [-6, 6], [-6, 6], 22);
     const mod = (p) => Math.hypot(p[0], p[1]), arg = (p) => { let a = Math.atan2(p[1], p[0]) * 180 / Math.PI; return a < 0 ? a + 360 : a; };
     const rect = (p) => `${ixN(p[0], 3)} ${p[1] < 0 ? '−' : '+'} ${ixN(Math.abs(p[1]), 3)}i`;
     const trig = (p) => `${ixN(mod(p), 3)}(cos ${ixN(arg(p), 1)}° + i sin ${ixN(arg(p), 1)}°)`;
@@ -43134,7 +43134,7 @@ IX.complex = { subjects: ['precalc'],
     }
     const nS = ixSlider('n', 2, 8, 1, S.n, String, (v) => { S.n = v; draw(); });
     ctl.append(ixSeg([['mult', 'Multiply z · w'], ['power', 'Powers (De Moivre)'], ['roots', 'nth roots']], S.mode, (k) => { S.mode = k; nS.style.display = k === 'mult' ? 'none' : ''; draw(); }), nS);
-    nS.style.display = 'none';
+    nS.style.display = S.mode === 'mult' ? 'none' : '';
     ixDrag(cv, (x, y) => ixPick(S.mode === 'mult' ? { z: [V.X(S.z[0]), V.Y(S.z[1])], w: [V.X(S.w[0]), V.Y(S.w[1])] } : { z: [V.X(S.z[0]), V.Y(S.z[1])] }, x, y, 34), (k, x, y) => { S[k] = [Math.max(-6, Math.min(6, Math.round(V.ix(x) * 2) / 2)), Math.max(-6, Math.min(6, Math.round(V.iy(y) * 2) / 2))]; draw(); });
     draw();
   } };
@@ -43180,7 +43180,7 @@ IX.conics = { subjects: ['precalc', 'algebra2'],
   title: 'Conic sections', hint: 'Tilt the plane that slices the double cone. Flat makes a circle, a little tilt an ellipse, parallel to the side a parabola, and steeper a hyperbola. The right side shows its graph.',
   build({ main, ctl, read }, o) {
     const cv = ixCanvas(820, 460), ctx = cv._ctx; main.append(cv);
-    const S = { tilt: 0, a: 4, b: 3 }, side = 55; // the cone's sides are 55° from horizontal
+    const S = { tilt: Math.max(0, Math.min(85, +o.tilt || 0)), a: 4, b: 3 }, side = 55; // the cone's sides are 55° from horizontal
     function draw() {
       ctx.clearRect(0, 0, 820, 460); const cx = 190, cy = 230, H = 190, k = 1 / Math.tan(side * Math.PI / 180);
       // the double cone, seen from the side
@@ -43217,7 +43217,7 @@ IX.algTiles = { subjects: ['algebra1', 'algebra2'],
   title: 'Algebra tiles: multiplying and factoring', hint: 'Multiply: slide p and q to build (x + p)(x + q). Factor: slide b and c, and the tiles arrange into a rectangle if x² + bx + c factors. Red tiles are negative.',
   build({ main, ctl, read }, o) {
     const cv = ixCanvas(620, 560), ctx = cv._ctx; main.append(cv);
-    const S = { mode: 'mult', p: 2, q: 3, b: 5, c: 6 };
+    const S = { mode: o.mode === 'fact' ? 'fact' : 'mult', p: 2, q: 3, b: 5, c: 6 };
     const sg = (n) => (n < 0 ? ' − ' + Math.abs(n) : ' + ' + n);
     function tiles(p, q, ok) {
       const X = 150, u = 26, x0 = 70, y0 = 70, pos = IXC.blue, neg = IXC.red;
@@ -43244,7 +43244,7 @@ IX.algTiles = { subjects: ['algebra1', 'algebra2'],
     const sp = el('div', {}, ixSlider('p', -6, 6, 1, S.p, String, (v) => { S.p = v; draw(); }), ixSlider('q', -6, 6, 1, S.q, String, (v) => { S.q = v; draw(); }));
     const sb = el('div', {}, ixSlider('b (x-term)', -12, 12, 1, S.b, String, (v) => { S.b = v; draw(); }), ixSlider('c (constant)', -36, 36, 1, S.c, String, (v) => { S.c = v; draw(); }));
     ctl.append(ixSeg([['mult', 'Multiply (x + p)(x + q)'], ['fact', 'Factor x² + bx + c']], S.mode, (k) => { S.mode = k; sp.style.display = k === 'mult' ? '' : 'none'; sb.style.display = k === 'mult' ? 'none' : ''; draw(); }), sp, sb);
-    sb.style.display = 'none'; draw();
+    sp.style.display = S.mode === 'mult' ? '' : 'none'; sb.style.display = S.mode === 'mult' ? 'none' : ''; draw();
   } };
 
 // ---- Solving equations with a balance scale
@@ -43519,6 +43519,86 @@ const LP_DEMOS = {
   'geo-10-2': [['circleAngles', 'Example 1', { mode: 'central', modes: 'central' }, 'Drag A and B: the minor arc matches the central angle. Drag past 180° to make a major arc.']],
   'geo-10-4': [['circleAngles', 'Example 1', { mode: 'inscribed', modes: 'inscribed,same,semi,quad' }, 'Drag C around the circle: the inscribed angle stays half the arc. Then try Same arc, Semicircle, and Inscribed quadrilateral.']],
   'geo-10-5': [['circleAngles', 'Example 1', { mode: 'lines', modes: 'lines,inscribed' }, 'Drag the points so E moves inside, then outside the circle. Inside: half the sum of the arcs. Outside: half the difference.']] };
+// more built-in pairings: each interactive with the lesson(s) it fits best
+const LP_DEMOS_MORE = {
+  "geo-1-5": [["construct", "Example 4", {"c": "angle"}, "Before the bisector example, step through bisecting an angle with a compass so students see why the two halves are equal."]],
+  "geo-3-1": [["parallel", "Example 3", {}, "Click each angle pair name and have students find it on the figure before you highlight it."]],
+  "geo-3-2": [["parallel", "Example 1", {}, "Drag the transversal: corresponding and alternate interior angles stay equal, consecutive interior angles always add to 180°."]],
+  "geo-3-3": [["parallel", "Example 1", {}, "Tilt one line so they are no longer parallel: the angle pairs stop matching. That is the converse."]],
+  "geo-3-5": [["slope", "Example 3", {}, "Show parallel lines (same slope) and perpendicular lines (slopes multiply to −1) before writing the equations."]],
+  "geo-4-6": [["similar", "Example 1", {}, "Change the scale factor and drag the center: angles stay the same, sides multiply by k."]],
+  "geo-5-3": [["congruence", "Example 1", {"k": "SAS"}, "Lock two sides and the included angle: there is only one triangle. Then try SSA to show why the angle must be between the sides."]],
+  "geo-5-5": [["congruence", "Example 1", {"k": "SSS"}, "Three fixed sides only make one triangle. Have a student try to drag it into a different one."]],
+  "geo-5-6": [["congruence", "Example 1", {"k": "ASA"}, "Show ASA, then AAS (the third angle is forced), then SSA as the one that fails."]],
+  "geo-6-1": [["construct", "Example 1", {"c": "perp"}, "Step through constructing a perpendicular bisector: every point on it is the same distance from both endpoints."]],
+  "geo-6-5": [["triIneq", "Example 3", {}, "Shrink one side until the triangle can’t close: the two shorter sides must add to more than the longest."]],
+  "geo-7-1": [["polygon", "Example 1", {}, "Slide n from 3 up: the triangles from one vertex give (n − 2) · 180°. Then switch to exterior angles: always 360°."]],
+  "geo-8-2": [["similar", "Example 1", {}, "Two equal angles force the third, so the triangles are similar (AA). Change k and watch the side ratios."]],
+  "geo-9-1": [["pythag", "Example 1", {}, "Drag the legs: the areas of the two smaller squares add to the big square. Try a 3-4-5 and a 5-12-13."]],
+  "geo-9-4": [["rightTrig", "Example 1", {}, "Change the angle and read opposite/adjacent: the ratio stays the same no matter how big the triangle is."]],
+  "geo-9-5": [["rightTrig", "Example 1", {}, "Show sine and cosine as ratios. Then check that sin of one acute angle equals cos of the other."]],
+  "geo-9-6": [["nspire", "Example 1", {"skill": "invtrig"}, "Walk through tan⁻¹ on the TI-Nspire (degree mode) before students find angles on their own."]],
+  "geo-9-7": [["ambiguous", "Example 4", {}, "If you use the Law of Sines with two sides and a non-included angle, show how it can give 0, 1, or 2 triangles."]],
+  "geo-11-1": [["sector", "Example 3", {}, "Arc length is the fraction of the circle (θ/360) times the circumference. Change θ and r."]],
+  "geo-11-2": [["sector", "Example 3", {}, "Sector area is the same fraction (θ/360) of the whole area. Compare it with the arc length."]],
+  "geo-12-2": [["solids", "Example 1", {"solid": "prism"}, "Unfold the net: the surface area is the area of every face added up."]],
+  "geo-12-3": [["solids", "Example 1", {"solid": "pyramid"}, "Unfold the pyramid’s net to find the slant height, then switch to the cone."]],
+  "geo-12-4": [["solids", "Example 1", {"solid": "cylinder"}, "Volume = base area × height. Change r and h and watch the volume."]],
+  "geo-12-5": [["solids", "Example 1", {"solid": "cone"}, "Compare the cone with a cylinder of the same base and height: one-third the volume."]],
+  "precalc-1-1": [["sector", "Example 4", {}, "Switch to radians: arc length is s = rθ. One radian makes an arc as long as the radius."]],
+  "precalc-1-7": [["invTrig", "Example 1", {}, "Show sin⁻¹ only uses −90° to 90°, so each input has one answer. Then try cos⁻¹ (0° to 180°)."]],
+  "precalc-1-8": [["rightTrig", "Example 1", {}, "Use it to set up the triangle before solving it."]],
+  "precalc-2-3b": [["invTrig", "Example 1", {}, "The calculator only gives the answer from the bold piece. Use the graph to find the second solution in [0, 2π)."]],
+  "precalc-2-4": [["sumDiff", "Example 1", {}, "Click 75° = 45° + 30° and read the formula with exact values. Point out sin(A + B) ≠ sin A + sin B."]],
+  "precalc-3-1": [["ambiguous", "Example 3", {}, "Slide side a: no triangle, one right triangle, two triangles, then one triangle."]],
+  "precalc-3-3": [["vectors", "Example 1", {"mode": "sum"}, "Drag u and v: read the components, magnitude, and direction, then add them tip to tail."]],
+  "precalc-3-4": [["vectors", "Example 1", {"mode": "dot"}, "Drag v around u: the dot product is 0 exactly when they are perpendicular."]],
+  "precalc-4-3": [["complex", "Example 1", {"mode": "mult"}, "Drag z around the complex plane. Its absolute value is its distance from 0."]],
+  "precalc-4-4": [["complex", "Example 4", {"mode": "mult"}, "Multiplying multiplies the lengths and adds the angles. Drag w and watch zw."]],
+  "precalc-4-5": [["complex", "Example 1", {"mode": "power"}, "Powers: the length is raised to n and the angle is multiplied by n. Then switch to nth roots: evenly spaced on a circle."]],
+  "precalc-5-1": [["exponential", "Example 1", {}, "Change b: bigger than 1 grows, between 0 and 1 decays. The asymptote is y = 0."]],
+  "precalc-5-2": [["logs", "Example 4", {}, "The log graph is the exponential reflected over y = x. Drag the exponent and read both forms."]],
+  "precalc-5-5": [["exponential", "Example 1", {}, "Use it to compare growth and decay models before the word problems."]],
+  "precalc-6-2": [["conics", "Example 1", {"tilt": "55"}, "The plane parallel to the side of the cone makes a parabola. Point out the focus and directrix on the graph."]],
+  "precalc-6-3": [["conics", "Example 1", {"tilt": "30"}, "Tilt the plane a little: an ellipse. Change a and b and watch the foci (c² = a² − b²)."]],
+  "precalc-6-4": [["conics", "Example 1", {"tilt": "75"}, "Tilt the plane steeper than the cone’s side: a hyperbola. Note c² = a² + b² and the asymptotes."]],
+  "precalc-6-6": [["parametric", "Example 1", {"c": "line"}, "Press ▶ Play to show the direction of motion as t increases, then eliminate the parameter."], ["parametric", "Example 5", {"c": "proj"}, "Change the speed and angle; read the maximum height and where it lands."]],
+  "precalc-6-7": [["polar", "Example 1", {}, "Use it to connect (r, θ) to points on the graph before converting."]],
+  "precalc-6-8": [["polar", "Example 1", {}, "Change a, b, and n: limaçons, roses, and circles. Ask how many petals before you slide n."]],
+  "precalc-p-5": [["funcTest", "Example 1", {}, "Use the mapping diagrams: one input with two arrows means it is not a function."]],
+  "precalc-p-6": [["funcTest", "Example 1", {}, "Drag the vertical line across each graph. x = y² and the circle fail."]],
+  "alg2-4-1": [["polynomial", "Example 3", {}, "Change the leading coefficient and the degree: even degree ends point the same way, odd degree opposite ways."]],
+  "alg2-4-8": [["polynomial", "Example 1", {}, "Change a zero’s multiplicity: odd crosses, even bounces."]],
+  "alg2-7-2": [["rational", "Example 1", {}, "Move the vertical asymptote and the zero. Then turn on the hole: a factor that cancels leaves a gap, not an asymptote."]],
+  "alg2-2-3": [["conics", "Example 1", {"tilt": "55"}, "Show where a parabola comes from (slicing a cone), then focus on the focus and directrix."]],
+  "alg2-6-1": [["exponential", "Example 1", {}, "Change b: growth when b > 1, decay when 0 < b < 1."]],
+  "alg2-6-3": [["logs", "Example 1", {}, "Read the exponential and log forms together: the log is the exponent."]],
+  "alg2-9-1": [["normal", "Example 1", {}, "Turn on 68–95–99.7, then set bounds and read the shaded area. Show normCdf for the same answer."]],
+  "alg2-1-8": [["inequalities", "Example 1", {}, "Add inequalities one at a time; the solution is where all the shadings overlap."]],
+  "alg1-1-4": [["balance", "Example 1", {}, "Solve the balance equation together: whatever you do to one side, do to the other."]],
+  "alg1-1-7": [["balance", "Example 1", {}, "Take x boxes off both sides first, then the 1s, then divide into equal groups."]],
+  "alg1-3-1": [["funcTest", "Example 1", {}, "Mapping diagrams first, then the vertical line test on the graphs."]],
+  "alg1-3-6": [["slope", "Example 1", {}, "Drag the two points and read rise over run."]],
+  "alg1-4-1": [["slope", "Example 1", {}, "Drag the points; the equation in slope-intercept form updates."]],
+  "alg1-4-4": [["slope", "Example 1", {}, "Show parallel lines (same slope) and perpendicular lines (opposite reciprocals)."]],
+  "alg1-5-6": [["inequalities", "Example 1", {}, "Drag the line and flip the inequality sign: which side gets shaded, and is the line dashed or solid?"]],
+  "alg1-6-4": [["exponential", "Example 1", {}, "Compare the exponential with a line: which one grows faster in the long run?"]],
+  "alg1-6-5": [["exponential", "Example 7", {"mode": "money"}, "Change how often interest compounds and compare the totals."]],
+  "alg1-7-2": [["algTiles", "Example 3", {"mode": "mult"}, "Build (x + p)(x + q) with tiles: x², the x strips, and the unit squares are the four parts of FOIL."]],
+  "alg1-7-5": [["algTiles", "Example 1", {"mode": "fact"}, "Change b and c: the tiles make a rectangle only when two numbers multiply to c and add to b."]],
+  "alg1-8-1": [["meanMedian", "Example 3", {}, "Add an outlier at 20: the mean jumps, the median barely moves."]],
+  "alg1-8-3": [["boxPlot", "Example 1", {}, "Drag the dots and watch the five-number summary and the box move. Drag one far out to make an outlier."]],
+  "alg1-9-1": [["probability", "Example 1", {}, "Run a few trials, then many: the experimental probability gets close to the theoretical one."], ["dartProb", "Example 4", {}, "Throw darts: the fraction that land in the region gets close to its area divided by the total area."]],
+  "alg1-9-6": [["nspire", "Example 1", {"skill": "ncr"}, "Show nCr on the TI-Nspire before students check their counts."]],
+  "precalc-1-5": [["sinModel", "Example 5", {}, "Pick a real data set (Ferris wheel, tides, temperature) and fit a, b, c, d to it, the same way Example 5 builds an equation from a maximum, minimum, and period."]] };
+Object.entries(LP_DEMOS_MORE).forEach(([k, v]) => { LP_DEMOS[k] = [...(LP_DEMOS[k] || []), ...v]; });
+// the lessons an interactive goes with, in course order
+function ixLessons(id) {
+  const order = ['geometry', 'algebra1', 'algebra2', 'precalc', 'calc3', 'apcalc'], num = (t) => { const m = /^(\d+|P)\.(\d+)/.exec(t || ''); return m ? (m[1] === 'P' ? 0 : +m[1]) * 100 + +m[2] : 1e4; };
+  return Object.entries(LP_DEMOS).filter(([k, L]) => L.some((d) => d[0] === id) && lpSet(k)).map(([k]) => ({ k, subject: lpSet(k).subject, title: lpSet(k).title }))
+    .sort((a, b) => order.indexOf(a.subject) - order.indexOf(b.subject) || num(a.title) - num(b.title));
+}
+const ixGoesWith = (id, subj) => { const L = ixLessons(id).filter((x) => !subj || x.subject === subj); return L.length ? el('div', { class: 'small', style: 'margin:2px 0 0;color:var(--muted,#6b6b6b)' }, el('b', {}, 'Goes with: '), L.map((x) => (subj ? '' : (IX_SUBJ_NAMES[x.subject] || x.subject) + ' ') + x.title).join('; ')) : ''; };
 // The interactives of a plan: [[id, the TV screen it comes right before, settings, note for the teacher], …].
 // Your edited plan's list wins (on your computers), then the list your Sheet gives students (STU_DEMOS), then the built-in one.
 let STU_DEMOS = null, stuDemosP = null;
@@ -44652,6 +44732,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-26', text: 'Every interactive now comes paired with the lesson(s) it fits. On the Interactives page, each one shows a “Goes with” line (for example, Algebra tiles goes with 7.2 and 7.5 in Algebra 1), and those lesson plans now include it on the TV right before the example it fits, with a note on how to use it. If you already edited a plan’s interactives, your list is kept.' },
   { date: '2026-11-26', text: '20 more interactives on the Interactives page. Geometry: the Pythagorean theorem (squares on the sides), the triangle inequality, polygon angle sums, arc length and sector area, compass-and-straightedge constructions, and geometric probability (darts). Pre-Calculus: sum and difference formulas, inverse trig ranges, complex numbers and De Moivre’s theorem, parametric equations (with a projectile), and conic sections from slicing a cone; the trig graphs one now also shows tan as the reciprocal of cot. Algebra: algebra tiles for multiplying and factoring, balance-scale equations, functions and the vertical line test, polynomial end behavior and multiplicity, logarithms, and rational functions with holes and asymptotes. ACT: mean vs. median with outliers, box plots with the 1.5 × IQR rule, and the normal curve with normCdf on the TI-Nspire.' },
   { date: '2026-11-26', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Year at a glance: the pacing check loads much faster (it shows the last saved copy right away), and each period’s place is now the furthest section it’s had in the last two weeks, so a review assignment doesn’t make it look behind.' },
   { date: '2026-11-26', subjects: ['geometry', 'algebra1', 'algebra2', 'precalc'], text: 'Year at a glance: the pacing check now goes by what most of a period’s assignments are, so an assignment posted to the wrong class no longer puts that period under the other course.' },
@@ -44797,7 +44878,7 @@ function helpScreen(open) {
       P(B('📍 Pacing check'), ' (at the top) says which unit the guide has for today and, for each period, how far along it is: the furthest section it’s had in the two weeks before its newest assignment, so a review of older sections doesn’t make it look behind. A period counts as a course when most of its assignments are, so one posted to the wrong class is ignored. It shows the last saved copy right away and then checks your Sheet for anything newer. It says whether each period is on pace, behind, or ahead (in school days), counting Monday–Friday, so holidays make a period look a little behind.'),
       P('In Build an assignment, a ', B('★'), ' after a standard means it’s a priority standard in the Year at a Glance.')]],
     ['ix', `${hasLessons ? 9 : 8}. Interactives`, [
-      P('The ', B('Interactives'), ' tab opens a page of hands-on demos in a new tab, ready to put on the TV, grouped by subject (your subjects first): ', B('Geometry'), ' (congruence shortcuts, dilations and similar triangles, SOH CAH TOA, volume and surface area, parallel lines and a transversal, circle angles, triangle centers, transformations, the Pythagorean theorem, the triangle inequality, polygon angles, arc length and sectors, compass constructions, geometric probability), ', B('Pre-Calculus'), ' (unit circle, trig graphs with reciprocals, sum and difference formulas, inverse trig, the ambiguous case, polar graphs, vectors, complex numbers and De Moivre, parametric equations, conic sections, sine-curve modeling), ', B('Algebra I and II'), ' (algebra tiles, balance-scale equations, functions and the vertical line test, slope and lines, exponential growth, logarithms, polynomials, rational functions, inequalities and linear programming, systems, quadratics, transformations, inverses), and ', B('ACT and calculators'), ' (mean and median, box plots, the normal curve, a probability simulator, and a TI-Nspire key-press walkthrough). Drag the points and sliders right on the touchscreen.'),
+      P('The ', B('Interactives'), ' tab opens a page of hands-on demos in a new tab, ready to put on the TV, grouped by subject (your subjects first): ', B('Geometry'), ' (congruence shortcuts, dilations and similar triangles, SOH CAH TOA, volume and surface area, parallel lines and a transversal, circle angles, triangle centers, transformations, the Pythagorean theorem, the triangle inequality, polygon angles, arc length and sectors, compass constructions, geometric probability), ', B('Pre-Calculus'), ' (unit circle, trig graphs with reciprocals, sum and difference formulas, inverse trig, the ambiguous case, polar graphs, vectors, complex numbers and De Moivre, parametric equations, conic sections, sine-curve modeling), ', B('Algebra I and II'), ' (algebra tiles, balance-scale equations, functions and the vertical line test, slope and lines, exponential growth, logarithms, polynomials, rational functions, inequalities and linear programming, systems, quadratics, transformations, inverses), and ', B('ACT and calculators'), ' (mean and median, box plots, the normal curve, a probability simulator, and a TI-Nspire key-press walkthrough). Drag the points and sliders right on the touchscreen. Under each one, a ', B('Goes with'), ' line names the lessons it fits; those lesson plans already include it on the TV, right before the example it goes with.'),
       P('Each interactive opens on its own page. To let students explore one on their Chromebooks, copy that page’s address from the browser’s address bar and post it in Google Classroom. Nothing is graded. In a lesson plan, the interactives it uses have a ', B('🔗 Copy student link'), ' button right beside them. You can add interactives to any lesson plan (see Lesson plans above).')]],
     ['roster', `${hasLessons ? 10 : 9}. Classes & roster (instead of opening the Google Sheet)`, [
       OL(['The first time: match each Google Classroom class to its period, click ', B('Save periods'), ', then ', B('Refresh roster from Classroom'), '. Yellow boxes are guesses; check them.'],
