@@ -41450,7 +41450,11 @@ function ixDrag(cv, pick, move, end) {
 }
 // a coordinate view: X, Y map math -> canvas; ix, iy map back
 function ixView(cv, xr, yr, pad = 26) {
-  const W = cv._w, H = cv._h, sx = (W - 2 * pad) / (xr[1] - xr[0]), sy = (H - 2 * pad) / (yr[1] - yr[0]);
+  const W = cv._w, H = cv._h; let sx = (W - 2 * pad) / (xr[1] - xr[0]), sy = (H - 2 * pad) / (yr[1] - yr[0]);
+  // when the x and y units are nearly the same size, make them exactly the same, so squares look square and circles round
+  // (widen the shorter range; nothing that fit gets cut off)
+  if (sy / sx > 0.8 && sy / sx < 1.25) { const s = Math.min(sx, sy), cx = (xr[0] + xr[1]) / 2, cy = (yr[0] + yr[1]) / 2, hx = (W - 2 * pad) / s / 2, hy = (H - 2 * pad) / s / 2;
+    xr = [cx - hx, cx + hx]; yr = [cy - hy, cy + hy]; sx = sy = s; }
   return { xr, yr, sx, sy, pad, X: (x) => pad + (x - xr[0]) * sx, Y: (y) => H - pad - (y - yr[0]) * sy, ix: (px) => xr[0] + (px - pad) / sx, iy: (py) => yr[0] + (H - pad - py) / sy };
 }
 // a grid with axes and number labels (piX: the x-axis counts in π, with a tick every piX·π)
@@ -43023,6 +43027,7 @@ function lpPrintBtn(key, x, attrs, label) {
    subjects (optional) limits a note to teachers who have one of those subjects. Notes a teacher hasn't seen are
    shown on their Teacher tools home page until they click "Got it" (remembered on that computer). */
 const WHATS_NEW = [
+  { date: '2026-11-28', text: 'Interactives: graphs where the x and y units should match (like Classifying quadrilaterals in Geometry 7.4, circles, the unit circle, and inverse functions) were slightly stretched in one direction. They now use exactly the same scale both ways, so squares look square and circles look round.' },
   { date: '2026-11-27', text: 'The Interactives page has a search box and subject buttons. Type a topic, a word, or a lesson number (like 9.1 or “chain rule”) and the list narrows as you type; it remembers your search when you come back from an interactive. Also: the site loads a little faster, because the interactives now download only when one is opened.' },
   { date: '2026-11-26', subjects: ['apcalc'], text: 'Volumes with known cross sections now has 5 bases (under √x, under 1 − x², a disk, between y = 2x and y = x², and a triangle) and 7 cross-section shapes (squares, semicircles, equilateral triangles, isosceles right triangles with a leg or the hypotenuse on the base, rectangles of height 2, and rectangles half as tall as wide), with the exact volume when it’s a simple fraction.' },
   { date: '2026-11-26', subjects: ['apcalc'], text: '7 more AP Calculus interactives, each paired with its lesson: the Chain Rule as linked rates (3.1), implicit differentiation with a tangent line you drag around the curve (3.2), derivatives of inverse functions (3.3), antiderivatives as a family of curves with an initial value (5.6), growth, decay, and Newton’s Law of Cooling (7.2), improper integrals (6.12), and the comparison tests for series (10.4, 10.7).' },
